@@ -4,7 +4,6 @@ import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
 import {
   buildOpnameLines,
   nextOpnameCode,
-  reasonLabel,
   type OpnameLine,
 } from "@/lib/stock-opname";
 
@@ -324,111 +323,53 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ status: "ditolak" });
   }
 
-  // ── Setujui: stok sistem disesuaikan ke angka fisik (hanya baris berselisih) ──
+  // ── Setujui: penyesuaian dihitung sebagai DELTA dari snapshot, atomik di database ──
+  // "system_stock" = snapshot saat sesi dimulai. Kalau ada transaksi selama proses hitung,
+  // stok terkini sudah beda — jadi stok baru = stok terkini + (fisik − snapshot), bukan
+  // di-set langsung ke angka fisik. Semua baris diproses dalam SATU transaksi RPC:
+  // satu baris gagal/negatif → seluruh approve dibatalkan (tidak ada stok setengah berubah).
   if (action === "approve") {
     if (session.status !== "menunggu") {
       return NextResponse.json({ error: "Sesi ini belum diajukan." }, { status: 400 });
     }
-    const { data: lines } = await admin
-      .from("stock_opname_lines")
-      .select("id, product_id, product_name, color, size, counted_stock, reason, reason_note, is_derived")
-      .eq("session_id", id);
 
-    const countable = (lines || []).filter(
-      (l: any) => !l.is_derived && l.counted_stock !== null,
-    );
-    const productIds = Array.from(new Set(countable.map((l: any) => l.product_id)));
-    const { data: live } = productIds.length
-      ? await admin
-          .from("product_variants")
-          .select("product_id, color, size, stock")
-          .in("product_id", productIds)
-      : { data: [] as any[] };
-    const liveMap = new Map<string, number>();
-    for (const v of live || []) {
-      liveMap.set(`${v.product_id}|${String(v.color || "default").toLowerCase()}|${v.size}`, Number(v.stock) || 0);
-    }
+    const { data, error } = await admin.rpc("samaqu_apply_stock_opname", {
+      p_session_id: id,
+      p_actor_id: actor.id,
+      p_actor_name: actor.name || "",
+    });
 
-    let adjusted = 0;
-    let skipped = 0;
-    const movements: Record<string, unknown>[] = [];
-    const appliedIds: string[] = [];
-
-    for (const line of countable) {
-      const key = `${line.product_id}|${String(line.color || "default").toLowerCase()}|${line.size}`;
-      if (!liveMap.has(key)) {
-        skipped += 1;
-        continue;
-      }
-      const current = liveMap.get(key) as number;
-      const target = Math.max(0, Number(line.counted_stock));
-      const delta = target - current;
-      if (delta === 0) {
-        appliedIds.push(line.id);
-        continue;
-      }
-
-      const { error: updateError } = await admin
-        .from("product_variants")
-        .update({ stock: target })
-        .eq("product_id", line.product_id)
-        .eq("color", line.color)
-        .eq("size", line.size);
-      if (updateError) {
-        console.error("[OPNAME] update stock:", line.product_id, line.size, updateError.message);
-        skipped += 1;
-        continue;
-      }
-
-      movements.push({
-        product_id: line.product_id,
-        color: String(line.color || "default"),
-        size: line.size,
-        qty: Math.abs(delta),
-        direction: delta > 0 ? "in" : "out",
-        source: "opname",
-        ref_type: "stock_opname",
-        ref_id: session.id,
-        before_stock: current,
-        after_stock: target,
-        actor_name: actor.name || null,
-        notes: `${session.code} · ${line.product_name || line.product_id} · ${reasonLabel(line.reason)}${
-          line.reason_note ? ` (${line.reason_note})` : ""
-        }`,
-      });
-      appliedIds.push(line.id);
-      adjusted += 1;
-    }
-
-    if (movements.length > 0) {
-      const { error: moveError } = await admin.from("stock_movements").insert(movements);
-      if (moveError) {
-        console.error("[OPNAME] insert movements:", moveError.message);
+    if (error) {
+      const message = String(error.message || "");
+      // Baris yang bakal negatif: rinciannya ikut di pesan supaya admin tahu baris mana.
+      const marker = "STOK_NEGATIF:";
+      const at = message.indexOf(marker);
+      if (at >= 0) {
+        let rows: unknown[] = [];
+        try {
+          rows = JSON.parse(message.slice(at + marker.length));
+        } catch {
+          rows = [];
+        }
         return NextResponse.json(
-          { error: "Stok sudah diubah tapi riwayat gagal dicatat. Hubungi developer." },
-          { status: 500 },
+          {
+            error: "Approve ditahan: ada baris yang stok akhirnya jadi negatif.",
+            rows,
+          },
+          { status: 400 },
         );
       }
+      console.error("[OPNAME] approve gagal:", message);
+      return NextResponse.json({ error: `Gagal menyetujui sesi: ${message}` }, { status: 400 });
     }
 
-    if (appliedIds.length > 0) {
-      await admin.from("stock_opname_lines").update({ applied: true }).in("id", appliedIds);
-    }
-
-    const { error: doneError } = await admin
-      .from("stock_opname_sessions")
-      .update({
-        status: "disetujui",
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: actor.id,
-        reviewed_by_name: actor.name,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-    if (doneError) return NextResponse.json({ error: "Gagal menyetujui sesi" }, { status: 500 });
-
-    console.log("[OPNAME] disetujui:", session.code, "baris disesuaikan:", adjusted, "dilewati:", skipped);
-    return NextResponse.json({ status: "disetujui", adjusted, skipped });
+    const result = (data || {}) as { adjusted?: number; skipped?: number; movements?: number };
+    console.log("[OPNAME] disetujui:", session.code, "baris disesuaikan:", result.adjusted || 0);
+    return NextResponse.json({
+      status: "disetujui",
+      adjusted: result.adjusted || 0,
+      skipped: result.skipped || 0,
+    });
   }
 
   return NextResponse.json({ error: "Aksi tidak dikenal" }, { status: 400 });

@@ -56,6 +56,17 @@ type Session = {
 
 type LiveRow = { product_id: string; color: string; size: string; stock: number };
 
+/** Baris yang ditahan saat approve karena stok akhirnya bakal negatif. */
+type BlockedRow = {
+  product_name?: string;
+  color?: string;
+  size?: string;
+  system_stock?: number;
+  counted_stock?: number;
+  current_stock?: number;
+  final_stock?: number;
+};
+
 /** Latar sel ala spreadsheet: lembut, garis grid tetap terlihat. */
 const CELL_BG: Record<string, string> = {
   belum: "bg-white",
@@ -124,6 +135,8 @@ export default function StokOpnameDetail({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  /** Baris yang membuat approve ditahan (stok akhirnya bakal negatif). */
+  const [blockedRows, setBlockedRows] = useState<BlockedRow[]>([]);
   /** Fokus antar sel ala spreadsheet (Enter / panah bawah / panah atas). */
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -262,6 +275,44 @@ export default function StokOpnameDetail({
     return count;
   }, [lines, live]);
 
+  /**
+   * Baris yang stok terkini-nya sudah berbeda dari snapshot (ada transaksi selama proses
+   * hitung). Ditampilkan di layar approval beserta stok akhir setelah penyesuaian:
+   * akhir = terkini + (fisik − snapshot).
+   */
+  const movementRows = useMemo(() => {
+    if (session?.status !== "menunggu") return [];
+    const map = new Map<string, number>();
+    for (const row of live) {
+      map.set(`${row.product_id}|${String(row.color || "default").toLowerCase()}|${row.size}`, Number(row.stock) || 0);
+    }
+    const out: {
+      key: string;
+      name: string;
+      color: string;
+      size: string;
+      snapshot: number;
+      current: number;
+      final: number;
+    }[] = [];
+    for (const line of lines) {
+      if (line.is_derived) continue;
+      if (line.counted_stock === null || line.counted_stock === undefined) continue;
+      const current = map.get(`${line.product_id}|${String(line.color).toLowerCase()}|${line.size}`);
+      if (current === undefined || current === Number(line.system_stock)) continue;
+      out.push({
+        key: line.id,
+        name: line.product_name,
+        color: line.color,
+        size: line.size,
+        snapshot: Number(line.system_stock),
+        current,
+        final: current + (Number(line.counted_stock) - Number(line.system_stock)),
+      });
+    }
+    return out;
+  }, [lines, live, session]);
+
   // ── Filter ───────────────────────────────────────────────────────────────
   const visibleRows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -354,7 +405,12 @@ export default function StokOpnameDetail({
       body: JSON.stringify({ id: sessionId, ...body }),
     });
     const json = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(json?.error || "Gagal menyimpan.");
+    if (!res.ok) {
+      // `rows` diisi server saat approve ditahan karena stok akhir bakal negatif.
+      const error = new Error(json?.error || "Gagal menyimpan.") as Error & { rows?: unknown[] };
+      error.rows = json?.rows;
+      throw error;
+    }
     return json;
   };
 
@@ -423,6 +479,7 @@ export default function StokOpnameDetail({
     if (busy) return;
     setBusy(true);
     setError("");
+    setBlockedRows([]);
     try {
       if (action === "reject") {
         if (!rejectReason.trim()) {
@@ -442,6 +499,8 @@ export default function StokOpnameDetail({
       }
       await load();
     } catch (e) {
+      const rows = (e as Error & { rows?: BlockedRow[] }).rows;
+      setBlockedRows(Array.isArray(rows) ? rows : []);
       setError(e instanceof Error ? e.message : "Gagal memproses keputusan.");
     } finally {
       setBusy(false);
@@ -522,6 +581,24 @@ export default function StokOpnameDetail({
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>
       ) : null}
+      {blockedRows.length > 0 ? (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+          <p className="text-sm font-bold">Approve ditahan — stok akhir akan negatif</p>
+          <p className="mt-0.5 text-[12px]">
+            Penyesuaian dihitung dari stok terkini (bukan angka fisik langsung). Perbaiki hitungan atau stok baris di
+            bawah, lalu ajukan & setujui lagi. Tidak ada stok yang berubah.
+          </p>
+          <ul className="mt-2 space-y-0.5">
+            {blockedRows.map((row, index) => (
+              <li key={index} className="text-[12px]">
+                <b>{row.product_name || "-"}</b> · {row.color || "default"} · {row.size || "-"}: sistem{" "}
+                {row.system_stock ?? "-"} · fisik {row.counted_stock ?? "-"} · kini {row.current_stock ?? "-"} ·
+                akhir <b className="text-red-700">{row.final_stock ?? "-"}</b>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {notice ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{notice}</div>
       ) : null}
@@ -544,6 +621,24 @@ export default function StokOpnameDetail({
             Ada {movementCount} ukuran yang stok sistemnya bergerak setelah sesi dimulai (transaksi baru). Penyesuaian
             tetap dihitung dari stok terbaru saat disetujui.
           </p>
+        ) : null}
+        {movementRows.length > 0 ? (
+          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
+            <p className="text-[11px] font-bold text-amber-800">Ada pergerakan stok sejak sesi dimulai</p>
+            <ul className="mt-1 space-y-0.5">
+              {movementRows.slice(0, 6).map((row) => (
+                <li key={row.key} className="text-[11px] text-amber-800">
+                  {row.name} · {displayColor(row.color, row.name)} · {row.size}: sistem {row.snapshot} → kini{" "}
+                  {row.current} → akhir <b>{row.final}</b>
+                </li>
+              ))}
+              {movementRows.length > 6 ? (
+                <li className="text-[11px] font-semibold text-amber-700">
+                  +{movementRows.length - 6} ukuran lain
+                </li>
+              ) : null}
+            </ul>
+          </div>
         ) : null}
         <div className="mt-1.5 flex flex-wrap gap-2.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
           <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Cocok</span>
