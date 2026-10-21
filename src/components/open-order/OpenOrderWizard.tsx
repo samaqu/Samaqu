@@ -638,13 +638,6 @@ export default function OpenOrderWizard({
             startInfoShort={formatOpenOrderMoment(startDateProp ?? settings.open_order_start_date, settings.open_order_start_time, true)}
             endInfo={formatOpenOrderMoment(endDateProp ?? settings.open_order_end_date, settings.open_order_end_time, true)}
             onRemind={() => showToast(phase === "ended" ? "Siap! Kami kabari periode berikutnya" : "Siap! Kami ingatkan saat Open Order dibuka")}
-            onLockedAction={() =>
-              showToast(
-                phase === "ended"
-                  ? "Open order sudah ditutup. Follow @samaqu biar nggak ketinggalan batch berikutnya!"
-                  : "Open Order belum dibuka",
-              )
-            }
             cartCount={lines.reduce((sum, line) => sum + line.quantity, 0)}
             onOpen={(product, color) => openDetail(product.id, color)}
             onViewCart={() => setStep(3)}

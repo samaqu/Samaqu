@@ -36,7 +36,6 @@ export default function StepCatalog({
   startInfoShort,
   endInfo,
   onRemind,
-  onLockedAction,
   cartCount,
   onOpen,
   onViewCart,
@@ -56,8 +55,6 @@ export default function StepCatalog({
   endInfo?: string;
   /** Callback tombol pengingat / kabari periode berikutnya. */
   onRemind?: () => void;
-  /** Callback saat tombol produk yang terkunci diklik (memunculkan toast). */
-  onLockedAction?: () => void;
   cartCount: number;
   onOpen: (product: OpenOrderProduct, color: string) => void;
   onViewCart: () => void;
@@ -227,7 +224,6 @@ export default function StepCatalog({
                 {locked ? (
                   <button
                     type="button"
-                    onClick={() => onLockedAction?.()}
                     className="mt-3 w-full cursor-not-allowed rounded-xl border border-black/15 bg-white py-2 text-[11px] font-semibold text-neutral-500 transition hover:border-black hover:text-neutral-900 md:mt-5 md:rounded-2xl md:py-3.5 md:text-sm"
                   >
                     Lihat Detail
