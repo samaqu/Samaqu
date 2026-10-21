@@ -23,6 +23,14 @@ export default function PanelAdminLayout({ children }: { children: ReactNode }) 
         href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
         rel="stylesheet"
       />
+      {/* Terapkan status sidebar SEBELUM cat pertama supaya tidak ada kedip (flash) saat
+          halaman dibuka dengan sidebar dalam keadaan terlipat. Nilainya dari localStorage. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html:
+            "try{if(localStorage.getItem('samaqu:panel-sidebar')==='collapsed'){document.documentElement.setAttribute('data-panel-sidebar','collapsed')}}catch(e){}",
+        }}
+      />
       <PanelShell>{children}</PanelShell>
     </>
   );

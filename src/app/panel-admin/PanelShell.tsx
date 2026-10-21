@@ -8,7 +8,7 @@
  *
  * Catatan: menu Transaksi/Produk/Leads belum dibangun (badge `SOON`), jadi sengaja non-link.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
@@ -24,6 +24,8 @@ const AVATAR =
 
 type PanelTheme = "berry" | "sunflower" | "tropical";
 const THEME_KEY = "samaqu:panel-theme";
+/** Status lipat sidebar (dipakai lagi saat halaman dibuka ulang / pindah halaman). */
+const SIDEBAR_KEY = "samaqu:panel-sidebar";
 const THEMES: { id: PanelTheme; label: string; hint: string }[] = [
   { id: "berry", label: "Berry", hint: "Tema default SAMAQU" },
   { id: "sunflower", label: "Bunga Matahari", hint: "Krem hangat + aksen emas" },
@@ -140,6 +142,12 @@ export default function PanelShell({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [theme, setTheme] = useState<PanelTheme>("berry");
   const [themeOpen, setThemeOpen] = useState(false);
+  /**
+   * Sidebar terlipat (mode ikon, desktop saja). Nilai asli dibaca dari atribut
+   * `data-panel-sidebar` yang dipasang script di layout SEBELUM render pertama, jadi
+   * tampilan tidak berkedip saat halaman dibuka dengan keadaan terlipat.
+   */
+  const [collapsed, setCollapsed] = useState(false);
 
   // Halaman Transaksi memakai halaman ops yang sama → butuh React Query + Toaster (keduanya di
   // OpsShell). Client dibuat per-instance supaya tidak dibagi antar-request saat SSR.
@@ -168,6 +176,57 @@ export default function PanelShell({ children }: { children: ReactNode }) {
       /* localStorage bisa diblokir — tetap pakai tema default */
     }
   }, []);
+
+  // Sinkronkan state dengan atribut yang sudah dipasang script layout (anti-kedip).
+  useEffect(() => {
+    const isCollapsed = document.documentElement.getAttribute("data-panel-sidebar") === "collapsed";
+    setCollapsed(isCollapsed);
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        document.documentElement.setAttribute("data-panel-sidebar", next ? "collapsed" : "open");
+      } catch {
+        /* abaikan */
+      }
+      try {
+        window.localStorage.setItem(SIDEBAR_KEY, next ? "collapsed" : "open");
+      } catch {
+        /* localStorage bisa diblokir — status tetap jalan untuk sesi ini */
+      }
+      return next;
+    });
+  }, []);
+
+  // Shortcut: "[" atau Ctrl/Cmd+B. Tidak aktif saat fokus di input/textarea/select/contenteditable
+  // supaya tidak bentrok dengan pengisian angka di Stok Opname atau navigasi Enter/Tab.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      const typing =
+        tag === "input" ||
+        tag === "textarea" ||
+        tag === "select" ||
+        Boolean(target?.isContentEditable);
+      if (typing) return;
+
+      const primary = event.ctrlKey || event.metaKey;
+      if (primary && !event.altKey && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        toggleSidebar();
+        return;
+      }
+      if (!primary && !event.altKey && event.key === "[") {
+        event.preventDefault();
+        toggleSidebar();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleSidebar]);
 
   function selectTheme(next: PanelTheme) {
     setTheme(next);
@@ -302,7 +361,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
       <aside className={styles.side}>
         <div className={styles.brand}>
           <div className={styles.logo}>S</div>
-          <div>
+          <div className={styles.brandText}>
             <b>SAMAQU</b>
             <small>Admin Operasional</small>
           </div>
@@ -326,6 +385,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
                   <Link
                     key={item.label}
                     href={item.href}
+                    title={item.label}
                     className={activeItem?.href === item.href ? styles.on : undefined}
                   >
                     <NavIcon name={item.icon} />
@@ -347,6 +407,27 @@ export default function PanelShell({ children }: { children: ReactNode }) {
 
       <main className={`${styles.main}${pathname.startsWith("/panel-admin/assistant") ? ` ${styles.mainFill}` : ""}`}>
         <div className={styles.top}>
+          <button
+            type="button"
+            className={styles.collapseBtn}
+            onClick={toggleSidebar}
+            title={collapsed ? "Buka menu" : "Tutup menu"}
+            aria-label={collapsed ? "Buka menu" : "Tutup menu"}
+            aria-pressed={collapsed}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`${styles.collapseIcon}${collapsed ? ` ${styles.collapseIconOn}` : ""}`}
+              aria-hidden="true"
+            >
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+          </button>
           <div className={styles.date}>
             <svg viewBox="0 0 24 24">
               <rect x="3" y="5" width="18" height="16" rx="2" />

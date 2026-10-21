@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { usePanelSidebarCollapsed } from "@/lib/use-panel-sidebar";
 import {
   OPNAME_REASONS,
   OPNAME_SIZES,
@@ -133,6 +134,8 @@ export default function StokOpnameDetail({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  /** Sidebar panel admin terlipat → ruang tabel lebih lega (kolom Produk & Fisik ikut lebar). */
+  const sidebarCollapsed = usePanelSidebarCollapsed();
   const [busy, setBusy] = useState(false);
 
   const [counts, setCounts] = useState<Record<string, string>>({});
@@ -759,7 +762,7 @@ export default function StokOpnameDetail({
             <thead>
               <tr>
                 <th
-                  className="sticky top-0 left-0 z-30 h-9 w-[28%] min-w-[190px] rounded-tl-lg border-b border-r border-white/25 bg-[#1e3a5f] px-2 text-left text-[10px] font-bold uppercase tracking-wide text-white"
+                  className={`sticky top-0 left-0 z-30 h-9 ${sidebarCollapsed ? "w-[34%] min-w-[230px]" : "w-[28%] min-w-[190px]"} rounded-tl-lg border-b border-r border-white/25 bg-[#1e3a5f] px-2 text-left text-[10px] font-bold uppercase tracking-wide text-white`}
                   title="Nama produk, varian, SKU, dan kategori/kain"
                 >
                   Produk
@@ -780,7 +783,7 @@ export default function StokOpnameDetail({
                   Sistem
                 </th>
                 <th
-                  className="sticky top-0 z-20 hidden h-9 w-[64px] border-b border-r border-white/25 bg-[#1e3a5f] px-1 text-center text-[10px] font-bold uppercase tracking-wide text-white xl:table-cell"
+                  className={`sticky top-0 z-20 hidden h-9 w-[64px] border-b border-r border-white/25 bg-[#1e3a5f] px-1 text-center text-[10px] font-bold uppercase tracking-wide text-white ${sidebarCollapsed ? "lg:table-cell" : "xl:table-cell"}`}
                   title="Jumlah hitungan fisik satu baris"
                 >
                   Fisik
@@ -908,7 +911,7 @@ export default function StokOpnameDetail({
                         {totals.sys}
                       </td>
                       <td
-                        className={`hidden h-[72px] border-b border-r border-gray-200/70 px-1 text-center align-middle text-[14px] font-semibold tabular-nums text-slate-700 dark:text-slate-200 xl:table-cell ${zebra}`}
+                        className={`hidden h-[72px] border-b border-r border-gray-200/70 px-1 text-center align-middle text-[14px] font-semibold tabular-nums text-slate-700 dark:text-slate-200 ${sidebarCollapsed ? "lg:table-cell" : "xl:table-cell"} ${zebra}`}
                         title="Jumlah hitungan fisik"
                       >
                         {totals.fisik ?? "-"}
