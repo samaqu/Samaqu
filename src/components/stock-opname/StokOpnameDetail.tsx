@@ -744,38 +744,32 @@ export default function StokOpnameDetail({
         {/* Tanpa scroll internal: tinggi tabel penuh, yang scroll halaman utama (sticky header
             baru jalan kalau tidak ada parent ber-overflow). Di bawah lg boleh geser horizontal. */}
         <div className="overflow-x-auto lg:overflow-visible">
-          <table className="w-full min-w-[600px] table-fixed border-collapse text-[13px] lg:min-w-0">
+          <table className="w-full min-w-[640px] table-fixed border-collapse text-[13px] lg:min-w-0">
             <thead>
               <tr>
                 <th
-                  className="sticky top-0 left-0 z-30 h-8 w-[30%] rounded-tl-lg border-b border-r border-gray-300 bg-[#1e3a5f] px-2 text-left text-[10px] font-bold uppercase tracking-wide text-white"
-                  title="Nama produk dan SKU. Warna tampil di bawah nama."
+                  className="sticky top-0 left-0 z-30 h-8 w-[30%] min-w-[190px] rounded-tl-lg border-b border-r border-[#2d4a6f] bg-[#1e3a5f] px-2 text-left text-[10px] font-bold uppercase tracking-wide text-white"
+                  title="Nama produk, SKU, dan info kategori/kain/series"
                 >
                   Produk
-                </th>
-                <th
-                  className="sticky top-0 z-20 hidden h-8 w-[18%] border-b border-r border-gray-300 bg-[#1e3a5f] px-2 text-left text-[10px] font-bold uppercase tracking-wide text-white lg:table-cell"
-                  title="Kategori · jenis kain · series"
-                >
-                  Info
                 </th>
                 {visibleSizes.map((size) => (
                   <th
                     key={size}
-                    className="sticky top-0 z-20 h-8 w-[40px] border-b border-r border-gray-300 bg-[#1e3a5f] px-0.5 text-center text-[10px] font-bold uppercase tracking-wide text-white"
-                    title="Angka kecil kiri atas = stok di sistem. Isi hitungan di sel."
+                    className="sticky top-0 z-20 h-8 w-[58px] border-b border-r border-[#2d4a6f] bg-[#1e3a5f] px-0.5 text-center text-[10px] font-bold uppercase tracking-wide text-white lg:w-[68px]"
+                    title="Angka abu-abu = stok di sistem. Kotak = hitungan di rak."
                   >
                     {size}
                   </th>
                 ))}
                 <th
-                  className="sticky top-0 z-20 h-8 w-[80px] border-b border-r border-gray-300 bg-[#1e3a5f] px-1 text-center text-[10px] font-bold uppercase tracking-wide text-white"
-                  title="Jumlah stok sistem / hitungan fisik / selisih"
+                  className="sticky top-0 z-20 h-8 w-[92px] border-b border-r border-[#2d4a6f] bg-[#1e3a5f] px-1 text-center text-[10px] font-bold uppercase tracking-wide text-white"
+                  title="Stok di sistem / hitungan fisik"
                 >
                   Total
                 </th>
                 <th
-                  className="sticky top-0 z-20 h-8 w-[120px] rounded-tr-lg border-b border-gray-300 bg-[#1e3a5f] px-1 text-left text-[10px] font-bold uppercase tracking-wide text-white"
+                  className="sticky top-0 z-20 h-8 w-[150px] rounded-tr-lg border-b border-[#2d4a6f] bg-[#1e3a5f] px-1 text-left text-[10px] font-bold uppercase tracking-wide text-white lg:w-[165px]"
                   title="Pilih penyebab kalau ada selisih"
                 >
                   Penyebab
@@ -795,40 +789,37 @@ export default function StokOpnameDetail({
                   const rowReason = rowDiffLines.length > 0 ? reasons[rowDiffLines[0].id] || "" : "";
                   const rowNote = rowDiffLines.length > 0 ? notes[rowDiffLines[0].id] || "" : "";
                   const totals = rowTotals(row);
-                  // Zebra tipis + latar sel produk harus sama supaya kolom sticky tidak "bolong".
                   const zebra = index % 2 === 0 ? "bg-white" : "bg-slate-50/80";
+                  const info = [row.category, row.jenis_kain, row.series].filter(Boolean).join(" · ");
                   return (
                     <tr key={row.key} className={row.is_derived ? "opacity-70" : undefined}>
                       <td
-                        className={`sticky left-0 z-10 h-8 border-b border-r border-gray-200 px-1.5 py-0 align-middle ${zebra}`}
-                        title={`${row.product_name}${row.sku ? " · " + row.sku : ""}${row.is_derived ? " · ikut stok " + row.base_product_name : ""}`}
+                        className={`sticky left-0 z-10 h-14 border-b border-r border-gray-200/70 px-2 py-1 align-middle ${zebra}`}
+                        title={info}
                       >
-                        <div className="flex h-8 min-w-0 flex-col justify-center leading-tight">
-                          <span className="truncate text-[12px] font-semibold text-gray-900 dark:text-white">
+                        <div className="flex h-full min-w-0 flex-col justify-center gap-0.5 leading-tight">
+                          <span className="truncate text-[14px] font-semibold text-gray-900 dark:text-white">
                             {row.product_name}
-                            <span className="font-normal text-slate-400"> · {displayColor(row.color, row.product_name)}</span>
+                            <span className="ml-1 text-[12px] font-normal text-slate-500 dark:text-slate-400">
+                              · {displayColor(row.color, row.product_name)}
+                            </span>
                           </span>
-                          <span className="truncate text-[10px] font-normal text-slate-400">
+                          <span className={`truncate text-[12px] ${row.is_derived ? "font-medium text-amber-700" : "text-slate-600 dark:text-slate-300"}`}>
                             {row.is_derived ? `ikut stok ${row.base_product_name}` : row.sku || "-"}
                           </span>
+                          <span className="truncate text-[12px] text-slate-600 dark:text-slate-300">{info || "-"}</span>
                         </div>
-                      </td>
-                      <td
-                        className={`hidden h-8 truncate border-b border-r border-gray-200 px-1.5 py-0 align-middle text-[10px] text-slate-500 lg:table-cell ${zebra}`}
-                        title={[row.category, row.jenis_kain, row.series].filter(Boolean).join(" · ")}
-                      >
-                        {[row.category, row.jenis_kain, row.series].filter(Boolean).join(" · ") || "-"}
                       </td>
                       {visibleSizes.map((size) => {
                         const line = row.cells[size];
                         if (!line) {
+                          // Ukuran ini memang tidak dipakai produk tersebut: sel abu-abu polos.
                           return (
                             <td
                               key={size}
-                              className={`h-8 border-b border-r border-gray-200 px-0 text-center text-[11px] text-slate-300 ${zebra}`}
-                            >
-                              –
-                            </td>
+                              className="h-14 border-b border-r border-gray-200/70 bg-slate-100/70 dark:bg-slate-800/40"
+                              title="Produk ini tidak punya ukuran ini"
+                            />
                           );
                         }
                         const state = lineStateOf(line);
@@ -837,74 +828,84 @@ export default function StokOpnameDetail({
                         return (
                           <td
                             key={size}
-                            className={`relative h-8 border-b border-r border-gray-200 p-0 align-middle ${CELL_BG[state] || "bg-white"}`}
+                            className={`relative h-14 border-b border-r border-gray-200/70 p-0 align-middle ${CELL_BG[state] || "bg-white"}`}
                           >
-                            <span
-                              className="pointer-events-none absolute left-[3px] top-[2px] z-10 text-[8px] leading-none text-slate-400"
-                              title="Stok di sistem"
-                            >
-                              {line.system_stock}
-                            </span>
+                            <div className="flex h-14 flex-col items-center justify-center gap-1">
+                              <span
+                                className="text-[12px] font-medium leading-none text-slate-600 dark:text-slate-300"
+                                title="Stok di sistem"
+                              >
+                                {line.system_stock}
+                              </span>
+                              <input
+                                ref={(el) => {
+                                  inputRefs.current[line.id] = el;
+                                }}
+                                type="number"
+                                inputMode="numeric"
+                                min={0}
+                                value={counts[line.id] ?? ""}
+                                onChange={(e) => setCounts((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                                onFocus={(e) => e.currentTarget.select()}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === "ArrowDown") {
+                                    e.preventDefault();
+                                    focusRelative(line, 1);
+                                  } else if (e.key === "ArrowUp") {
+                                    e.preventDefault();
+                                    focusRelative(line, -1);
+                                  }
+                                }}
+                                disabled={disabled}
+                                placeholder=""
+                                aria-label={`Hitungan di rak ${row.product_name} ${row.color} ${size}`}
+                                title={row.is_derived ? `Ikut stok ${row.base_product_name}` : "Hitungan di rak"}
+                                className="h-7 w-[52px] rounded-[3px] border border-gray-300 bg-white px-0 text-center text-[14px] font-semibold tabular-nums text-slate-900 outline-none focus:ring-2 focus:ring-blue-400 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                              />
+                            </div>
                             {diff !== null && diff !== 0 ? (
                               <span
-                                className={`pointer-events-none absolute bottom-[2px] right-[3px] z-10 text-[8px] font-bold leading-none ${diff < 0 ? "text-red-600" : "text-orange-600"}`}
+                                className={`pointer-events-none absolute bottom-[3px] right-[4px] text-[10px] font-bold leading-none ${diff < 0 ? "text-red-600" : "text-orange-600"}`}
                                 title="Selisih (fisik − sistem)"
                               >
                                 {diff > 0 ? `+${diff}` : diff}
                               </span>
                             ) : null}
-                            <input
-                              ref={(el) => {
-                                inputRefs.current[line.id] = el;
-                              }}
-                              type="number"
-                              inputMode="numeric"
-                              min={0}
-                              value={counts[line.id] ?? ""}
-                              onChange={(e) => setCounts((prev) => ({ ...prev, [line.id]: e.target.value }))}
-                              onFocus={(e) => e.currentTarget.select()}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === "ArrowDown") {
-                                  e.preventDefault();
-                                  focusRelative(line, 1);
-                                } else if (e.key === "ArrowUp") {
-                                  e.preventDefault();
-                                  focusRelative(line, -1);
-                                }
-                              }}
-                              disabled={disabled}
-                              placeholder="–"
-                              aria-label={`Hitungan di rak ${row.product_name} ${row.color} ${size}`}
-                              title={row.is_derived ? `Ikut stok ${row.base_product_name}` : "Hitungan di rak"}
-                              className={`h-8 w-full bg-transparent px-0 text-center text-[13px] font-semibold tabular-nums text-slate-900 outline-none placeholder:text-slate-300 focus:bg-blue-50 focus:ring-1 focus:ring-inset focus:ring-blue-400 disabled:cursor-not-allowed disabled:text-slate-400 dark:text-white dark:focus:bg-slate-800`}
-                            />
                           </td>
                         );
                       })}
                       <td
-                        className={`h-8 whitespace-nowrap border-b border-r border-gray-200 px-1 text-center align-middle text-[10px] tabular-nums ${zebra}`}
-                        title="Stok sistem / hitungan fisik / selisih"
+                        className={`h-14 whitespace-nowrap border-b border-r border-gray-200/70 px-1 text-center align-middle text-[14px] tabular-nums ${zebra}`}
+                        title={
+                          totals.diff === null
+                            ? "Belum dihitung"
+                            : `Selisih ${totals.diff > 0 ? "+" : ""}${totals.diff}`
+                        }
                       >
-                        <span className="text-slate-500">{totals.sys}</span>
-                        <span className="text-slate-300"> / </span>
-                        <span className="font-semibold text-slate-700 dark:text-slate-200">{totals.fisik ?? "–"}</span>
-                        {totals.diff !== null && totals.diff !== 0 ? (
-                          <>
-                            <span className="text-slate-300"> / </span>
-                            <span className={`font-bold ${totals.diff < 0 ? "text-red-600" : "text-orange-600"}`}>
-                              {totals.diff > 0 ? `+${totals.diff}` : totals.diff}
-                            </span>
-                          </>
-                        ) : null}
+                        <span className="text-slate-600 dark:text-slate-300">{totals.sys}</span>
+                        <span className="mx-1.5 text-slate-300">/</span>
+                        <span
+                          className={
+                            totals.fisik === null
+                              ? "text-slate-400"
+                              : totals.diff === 0
+                                ? "font-semibold text-emerald-700"
+                                : (totals.diff ?? 0) < 0
+                                  ? "font-semibold text-red-600"
+                                  : "font-semibold text-orange-600"
+                          }
+                        >
+                          {totals.fisik ?? "–"}
+                        </span>
                       </td>
-                      <td className={`h-8 border-b border-gray-200 px-1 py-0 align-middle ${zebra}`}>
+                      <td className={`h-14 border-b border-gray-200/70 px-1.5 py-1 align-middle ${zebra}`}>
                         {rowDiffLines.length > 0 ? (
-                          <div className="flex flex-col gap-0.5 py-0.5">
+                          <div className="flex flex-col gap-1 py-0.5">
                             <select
                               value={rowReason}
                               onChange={(e) => setRowReason(row, e.target.value)}
                               disabled={readOnly}
-                              className="h-6 w-full rounded border border-gray-200 bg-white px-1 text-[10px] font-semibold text-slate-700 outline-none focus:ring-1 focus:ring-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                              className="h-7 w-full rounded border border-gray-300 bg-white px-1 text-[11px] font-semibold text-slate-700 outline-none focus:ring-1 focus:ring-blue-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
                               title="Pilih penyebab selisih"
                             >
                               <option value="">Penyebab…</option>
@@ -926,12 +927,12 @@ export default function StokOpnameDetail({
                                 }}
                                 disabled={readOnly}
                                 placeholder="Catatan"
-                                className="h-5 w-full rounded border border-gray-200 bg-white px-1 text-[10px] dark:border-slate-700 dark:bg-slate-900"
+                                className="h-6 w-full rounded border border-gray-300 bg-white px-1 text-[11px] dark:border-slate-600 dark:bg-slate-900"
                               />
                             ) : null}
                           </div>
                         ) : (
-                          <span className="block text-center text-[10px] text-slate-300">–</span>
+                          <span className="block text-center text-[12px] text-slate-400">–</span>
                         )}
                       </td>
                     </tr>
