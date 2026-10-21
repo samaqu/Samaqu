@@ -191,17 +191,20 @@ export default function StepCatalog({
                   </span>
                 )}
 
-                {/* Kunci — event belum dibuka / sudah berakhir.
-                    JANGAN pakai overlay gelap (`bg-black/25`): itu bikin foto produk keliatan
-                    butek — di katalog fotonya cerah. Cuma badge kecil di pojok atas, tanpa
-                    menurunkan terang fotonya. */}
+                {/* Kunci — event BELUM dibuka / sudah berakhir: foto digelapkan + pill
+                    "Segera dibuka" di tengahnya (biar jelas belum bisa dipesan).
+                    Event SUDAH dibuka → tidak ada overlay sama sekali, fotonya cerah
+                    persis seperti di halaman Katalog. */}
                 {locked && (
-                  <span
-                    title={lockMessage}
-                    className="absolute right-2.5 top-2.5 grid h-7 w-7 place-items-center rounded-full bg-white/90 text-neutral-900 backdrop-blur md:right-4 md:top-4"
-                  >
-                    <Lock size={13} strokeWidth={2.4} />
-                  </span>
+                  <div className="oo-lock-overlay absolute inset-0 flex items-center justify-center bg-black/25">
+                    <span
+                      title={lockMessage}
+                      className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-black shadow-md md:gap-2 md:px-4 md:py-2 md:text-sm"
+                    >
+                      <Lock size={12} strokeWidth={2.5} className="shrink-0 md:h-[14px] md:w-[14px]" />
+                      {phase === "ended" ? "Sudah ditutup" : "Segera dibuka"}
+                    </span>
+                  </div>
                 )}
               </div>
 
