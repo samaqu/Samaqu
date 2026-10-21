@@ -191,23 +191,17 @@ export default function StepCatalog({
                   </span>
                 )}
 
-                {/* Overlay kunci — event belum dibuka / sudah berakhir */}
+                {/* Kunci — event belum dibuka / sudah berakhir.
+                    JANGAN pakai overlay gelap (`bg-black/25`): itu bikin foto produk keliatan
+                    butek — di katalog fotonya cerah. Cuma badge kecil di pojok atas, tanpa
+                    menurunkan terang fotonya. */}
                 {locked && (
-                  <div className="oo-lock-overlay absolute inset-0 flex items-center justify-center bg-black/25">
-                    <span className="flex max-w-[92%] items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-black md:gap-2 md:px-4 md:py-2 md:text-sm">
-                      <Lock size={12} strokeWidth={2.5} className="shrink-0 md:h-[14px] md:w-[14px]" />
-                      {/* Teksnya dipendekkan di mobile — kartu cuma 2 kolom, jadi pill panjang
-                          nggak muat. */}
-                      {phase === "ended" ? (
-                        <>
-                          <span className="md:hidden">Sudah ditutup</span>
-                          <span className="hidden md:inline">{lockMessage}</span>
-                        </>
-                      ) : (
-                        lockMessage
-                      )}
-                    </span>
-                  </div>
+                  <span
+                    title={lockMessage}
+                    className="absolute right-2.5 top-2.5 grid h-7 w-7 place-items-center rounded-full bg-white/90 text-neutral-900 backdrop-blur md:right-4 md:top-4"
+                  >
+                    <Lock size={13} strokeWidth={2.4} />
+                  </span>
                 )}
               </div>
 
