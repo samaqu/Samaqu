@@ -134,8 +134,16 @@ export default function StepCatalog({
         </div>
       )}
 
-      {/* Produk */}
-      <section className="mt-12 flex flex-wrap justify-center gap-6 [&>article]:w-full [&>article]:sm:w-[340px]">
+      {/* Produk — MOBILE: grid 2x2 (ala marketplace). Desktop/tablet: kartu 340px yang
+          dibungkus flex-wrap dan dipusatkan, sesuai mockup. Kalau cuma satu produk, kartu
+          tetap dipusatkan (bukan nempel di kolom kiri). */}
+      <section
+        className={
+          shown.length === 1
+            ? "mt-12 flex flex-wrap justify-center gap-4 md:gap-6 [&>article]:w-full [&>article]:md:w-[340px]"
+            : "mt-12 grid grid-cols-2 gap-3 md:flex md:flex-wrap md:justify-center md:gap-6 [&>article]:w-full [&>article]:md:w-[340px]"
+        }
+      >
         {shown.map((product) => {
           const label = product.kain ? `Kain ${product.kain}` : product.category;
           const totalStock = product.totalStock;
@@ -157,7 +165,9 @@ export default function StepCatalog({
           return (
             <article
               key={product.id}
-              className="group oo-fade-up w-full max-w-[340px] cursor-pointer overflow-hidden rounded-3xl bg-white shadow-sm transition-shadow duration-500 hover:shadow-xl"
+              className={`group oo-fade-up w-full cursor-pointer overflow-hidden bg-white shadow-sm transition-shadow duration-500 hover:shadow-xl ${
+                shown.length === 1 ? "max-w-[340px] rounded-3xl" : "rounded-2xl md:rounded-3xl"
+              }`}
               style={{ animationDelay: ".2s" }}
               onClick={() => onOpen(product, initialColor)}
             >
@@ -177,12 +187,12 @@ export default function StepCatalog({
 
                 {/* Badge status stok */}
                 {!isSoldOut && (
-                  <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold backdrop-blur">
+                  <span className="absolute left-2.5 top-2.5 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold backdrop-blur md:left-4 md:top-4 md:px-3 md:py-1 md:text-xs">
                     {isLowStock ? `Menipis — sisa ${totalStock}` : "Ready stock"}
                   </span>
                 )}
                 {isSoldOut && (
-                  <span className="absolute left-4 top-4 rounded-full bg-neutral-950 px-3 py-1 text-xs font-semibold text-white">
+                  <span className="absolute left-2.5 top-2.5 rounded-full bg-neutral-950 px-2 py-0.5 text-[10px] font-semibold text-white md:left-4 md:top-4 md:px-3 md:py-1 md:text-xs">
                     Sold Out
                   </span>
                 )}
@@ -190,37 +200,46 @@ export default function StepCatalog({
                 {/* Overlay kunci — event belum dibuka / sudah berakhir */}
                 {locked && (
                   <div className="oo-lock-overlay absolute inset-0 flex items-center justify-center bg-black/25">
-                    <span className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-black">
-                      <Lock size={14} strokeWidth={2.5} />
-                      {lockMessage}
+                    <span className="flex max-w-[92%] items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-black md:gap-2 md:px-4 md:py-2 md:text-sm">
+                      <Lock size={12} strokeWidth={2.5} className="shrink-0 md:h-[14px] md:w-[14px]" />
+                      {/* Teksnya dipendekkan di mobile — kartu cuma 2 kolom, jadi pill panjang
+                          nggak muat. */}
+                      {phase === "ended" ? (
+                        <>
+                          <span className="md:hidden">Sudah ditutup</span>
+                          <span className="hidden md:inline">{lockMessage}</span>
+                        </>
+                      ) : (
+                        lockMessage
+                      )}
                     </span>
                   </div>
                 )}
               </div>
 
-              <div className="p-6">
-                <h3 className="text-xl font-bold">
+              <div className="p-3 md:p-6">
+                <h3 className="text-sm font-bold leading-snug md:text-xl">
                   <span className="hover:underline">{product.name}</span>
                 </h3>
-                <p className="mt-1 text-sm text-neutral-500">
+                <p className="mt-1 text-[11px] leading-snug text-neutral-500 md:text-sm">
                   {label}
                   {seriesCount > 1 ? ` · ${seriesCount} series tersedia` : ""}
                 </p>
 
-                <p className="mt-4 text-sm text-neutral-500">Mulai</p>
-                <p className="text-2xl font-extrabold">{rupiah(openOrderProductPrice(product))}</p>
+                <p className="mt-2 text-[11px] text-neutral-500 md:mt-4 md:text-sm">Mulai</p>
+                <p className="text-base font-extrabold md:text-2xl">{rupiah(openOrderProductPrice(product))}</p>
 
                 {locked ? (
                   <button
                     type="button"
                     onClick={() => onLockedAction?.()}
-                    className="mt-5 w-full cursor-not-allowed rounded-2xl border border-black/15 bg-white py-3.5 font-semibold text-neutral-400 transition hover:border-black hover:text-neutral-900"
+                    className="mt-3 w-full cursor-not-allowed rounded-xl border border-black/15 bg-white py-2 text-[11px] font-semibold text-neutral-400 transition hover:border-black hover:text-neutral-900 md:mt-5 md:rounded-2xl md:py-3.5 md:text-sm"
                   >
                     {phase === "ended" ? "Lihat Detail Produk" : "Belum Dibuka"}
                   </button>
                 ) : (
-                  <span className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-2xl bg-black py-3.5 font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg">
-                    Lihat Detail <ChevronRight size={15} strokeWidth={2} />
+                  <span className="mt-3 flex w-full items-center justify-center gap-1 rounded-xl bg-black py-2 text-[11px] font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg md:mt-5 md:gap-1.5 md:rounded-2xl md:py-3.5 md:text-sm">
+                    Lihat Detail <ChevronRight size={13} strokeWidth={2} className="md:h-[15px] md:w-[15px]" />
                   </span>
                 )}
               </div>
