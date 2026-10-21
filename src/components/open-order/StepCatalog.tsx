@@ -13,7 +13,7 @@
 import { useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { cloudinaryUrl } from "@/lib/cloudinary";
-import { openOrderImage } from "@/lib/open-order-catalog";
+import { openOrderProductImage } from "@/lib/open-order-catalog";
 import {
   lowestOpenOrderPrice,
   openOrderProductPrice,
@@ -100,9 +100,12 @@ export default function StepCatalog({
           const isSoldOut = totalStock === 0;
           const isLowStock = totalStock > 0 && totalStock <= LOW_STOCK_THRESHOLD;
           const seriesCount = product.series.length;
-          // Foto kartu = gambar utama produk; kalau kosong pakai foto varian pertama.
-          const mainImage =
-            product.image || openOrderImage(product, product.colors.find(Boolean) ?? "");
+          // Foto kartu = media bertipe GAMBAR (bukan video) dari varian; `product.image`
+          // sendiri bisa berupa .mp4 sehingga `<img>` gagal dan kartu tampak kosong.
+          const mainImage = openOrderProductImage(
+            product,
+            product.variants.find((variant) => variant.stock > 0)?.color ?? product.colors[0] ?? "",
+          );
           // Warna awal saat "Lihat Detail": yang masih ada stok, kalau semua habis warnanya pertama.
           const initialColor =
             product.variants.find((variant) => variant.stock > 0)?.color ??

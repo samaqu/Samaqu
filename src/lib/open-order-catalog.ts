@@ -36,3 +36,28 @@ export function openOrderGallery(product: OpenOrderProduct, color: string, serie
   if (media.length > 0) return media;
   return product.image ? [{ src: product.image, type: "image" }] : [];
 }
+
+/**
+ * Foto utama KARTU produk (bukan halaman detail).
+ *
+ * `product.image` bisa saja berupa video (media pertama sebuah baris katalog), dan `<img>` tidak
+ * bisa merendernya — dulu kartu Open Order jadi kosong untuk produk seperti Thobe Superblack.
+ * Jadi utamakan media bertipe `image` (dari varian warna terpilih, lalu varian lain), baru
+ * jatuh ke `product.image` kalau memang bukan video.
+ */
+export function openOrderProductImage(product: OpenOrderProduct, color?: string | null): string {
+  const wanted = String(color ?? "").trim();
+  const ordered = wanted
+    ? [...product.variants.filter((variant) => variant.color === wanted), ...product.variants]
+    : product.variants;
+
+  for (const variant of ordered) {
+    const image = variant.media.find((item) => item.type === "image");
+    if (image?.src) return image.src;
+  }
+
+  const fallback = product.image || "";
+  if (fallback && !/\.(mp4|m4v|webm)(\?|$)/i.test(fallback)) return fallback;
+  return "";
+}
+
