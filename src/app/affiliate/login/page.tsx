@@ -190,7 +190,8 @@ export default function AffiliateLoginPage() {
         <button
           type="submit"
           disabled={busy}
-          className="mt-2 h-12 w-full rounded-[10px] bg-[#1f6274] text-[14px] font-bold text-white transition-colors hover:bg-[#194f5e] disabled:opacity-60"
+          style={{ color: "#ffffff" }}
+          className="mt-2 h-12 w-full rounded-[10px] bg-[#1f6274] text-[14px] font-bold transition-colors hover:bg-[#194f5e] disabled:opacity-60"
         >
           {busy ? "Memproses…" : "Masuk"}
         </button>
