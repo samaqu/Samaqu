@@ -1,5 +1,6 @@
 import type { BioPageContent } from "@/lib/bio-page-content";
 import BioLinkEffects from "@/components/BioLinkEffects";
+import BioOpenOrderBanner, { type BioOpenOrderPhase } from "@/components/BioOpenOrderBanner";
 
 const ICON_PATHS: Record<string, string[]> = {
   ruler: [
@@ -106,7 +107,17 @@ function ArrowUpRight({ size = 16 }: { size?: number }) {
   );
 }
 
-export default function BioLinkPage({ content }: { content: BioPageContent }) {
+export default function BioLinkPage({
+  content,
+  openOrder,
+}: {
+  content: BioPageContent;
+  /**
+   * Jendela Open Order — dibaca dari server. Kalau `null`, tidak ada event yang sedang
+   * berjalan/p upcoming, jadi bar pengumuman nggak dirender sama sekali.
+   */
+  openOrder?: { phase: BioOpenOrderPhase; target: number; caption: string; href: string } | null;
+}) {
   const { logo_url, eyebrow, description, hero, categories, belanja, rows, guarantee, socials, footer, marquee } = content;
   const hasVideo = Boolean(hero.video_url?.trim());
   const videoPoster = videoPosterUrl(hero.video_url, hero.image_url);
@@ -138,6 +149,18 @@ export default function BioLinkPage({ content }: { content: BioPageContent }) {
             </p>
             <p className="mt-2 text-sm leading-snug text-black/65">{description}</p>
           </header>
+
+          {/* Pengumuman Open Order — hanya muncul kalau memang ada event (dibaca server). */}
+          {openOrder && (
+            <div className="rv mt-5">
+              <BioOpenOrderBanner
+                phase={openOrder.phase}
+                target={openOrder.target}
+                href={openOrder.href}
+                caption={openOrder.caption}
+              />
+            </div>
+          )}
 
           {/* Hero — Best seller */}
           <div id="bio-hero" className="rv relative mt-5">
@@ -461,12 +484,26 @@ export default function BioLinkPage({ content }: { content: BioPageContent }) {
         .bio-row:hover .bio-ic { background: #fff; color: #0B0B0B; }
         .bio-row:hover .bio-ar { transform: translate(3px,-3px); background: #fff; color: #0B0B0B; }
         .bio-ar { transition: transform .25s; }
+        /* ── Bar pengumuman Open Order (halaman bio) ──
+           Satu-satunya elemen "live" di halaman ini: titik amber berdenyut + angka detik
+           yang berdetak + satu sapuan shimmer lambat. Akson amber dipakai supaya bedanya
+           jelas dari hijau WhatsApp di CTA mengambang. */
+        .bio-oo { box-shadow: 0 22px 46px -24px rgba(0,0,0,.6); transition: transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s; }
+        .bio-oo:hover { transform: translateY(-3px); box-shadow: 0 30px 58px -22px rgba(0,0,0,.65); }
+        .bio-oo-dot { width: 10px; height: 10px; border-radius: 999px; background: #F5A524; animation: bio-oo-blink 1.8s ease-in-out infinite; }
+        @keyframes bio-oo-blink { 0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(245,165,36,.5); } 50% { opacity: .55; transform: scale(.82); box-shadow: 0 0 0 7px rgba(245,165,36,0); } }
+        .bio-oo-box { display: inline-block; min-width: 2.1ch; padding: 5px 6px; border-radius: 9px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.14); font-size: 12px; font-weight: 800; line-height: 1; text-align: center; font-variant-numeric: tabular-nums; }
+        .bio-oo-sweep { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 38%, rgba(245,165,36,.16) 50%, transparent 62%); transform: translateX(-100%); animation: bio-oo-sw 7s ease-in-out infinite; }
+        @keyframes bio-oo-sw { 0% { transform: translateX(-100%); } 55%, 100% { transform: translateX(100%); } }
+        .bio-oo-arrow { transition: transform .25s cubic-bezier(.2,.8,.2,1); }
+        .bio-oo:hover .bio-oo-arrow { transform: translate(2px, -2px); }
         .rv { opacity: 0; transform: translateY(28px) scale(.98); transition: opacity .8s cubic-bezier(.2,.8,.2,1), transform .8s cubic-bezier(.2,.8,.2,1); will-change: transform, opacity; }
         .rv.in { opacity: 1; transform: none; }
+        /* Bar pengumuman Open Order: masuk dengan reveal yang sama seperti section lain. */
         .tilt { transition: transform .3s; }
         .bio-mq { animation: bio-mq 24s linear infinite; }
         @keyframes bio-mq { to { transform: translateX(-50%); } }
-        @media (prefers-reduced-motion: reduce) { .bio-root *, .bio-mq { animation: none !important; transition: none !important; } .bio-up, .rv { opacity: 1; transform: none; } .bio-cta { transition: none; } }
+        @media (prefers-reduced-motion: reduce) { .bio-root *, .bio-mq, .bio-oo * { animation: none !important; transition: none !important; } .bio-up, .rv { opacity: 1; transform: none; } .bio-cta { transition: none; } .bio-oo-sweep { display: none; } }
       `}</style>
     </>
   );
