@@ -508,24 +508,33 @@ Page presentation (not obvious from the code):
   (satu modul dengan aturan jendela); tanggal di `store_settings` dianggap hari lokal toko
   (WIB = UTC+7), jadi batas akhirnya `16:59:59.999 UTC` hari yang sama dan batas mulainya
   `17:00:00 UTC` hari sebelumnya. Pecahan jam/menit/detik dari `splitCountdown()` (fungsi murni,
-  bisa diuji tanpa browser); bagian **hari** muncul hanya kalau sisa waktu > 24 jam. Gaya:
-  **kartu putih + aksen emas tipis** (konsisten dengan kartu katalog) — jangan pakai kartu
-  gelap/coklat, pemilik bilang jelek. Tiga aturan penting:
+  bisa diuji tanpa browser). Gaya: **kartu putih tanpa garis pinggir** (cuma bayangan halus) —
+  jangan pakai kartu gelap/coklat (pemilik bilang jelek) dan jangan pakai aksen/garis di tepi
+  (juga diminta dihilang). **Responsif mobile-first**: di layar sempit label + keterangan di
+  tengah dengan angka di bawahnya, kotak angka 38 px (→ 44 px di `sm+`); di HP 375 px banner
+  tetap 320 px dan tanpa scroll horizontal. Bagian **HARI selalu ditampilkan** (nilainya `00`
+  kalau sisa waktu < 24 jam) — kalau disembunyikan saat 0, lebar kartu ikut berubah tiap
+  pergantian hari dan tampilannya "bergeser". Tiga aturan penting:
   (1) tanggalnya kosong → countdown **tidak tampil sama sekali** (`null`), itu beda dengan
   "waktu habis";
-  (2) **status jendela & deadline dibaca di SERVER** (`src/app/[locale]/(customer)/open-order/page.tsx`
-  → `store_settings`) lalu dikirim sebagai prop ke `OpenOrderWizard` (`initialState`,
-  `startDeadline`, `endDeadline`) — kalau dihitung dari `useStoreSettings()` saja, nilainya baru ada
-  setelah hydration sehingga tombol yang seharusnya terkunci sempat bisa diklik (pop-in);
+  (2) **status jendela & deadline & periode dibaca di SERVER**
+  (`src/app/[locale]/(customer)/open-order/page.tsx` → `store_settings`) lalu dikirim sebagai prop ke
+  `OpenOrderWizard` (`initialState`, `startDeadline`, `endDeadline`, `period`) — kalau dihitung dari
+  `useStoreSettings()` saja, nilainya baru ada setelah hydration sehingga tombol yang seharusnya
+  terkunci sempat bisa diklik (pop-in) dan baris "Periode …" sempat nampilin teks fallback lama;
   (3) angka baru dihitung setelah komponen ter-mount (SSR tidak punya jam yang sama dengan klien)
   jadi sebelum mount angkanya `"--"` — mencegah hydration mismatch.
 - **Pemesanan terkunci saat jendela belum dibuka** (`before`) — katalog/harga/Create Your Price
-  tetap bisa dilihat, tapi **"Tambah ke Pesanan" dimatikan** (desktop + bar sticky mobile, teksnya
-  jadi "Belum Bisa Dipesan") dan yang tampil adalah hitung mundur "Buka dalam …" (`StepProduct` +
-  `StepCatalog`). Status `closed` tetap memakai layar "Periode Open Order Telah Berakhir" (wizard
-  tidak dirender). **Server juga menolak**: `POST /api/open-order` membaca `store_settings` dan
-  membalas **403** kalau statusnya `before` atau `closed` — jangan andalkan tombol UI saja, orang
-  bisa POST langsung.
+  tetap bisa dilihat, tapi **"Tambah ke Pesanan" dimatikan** dan berubah jadi **satu blok tombol
+  berisi hitung mundur**: ikon kunci + "Dibuka dalam" + timer (`HH:MM:SS`) DI DALAM tombol, dengan
+  catatan "Tombol pesanan aktif otomatis saat Open Order dimulai (tanggal)." di bawahnya. Di
+  **mobile** bar sticky-nya jadi satu blok vertikal (total di atas, tombol hitung mundur full
+  width) — gaya satu aksi utama ala app native, bukan dua tombol terpisah. `Countdown` punya 3
+  varian: `banner` (kartu besar, langkah 1), `compact` (pil di header lengket), `inline` (angka
+  polos buat di dalam tombol). Status `closed` tetap memakai layar "Periode Open Order Telah
+  Berakhir" (wizard tidak dirender). **Server juga menolak**: `POST /api/open-order` membaca
+  `store_settings` dan membalas **403** kalau statusnya `before` atau `closed` — jangan andalkan
+  tombol UI saja, orang bisa POST langsung.
 - **Pilih produk** (dulu "batasi series"): sejak **2026-10-14** yang menentukan produk mana yang
   tampil di `/open-order` adalah kolom **`products.open_order_enabled`** (default `true`), bukan lagi
   `store_settings.open_order_series`. Dua tempat mengaturnya: **checkbox "Tampilkan di Open Order"**

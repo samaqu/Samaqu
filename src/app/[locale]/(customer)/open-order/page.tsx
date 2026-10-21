@@ -1,5 +1,7 @@
 import OpenOrderWizard from "@/components/open-order/OpenOrderWizard";
+import { OPEN_ORDER_PERIOD } from "@/lib/open-order-config";
 import {
+  formatOpenOrderPeriod,
   openOrderDeadline,
   openOrderStartDeadline,
   resolveOpenOrderState,
@@ -33,6 +35,7 @@ export default async function OpenOrderPage() {
       initialState={resolveOpenOrderState(window)}
       startDeadline={openOrderStartDeadline(window)}
       endDeadline={openOrderDeadline(window)}
+      period={formatOpenOrderPeriod(window, OPEN_ORDER_PERIOD)}
     />
   );
 }

@@ -124,6 +124,7 @@ export default function OpenOrderWizard({
   initialState,
   startDeadline,
   endDeadline,
+  period: periodProp,
 }: {
   /** Status jendela Open Order — dibaca di server (route halaman) supaya tidak pop-in. */
   initialState: OpenOrderState;
@@ -131,6 +132,8 @@ export default function OpenOrderWizard({
   startDeadline: number | null;
   /** 23:59:59.999 WIB tanggal tutup (epoch ms) — untuk hitung mundur "Berakhir dalam". */
   endDeadline: number | null;
+  /** Teks periode — dikirim dari server supaya SSR tidak nampilin teks fallback lama. */
+  period?: string;
 }) {
   const [step, setStep] = useState<Step>(1);
   const [catalog, setCatalog] = useState<Product[]>([]);
@@ -161,7 +164,10 @@ export default function OpenOrderWizard({
   const settings = useStoreSettings();
   // Periode & status datang dari tanggal yang diatur admin; teks periode lama jadi fallback
   // selama tanggalnya belum diisi.
-  const period = formatOpenOrderPeriod(settings, settings.open_order_period || OPEN_ORDER_PERIOD);
+  // Periode: versi server (route halaman) yang jadi acuan awal — hook `useStoreSettings()`
+  // baru terisi setelah hydration, jadi tanpa ini SSR sempat nampilin teks fallback lama
+  // ("8-15 Agustus 2026") padahal tanggal jendelanya sudah lain.
+  const period = periodProp ?? formatOpenOrderPeriod(settings, settings.open_order_period || OPEN_ORDER_PERIOD);
   const periodCompact = formatOpenOrderPeriodCompact(settings, settings.open_order_period || OPEN_ORDER_PERIOD);
 
   // Status jendela: server (route halaman) yang jadi acuan awal supaya tidak "pop-in" —
@@ -681,11 +687,7 @@ export default function OpenOrderWizard({
             period={period}
             deadline={locked ? startDeadline : endDeadline}
             countdownLabel={locked ? "Buka dalam" : "Berakhir dalam"}
-            countdownCaption={
-              locked
-                ? `Open Order dibuka ${startLabel || "segera"} — sudah bisa pesan setelah timer habis.`
-                : undefined
-            }
+            countdownCaption={locked ? (startLabel ? `Buka ${startLabel}` : "Segera dibuka") : undefined}
             locked={locked}
             cartCount={lines.reduce((sum, line) => sum + line.quantity, 0)}
             onOpen={(product, color) => openDetail(product.id, color)}
