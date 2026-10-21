@@ -16,6 +16,7 @@ import { Badge } from "./ui";
 import { affiliateFetch, type MePayload } from "@/lib/affiliate/client";
 import { portalBaseFor, portalPath } from "@/lib/affiliate/site";
 import { supabaseAffiliate as supabase } from "@/lib/supabase-affiliate";
+import AffiliateLanding from "./AffiliateLanding";
 
 /**
  * Kerangka portal Affiliate — sidebar + header, mengikuti mockup
@@ -65,6 +66,12 @@ function isAuthPath(pathname: string): boolean {
   // terakhir ("/login", "/daftar") — bukan path lengkap.
   const seg = pathname.replace(/\/+$/, "").split("/").filter(Boolean).pop() || "";
   return seg === "login" || seg === "daftar";
+}
+
+/** Halaman depan portal: `/affiliate` (atau `/` di subdomain) → landing publik. */
+function isLandingPath(pathname: string): boolean {
+  const parts = pathname.replace(/\/+$/, "").split("/").filter(Boolean);
+  return parts.length === 0 || (parts.length === 1 && parts[0] === "affiliate");
 }
 
 export default function AffiliateShell({ children }: { children: ReactNode }) {
@@ -164,6 +171,10 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
   }
 
   if (!me) {
+    // Halaman depan portal = landing publik (ajakan daftar/masuk). Halaman dalam lain
+    // tetap menampilkan kartu "masuk dulu" seperti sebelumnya.
+    if (isLandingPath(pathname)) return <AffiliateLanding />;
+
     return (
       <div
         className="min-h-screen flex items-center justify-center p-5 relative"

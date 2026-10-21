@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getAffiliateSettings } from "@/lib/affiliate/settings";
+import { checkPurchaseEligibility } from "@/lib/affiliate/eligibility";
 
 /**
  * Pendaftaran akun affiliate.
@@ -70,6 +71,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Syarat: minimal satu pembelian VALID. Diverifikasi di server dari riwayat `orders`.
+  // Kalau belum bisa diverifikasi (mis. email/telepon beda dengan data pesanan), jangan
+  // langsung tolak: pendaftaran tetap dibuat dan admin yang memverifikasi.
+  const eligibility = await checkPurchaseEligibility(admin, { email, phone });
+  if (eligibility.status === "not_eligible") {
+    return NextResponse.json(
+      {
+        error:
+          "Riwayat pembelianmu belum valid (pesanan dibatalkan/refund). Silakan lakukan pembelian pertama dulu sebelum mendaftar affiliate.",
+        code: "NOT_ELIGIBLE",
+        eligibility,
+      },
+      { status: 403 },
+    );
+  }
+
   // 1. Buat akun auth (alur sama dengan akun pelanggan: verifikasi email bila diaktifkan).
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
   if (signUpError) {
@@ -116,13 +133,14 @@ export async function POST(req: NextRequest) {
     actor_id: user.id,
     action: "daftar",
     to_status: "menunggu",
-    note: `Pendaftaran akun affiliate ${email}.`,
+    note: `Pendaftaran akun affiliate ${email}. Verifikasi pembelian: ${eligibility.status}.`,
   });
 
   return NextResponse.json({
     ok: true,
     email,
     affiliateCode,
+    eligibility,
     needsVerification: !signUpData?.session,
   });
 }

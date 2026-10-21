@@ -33,6 +33,45 @@ export default function AffiliateRegisterPage() {
   const [tos, setTos] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<Record<string, string>>({});
+  const [eligibility, setEligibility] = useState<{
+    status: "eligible" | "not_eligible" | "needs_verification";
+    message: string;
+    validOrders?: number;
+    totalOrders?: number;
+  } | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  /** Cek syarat pembelian di server (riwayat pesanan nyata). */
+  const checkEligibility = async (): Promise<string | null> => {
+    setChecking(true);
+    try {
+      const res = await fetch("/api/affiliate/eligibility", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), phone: phone.trim() }),
+      });
+      const json = await res.json().catch(() => null);
+      const status = json?.status as "eligible" | "not_eligible" | "needs_verification" | undefined;
+      if (status) {
+        setEligibility({
+          status,
+          message: String(json?.message || ""),
+          validOrders: Number(json?.validOrders || 0),
+          totalOrders: Number(json?.totalOrders || 0),
+        });
+      }
+      return status || null;
+    } catch {
+      setEligibility({
+        status: "needs_verification",
+        message:
+          "Pembelian belum bisa diverifikasi otomatis. Kamu tetap bisa mendaftar — admin akan memverifikasi riwayat pembelianmu.",
+      });
+      return "needs_verification";
+    } finally {
+      setChecking(false);
+    }
+  };
 
   const submit = async () => {
     const next: Record<string, string> = {};
@@ -50,6 +89,16 @@ export default function AffiliateRegisterPage() {
     setErr(next);
     if (Object.keys(next).length) {
       toast("Periksa kembali formulir pendaftaran", "err");
+      return;
+    }
+
+    // Syarat bergabung: minimal 1 pembelian valid, diverifikasi server dari data pesanan.
+    const status = await checkEligibility();
+    if (status === "not_eligible") {
+      setErr({
+        form:
+          "Riwayat pembelianmu belum valid (pesanan dibatalkan/refund). Silakan lakukan pembelian pertama dulu sebelum mendaftar affiliate.",
+      });
       return;
     }
 
@@ -73,7 +122,11 @@ export default function AffiliateRegisterPage() {
         return;
       }
 
-      toast("Pendaftaran berhasil, menunggu persetujuan admin.");
+      toast(
+        json?.eligibility?.status === "needs_verification"
+          ? "Pendaftaran terkirim. Riwayat pembelianmu akan diverifikasi admin."
+          : "Pendaftaran berhasil, menunggu persetujuan admin.",
+      );
       router.push("/affiliate/login");
     } catch {
       setErr({ form: "Gagal terhubung ke server." });
@@ -104,9 +157,51 @@ export default function AffiliateRegisterPage() {
       >
         {err.form ? (
           <div className="rounded-[10px] border border-red-200 bg-red-50 px-3.5 py-2.5 text-[12px] font-medium text-red-700">
-            {err.form}
+            <p>{err.form}</p>
+            {/pembelian|katalog|dibatalkan|refund/i.test(err.form) ? (
+              <a
+                href="https://www.samaqu.id/id/katalog"
+                className="mt-2 inline-flex font-bold underline"
+                style={{ color: "#b42318" }}
+              >
+                Lihat katalog produk →
+              </a>
+            ) : null}
           </div>
         ) : null}
+
+        {/* Syarat bergabung + status verifikasi (tanpa menghalangi yang belum terverifikasi) */}
+        <div className="rounded-[10px] border border-[#e5e7eb] bg-[#f8fafb] px-3.5 py-3">
+          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#111827]">Syarat bergabung</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-[#4b5563]">
+            Minimal pernah membeli 1 produk SAMAQU. Pembelian harus valid, bukan pesanan
+            yang dibatalkan atau direfund.
+          </p>
+          {eligibility ? (
+            <p
+              className="mt-2 text-[12px] font-semibold"
+              style={{
+                color:
+                  eligibility.status === "eligible"
+                    ? "#047857"
+                    : eligibility.status === "not_eligible"
+                      ? "#b42318"
+                      : "#1f5a6c",
+              }}
+            >
+              {eligibility.message}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onClick={checkEligibility}
+            disabled={checking}
+            className="mt-2 text-[12px] font-bold underline disabled:opacity-60"
+            style={{ color: "#1f6274" }}
+          >
+            {checking ? "Memeriksa…" : "Cek syarat pembelian saya"}
+          </button>
+        </div>
 
         <div>
           <input
