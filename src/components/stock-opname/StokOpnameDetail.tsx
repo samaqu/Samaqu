@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import {
@@ -56,12 +56,13 @@ type Session = {
 
 type LiveRow = { product_id: string; color: string; size: string; stock: number };
 
-const STATE_STYLE: Record<string, string> = {
-  belum: "border-gray-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white",
-  cocok: "border-emerald-400 bg-emerald-50 text-emerald-800 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-200",
-  kurang: "border-red-400 bg-red-50 text-red-700 dark:border-red-600 dark:bg-red-900/30 dark:text-red-200",
-  lebih: "border-orange-400 bg-orange-50 text-orange-700 dark:border-orange-600 dark:bg-orange-900/30 dark:text-orange-200",
-  info: "border-gray-200 bg-gray-100 text-gray-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500",
+/** Latar sel ala spreadsheet: lembut, garis grid tetap terlihat. */
+const CELL_BG: Record<string, string> = {
+  belum: "bg-white",
+  cocok: "bg-emerald-50",
+  kurang: "bg-red-50",
+  lebih: "bg-orange-50",
+  info: "bg-gray-100",
 };
 
 function statusPill(status: OpnameStatus) {
@@ -123,6 +124,8 @@ export default function StokOpnameDetail({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  /** Fokus antar sel ala spreadsheet (Enter / panah bawah / panah atas). */
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -276,6 +279,52 @@ export default function StokOpnameDetail({
       return true;
     });
   }, [rows, search, kategori, kain, series, onlyUncounted, onlyDiff, counts]);
+
+  /**
+   * Kolom ukuran yang benar-benar dipakai baris yang sedang tampil. Kategori tanpa ukuran
+   * (mis. Cover & Hanger) otomatis hanya menampilkan ALL SIZE — tidak ada kolom kosong.
+   */
+  const visibleSizes = useMemo(() => {
+    const found = new Set<string>();
+    for (const row of visibleRows) for (const size of Object.keys(row.cells)) found.add(size);
+    if (found.size === 0) return sizeColumns;
+    const standard = OPNAME_SIZES.filter((s) => found.has(s));
+    const extra = Array.from(found)
+      .filter((s) => !OPNAME_SIZES.includes(s as any))
+      .sort();
+    return [...standard, ...extra];
+  }, [visibleRows, sizeColumns]);
+
+  /** Pindah fokus ke sel yang sama di baris berikutnya/sebelumnya (Enter / panah). */
+  const focusRelative = (line: Line, step: number) => {
+    const rowIndex = visibleRows.findIndex((r) => r.cells[line.size]?.id === line.id);
+    if (rowIndex < 0) return;
+    for (let i = rowIndex + step; i >= 0 && i < visibleRows.length; i += step) {
+      const next = visibleRows[i].cells[line.size];
+      if (next && !next.is_derived && !readOnly) {
+        inputRefs.current[next.id]?.focus();
+        return;
+      }
+    }
+  };
+
+  /** Ringkasan per baris: total stok sistem, total fisik, dan selisihnya. */
+  const rowTotals = (row: ProductRow) => {
+    let sys = 0;
+    let fisik = 0;
+    let counted = 0;
+    let diff = 0;
+    for (const cell of Object.values(row.cells)) {
+      if (cell.is_derived) continue;
+      sys += Number(cell.system_stock) || 0;
+      const value = countedValue(cell);
+      if (value === null) continue;
+      counted += 1;
+      fisik += value;
+      diff += value - Number(cell.system_stock);
+    }
+    return { sys, fisik: counted > 0 ? fisik : null, diff: counted > 0 ? diff : null };
+  };
 
   const groups = useMemo(() => {
     const kategoriCount = new Map<string, number>();
@@ -591,29 +640,55 @@ export default function StokOpnameDetail({
         </div>
       </div>
 
-      {/* Tabel hitung */}
-      <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#1a1d28] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[900px]">
+      {/* Tabel hitung — compact ala spreadsheet */}
+      <style>{`/* spinner angka disembunyikan: sel terasa seperti sel spreadsheet */
+.opname-table input[type=number]::-webkit-outer-spin-button,
+.opname-table input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.opname-table input[type=number]{-moz-appearance:textfield}`}</style>
+      <div className="opname-table rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-[#1a1d28] overflow-hidden">
+        <div className="max-h-[calc(100vh-270px)] min-h-[240px] overflow-auto">
+          <table className="w-full min-w-[680px] md:min-w-0 table-fixed border-collapse text-[13px]">
             <thead>
-              <tr className="bg-[#1e3a5f]">
-                <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase tracking-wide border-r border-[#2d4a6f]" title="Nama produk dan warnanya">Produk</th>
-                <th className="w-[120px] px-3 py-3 text-left text-xs font-bold text-white uppercase tracking-wide border-r border-[#2d4a6f]" title="Kode SKU produk">SKU</th>
-                <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase tracking-wide border-r border-[#2d4a6f]" title="Kategori produk">Kategori</th>
-                <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase tracking-wide border-r border-[#2d4a6f]" title="Jenis kain">Jenis Kain</th>
-                <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase tracking-wide border-r border-[#2d4a6f]" title="Nama series">Series</th>
-                {sizeColumns.map((size) => (
-                  <th key={size} className="w-[78px] px-1.5 py-3 text-center text-xs font-bold text-white uppercase tracking-wide border-r border-[#2d4a6f]" title="Angka kecil = stok di sistem. Kotak di bawah = hitungan di rak.">
+              <tr>
+                <th
+                  className="sticky top-0 left-0 z-30 h-9 w-[30%] min-w-[170px] border-b border-r border-gray-300 bg-[#1e3a5f] px-2 text-left text-[10px] font-bold uppercase tracking-wide text-white"
+                  title="Nama produk dan SKU. Warna tampil di bawah nama."
+                >
+                  Produk
+                </th>
+                <th
+                  className="sticky top-0 z-20 hidden h-9 w-[18%] border-b border-r border-gray-300 bg-[#1e3a5f] px-2 text-left text-[10px] font-bold uppercase tracking-wide text-white lg:table-cell"
+                  title="Kategori · jenis kain · series"
+                >
+                  Info
+                </th>
+                {visibleSizes.map((size) => (
+                  <th
+                    key={size}
+                    className="sticky top-0 z-20 h-9 w-[44px] border-b border-r border-gray-300 bg-[#1e3a5f] px-0.5 text-center text-[10px] font-bold uppercase tracking-wide text-white"
+                    title="Angka kecil kiri atas = stok di sistem. Isi hitungan di sel."
+                  >
                     {size}
                   </th>
                 ))}
-                <th className="w-[150px] px-2 py-3 text-left text-xs font-bold text-white uppercase tracking-wide" title="Pilih penyebab kalau ada selisih">Penyebab selisih</th>
+                <th
+                  className="sticky top-0 z-20 h-9 w-[86px] border-b border-r border-gray-300 bg-[#1e3a5f] px-1 text-center text-[10px] font-bold uppercase tracking-wide text-white"
+                  title="Jumlah stok sistem / hitungan fisik / selisih"
+                >
+                  Total
+                </th>
+                <th
+                  className="sticky top-0 z-20 h-9 w-[128px] border-b border-gray-300 bg-[#1e3a5f] px-1 text-left text-[10px] font-bold uppercase tracking-wide text-white"
+                  title="Pilih penyebab kalau ada selisih"
+                >
+                  Penyebab
+                </th>
               </tr>
             </thead>
             <tbody>
               {visibleRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6 + sizeColumns.length} className="px-4 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={3 + visibleSizes.length} className="px-4 py-12 text-center text-sm text-slate-400">
                     Tidak ada baris yang cocok dengan pencarian/filter.
                   </td>
                 </tr>
@@ -622,70 +697,120 @@ export default function StokOpnameDetail({
                   const rowDiffLines = Object.values(row.cells).filter((c) => !c.is_derived && (diffOf(c) ?? 0) !== 0);
                   const rowReason = rowDiffLines.length > 0 ? reasons[rowDiffLines[0].id] || "" : "";
                   const rowNote = rowDiffLines.length > 0 ? notes[rowDiffLines[0].id] || "" : "";
+                  const totals = rowTotals(row);
+                  // Zebra tipis + latar sel produk harus sama supaya kolom sticky tidak "bolong".
+                  const zebra = index % 2 === 0 ? "bg-white" : "bg-slate-50/80";
                   return (
-                    <tr
-                      key={row.key}
-                      className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-blue-50/30 dark:bg-[#1a1d28]"} border-b border-gray-100 dark:border-slate-800/50 ${row.is_derived ? "opacity-60" : ""}`}
-                    >
-                      <td className="px-3 py-2.5 align-middle border-r border-gray-100 dark:border-slate-800/50">
-                        <span className="block text-sm font-semibold text-gray-900 dark:text-white">{row.product_name}</span>
-                        <span className="block text-[10px] font-medium text-slate-500 dark:text-slate-400">{displayColor(row.color, row.product_name)}</span>
-                        {row.is_derived ? (
-                          <span className="block text-[10px] font-medium text-amber-600">
-                            Ikut stok {row.base_product_name}, hitung di baris induk
+                    <tr key={row.key} className={row.is_derived ? "opacity-70" : undefined}>
+                      <td
+                        className={`sticky left-0 z-10 h-8 border-b border-r border-gray-200 px-1.5 py-0 align-middle ${zebra}`}
+                        title={`${row.product_name}${row.sku ? " · " + row.sku : ""}${row.is_derived ? " · ikut stok " + row.base_product_name : ""}`}
+                      >
+                        <div className="flex h-8 min-w-0 flex-col justify-center leading-tight">
+                          <span className="truncate text-[12px] font-semibold text-gray-900 dark:text-white">
+                            {row.product_name}
+                            <span className="font-normal text-slate-400"> · {displayColor(row.color, row.product_name)}</span>
                           </span>
-                        ) : null}
+                          <span className="truncate text-[10px] font-normal text-slate-400">
+                            {row.is_derived ? `ikut stok ${row.base_product_name}` : row.sku || "-"}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-3 py-2.5 text-[12px] font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap border-r border-gray-100 dark:border-slate-800/50">{row.sku || "-"}</td>
-                      <td className="px-3 py-2.5 text-[12px] text-slate-600 dark:text-slate-300 whitespace-nowrap border-r border-gray-100 dark:border-slate-800/50">{row.category || "-"}</td>
-                      <td className="px-3 py-2.5 text-[12px] text-slate-600 dark:text-slate-300 whitespace-nowrap border-r border-gray-100 dark:border-slate-800/50">{row.jenis_kain || "-"}</td>
-                      <td className="px-3 py-2.5 text-[12px] text-slate-600 dark:text-slate-300 whitespace-nowrap border-r border-gray-100 dark:border-slate-800/50">{row.series || "-"}</td>
-                      {sizeColumns.map((size) => {
+                      <td
+                        className={`hidden h-8 truncate border-b border-r border-gray-200 px-1.5 py-0 align-middle text-[10px] text-slate-500 lg:table-cell ${zebra}`}
+                        title={[row.category, row.jenis_kain, row.series].filter(Boolean).join(" · ")}
+                      >
+                        {[row.category, row.jenis_kain, row.series].filter(Boolean).join(" · ") || "-"}
+                      </td>
+                      {visibleSizes.map((size) => {
                         const line = row.cells[size];
                         if (!line) {
-                          return <td key={size} className="px-1.5 py-2.5 text-center text-[11px] text-slate-300 border-r border-gray-100 dark:border-slate-800/50">–</td>;
+                          return (
+                            <td
+                              key={size}
+                              className={`h-8 border-b border-r border-gray-200 px-0 text-center text-[11px] text-slate-300 ${zebra}`}
+                            >
+                              –
+                            </td>
+                          );
                         }
                         const state = lineStateOf(line);
                         const diff = diffOf(line);
                         const disabled = readOnly || row.is_derived;
                         return (
-                          <td key={size} className="px-1.5 py-2 align-middle text-center border-r border-gray-100 dark:border-slate-800/50">
-                            <span className="block text-[10px] font-semibold text-slate-400" title="Stok di sistem">
+                          <td
+                            key={size}
+                            className={`relative h-8 border-b border-r border-gray-200 p-0 align-middle ${CELL_BG[state] || "bg-white"}`}
+                          >
+                            <span
+                              className="pointer-events-none absolute left-[3px] top-[2px] z-10 text-[8px] leading-none text-slate-400"
+                              title="Stok di sistem"
+                            >
                               {line.system_stock}
                             </span>
+                            {diff !== null && diff !== 0 ? (
+                              <span
+                                className={`pointer-events-none absolute bottom-[2px] right-[3px] z-10 text-[8px] font-bold leading-none ${diff < 0 ? "text-red-600" : "text-orange-600"}`}
+                                title="Selisih (fisik − sistem)"
+                              >
+                                {diff > 0 ? `+${diff}` : diff}
+                              </span>
+                            ) : null}
                             <input
+                              ref={(el) => {
+                                inputRefs.current[line.id] = el;
+                              }}
                               type="number"
                               inputMode="numeric"
                               min={0}
                               value={counts[line.id] ?? ""}
                               onChange={(e) => setCounts((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                              onFocus={(e) => e.currentTarget.select()}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === "ArrowDown") {
+                                  e.preventDefault();
+                                  focusRelative(line, 1);
+                                } else if (e.key === "ArrowUp") {
+                                  e.preventDefault();
+                                  focusRelative(line, -1);
+                                }
+                              }}
                               disabled={disabled}
                               placeholder="–"
                               aria-label={`Hitungan di rak ${row.product_name} ${row.color} ${size}`}
                               title={row.is_derived ? `Ikut stok ${row.base_product_name}` : "Hitungan di rak"}
-                              className={`w-14 h-10 rounded-lg border-2 text-center text-sm font-black outline-none focus:ring-2 focus:ring-blue-400 disabled:cursor-not-allowed ${STATE_STYLE[state]}`}
+                              className={`h-8 w-full bg-transparent px-0 text-center text-[13px] font-semibold tabular-nums text-slate-900 outline-none placeholder:text-slate-300 focus:bg-blue-50 focus:ring-1 focus:ring-inset focus:ring-blue-400 disabled:cursor-not-allowed disabled:text-slate-400 dark:text-white dark:focus:bg-slate-800`}
                             />
-                            {diff !== null && diff !== 0 ? (
-                              <span className={`block text-[10px] font-black ${diff < 0 ? "text-red-600" : "text-orange-600"}`}>
-                                {diff > 0 ? `+${diff}` : diff}
-                              </span>
-                            ) : (
-                              <span className="block text-[10px] text-transparent">·</span>
-                            )}
                           </td>
                         );
                       })}
-                      <td className="px-2 py-2 align-middle">
+                      <td
+                        className={`h-8 whitespace-nowrap border-b border-r border-gray-200 px-1 text-center align-middle text-[10px] tabular-nums ${zebra}`}
+                        title="Stok sistem / hitungan fisik / selisih"
+                      >
+                        <span className="text-slate-500">{totals.sys}</span>
+                        <span className="text-slate-300"> / </span>
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">{totals.fisik ?? "–"}</span>
+                        {totals.diff !== null && totals.diff !== 0 ? (
+                          <>
+                            <span className="text-slate-300"> / </span>
+                            <span className={`font-bold ${totals.diff < 0 ? "text-red-600" : "text-orange-600"}`}>
+                              {totals.diff > 0 ? `+${totals.diff}` : totals.diff}
+                            </span>
+                          </>
+                        ) : null}
+                      </td>
+                      <td className={`h-8 border-b border-gray-200 px-1 py-0 align-middle ${zebra}`}>
                         {rowDiffLines.length > 0 ? (
-                          <div className="space-y-1">
+                          <div className="flex flex-col gap-0.5 py-0.5">
                             <select
                               value={rowReason}
                               onChange={(e) => setRowReason(row, e.target.value)}
                               disabled={readOnly}
-                              className="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[12px] font-semibold text-slate-700 dark:text-slate-200"
+                              className="h-6 w-full rounded border border-gray-200 bg-white px-1 text-[10px] font-semibold text-slate-700 outline-none focus:ring-1 focus:ring-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                               title="Pilih penyebab selisih"
                             >
-                              <option value="">Pilih penyebab…</option>
+                              <option value="">Penyebab…</option>
                               {OPNAME_REASONS.map((r) => (
                                 <option key={r.value} value={r.value}>{r.label}</option>
                               ))}
@@ -703,13 +828,13 @@ export default function StokOpnameDetail({
                                   });
                                 }}
                                 disabled={readOnly}
-                                placeholder="Catatan singkat"
-                                className="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[12px]"
+                                placeholder="Catatan"
+                                className="h-5 w-full rounded border border-gray-200 bg-white px-1 text-[10px] dark:border-slate-700 dark:bg-slate-900"
                               />
                             ) : null}
                           </div>
                         ) : (
-                          <span className="text-[11px] text-slate-300">–</span>
+                          <span className="block text-center text-[10px] text-slate-300">–</span>
                         )}
                       </td>
                     </tr>
@@ -723,7 +848,7 @@ export default function StokOpnameDetail({
 
       {/* Bar aksi bawah — selalu terlihat */}
       {showActions ? (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 dark:border-slate-800 bg-white/95 dark:bg-[#12141a]/95 backdrop-blur px-3 py-2.5">
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 dark:border-slate-800 bg-white/95 dark:bg-[#12141a]/95 backdrop-blur px-3 py-1.5">
           <div className="mx-auto flex max-w-6xl items-center gap-2">
             <div className="min-w-0 flex-1">
               <p className="truncate text-[11px] font-bold text-slate-600 dark:text-slate-300">
