@@ -646,3 +646,45 @@ a { text-decoration: none; }
   background: rgba(42, 33, 27, .3);
   background-clip: content-box;
 }
+
+/* ===== Open Order (mockup grayscale) =====
+   Halaman /open-order pakai palet netral (putih + hitam) sesuai mockup, bukan tema katalog
+   (krem/espresso/emas). Semua kelas di bawah berawalan `oo-` supaya tidak nabrak sama
+   gaya halaman lain. Animasi angka countdown (roll), shimmer tombol terkunci, dan ping
+   pada titik status diambil dari mockup. */
+.oo-roll span { display: block; animation: oo-roll .5s cubic-bezier(.2,.8,.2,1); }
+@keyframes oo-roll {
+  from { transform: translateY(-70%); opacity: 0; filter: blur(6px); }
+  to   { transform: none; opacity: 1; filter: none; }
+}
+.oo-tick span { display: inline-block; animation: oo-tick .45s cubic-bezier(.2,.8,.2,1); }
+@keyframes oo-tick {
+  from { transform: translateY(-40%); opacity: 0; filter: blur(3px); }
+  to   { transform: none; opacity: 1; filter: none; }
+}
+/* Tombol terkunci: latar gelap yang "mengalir" (shimmer) — sinyal "belum bisa dipakai". */
+.oo-shimmer {
+  background: linear-gradient(110deg, #1a1a1a 30%, #3a3a3a 50%, #1a1a1a 70%);
+  background-size: 220% 100%;
+  animation: oo-sh 2.6s linear infinite;
+}
+@keyframes oo-sh { to { background-position: -220% 0; } }
+/* Titik status hijau (event jalan) — denyut halus. */
+.oo-ping { animation: oo-ping 1.6s infinite; }
+@keyframes oo-ping {
+  0%   { box-shadow: 0 0 0 0 rgba(16,185,129,.6); }
+  70%  { box-shadow: 0 0 0 7px rgba(16,185,129,0); }
+  100% { box-shadow: none; }
+}
+/* Muncul naik pelan (hero + kartu produk). */
+.oo-fade-up { opacity: 0; transform: translateY(16px); animation: oo-fu .7s ease forwards; }
+@keyframes oo-fu { to { opacity: 1; transform: none; } }
+/* Overlay kunci di atas foto produk. */
+.oo-lock-overlay { transition: opacity .4s ease; }
+
+/* Aksesibilitas: kalau penggunaaskurangi animasi, semua dekorasi Open Order dimatikan dan
+   konten langsung terlihat (tanpa ini elemen ber-`oo-fade-up` bisa tertahan opacity 0). */
+@media (prefers-reduced-motion: reduce) {
+  .oo-fade-up { opacity: 1; transform: none; animation: none; }
+  .oo-roll span, .oo-tick span, .oo-shimmer, .oo-ping { animation: none !important; }
+}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { OPEN_ORDER_ADDON, resolveAddonWeight } from "@/lib/open-order-config";
+import { readOpenOrderWindow } from "@/lib/open-order-settings";
 import { resolveOpenOrderState } from "@/lib/open-order-window";
 import {
   buildOpenOrderProducts,
@@ -143,16 +144,8 @@ export async function POST(request: NextRequest) {
     // Tombol "Tambah ke Pesanan" di wizard dimatikan kalau periode belum dibuka, tapi itu hanya
     // sisi klien — jadi server juga wajib menolak. Tanpa ini pesanan bisa dibuat dengan
     // POST langsung meskipun jendela belum dibuka / sudah lewat tanggal tutup.
-    const { data: windowSetting } = await supabaseAdmin
-      .from("store_settings")
-      .select("open_order_start_date, open_order_end_date, open_order_active")
-      .eq("id", 1)
-      .maybeSingle();
-    const windowState = resolveOpenOrderState({
-      open_order_start_date: windowSetting?.open_order_start_date ?? null,
-      open_order_end_date: windowSetting?.open_order_end_date ?? null,
-      open_order_active: windowSetting?.open_order_active ?? null,
-    });
+    const windowSetting = await readOpenOrderWindow(supabaseAdmin);
+    const windowState = resolveOpenOrderState(windowSetting);
     if (windowState === "before") {
       return NextResponse.json(
         { error: "Open Order belum dibuka. Pesanan hanya bisa dibuat saat periode sudah dimulai." },

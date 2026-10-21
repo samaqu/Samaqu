@@ -133,8 +133,14 @@ export default function OpenOrderSettingsForm() {
   const [needsSql, setNeedsSql] = useState(false);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  // Jam buka & jam tutup (HH:MM, WIB) — kolom opsional, kosong = 00:00 / 23:59.
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  /** `true` kalau kolom jam sudah ada di database (SQL-nya sudah dijalankan). */
+  const [hasTimeColumns, setHasTimeColumns] = useState(false);
   // Nilai tanggal terakhir yang tersimpan — dasar tombol Batal & penanda perubahan.
   const [original, setOriginal] = useState({ start: "", end: "" });
+  const [originalTime, setOriginalTime] = useState({ start: "", end: "" });
 
   // Berat kirim add-on "Extra Cover & Hanger" (gram) — setting internal, tidak tampil di publik.
   const [addonWeight, setAddonWeight] = useState("");
@@ -175,6 +181,24 @@ export default function OpenOrderSettingsForm() {
         setLoading(false);
       });
 
+    // Jam buka/tutup — kolom opsional. Kalau belum ada di database, query-nya error dan
+    // jamnya tetap kosong (fallback 00:00 / 23:59) tanpa bikin form ini ikut rusak.
+    supabase
+      .from("store_settings")
+      .select("open_order_start_time, open_order_end_time")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!mounted) return;
+        if (error || !data) return;
+        const savedStartTime = data.open_order_start_time ?? "";
+        const savedEndTime = data.open_order_end_time ?? "";
+        setStartTime(savedStartTime);
+        setEndTime(savedEndTime);
+        setOriginalTime({ start: savedStartTime, end: savedEndTime });
+        setHasTimeColumns(true);
+      });
+
     // Katalog: produk + varian (stok) + foto — sumber yang sama dengan menu Produk.
     async function loadCatalog() {
       const products = await getProducts();
@@ -208,34 +232,53 @@ export default function OpenOrderSettingsForm() {
     };
   }, []);
 
-  const windowSettings = { open_order_start_date: start || null, open_order_end_date: end || null };
+  const windowSettings = {
+    open_order_start_date: start || null,
+    open_order_end_date: end || null,
+    open_order_start_time: startTime || null,
+    open_order_end_time: endTime || null,
+  };
   const state = resolveOpenOrderState(windowSettings);
   const periodLabel = formatOpenOrderPeriod(windowSettings, OPEN_ORDER_PERIOD);
   const invalidRange = Boolean(start && end && end < start);
-  const dirty = start !== original.start || end !== original.end;
+  const dirty =
+    start !== original.start ||
+    end !== original.end ||
+    startTime !== originalTime.start ||
+    endTime !== originalTime.end;
   const enabledCount = items.filter((item) => item.openOrderEnabled !== false).length;
 
   function cancel() {
     setStart(original.start);
     setEnd(original.end);
+    setStartTime(originalTime.start);
+    setEndTime(originalTime.end);
     setEditing(false);
   }
 
   async function save() {
     if (invalidRange) return;
     setSaving(true);
-    const { error } = await supabase.from("store_settings").upsert({
+    // Kolom jam hanya ikut kalau sudah ada di database — kalau belum (SQL belum dijalankan),
+    // upsert dengan kolom itu akan ditolak PostgREST dan seluruh simpan gagal.
+    const payload: Record<string, unknown> = {
       id: 1,
       open_order_start_date: start || null,
       open_order_end_date: end || null,
       updated_at: new Date().toISOString(),
-    });
+    };
+    if (hasTimeColumns) {
+      payload.open_order_start_time = startTime || null;
+      payload.open_order_end_time = endTime || null;
+    }
+    const { error } = await supabase.from("store_settings").upsert(payload);
     setSaving(false);
     if (error) {
       toast.showToast("error", error.message);
       return;
     }
     setOriginal({ start, end });
+    setOriginalTime({ start: startTime, end: endTime });
     setEditing(false);
     toast.showToast("success", "Jendela Open Order disimpan");
   }
@@ -310,6 +353,21 @@ export default function OpenOrderSettingsForm() {
         )}
       </header>
 
+      {!needsSql && !hasTimeColumns && (
+        <div
+          className="flex gap-3 rounded-xl p-4"
+          style={{ background: "#fdf6e7", border: "1px solid rgba(181,140,74,.28)" }}
+        >
+          <AlertTriangle size={18} className="mt-0.5 shrink-0" style={{ color: "var(--gold-deep)" }} />
+          <p className="text-[13px] leading-relaxed" style={{ color: "#7a5c22" }}>
+            Kolom jam buka/tutup belum ada di Supabase — jalankan{" "}
+            <code>supabase/migrations/20261021_open_order_time.sql</code> di SQL editor Supabase,
+            lalu muat ulang halaman ini. Sampai itu dijalankan, jam buka/tutup memakai default
+            (buka 00:00, tutup 23:59 WIB).
+          </p>
+        </div>
+      )}
+
       {needsSql && (
         <div
           className="flex gap-3 rounded-xl p-4"
@@ -377,6 +435,33 @@ export default function OpenOrderSettingsForm() {
                     style={fieldStyle}
                   />
                 </label>
+                {/* Jam buka & jam tutup (WIB) — opsional. Kosong = 00:00 / 23:59. */}
+                <label className="block">
+                  <span className={LABEL} style={labelStyle}>
+                    Jam buka (WIB)
+                  </span>
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    disabled={!hasTimeColumns}
+                    className="mt-2 w-full rounded-xl px-4 py-3 text-sm outline-none transition-colors duration-150 disabled:opacity-50"
+                    style={fieldStyle}
+                  />
+                </label>
+                <label className="block">
+                  <span className={LABEL} style={labelStyle}>
+                    Jam tutup (WIB)
+                  </span>
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    disabled={!hasTimeColumns}
+                    className="mt-2 w-full rounded-xl px-4 py-3 text-sm outline-none transition-colors duration-150 disabled:opacity-50"
+                    style={fieldStyle}
+                  />
+                </label>
               </div>
             ) : (
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -396,6 +481,22 @@ export default function OpenOrderSettingsForm() {
                     {formatDateLabel(end) || "Belum diatur"}
                   </p>
                 </div>
+                <div>
+                  <span className={LABEL} style={labelStyle}>
+                    Jam buka (WIB)
+                  </span>
+                  <p className="mt-2 text-sm font-medium" style={{ color: startTime ? "var(--espresso)" : LABEL_COLOR }}>
+                    {startTime || "00:00 (default)"}
+                  </p>
+                </div>
+                <div>
+                  <span className={LABEL} style={labelStyle}>
+                    Jam tutup (WIB)
+                  </span>
+                  <p className="mt-2 text-sm font-medium" style={{ color: endTime ? "var(--espresso)" : LABEL_COLOR }}>
+                    {endTime || "23:59 (default)"}
+                  </p>
+                </div>
               </div>
             )}
 
@@ -406,7 +507,22 @@ export default function OpenOrderSettingsForm() {
             )}
 
             <p className="mt-4 text-[12.5px] leading-relaxed" style={{ color: LABEL_COLOR }}>
-              Tampil di halaman /open-order sebagai <span style={{ color: "var(--espresso)" }}>Periode {periodLabel}</span>.
+              Tampil di halaman /open-order sebagai <span style={{ color: "var(--espresso)" }}>Periode {periodLabel}</span>
+              {startTime || endTime ? (
+                <>
+                  , dibuka{" "}
+                  <span style={{ color: "var(--espresso)" }}>
+                    {startTime || "00:00"} WIB
+                  </span>{" "}
+                  dan ditutup{" "}
+                  <span style={{ color: "var(--espresso)" }}>
+                    {endTime || "23:59"} WIB
+                  </span>
+                  . Hitung mundur di halaman itu memakai jam ini.
+                </>
+              ) : (
+                " (jam buka/tutup belum diatur → buka 00:00, tutup 23:59 WIB)."
+              )}
             </p>
 
             <div className="mt-5 flex flex-wrap items-center justify-between gap-4">

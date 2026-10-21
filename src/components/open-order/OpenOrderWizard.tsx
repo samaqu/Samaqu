@@ -27,6 +27,7 @@ import {
 } from "@/lib/open-order-offering";
 import {
   formatDateLabel,
+  formatOpenOrderMoment,
   formatOpenOrderPeriod,
   formatOpenOrderPeriodCompact,
   resolveOpenOrderState,
@@ -46,7 +47,7 @@ import StepCustomer from "./StepCustomer";
 import StepProduct from "./StepProduct";
 import StepReview from "./StepReview";
 import StepSuccess from "./StepSuccess";
-import Countdown from "./Countdown";
+import Countdown, { type OpenOrderPhase } from "./Countdown";
 import { EMPTY_CUSTOMER, type CartLine, type CustomerData, type DraftShipping, type ProductDraft, type SavedAddress } from "./types";
 import { INK, LINE, MUTED } from "./ui";
 
@@ -126,6 +127,7 @@ export default function OpenOrderWizard({
   endDeadline,
   period: periodProp,
   startDate: startDateProp,
+  endDate: endDateProp,
 }: {
   /** Status jendela Open Order — dibaca di server (route halaman) supaya tidak pop-in. */
   initialState: OpenOrderState;
@@ -137,6 +139,8 @@ export default function OpenOrderWizard({
   period?: string;
   /** Tanggal mulai (YYYY-MM-DD) — untuk caption "Buka <tanggal>", dikirim dari server. */
   startDate?: string | null;
+  /** Tanggal tutup (YYYY-MM-DD) — untuk label "Berakhir …", dikirim dari server. */
+  endDate?: string | null;
 }) {
   const [step, setStep] = useState<Step>(1);
   const [catalog, setCatalog] = useState<Product[]>([]);
@@ -561,141 +565,85 @@ export default function OpenOrderWizard({
    * Pesanan" mati dan yang tampil instead-of-tombol adalah hitung mundur "Dibuka dalam …".
    */
   const locked = openState === "before";
-  // Tanggal mulai untuk caption "Buka <tanggal>" — versi server dulu (client hook-nya
-  // masih kosong saat SSR, jadi tanpa ini caption-nya nampilin "Segera dibuka").
+  // Fase event untuk tampilan (mockup): belum dibuka / sedang berjalan / sudah berakhir.
+  const phase: OpenOrderPhase = openState === "open" ? "live" : openState === "before" ? "upcoming" : "ended";
+
+  // Toast lokal ala mockup (pengingat / kabari periode berikutnya / klik tombol terkunci).
+  const [toast, setToast] = useState("");
+  function showToast(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 2200);
+  }
+
+  // Tanggal mulai & tutup (label "21 Oktober 2026 · 10.00 WIB" di bawah timer).
   const startLabel = formatDateLabel(startDateProp ?? settings.open_order_start_date);
 
   /**
-   * Jendela Open Order ditutup (tanggal sudah lewat): halaman publik hanya menampilkan
-   * pesannya, bukan wizardnya.
-   *
-   * Kasus "belum dibuka" TIDAKhandled di sini — katalognya tetap bisa dilihat (customer bisa
-   * lihat produk & harga), tapi pemesanan dikunci sampai tanggal mulai. Kuncinya dipakai di
-   * `StepCatalog` (banner "Dibuka dalam") dan `StepProduct` (tombol "Tambah ke Pesanan" mati).
+   * Jendela yang sudah lewat TIDAK lagi memakai layar pesan terpisah — sesuai mockup,
+   * katalognya tetap tampil dengan overlay kunci dan tombol yang mati ("OPEN ORDER
+   * DITUTUP"). Pemesanan tetap terkunci, dan server juga menolak dengan 403.
    */
-  if (openState === "closed") {
-    return (
-      <section
-        className="grid min-h-screen place-items-center px-5"
-        style={{ background: "#F3F3F3", color: INK, fontFamily: "var(--font-inter), system-ui, sans-serif" }}
-      >
-        <div className="w-full max-w-md text-center">
-          <p className="text-[11px] font-medium uppercase tracking-[0.28em]" style={{ color: "var(--gold)" }}>
-            Create Your Price
-          </p>
-          <h1
-            className="mt-3 text-[1.9rem] font-semibold leading-tight"
-            style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--espresso)" }}
-          >
-            Open Order <span style={{ color: "var(--gold)" }}>Samaqu</span>
-          </h1>
-
-          <div
-            className="mt-7 rounded-3xl px-6 py-8"
-            style={{ background: "var(--cream-bright)", border: "1px solid rgba(0,0,0,.3)" }}
-          >
-            <span
-              className="mx-auto grid h-12 w-12 place-items-center rounded-full"
-              style={{ background: "rgba(0,0,0,.12)", color: "var(--gold)" }}
-            >
-              <Calendar size={20} />
-            </span>
-            <p className="mt-4 text-[15px] font-semibold" style={{ color: "var(--espresso)" }}>
-              Periode Open Order Telah Berakhir
-            </p>
-            <p className="mt-2 text-[13px] leading-relaxed" style={{ color: MUTED }}>
-              Periode Open Order {periodCompact} telah berakhir. Nantikan informasi periode Open Order berikutnya melalui Instagram SAMAQU.
-            </p>
-          </div>
-
-          <div className="mt-7 flex justify-center gap-2.5">
-            <Link
-              href={`/${locale}/katalog`}
-              className="rounded-xl px-5 py-3 text-[13px] font-medium"
-              style={{ background: "var(--espresso)", color: "var(--cream)" }}
-            >
-              Lihat Katalog
-            </Link>
-            <Link
-              href={`/${locale}`}
-              className="rounded-xl px-5 py-3 text-[13px] font-medium"
-              style={{ border: `1px solid ${LINE}`, color: INK }}
-            >
-              Beranda
-            </Link>
-          </div>
-        </div>
-      </section>
-    );
-  }
 
   return (
-    <section className="min-h-screen" style={{ background: "#F3F3F3", color: INK, fontFamily: "var(--font-inter), system-ui, sans-serif" }}>
+    <section
+      className="min-h-screen bg-[#f6f5f2] text-[#111]"
+      style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+    >
       {/* Header + progres langkah */}
-      <header
-        className="sticky top-0 z-30"
-        style={{ borderBottom: "1px solid rgba(0,0,0,.28)", background: "rgba(248,245,241,.95)", backdropFilter: "blur(8px)" }}
-      >
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-5 pt-3.5 pb-3 sm:px-8">
+      <header className="sticky top-0 z-30 border-b border-black/5 bg-[#f4f4f2]/90 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5">
           {backTo ? (
             <button
               type="button"
               onClick={() => setStep(backTo)}
               aria-label="Kembali"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full transition-colors duration-200 hover:bg-[rgba(0,0,0,.09)]"
-              style={{ border: `1px solid ${LINE}` }}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/15 transition hover:bg-white"
             >
-              <ChevronLeft size={16} />
+              <ChevronLeft size={16} strokeWidth={2} />
             </button>
           ) : (
             <Link
               href="/"
               aria-label="Tutup"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full transition-colors duration-200 hover:bg-[rgba(0,0,0,.09)]"
-              style={{ border: `1px solid ${LINE}` }}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/15 transition hover:bg-white"
             >
-              <X size={16} />
+              <X size={16} strokeWidth={2} />
             </Link>
           )}
 
-          <p className="flex-1 text-center text-[12px] font-medium uppercase tracking-[0.2em]">{stepTitle}</p>
+          <span className="text-xs font-semibold uppercase tracking-[.25em]">{stepTitle}</span>
 
-          <span className="w-9 shrink-0 text-right text-[11.5px] font-medium" style={{ color: MUTED }}>
+          <span className="w-9 shrink-0 text-right text-xs text-neutral-500">
             {step}/6
           </span>
         </div>
-        <div className="mx-auto max-w-5xl px-5 pb-3 sm:px-8">
-          <div className="h-[3px] w-full overflow-hidden rounded-full" style={{ background: "rgba(0,0,0,.28)" }}>
+        <div className="mx-auto max-w-6xl px-5 pb-2.5">
+          <div className="h-[2px] overflow-hidden rounded bg-black/10">
             <div
-              className="h-full rounded-full transition-all duration-300"
-              style={{ background: INK, width: `${(step / 6) * 100}%` }}
+              className="h-full rounded bg-black transition-all duration-1000"
+              style={{ width: `${(step / 6) * 100}%` }}
             />
           </div>
-          {/* Timer ringkas di header lengket — kelihatan di langkah 3–5. Langkah 1 sudah
-              punya banner besar, langkah 2 (detail produk) sudah punya timer di dalam
-              tombolnya, jadi di dua langkah itu disembunyikan supaya tidak dobel. */}
-          {step !== 1 && step !== 2 && (
-            <div className="mt-2 flex justify-center">
-              <Countdown
-                deadline={locked ? startDeadline : endDeadline}
-                variant="compact"
-                label={locked ? "Dibuka dalam" : "Berakhir dalam"}
-              />
-            </div>
-          )}
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-10">
+      <main className="mx-auto max-w-6xl px-5 pb-20">
         {step === 1 && (
           <StepCatalog
             products={products}
             period={period}
-            deadline={locked ? startDeadline : endDeadline}
-            countdownLabel={locked ? "Dibuka dalam" : "Berakhir dalam"}
-            countdownCaption={locked ? (startLabel || "Segera dibuka") : undefined}
-            countdownTone={locked ? "soon" : "live"}
-            locked={locked}
+            phase={phase}
+            countdownTarget={phase === "ended" ? null : phase === "upcoming" ? startDeadline : endDeadline}
+            startInfo={formatOpenOrderMoment(startDateProp ?? settings.open_order_start_date, settings.open_order_start_time)}
+            endInfo={formatOpenOrderMoment(endDateProp ?? settings.open_order_end_date, settings.open_order_end_time, true)}
+            onRemind={() => showToast(phase === "ended" ? "Siap! Kami kabari periode berikutnya" : "Siap! Kami ingatkan saat Open Order dibuka")}
+            onLockedAction={() =>
+              showToast(
+                phase === "ended"
+                  ? "Open order sudah ditutup. Follow @samaqu biar nggak ketinggalan batch berikutnya!"
+                  : "Open Order belum dibuka",
+              )
+            }
             cartCount={lines.reduce((sum, line) => sum + line.quantity, 0)}
             onOpen={(product, color) => openDetail(product.id, color)}
             onViewCart={() => setStep(3)}
@@ -703,18 +651,14 @@ export default function OpenOrderWizard({
         )}
 
         {(step === 2 || step === 3 || step === 4 || step === 5) && (
-          <div className={step === 2 ? "mx-auto max-w-5xl" : "mx-auto max-w-2xl"}>
+          <div className={step === 2 ? "mx-auto max-w-6xl" : "mx-auto max-w-2xl"}>
             {step === 2 && draft && (
               <StepProduct
                 draft={draft}
                 products={products}
-                locked={locked}
-                lockDeadline={startDeadline}
-                lockCaption={
-                  locked
-                    ? `Tombol pesanan aktif otomatis saat Open Order dimulai${startLabel ? ` (${startLabel})` : ""}.`
-                    : undefined
-                }
+                phase={phase}
+                countdownTarget={phase === "ended" ? null : phase === "upcoming" ? startDeadline : endDeadline}
+                endInfo={formatOpenOrderMoment(endDateProp ?? settings.open_order_end_date, settings.open_order_end_time, true)}
                 onChange={(patch) => setDraft((prev) => (prev ? { ...prev, ...patch } : prev))}
                 onAdd={addDraftToCart}
               />
@@ -790,6 +734,15 @@ export default function OpenOrderWizard({
           </div>
         )}
       </main>
+
+      {/* Toast ala mockup (pengingat / kabari periode berikutnya / klik tombol terkunci). */}
+      <div
+        className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-black px-5 py-3 text-sm text-white shadow-xl transition-all duration-500 ${
+          toast ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-24 opacity-0"
+        }`}
+      >
+        {toast}
+      </div>
     </section>
   );
 }

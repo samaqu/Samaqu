@@ -1,18 +1,18 @@
 "use client";
 
 /**
- * Langkah 2 — detail produk. Tampilannya mengikuti **halaman detail produk di Katalog**
- * (`src/app/[locale]/(customer)/katalog/[id]/page.tsx`): grid dua kolom (galeri di kiri, info
- * di kanan), galeri aspect 3/4 dengan panah + titik + thumbnail, eyebrow "Detail Produk", judul
- * serif dengan aksen gold, chip series/warna/ukuran, kartu harga Create Your Price dengan
- * quick-pick, deskripsi, dan accordion info.
+ * Langkah 2 — detail produk. Tampilan mengikuti mockup (grayscale): galeri 4:5 dengan
+ * thumbnail, judul serif besar, baris seri/ukuran berupa chip, kartu harga Create Your
+ * Price, bar jumlah, dan CTA besar yang berubah sesuai fase event:
+ * - `live`     → "TAMBAH KE PESANAN" (hitam),
+ * - `upcoming` → tombol shimmer gelap berisi ikon kunci + "SEGERA DIBUKA" + hitung mundur,
+ * - `ended`    → "OPEN ORDER DITUTUP" (abu, nonaktif).
  *
- * Bedanya cuma aksi bawahnya: di sini "Tambah ke Pesanan" (masuk keranjang Open Order), bukan
- * Keranjang / WhatsApp.
+ * Data produk/warna/series/ukuran tetap berasal dari katalog (lihat `open-order-offering.ts`).
  */
 
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Lock, Minus, Plus } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Minus, Plus } from "lucide-react";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import { colorMap } from "@/lib/katalog-data";
 import { openOrderGallery } from "@/lib/open-order-catalog";
@@ -24,16 +24,19 @@ import {
   type OpenOrderProduct,
 } from "@/lib/open-order-offering";
 import type { ProductDraft } from "./types";
-import Countdown from "./Countdown";
+import Countdown, { type OpenOrderPhase } from "./Countdown";
 
-/** Format harga sama dengan halaman detail Katalog ("Rp 329.000"). */
+/** Format harga sama dengan halaman detail Katalog ("Rp 299.000"). */
 const rupiah = (value: number) => "Rp " + Math.round(value).toLocaleString("id-ID");
 
 /** Deskripsi cadangan per kategori — sama dengan `getDescription()` di halaman katalog. */
 const DESCRIPTION_BY_CATEGORY: Record<string, string> = {
-  Thobe: "Thobe premium dengan bahan pilihan yang adem dan nyaman. Potongan presisi, jahitan rapi, cocok untuk ibadah maupun acara istimewa. Tersedia dalam berbagai pilihan kain dan warna.",
-  Kandora: "Kandora berkualitas dengan bahan ringan dan potongan yang elegan. Nyaman dipakai sehari-hari maupun untuk acara formal.",
-  Koko: "Baju Koko dengan desain modern dan bahan premium. Nyaman untuk shalat maupun kegiatan sehari-hari.",
+  Thobe:
+    "Thobe premium dengan bahan pilihan yang adem dan nyaman. Potongan presisi, jahitan rapi, cocok untuk ibadah maupun acara istimewa. Tersedia dalam berbagai pilihan kain dan warna.",
+  Kandora:
+    "Kandora berkualitas dengan bahan ringan dan potongan yang elegan. Nyaman dipakai sehari-hari maupun untuk acara formal.",
+  Koko:
+    "Baju Koko dengan desain modern dan bahan premium. Nyaman untuk shalat maupun kegiatan sehari-hari.",
   Vest: "Vest elegan dengan potongan yang presisi. Cocok dipadukan dengan thobe atau koko untuk tampilan lebih berkelas.",
   Kabak: "Kabak premium dengan kualitas terbaik. Tersedia dalam berbagai pilihan.",
   "Cover & Hanger": "Cover dan hanger premium untuk menjaga busana tetap rapi dan terlindungi.",
@@ -43,37 +46,39 @@ const DESCRIPTION_BY_CATEGORY: Record<string, string> = {
 function InfoAccordionItem({ title, children }: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-lg overflow-hidden" style={{ background: "rgba(0,0,0,.03)", border: "1px solid rgba(0,0,0,.15)" }}>
-      <button type="button" onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left">
-        <span className="text-[13px] font-medium font-ui" style={{ color: "var(--espresso)" }}>{title}</span>
-        <ChevronDown size={16} strokeWidth={1.5} className="shrink-0 transition-transform duration-300" style={{ color: "var(--stone)", transform: open ? "rotate(180deg)" : "none" }} />
-      </button>
-      {open && (
-        <div className="px-4 pb-3.5">
-          <p className="text-[12.5px] leading-relaxed font-ui" style={{ color: "var(--stone)" }}>{children}</p>
-        </div>
-      )}
-    </div>
+    <details className="rounded-xl border border-black/5 bg-[#ebebe9]">
+      <summary
+        className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium"
+        onClick={(e) => {
+          e.preventDefault();
+          setOpen((o) => !o);
+        }}
+      >
+        {title}
+        <ChevronDown size={14} strokeWidth={2} className="shrink-0" style={{ transform: open ? "rotate(180deg)" : "none" }} />
+      </summary>
+      {open && <p className="px-4 pb-4 text-sm text-neutral-600">{children}</p>}
+    </details>
   );
 }
 
 export default function StepProduct({
   draft,
   products,
-  locked,
-  lockDeadline,
-  lockCaption,
+  phase,
+  countdownTarget,
+  endInfo,
   onChange,
   onAdd,
 }: {
   draft: ProductDraft;
   products: OpenOrderProduct[];
-  /** Jendela Open Order belum dibuka → tombol "Tambah ke Pesanan" dimatikan. */
-  locked?: boolean;
-  /** Batas mulai jendela (epoch ms) — untuk hitung mundur "Buka dalam". */
-  lockDeadline?: number | null;
-  /** Keterangan singkat di bawah hitung mundur. */
-  lockCaption?: string;
+  /** Fase event — menentukan tampilan CTA. */
+  phase: OpenOrderPhase;
+  /** Batas hitung mundur (epoch ms) — dipakai di dalam tombol terkunci. */
+  countdownTarget: number | null;
+  /** "22 Okt 2026 · 23.59 WIB" — dipakai saat event sudah berakhir. */
+  endInfo?: string;
   onChange: (patch: Partial<ProductDraft>) => void;
   onAdd: (line: ProductDraft) => void;
 }) {
@@ -96,7 +101,7 @@ export default function StepProduct({
   const activePhoto = Math.min(photo, Math.max(gallery.length - 1, 0));
   const currentMedia = gallery[activePhoto] ?? null;
   /** Foto yang dipakai sebagai cover video — foto pertama di galeri. */
-  const videoPoster = gallery.find((item) => item.type === "image")?.src ?? product?.image ?? "";
+  const videoPoster = gallery.find((item) => item.type === "image")?.src || product?.image || "";
 
   // Produk/warna/series berganti → harga & foto ikut menyesuaikan.
   useEffect(() => {
@@ -129,39 +134,38 @@ export default function StepProduct({
   }
 
   function handleAdd() {
-    if (priceTooLow || locked) return;
+    if (priceTooLow || phase !== "live") return;
     onAdd({ ...draft, price: finalPrice, series: series?.name ?? "" });
   }
 
+  const locked = phase !== "live";
+
   return (
-    <>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 lg:gap-14">
+    <div className="grid grid-cols-1 gap-8 py-8 lg:grid-cols-[1fr_1.15fr] lg:gap-12">
       {/* ── Galeri ── */}
-      <div>
-        <div className="relative w-full aspect-[3/4] rounded-3xl overflow-hidden" style={{ background: "#e5e5e5" }}>
-          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,rgba(232,223,209,.5),rgba(0,0,0,.28))" }} />
+      <section>
+        <div className="relative aspect-[4/5] overflow-hidden rounded-3xl bg-[#e9e9e7]">
           {currentMedia?.type === "video" ? (
             playing ? (
               <video
                 key={currentMedia.src}
                 src={currentMedia.src}
                 loop
-                playsInline
+                muted
                 autoPlay
+                playsInline
                 preload="auto"
                 onClick={() => setPlaying(false)}
-                className="absolute inset-0 w-full h-full object-cover cursor-pointer"
+                className="h-full w-full cursor-pointer object-contain"
               />
             ) : (
               <>
-                {videoPoster ? (
+                {videoPoster && (
                   <img
                     src={cloudinaryUrl(videoPoster, { width: 1200 })}
-                    alt={`${product.name} ${colorLabel}${series ? ` — ${series.name}` : ""}`}
-                    className="absolute inset-0 w-full h-full object-contain"
+                    alt={product.name}
+                    className="h-full w-full object-contain"
                   />
-                ) : (
-                  <div className="absolute inset-0" style={{ background: "#e5e5e5" }} />
                 )}
                 <button
                   type="button"
@@ -170,12 +174,9 @@ export default function StepProduct({
                   className="absolute inset-0 z-10 flex items-center justify-center"
                   style={{ background: "rgba(0,0,0,.08)" }}
                 >
-                  <span
-                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-full grid place-items-center transition-transform hover:scale-110"
-                    style={{ background: "#ffffff", backdropFilter: "blur(8px)" }}
-                  >
-                    <svg width="24" height="24" viewBox="0 0 24 24" className="ml-1" aria-hidden>
-                      <path d="M8 5v14l11-7z" fill="#000000" />
+                  <span className="grid h-14 w-14 place-items-center rounded-full bg-white shadow-lg transition-transform hover:scale-110">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                      <path d="M8 5v14l11-7z" />
                     </svg>
                   </span>
                 </button>
@@ -185,115 +186,105 @@ export default function StepProduct({
             <img
               key={currentMedia.src}
               src={cloudinaryUrl(currentMedia.src, { width: 1200 })}
-              alt={`${product.name} ${colorLabel}${series ? ` — ${series.name}` : ""}`}
-              className="absolute inset-0 w-full h-full object-contain"
+              alt={product.name}
+              loading="lazy"
+              className="h-full w-full object-contain transition-opacity duration-300"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = "none";
               }}
             />
           ) : null}
+
           {gallery.length > 1 && (
             <>
               <button
                 type="button"
                 onClick={() => setPhoto((i) => (i - 1 + gallery.length) % gallery.length)}
                 aria-label="Foto sebelumnya"
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 z-10"
-                style={{ background: "rgba(248,246,242,.85)", backdropFilter: "blur(6px)" }}
+                className="absolute left-3 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow"
               >
-                <ChevronLeft size={18} style={{ color: "var(--espresso)" }} />
+                <ChevronLeft size={14} strokeWidth={2.5} />
               </button>
               <button
                 type="button"
                 onClick={() => setPhoto((i) => (i + 1) % gallery.length)}
                 aria-label="Foto berikutnya"
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 z-10"
-                style={{ background: "rgba(248,246,242,.85)", backdropFilter: "blur(6px)" }}
+                className="absolute right-3 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow"
               >
-                <ChevronRight size={18} style={{ color: "var(--espresso)" }} />
+                <ChevronRight size={14} strokeWidth={2.5} />
               </button>
             </>
           )}
         </div>
 
-        {/* Titik navigasi */}
-        {gallery.length > 1 && (
-          <div className="flex justify-center gap-1.5 mt-3">
-            {gallery.map((item, i) => (
-              <button
-                key={item.src}
-                type="button"
-                onClick={() => setPhoto(i)}
-                aria-label={`Media ${i + 1}`}
-                className="rounded-full transition-all duration-300"
-                style={{ background: i === activePhoto ? "var(--gold)" : "rgba(0,0,0,.4)", width: i === activePhoto ? 16 : 6, height: 6 }}
-              />
-            ))}
-          </div>
-        )}
-
         {/* Thumbnail */}
         {gallery.length > 1 && (
-          <div className="hidden md:grid mt-4 grid-cols-4 gap-2">
+          <div className="mt-3 grid grid-cols-4 gap-2.5">
             {gallery.map((item, i) => (
               <button
                 key={item.src}
                 type="button"
                 onClick={() => setPhoto(i)}
-                aria-label={`Media ${i + 1}`}
-                className="relative aspect-square rounded-lg overflow-hidden transition-all duration-200"
-                style={{ boxShadow: i === activePhoto ? "0 0 0 2px var(--espresso)" : "0 0 0 1px rgba(0,0,0,.3)" }}
+                aria-label={`Foto ${i + 1}`}
+                className={`aspect-[4/5] overflow-hidden rounded-xl bg-[#e9e9e7] transition ${
+                  i === activePhoto ? "ring-2 ring-black" : "ring-1 ring-black/10"
+                }`}
               >
                 {item.type === "video" ? (
-                  <>
-                    {/* Thumbnail video memakai poster foto (bukan elemen video) + ikon play. */}
-                    <img src={cloudinaryUrl(videoPoster || item.src, { width: 300 })} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  <span className="relative block h-full w-full">
+                    <img src={cloudinaryUrl(videoPoster, { width: 300 })} alt="" className="h-full w-full object-contain" loading="lazy" />
                     <span className="absolute inset-0 grid place-items-center" style={{ background: "rgba(0,0,0,.28)" }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
-                        <path d="M8 5v14l11-7z" fill="#fff" />
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff" aria-hidden>
+                        <path d="M8 5v14l11-7z" />
                       </svg>
                     </span>
-                  </>
+                  </span>
                 ) : (
-                  <img src={cloudinaryUrl(item.src, { width: 300 })} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  <img
+                    src={cloudinaryUrl(item.src, { width: 300 })}
+                    alt=""
+                    className="h-full w-full object-contain"
+                    loading="lazy"
+                  />
                 )}
               </button>
             ))}
           </div>
         )}
-      </div>
+      </section>
 
       {/* ── Info ── */}
-      <div>
-        <p className="text-[10px] md:text-[11px] tracking-[0.28em] uppercase font-ui mb-2 md:mb-3" style={{ color: "var(--gold)" }}>
-          Detail Produk
-        </p>
-        <h2 className="text-[1.5rem] sm:text-[1.8rem] md:text-[2rem] lg:text-[2.2rem] font-semibold leading-tight mb-1.5 md:mb-2" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--espresso)" }}>
+      <section>
+        <p className="text-[11px] font-semibold uppercase tracking-[.25em] text-neutral-500">Detail Produk</p>
+        <h1
+          className="mt-2 text-4xl leading-tight sm:text-[44px]"
+          style={{ fontFamily: "var(--font-cormorant), Georgia, serif" }}
+        >
           {product.name}
-          {product.kain ? (
-            <span style={{ color: "var(--gold)" }}> — Kain {product.kain}</span>
-          ) : series ? (
-            <span style={{ color: "var(--gold)" }}> — {series.name}</span>
-          ) : colorLabel ? (
-            <span style={{ color: "var(--gold)" }}> — {colorLabel}</span>
-          ) : null}
-        </h2>
-        <p className="text-[13px] font-ui mb-5 md:mb-6" style={{ color: "var(--stone)" }}>
+          {product.kain ? ` — Kain ${product.kain}` : series ? ` — ${series.name}` : colorLabel ? ` — ${colorLabel}` : ""}
+        </h1>
+        <p className="mt-1 text-sm text-neutral-500">
           {product.kain && (
             <>
-              Jenis kain <span style={{ color: "var(--gold)" }}>{product.kain}</span>
-              {" · "}
+              Jenis kain <b className="font-medium text-neutral-800">{product.kain}</b> ·{" "}
             </>
           )}
-          <span style={{ color: "var(--gold)" }}>{product.category}</span>
-          <span>{product.weight ? ` · ${product.weight >= 1000 ? (product.weight / 1000).toFixed(1) + " kg" : product.weight + " g"}` : " · ready stock"}</span>
+          {product.category}
+          {product.weight ? ` · ${product.weight >= 1000 ? (product.weight / 1000).toFixed(1) + " kg" : product.weight + " g"}` : ""}
         </p>
 
-        {/* Series — hanya produk yang punya series (mis. Thobe) */}
+        {/* Timer — disembunyikan saat event belum dibuka (timer-nya sudah ada di dalam CTA). */}
+        {phase !== "upcoming" && (
+          <div className="mt-5">
+            <Countdown target={countdownTarget} phase={phase} variant="pill" endInfo={endInfo} />
+          </div>
+        )}
+
+        {/* Series */}
         {product.series.length > 0 && (
-          <div className="mb-6">
-            <p className="text-[10px] tracking-[0.1em] md:text-[10.5px] md:tracking-[0.18em] uppercase text-[var(--muted)] mb-2.5">Pilih Series</p>
-            <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:gap-2">
+          <>
+            <p className="mt-7 text-[11px] font-semibold uppercase tracking-[.2em]">Pilih Series</p>
+            <div className="mt-3 flex flex-wrap gap-2">
               {product.series.map((option) => {
                 const active = option.name === series?.name;
                 return (
@@ -301,35 +292,29 @@ export default function StepProduct({
                     key={option.name}
                     type="button"
                     onClick={() => onChange({ series: option.name, price: option.price })}
-                    className="flex flex-col items-start gap-1 px-3 py-2.5 md:inline-flex md:flex-row md:items-center md:justify-between md:gap-1.5 md:px-3.5 md:py-2 rounded-lg text-[11px] md:text-[12.5px] transition"
-                    style={{
-                      background: active ? "var(--espresso)" : "var(--cream-bright)",
-                      color: active ? "var(--cream)" : "var(--coffee)",
-                      border: `1px solid ${active ? "var(--espresso)" : "rgba(0,0,0,.3)"}`,
-                    }}
+                    className={`rounded-lg border px-3.5 py-2 text-xs transition ${
+                      active ? "border-neutral-950 bg-neutral-950 text-white" : "border-black/15 bg-white text-neutral-800 hover:bg-neutral-100"
+                    }`}
                   >
-                    <span className="font-medium">{option.name}</span>
-                    <span className="ml-1.5" style={{ color: active ? "rgba(248,245,241,.75)" : "var(--gold)" }}>
-                      mulai dari {rupiah(option.price)}
-                    </span>
+                    <b className="font-semibold">{option.name}</b>
+                    <span className="ml-1.5 opacity-70">mulai dari {rupiah(option.price)}</span>
                   </button>
                 );
               })}
             </div>
-          </div>
+          </>
         )}
 
         {/* Warna */}
         {product.colors.length > 0 && product.colors.some((c) => c && c !== "default") && (
-          <div className="mb-6">
-            <p className="text-[10px] tracking-[0.1em] md:text-[11px] md:tracking-[0.12em] uppercase font-ui font-medium mb-2.5 md:mb-3" style={{ color: "var(--espresso)" }}>
-              Pilih Warna
-            </p>
-            <div className="flex flex-wrap gap-1.5 md:gap-2">
+          <>
+            <p className="mt-6 text-[11px] font-semibold uppercase tracking-[.2em]">Pilih Warna</p>
+            <div className="mt-3 flex flex-wrap gap-2">
               {product.colors.map((color) => {
                 const variant = openOrderVariantFor(product, color);
                 const stock = variant?.stock ?? 0;
                 const habis = stock === 0;
+                const active = color === draft.color;
                 return (
                   <button
                     key={color}
@@ -337,242 +322,161 @@ export default function StepProduct({
                     onClick={() => onChange({ color })}
                     disabled={habis}
                     title={habis ? "Stok habis" : `Stok ${stock}`}
-                    className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 md:py-2 text-[11px] md:text-[12px] font-ui rounded-sm transition-all duration-200 disabled:cursor-not-allowed"
-                    style={{
-                      background: color === draft.color ? "var(--espresso)" : "transparent",
-                      color: color === draft.color ? "var(--cream)" : "var(--coffee)",
-                      border: `1px solid ${color === draft.color ? "var(--espresso)" : "rgba(0,0,0,.3)"}`,
-                      opacity: habis && color !== draft.color ? 0.55 : 1,
-                    }}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition disabled:cursor-not-allowed ${
+                      active ? "border-neutral-950 bg-neutral-950 text-white" : "border-black/15 bg-white text-neutral-800 hover:bg-neutral-100"
+                    }`}
+                    style={{ opacity: habis && !active ? 0.5 : 1 }}
                   >
                     <span
-                      className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full shrink-0"
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
                       style={{ background: colorMap[color] || "#ccc", border: "1px solid rgba(0,0,0,.1)" }}
                     />
                     {openOrderColorLabel(product, color)}
-                    <span
-                      className="ml-0.5 text-[10px] font-semibold tabular-nums"
-                      style={{ color: habis ? "#b91c1c" : color === draft.color ? "rgba(255,255,255,.8)" : "#6b8a5e" }}
-                    >
+                    <span className={`text-[10px] font-semibold tabular-nums ${habis ? "text-red-600" : active ? "text-white/80" : "text-neutral-500"}`}>
                       {habis ? "Habis" : stock}
                     </span>
                   </button>
                 );
               })}
             </div>
-          </div>
+          </>
         )}
 
         {/* Ukuran */}
-        <div className="mb-6">
-          <p className="text-[10px] tracking-[0.1em] md:text-[10.5px] md:tracking-[0.18em] uppercase text-[var(--muted)] mb-2.5">Pilih Ukuran</p>
-          <div className="flex flex-wrap gap-1.5 md:gap-2">
-            {sizes.map((size) => (
+        <p className="mt-6 text-[11px] font-semibold uppercase tracking-[.2em]">Pilih Ukuran</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {sizes.map((size) => {
+            const active = size === draft.size;
+            return (
               <button
                 key={size}
                 type="button"
                 onClick={() => onChange({ size })}
-                className="w-10 h-10 md:w-auto md:h-auto flex items-center justify-center md:px-4 md:py-2 rounded-sm md:rounded-lg text-[12px] md:text-[12.5px] transition"
-                style={{
-                  background: size === draft.size ? "var(--espresso)" : "var(--cream-bright)",
-                  color: size === draft.size ? "var(--cream)" : "var(--coffee)",
-                  border: `1px solid ${size === draft.size ? "var(--espresso)" : "rgba(0,0,0,.3)"}`,
-                }}
+                className={`h-9 min-w-[44px] rounded-lg border px-3 text-xs font-medium transition ${
+                  active ? "border-neutral-950 bg-neutral-950 text-white" : "border-black/15 bg-white text-neutral-800 hover:bg-neutral-100"
+                }`}
               >
                 {size}
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
 
-        {/* Kartu harga — gaya Open Order: Harga Minimum + input harga bebas (Create Your Price).
-            Quick-pick ala katalog sengaja TIDAK dipakai di sini. */}
-        <div className="mb-6 md:mb-8 rounded-2xl p-5 md:p-6" style={{ background: "var(--cream-bright)", border: "1px solid rgba(0,0,0,.25)" }}>
-          {cypEnabled ? (
-            <div>
-              <p className="text-[10px] md:text-[11px] tracking-[0.1em] uppercase font-ui mb-1" style={{ color: "var(--stone)" }}>Harga Minimum</p>
-              <p className="text-[1.3rem] md:text-[20px] font-ui font-semibold mb-1" style={{ color: "var(--gold)" }}>
-                {rupiah(minimum)}
-              </p>
-              <p className="text-[12px] font-ui" style={{ color: "var(--stone)" }}>
+        {/* Harga */}
+        <div className="mt-6 rounded-2xl border border-black/10 bg-white p-5">
+          <p className="text-[11px] uppercase tracking-[.2em] text-neutral-500">
+            {cypEnabled ? "Harga Minimum" : "Harga"}
+          </p>
+          <p className="mt-1 text-xl font-bold">{rupiah(minimum)}</p>
+          {cypEnabled && (
+            <>
+              <p className="mt-1 text-xs text-neutral-500">
                 Create Your Price — pilih harga terbaikmu{series ? ` untuk series ${series.name}` : ""}.
               </p>
-              <div className="mt-3 flex items-center gap-2 rounded-lg bg-white px-4 py-3" style={{ border: "1px solid rgba(0,0,0,.35)" }}>
-                <span className="text-[13.5px] font-semibold" style={{ color: "var(--stone)" }}>Rp</span>
+              <label className="mt-3 flex items-center gap-2 rounded-xl border border-black/15 px-4 py-3 transition focus-within:border-black">
+                <span className="text-sm text-neutral-500">Rp</span>
                 <input
                   value={price ? price.toLocaleString("id-ID") : ""}
                   onChange={(e) => handlePriceInput(e.target.value)}
                   inputMode="numeric"
                   aria-label="Harga pilihanmu"
                   placeholder={minimum.toLocaleString("id-ID")}
-                  className="w-full bg-transparent text-[15px] font-semibold tabular-nums outline-none"
-                  style={{ color: "var(--espresso)" }}
+                  className="flex-1 bg-transparent font-semibold outline-none"
                 />
-              </div>
+              </label>
               {priceTooLow && (
-                <p className="mt-2 text-[11.5px] leading-relaxed" style={{ color: "#e74c3c" }}>
+                <p className="mt-2 text-[11.5px] leading-relaxed text-red-600">
                   Harga minimum{series ? ` untuk series ${series.name}` : ""} adalah {rupiah(minimum)}.
                 </p>
               )}
-            </div>
-          ) : (
-            <div>
-              <p className="text-[10px] md:text-[11px] tracking-[0.1em] uppercase font-ui mb-1" style={{ color: "var(--stone)" }}>Harga</p>
-              <p className="text-[1.3rem] md:text-[20px] font-ui font-semibold" style={{ color: "var(--gold)" }}>
-                {rupiah(minimum)}
-              </p>
-            </div>
+            </>
           )}
         </div>
 
-        {description && (
-          <p className="text-[13px] md:text-[15px] leading-relaxed font-ui mb-5 md:mb-8" style={{ color: "rgba(0,0,0,.8)" }}>
-            {description}
-          </p>
-        )}
-
-        <div className="h-px mb-5 md:mb-7" style={{ background: "rgba(0,0,0,.2)" }} />
+        {description && <p className="mt-6 text-sm leading-relaxed text-neutral-700">{description}</p>}
 
         {/* Jumlah */}
-        <div className="flex items-center justify-between mb-5 md:mb-8">
-          <p className="text-[11px] sm:text-[12px] tracking-[0.12em] uppercase font-ui font-medium" style={{ color: "var(--espresso)" }}>Jumlah</p>
-          <div className="flex items-center gap-3">
+        <div className="mt-6 flex items-center justify-between border-t border-black/10 pt-5">
+          <span className="text-[11px] font-semibold uppercase tracking-[.2em]">Jumlah</span>
+          <div className="flex items-center gap-4">
             <button
               type="button"
               onClick={() => onChange({ quantity: Math.max(1, draft.quantity - 1) })}
-              className="w-9 h-9 flex items-center justify-center rounded-sm transition-all duration-200 hover:scale-105"
-              style={{ border: "1px solid rgba(0,0,0,.3)", color: "var(--espresso)" }}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-black/15 bg-white transition hover:bg-neutral-100"
               aria-label="Kurangi jumlah"
             >
-              <Minus size={14} />
+              <Minus size={13} />
             </button>
-            <span className="w-8 text-center text-sm font-ui font-medium" style={{ color: "var(--espresso)" }}>{draft.quantity}</span>
+            <span className="w-4 text-center font-semibold">{draft.quantity}</span>
             <button
               type="button"
               onClick={() => onChange({ quantity: draft.quantity + 1 })}
-              className="w-9 h-9 flex items-center justify-center rounded-sm transition-all duration-200 hover:scale-105"
-              style={{ border: "1px solid rgba(0,0,0,.3)", color: "var(--espresso)" }}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-black/15 bg-white transition hover:bg-neutral-100"
               aria-label="Tambah jumlah"
             >
-              <Plus size={14} />
+              <Plus size={13} />
             </button>
           </div>
         </div>
 
-        {/* Total + aksi — desktop & tablet (mobile pakai bar sticky di bawah) */}
-        <div className="hidden md:block">
-          <div className="flex items-end justify-between mb-4">
-            <span className="text-[11px] sm:text-[12px] tracking-[0.12em] uppercase font-ui font-medium" style={{ color: "var(--espresso)" }}>
-              Total ({draft.quantity} pcs)
-            </span>
-            <span className="text-[1.25rem] font-ui font-semibold tabular-nums" style={{ color: "var(--gold)" }}>
-              {rupiah(lineTotal)}
-            </span>
-          </div>
+        {/* Total */}
+        <div className="mt-5 flex items-center justify-between border-t border-black/10 pt-5">
+          <span className="text-[11px] font-semibold uppercase tracking-[.2em]">
+            Total ({draft.quantity} pcs)
+          </span>
+          <span className="text-2xl font-bold">{rupiah(lineTotal)}</span>
+        </div>
 
-          {/* Jendela belum dibuka → tombolnya berubah jadi hitung mundur (gaya marketplace):
-              ikon kunci + "Dibuka dalam" + timer DI DALAM tombol, dengan catatan kecil di
-              bawahnya. Jadi tidak ada tombol abu-abu yang terpisah dari timernya. */}
-          {locked ? (
-            <>
-              <div
-                className="flex w-full items-center justify-center gap-2.5 rounded-sm py-4 text-[12px] tracking-[0.08em] uppercase font-ui font-semibold"
-                style={{ background: "var(--espresso)", color: "white", boxShadow: "0 8px 28px -8px rgba(0,0,0,.35)" }}
-              >
-                <Lock size={15} strokeWidth={2.2} className="shrink-0" />
-                <span className="whitespace-nowrap">Dibuka dalam</span>
-                <Countdown deadline={lockDeadline ?? null} variant="inline" />
-              </div>
-              <p className="mt-2.5 text-center text-[11.5px] leading-relaxed" style={{ color: "var(--stone)" }}>
-                {lockCaption || "Tombol pesanan aktif otomatis saat Open Order dimulai."}
-              </p>
-            </>
-          ) : (
+        {/* CTA — berubah sesuai fase event */}
+        <div className="relative mt-5 h-[58px]">
+          {phase === "live" ? (
             <button
               type="button"
               onClick={handleAdd}
               disabled={priceTooLow}
-              className="w-full flex items-center justify-center gap-2.5 py-4 rounded-sm text-[12px] tracking-[0.08em] uppercase font-ui font-semibold transition-all duration-300 hover:scale-[1.01] hover:shadow-lg disabled:opacity-40 disabled:hover:scale-100"
-              style={{ background: "var(--espresso)", color: "white", boxShadow: "0 8px 28px -8px rgba(0,0,0,.35)" }}
+              className="absolute inset-0 w-full rounded-xl text-sm font-semibold uppercase tracking-[.15em] transition-all duration-500 hover:-translate-y-0.5 hover:shadow-xl active:scale-[.99] disabled:opacity-40"
+              style={{ background: "#000000", color: "#fff" }}
             >
               Tambah ke Pesanan
             </button>
+          ) : phase === "upcoming" ? (
+            <>
+              <div className="oo-shimmer absolute inset-0 flex cursor-not-allowed items-center justify-center rounded-xl text-white">
+                <Countdown target={countdownTarget} phase={phase} variant="inline" />
+              </div>
+              <p className="mt-2 h-4 text-center text-xs text-neutral-500">
+                Tombol pesanan aktif otomatis saat Open Order dimulai.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="absolute inset-0 flex cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-neutral-200 text-sm font-semibold uppercase tracking-[.15em] text-neutral-500">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M5.6 5.6l12.8 12.8" />
+                </svg>
+                Open Order Ditutup
+              </div>
+              <p className="mt-2 h-4 text-center text-xs text-neutral-500">
+                Periode ini sudah berakhir. <span className="font-medium text-neutral-800 underline">Kabari saya periode berikutnya</span>
+              </p>
+            </>
           )}
         </div>
 
         {/* Info tambahan */}
-        <div className="mt-5 md:mt-7 space-y-2.5">
+        <div className="mt-6 space-y-2.5">
           <InfoAccordionItem title="Detail bahan & perawatan">
-            Kain premium dengan sirkulasi udara baik, tidak menerawang, dan jatuh rapi. Cuci dengan air dingin, setrika suhu sedang, jangan gunakan pemutih.
+            Kain premium dengan sirkulasi udara baik, tidak menerawang, dan jatuh rapi. Cuci dengan air dingin, setrika suhu sedang, jangan pakai pemutih.
           </InfoAccordionItem>
           <InfoAccordionItem title="Panduan ukuran">
-            Tersedia ukuran S–XXL. Ukur lingkar dada dan panjang badan, lalu sesuaikan dengan tabel ukuran. Ragu? Chat kami via WhatsApp.
+            Tersedia ukuran XS–XXL. Ukur lingkar dada dan panjang badan, lalu sesuaikan dengan tabel ukuran. Ragu? Chat kami via WhatsApp.
           </InfoAccordionItem>
           <InfoAccordionItem title="Pengiriman & pengembalian">
             Dikirim 1–2 hari kerja setelah pembayaran. Salah ukuran bisa ditukar maksimal 7 hari setelah barang diterima.
           </InfoAccordionItem>
         </div>
-      </div>
+      </section>
     </div>
-
-    {/* ── Bar aksi sticky (mobile) ──
-        Mengikuti wireframe needmcp "orange-food-details" (Sticky Bottom CTA Bar): bar putih
-        translucent menempel di dasar layar, total di kiri, tombol pill di kanan. Versi desktop
-        tetap pakai tombol lebar di atas (blok `hidden md:block`). */}
-    <div
-      className="md:hidden fixed bottom-0 inset-x-0 z-40"
-      style={{ background: "rgba(255,255,255,.95)", backdropFilter: "blur(8px)", borderTop: "1px solid rgba(0,0,0,.12)" }}
-    >
-      {locked ? (
-        /* Terkunci: bar sticky jadi satu blok — total di atas, tombol hitung mundur full
-           width di bawahnya (gaya app native: satu aksi utama yang jelas, bukan dua
-           tombol terpisah yang bikin sempit). */
-        <div className="px-5 pt-3.5" style={{ paddingBottom: "calc(0.9rem + env(safe-area-inset-bottom))" }}>
-          <div className="mb-2.5 flex items-baseline justify-between gap-3">
-            <span className="text-[10px] font-ui font-bold uppercase tracking-[0.08em]" style={{ color: "var(--stone)" }}>
-              Total
-            </span>
-            <span className="text-[19px] font-ui font-extrabold leading-none tabular-nums" style={{ color: "var(--gold)" }}>
-              {rupiah(lineTotal)}
-            </span>
-          </div>
-          <div
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full text-[13px] font-ui font-bold"
-            style={{ background: "var(--espresso)", color: "white" }}
-          >
-            <Lock size={14} strokeWidth={2.2} className="shrink-0" />
-            <span className="whitespace-nowrap uppercase tracking-[0.06em]">Dibuka dalam</span>
-            <Countdown deadline={lockDeadline ?? null} variant="inline" />
-          </div>
-        </div>
-      ) : (
-        <div
-          className="flex items-center justify-between gap-4 px-6 pt-4"
-          style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
-        >
-          <div className="min-w-0">
-            <p className="text-[10px] font-ui font-bold uppercase tracking-[0.08em]" style={{ color: "var(--stone)" }}>
-              Total
-            </p>
-            <p className="text-[20px] font-ui font-extrabold leading-none tabular-nums" style={{ color: "var(--gold)" }}>
-              {rupiah(lineTotal)}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleAdd}
-            disabled={priceTooLow}
-            className="shrink-0 h-12 px-6 rounded-full text-[14px] font-ui font-bold transition-all duration-300 active:scale-[.98] disabled:opacity-40"
-            style={{ background: "var(--espresso)", color: "white" }}
-          >
-            Tambah ke Pesanan
-          </button>
-        </div>
-      )}
-    </div>
-
-    {/* Ruang bawah supaya isi terakhir tidak ketutup bar sticky (mobile). */}
-    <div className="md:hidden h-24" aria-hidden="true" />
-    </>
   );
 }

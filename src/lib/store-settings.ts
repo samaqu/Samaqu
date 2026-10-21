@@ -21,6 +21,10 @@ interface StoreSettings {
   open_order_start_date: string | null;
   /** Tanggal tutup jendela Open Order (YYYY-MM-DD). */
   open_order_end_date: string | null;
+  /** Jam buka jendela Open Order (HH:MM, WIB) — kolom opsional, kosong = 00:00. */
+  open_order_start_time: string | null;
+  /** Jam tutup jendela Open Order (HH:MM, WIB) — kolom opsional, kosong = 23:59. */
+  open_order_end_time: string | null;
   /**
    * Berat kirim add-on "Extra Cover & Hanger" (gram) — diatur dari menu admin "Open Order".
    * Null/kosong = pakai default 300 g (`DEFAULT_OPEN_ORDER_ADDON_WEIGHT`).
@@ -41,6 +45,8 @@ const DEFAULTS: StoreSettings = {
   open_order_active: true,
   open_order_start_date: null,
   open_order_end_date: null,
+  open_order_start_time: null,
+  open_order_end_time: null,
   open_order_addon_weight: DEFAULT_OPEN_ORDER_ADDON_WEIGHT,
 };
 
