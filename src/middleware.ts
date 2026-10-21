@@ -67,6 +67,14 @@ export default function middleware(request: NextRequest) {
     return NextResponse.rewrite(url, { request: { headers } });
   }
 
+  // Halaman Bio Link hidup TANPA prefix locale (samaqu.id/bio). Jalur lama /id/bio & /en/bio
+  // diarahkan ke /bio supaya cuma ada satu URL untuk satu halaman (kebas double).
+  if (/^\/(id|en)\/bio(\/|$)/.test(request.nextUrl.pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = request.nextUrl.pathname.replace(/^\/(id|en)/, "");
+    return NextResponse.redirect(url, 308);
+  }
+
   return intlMiddleware(new NextRequest(request, { headers }));
 }
 
@@ -75,10 +83,11 @@ export const config = {
   // kalau tidak middleware locale mengalihkannya ke /<locale>/… (404).
   // `.*\..*` mengecualikan semua file statis (robots.txt, sitemap.xml, llms.txt,
   // llms-full.txt, favicon.ico, gambar, .well-known/…) dari redirect locale.
-  // `affiliate` = portal partner (tanpa locale), `r/` = halaman tujuan tautan referral.
+  // `affiliate` = portal partner (tanpa locale), `r/` = halaman tujuan tautan referral,
+  // `bio` = halaman Bio Link (tanpa locale — satu-satunya URL: /bio).
   matcher: [
     "/",
     "/(id|en)/:path*",
-    "/((?!_next|admin|panel-admin|ops|affiliate|r/|api|opengraph-image|twitter-image|icon|apple-icon|manifest|\\.well-known|.*\\..*).*)",
+    "/((?!_next|admin|panel-admin|ops|affiliate|bio|r/|api|opengraph-image|twitter-image|icon|apple-icon|manifest|\\.well-known|.*\\..*).*)",
   ],
 };

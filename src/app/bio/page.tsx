@@ -4,7 +4,6 @@ import { plusJakarta } from "@/lib/bio-font";
 import { fetchBioPageContent } from "@/lib/bio-page-content";
 import { readOpenOrderWindow } from "@/lib/open-order-settings";
 import {
-  formatOpenOrderMoment,
   openOrderDeadline,
   openOrderStartDeadline,
   resolveOpenOrderState,
@@ -23,14 +22,10 @@ export default async function Page() {
   const phase: BioOpenOrderPhase | null =
     state === "open" ? "live" : state === "before" ? "upcoming" : null;
   const target = state === "open" ? openOrderDeadline(window) : openOrderStartDeadline(window);
-  const caption =
-    state === "open"
-      ? `Tutup ${formatOpenOrderMoment(window.open_order_end_date, window.open_order_end_time, true)}`
-      : `Buka ${formatOpenOrderMoment(window.open_order_start_date, window.open_order_start_time, true)}`;
 
   const openOrder =
     phase && target
-      ? { phase, target, caption, href: "/id/open-order" }
+      ? { phase, target, href: "/id/open-order" }
       : null;
 
   return (

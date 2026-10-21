@@ -116,7 +116,7 @@ export default function BioLinkPage({
    * Jendela Open Order — dibaca dari server. Kalau `null`, tidak ada event yang sedang
    * berjalan/p upcoming, jadi bar pengumuman nggak dirender sama sekali.
    */
-  openOrder?: { phase: BioOpenOrderPhase; target: number; caption: string; href: string } | null;
+  openOrder?: { phase: BioOpenOrderPhase; target: number; href: string } | null;
 }) {
   const { logo_url, eyebrow, description, hero, categories, belanja, rows, guarantee, socials, footer, marquee } = content;
   const hasVideo = Boolean(hero.video_url?.trim());
@@ -157,7 +157,6 @@ export default function BioLinkPage({
                 phase={openOrder.phase}
                 target={openOrder.target}
                 href={openOrder.href}
-                caption={openOrder.caption}
               />
             </div>
           )}
@@ -492,7 +491,10 @@ export default function BioLinkPage({
         .bio-oo:hover { transform: translateY(-3px); box-shadow: 0 30px 58px -22px rgba(0,0,0,.65); }
         .bio-oo-dot { width: 10px; height: 10px; border-radius: 999px; background: #F5A524; animation: bio-oo-blink 1.8s ease-in-out infinite; }
         @keyframes bio-oo-blink { 0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(245,165,36,.5); } 50% { opacity: .55; transform: scale(.82); box-shadow: 0 0 0 7px rgba(245,165,36,0); } }
-        .bio-oo-box { display: inline-block; min-width: 2.1ch; padding: 5px 6px; border-radius: 9px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.14); font-size: 12px; font-weight: 800; line-height: 1; text-align: center; font-variant-numeric: tabular-nums; }
+        .bio-oo-dot-live { background: #34D399; animation-name: bio-oo-blink-live; }
+        @keyframes bio-oo-blink-live { 0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(52,211,153,.5); } 50% { opacity: .55; transform: scale(.82); box-shadow: 0 0 0 7px rgba(52,211,153,0); } }
+        .bio-oo-box { display: inline-block; min-width: 1.9ch; padding: 4px 5px; border-radius: 8px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.14); font-size: 11px; font-weight: 800; line-height: 1; text-align: center; font-variant-numeric: tabular-nums; }
+        @media (min-width: 640px) { .bio-oo-box { min-width: 2.1ch; padding: 5px 6px; border-radius: 9px; font-size: 12px; } }
         .bio-oo-sweep { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 38%, rgba(245,165,36,.16) 50%, transparent 62%); transform: translateX(-100%); animation: bio-oo-sw 7s ease-in-out infinite; }
         @keyframes bio-oo-sw { 0% { transform: translateX(-100%); } 55%, 100% { transform: translateX(100%); } }
         .bio-oo-arrow { transition: transform .25s cubic-bezier(.2,.8,.2,1); }
