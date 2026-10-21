@@ -177,15 +177,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Gagal membuat sesi opname" }, { status: 500 });
   }
 
-  const rows = lines.map((line) => ({ ...line, session_id: session.id, updated_at: undefined }));
+  // Jangan kirim field opsional bernilai undefined: supabase-js mengubahnya jadi null
+  // (updated_at NOT NULL), jadi cukup tambahkan session_id.
+  const rows = lines.map((line) => ({ ...line, session_id: session.id }));
   for (let i = 0; i < rows.length; i += 200) {
     const { error: lineError } = await admin
       .from("stock_opname_lines")
       .insert(rows.slice(i, i + 200));
     if (lineError) {
-      console.error("[OPNAME] insert lines:", lineError.message);
+      console.error("[OPNAME] insert lines:", lineError.message, lineError.details, lineError.hint);
       await admin.from("stock_opname_sessions").delete().eq("id", session.id);
-      return NextResponse.json({ error: "Gagal menyiapkan baris hitung" }, { status: 500 });
+      return NextResponse.json(
+        { error: `Gagal menyiapkan baris hitung: ${lineError.message}` },
+        { status: 500 },
+      );
     }
   }
 
