@@ -23,8 +23,6 @@ import {
 import Countdown, { type OpenOrderPhase } from "./Countdown";
 
 const ALL = "semua";
-/** Ambang "stok menipis" — angka yang sama dengan kartu katalog. */
-const LOW_STOCK_THRESHOLD = 3;
 
 /** Format harga kartu katalog: "Rp 299.000". */
 const rupiah = (value: number) => "Rp " + Math.round(value).toLocaleString("id-ID");
@@ -148,7 +146,6 @@ export default function StepCatalog({
           const label = product.kain ? `Kain ${product.kain}` : product.category;
           const totalStock = product.totalStock;
           const isSoldOut = totalStock === 0;
-          const isLowStock = totalStock > 0 && totalStock <= LOW_STOCK_THRESHOLD;
           const seriesCount = product.series.length;
           // Foto kartu = media bertipe GAMBAR (bukan video) dari varian; `product.image`
           // sendiri bisa berupa .mp4 sehingga `<img>` gagal dan kartu tampak kosong.
@@ -171,13 +168,15 @@ export default function StepCatalog({
               style={{ animationDelay: ".2s" }}
               onClick={() => onOpen(product, initialColor)}
             >
-              <div className="relative aspect-[3/4] overflow-hidden bg-neutral-100">
+              <div className="relative aspect-[3/4] overflow-hidden bg-[#f5f5f4]">
                 {mainImage && (
                   <img
                     src={cloudinaryUrl(mainImage, { width: 700 })}
                     alt={product.name}
                     loading="lazy"
-                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    /* `object-contain` → foto produk tampil UTUH (nggak terpotong), beda sama
+                       kartu katalog yang pakai `object-cover`. */
+                    className="h-full w-full object-contain p-1 transition-transform duration-700 group-hover:scale-[1.03]"
                     style={isSoldOut ? { filter: "grayscale(35%) brightness(.85)" } : undefined}
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
@@ -185,12 +184,7 @@ export default function StepCatalog({
                   />
                 )}
 
-                {/* Badge status stok */}
-                {!isSoldOut && (
-                  <span className="absolute left-2.5 top-2.5 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold backdrop-blur md:left-4 md:top-4 md:px-3 md:py-1 md:text-xs">
-                    {isLowStock ? `Menipis — sisa ${totalStock}` : "Ready stock"}
-                  </span>
-                )}
+                {/* Badge "Sold Out" saja — tulisan stok ("Ready stock") nggak dipakai di sini. */}
                 {isSoldOut && (
                   <span className="absolute left-2.5 top-2.5 rounded-full bg-neutral-950 px-2 py-0.5 text-[10px] font-semibold text-white md:left-4 md:top-4 md:px-3 md:py-1 md:text-xs">
                     Sold Out
@@ -233,9 +227,9 @@ export default function StepCatalog({
                   <button
                     type="button"
                     onClick={() => onLockedAction?.()}
-                    className="mt-3 w-full cursor-not-allowed rounded-xl border border-black/15 bg-white py-2 text-[11px] font-semibold text-neutral-400 transition hover:border-black hover:text-neutral-900 md:mt-5 md:rounded-2xl md:py-3.5 md:text-sm"
+                    className="mt-3 w-full cursor-not-allowed rounded-xl border border-black/15 bg-white py-2 text-[11px] font-semibold text-neutral-500 transition hover:border-black hover:text-neutral-900 md:mt-5 md:rounded-2xl md:py-3.5 md:text-sm"
                   >
-                    {phase === "ended" ? "Lihat Detail Produk" : "Belum Dibuka"}
+                    Lihat Detail
                   </button>
                 ) : (
                   <span className="mt-3 flex w-full items-center justify-center gap-1 rounded-xl bg-black py-2 text-[11px] font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg md:mt-5 md:gap-1.5 md:rounded-2xl md:py-3.5 md:text-sm">
