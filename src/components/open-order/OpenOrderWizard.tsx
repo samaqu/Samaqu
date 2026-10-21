@@ -693,6 +693,7 @@ export default function OpenOrderWizard({
             deadline={locked ? startDeadline : endDeadline}
             countdownLabel={locked ? "Buka dalam" : "Berakhir dalam"}
             countdownCaption={locked ? (startLabel ? `Buka ${startLabel}` : "Segera dibuka") : undefined}
+            countdownTone={locked ? "soon" : "live"}
             locked={locked}
             cartCount={lines.reduce((sum, line) => sum + line.quantity, 0)}
             onOpen={(product, color) => openDetail(product.id, color)}

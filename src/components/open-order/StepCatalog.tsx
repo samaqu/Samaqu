@@ -35,6 +35,7 @@ export default function StepCatalog({
   deadline,
   countdownLabel,
   countdownCaption,
+  countdownTone,
   locked,
   cartCount,
   onOpen,
@@ -49,6 +50,8 @@ export default function StepCatalog({
   countdownLabel?: string;
   /** Keterangan singkat di bawah label hitung mundur. */
   countdownCaption?: string;
+  /** Warna titik di depan label: `live` (hijau) atau `soon` (amber). */
+  countdownTone?: "live" | "soon";
   /** Pemesanan terkunci (jendela belum dibuka) — tombol tambah pesanan dimatikan. */
   locked?: boolean;
   cartCount: number;
@@ -87,7 +90,12 @@ export default function StepCatalog({
           Periode {period}
         </p>
         {/* Hitung mundur ala marketplace — countdown murni tampilan, tidak menutup wizard. */}
-        <Countdown deadline={deadline} label={countdownLabel} caption={countdownCaption} />
+        <Countdown
+          deadline={deadline}
+          label={countdownLabel}
+          caption={countdownCaption}
+          tone={countdownTone}
+        />
         <p className="mx-auto mt-3 max-w-xl text-[13px] leading-relaxed" style={{ color: MUTED }}>
           Pilih produk, atur ukuran dan harga, lalu kirim pesanan kamu. Admin akan mengonfirmasi lewat WhatsApp.
         </p>
@@ -141,13 +149,21 @@ export default function StepCatalog({
               key={product.id}
               type="button"
               onClick={() => onOpen(product, initialColor)}
-              className={`group relative flex flex-col h-full rounded-2xl overflow-hidden cursor-pointer text-left ${
-                shown.length === 1 ? "w-full max-w-[260px] sm:max-w-[280px] md:max-w-[300px] lg:max-w-[280px]" : ""
+              className={`group relative flex flex-col items-stretch h-full rounded-2xl overflow-hidden cursor-pointer text-left ${
+                shown.length === 1 ? "w-[260px] max-w-full shrink-0 sm:w-[280px] md:w-[300px] lg:w-[280px]" : ""
               }`}
-              style={{ background: "#ffffff", border: "1px solid rgba(0,0,0,.1)" }}
+              // `align-items: stretch` WAJIB: <button> punya `align-items` default dari UA
+              // stylesheet, dan di WebKit (iOS Safari) nilainya bukan stretch — akibatnya
+              // container foto nggak melebar, `aspect-ratio` jadi tinggi 0, dan fotonya
+              // ILANG di iPhone (di Chrome kebetulan jalan). Lebar kartu juga pakai px
+              // tetap (bukan %) supaya sizing-nya deterministik di semua browser.
+              style={{ background: "#ffffff", border: "1px solid rgba(0,0,0,.1)", alignItems: "stretch" }}
             >
               {/* Foto */}
-              <div className="relative aspect-[3/4] overflow-hidden" style={{ background: "#e5e5e5" }}>
+              <div
+                className="relative w-full overflow-hidden"
+                style={{ background: "#e5e5e5", aspectRatio: "3 / 4" }}
+              >
                 <div
                   className="absolute inset-0 transition-transform duration-700 group-hover:scale-[1.04]"
                   style={{ background: "linear-gradient(135deg,rgba(232,223,209,.6),rgba(0,0,0,.25))" }}
@@ -176,7 +192,7 @@ export default function StepCatalog({
               </div>
 
               {/* Info */}
-              <div className="p-3.5 md:p-4 flex flex-col flex-1">
+              <div className="p-3.5 md:p-4 flex flex-col flex-1 w-full">
                 <h3
                   className="text-[14px] md:text-[16px] font-semibold leading-snug line-clamp-1"
                   style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "#000000" }}

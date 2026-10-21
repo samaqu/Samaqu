@@ -67,6 +67,7 @@ export default function Countdown({
   variant = "banner",
   label = "Berakhir dalam",
   caption,
+  tone = "live",
 }: {
   /** Batas akhir (epoch ms). `null` → tidak ada hitung mundur yang bisa ditampilkan. */
   deadline: number | null;
@@ -74,6 +75,8 @@ export default function Countdown({
   label?: string;
   /** Keterangan singkat di bawah label (mis. tanggal bukanya). */
   caption?: string;
+  /** Warna titik di depan label: `live` (hijau, event jalan) atau `soon` (amber, belum buka). */
+  tone?: "live" | "soon";
 }) {
   /** Sisa waktu dalam ms — `null` sampai komponen ter-mount (SSR vs klien). */
   const [remaining, setRemaining] = useState<number | null>(null);
@@ -127,34 +130,45 @@ export default function Countdown({
   }
 
   // Varian banner — kartu besar di langkah 1.
+  // Mobile: ikon + titik + label jadi SATU baris di tengah, angka di bawahnya, tanpa
+  // caption (biar ringkas kayak mockup). Desktop: blok kiri (ikon + label + caption)
+  // dan angka di kanan.
   return (
     <div
       className="relative mt-5 w-full overflow-hidden rounded-2xl"
       style={{ background: "#ffffff", boxShadow: "0 10px 28px -20px rgba(0,0,0,.45)" }}
     >
       <div className="flex flex-col items-center gap-3 px-4 py-4 sm:flex-row sm:justify-between sm:gap-6 sm:px-6 sm:py-5">
-        <div className="flex w-full items-center gap-2.5 sm:w-auto sm:min-w-0 sm:gap-3">
-          <span
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full sm:h-10 sm:w-10"
-            style={{ background: "rgba(0,0,0,.05)", color: "var(--espresso)" }}
-          >
-            <Clock size={16} className="h-4 w-4 sm:h-[17px] sm:w-[17px]" />
-          </span>
-          <span className="min-w-0 text-center sm:text-left">
+        <div className="flex w-full flex-col items-center gap-2 sm:w-auto sm:min-w-0 sm:items-start sm:gap-3">
+          <span className="flex w-full items-center justify-center gap-2.5 sm:w-auto sm:justify-start sm:gap-3">
             <span
-              className="block text-[10.5px] font-semibold uppercase tracking-[0.18em] sm:text-[11px] sm:tracking-[0.22em]"
-              style={{ color: "var(--gold-deep)" }}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full sm:h-10 sm:w-10"
+              style={{ background: "rgba(0,0,0,.05)", color: "var(--espresso)" }}
             >
-              {label}
+              <Clock size={16} className="h-4 w-4 sm:h-[17px] sm:w-[17px]" />
             </span>
-            {caption && (
-              <span
-                className="mt-1 block text-[11px] leading-snug sm:text-[12px] sm:leading-relaxed"
-                style={{ color: "var(--stone)" }}
-              >
-                {caption}
+            <span className="flex flex-col items-center gap-1 sm:items-start">
+              <span className="flex items-center justify-center gap-1.5 sm:justify-start">
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: tone === "soon" ? "#d97706" : "#16a34a" }}
+                />
+                <span
+                  className="text-[10.5px] font-semibold uppercase tracking-[0.18em] sm:text-[11px] sm:tracking-[0.22em]"
+                  style={{ color: "var(--gold-deep)" }}
+                >
+                  {label}
+                </span>
               </span>
-            )}
+              {caption && (
+                <span
+                  className="hidden text-[12px] leading-relaxed sm:block"
+                  style={{ color: "var(--stone)" }}
+                >
+                  {caption}
+                </span>
+              )}
+            </span>
           </span>
         </div>
 
