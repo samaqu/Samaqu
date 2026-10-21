@@ -36,32 +36,3 @@ export function openOrderGallery(product: OpenOrderProduct, color: string, serie
   if (media.length > 0) return media;
   return product.image ? [{ src: product.image, type: "image" }] : [];
 }
-
-export interface OpenOrderVariantCard {
-  key: string;
-  product: OpenOrderProduct;
-  /** Warna seperti tersimpan di varian — nilai yang dikirim saat memesan. */
-  color: string;
-  /** Nama warna untuk ditampilkan. */
-  label: string;
-  image: string;
-  /** Ukuran yang tersedia untuk warna ini (dari varian produk). */
-  sizes: string[];
-}
-
-/** Satu kartu per produk × warna — dipakai grid di langkah pertama. */
-export function openOrderVariants(products: OpenOrderProduct[]): OpenOrderVariantCard[] {
-  return products.flatMap((product) =>
-    product.colors.map((color) => {
-      const variant = openOrderVariantFor(product, color);
-      return {
-        key: `${product.id}-${color.toLowerCase().replace(/\s+/g, "-")}`,
-        product,
-        color,
-        label: variant?.label ?? color,
-        image: openOrderImage(product, color),
-        sizes: variant?.sizes ?? [],
-      };
-    })
-  );
-}

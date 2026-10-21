@@ -316,25 +316,39 @@ export default function StepProduct({
               Pilih Warna
             </p>
             <div className="flex flex-wrap gap-1.5 md:gap-2">
-              {product.colors.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => onChange({ color })}
-                  className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 md:py-2 text-[11px] md:text-[12px] font-ui rounded-sm transition-all duration-200"
-                  style={{
-                    background: color === draft.color ? "var(--espresso)" : "transparent",
-                    color: color === draft.color ? "var(--cream)" : "var(--coffee)",
-                    border: `1px solid ${color === draft.color ? "var(--espresso)" : "rgba(0,0,0,.3)"}`,
-                  }}
-                >
-                  <span
-                    className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full shrink-0"
-                    style={{ background: colorMap[color] || "#ccc", border: "1px solid rgba(0,0,0,.1)" }}
-                  />
-                  {openOrderColorLabel(product, color)}
-                </button>
-              ))}
+              {product.colors.map((color) => {
+                const variant = openOrderVariantFor(product, color);
+                const stock = variant?.stock ?? 0;
+                const habis = stock === 0;
+                return (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => onChange({ color })}
+                    disabled={habis}
+                    title={habis ? "Stok habis" : `Stok ${stock}`}
+                    className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 md:py-2 text-[11px] md:text-[12px] font-ui rounded-sm transition-all duration-200 disabled:cursor-not-allowed"
+                    style={{
+                      background: color === draft.color ? "var(--espresso)" : "transparent",
+                      color: color === draft.color ? "var(--cream)" : "var(--coffee)",
+                      border: `1px solid ${color === draft.color ? "var(--espresso)" : "rgba(0,0,0,.3)"}`,
+                      opacity: habis && color !== draft.color ? 0.55 : 1,
+                    }}
+                  >
+                    <span
+                      className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full shrink-0"
+                      style={{ background: colorMap[color] || "#ccc", border: "1px solid rgba(0,0,0,.1)" }}
+                    />
+                    {openOrderColorLabel(product, color)}
+                    <span
+                      className="ml-0.5 text-[10px] font-semibold tabular-nums"
+                      style={{ color: habis ? "#b91c1c" : color === draft.color ? "rgba(255,255,255,.8)" : "#6b8a5e" }}
+                    >
+                      {habis ? "Habis" : stock}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

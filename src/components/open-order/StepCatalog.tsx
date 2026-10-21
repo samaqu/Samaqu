@@ -13,8 +13,12 @@
 import { useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { cloudinaryUrl } from "@/lib/cloudinary";
-import { openOrderVariants } from "@/lib/open-order-catalog";
-import { lowestOpenOrderPrice, type OpenOrderProduct } from "@/lib/open-order-offering";
+import { openOrderImage } from "@/lib/open-order-catalog";
+import {
+  lowestOpenOrderPrice,
+  openOrderProductPrice,
+  type OpenOrderProduct,
+} from "@/lib/open-order-offering";
 import { Chip, INK, MUTED, PrimaryButton } from "./ui";
 
 const ALL = "semua";
@@ -44,9 +48,14 @@ export default function StepCatalog({
     () => [...new Set(products.map((product) => product.category))].sort((a, b) => a.localeCompare(b)),
     [products]
   );
-  const variants = useMemo(() => openOrderVariants(products), [products]);
+  // Satu kartu per PRODUK (bukan per warna/varian). Pengelompokan sudah dilakukan
+  // `buildOpenOrderProducts` dengan kunci yang sama seperti halaman Katalog
+  // (kategori + nama), jadi Kabak (Kabak 01/02/04/12) tampil sebagai satu kartu.
   const lowestPrice = useMemo(() => lowestOpenOrderPrice(products), [products]);
-  const shown = category === ALL ? variants : variants.filter((variant) => variant.product.category === category);
+  const shown = useMemo(
+    () => (category === ALL ? products : products.filter((product) => product.category === category)),
+    [products, category],
+  );
 
   return (
     <div>
@@ -85,19 +94,26 @@ export default function StepCatalog({
 
       {/* Grid produk — kartu sama seperti halaman katalog */}
       <div className="mt-6 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
-        {shown.map((variant) => {
-          const product = variant.product;
+        {shown.map((product) => {
           const label = product.kain ? `Kain ${product.kain}` : product.category;
           const totalStock = product.totalStock;
           const isSoldOut = totalStock === 0;
           const isLowStock = totalStock > 0 && totalStock <= LOW_STOCK_THRESHOLD;
           const seriesCount = product.series.length;
+          // Foto kartu = gambar utama produk; kalau kosong pakai foto varian pertama.
+          const mainImage =
+            product.image || openOrderImage(product, product.colors.find(Boolean) ?? "");
+          // Warna awal saat "Lihat Detail": yang masih ada stok, kalau semua habis warnanya pertama.
+          const initialColor =
+            product.variants.find((variant) => variant.stock > 0)?.color ??
+            product.colors[0] ??
+            "";
 
           return (
             <button
-              key={variant.key}
+              key={product.id}
               type="button"
-              onClick={() => onOpen(product, variant.color)}
+              onClick={() => onOpen(product, initialColor)}
               className="group relative flex flex-col h-full rounded-2xl overflow-hidden cursor-pointer text-left"
               style={{ background: "#ffffff", border: "1px solid rgba(0,0,0,.1)" }}
             >
@@ -107,10 +123,10 @@ export default function StepCatalog({
                   className="absolute inset-0 transition-transform duration-700 group-hover:scale-[1.04]"
                   style={{ background: "linear-gradient(135deg,rgba(232,223,209,.6),rgba(0,0,0,.25))" }}
                 />
-                {variant.image && (
+                {mainImage && (
                   <img
-                    src={cloudinaryUrl(variant.image, { width: 700 })}
-                    alt={`${product.name}${variant.label ? ` ${variant.label}` : ""}`}
+                    src={cloudinaryUrl(mainImage, { width: 700 })}
+                    alt={product.name}
                     loading="lazy"
                     className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
                     style={isSoldOut ? { filter: "grayscale(35%) brightness(.85)" } : undefined}
@@ -183,7 +199,7 @@ export default function StepCatalog({
                 <p className="mt-1 text-[12.5px] font-ui" style={{ color: "rgba(0,0,0,.55)" }}>
                   Mulai{" "}
                   <span className="font-medium" style={{ color: "#000000" }}>
-                    {rupiah(product.price)}
+                    {rupiah(openOrderProductPrice(product))}
                   </span>
                 </p>
 
