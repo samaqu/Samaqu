@@ -9,6 +9,7 @@ import {
   OPNAME_STATUS,
   displayColor,
   formatRupiah,
+  reasonLabel,
   type OpnameStatus,
 } from "@/lib/stock-opname";
 
@@ -55,6 +56,21 @@ type Session = {
 };
 
 type LiveRow = { product_id: string; color: string; size: string; stock: number };
+
+/** Satu baris riwayat penyesuaian yang sudah diterapkan (dari `stock_movements`). */
+type AppliedMovement = {
+  id: string;
+  product_id: string;
+  color: string | null;
+  size: string | null;
+  qty: number;
+  direction: "in" | "out";
+  before_stock: number | null;
+  after_stock: number | null;
+  actor_name: string | null;
+  notes: string | null;
+  created_at: string;
+};
 
 /** Baris yang ditahan saat approve karena stok akhirnya bakal negatif. */
 type BlockedRow = {
@@ -113,6 +129,7 @@ export default function StokOpnameDetail({
   const [session, setSession] = useState<Session | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [live, setLive] = useState<LiveRow[]>([]);
+  const [movements, setMovements] = useState<AppliedMovement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -148,6 +165,7 @@ export default function StokOpnameDetail({
       setSession(json.session);
       setLines(json.lines || []);
       setLive(json.live || []);
+      setMovements(json.movements || []);
       const nextCounts: Record<string, string> = {};
       const nextReasons: Record<string, string> = {};
       const nextNotes: Record<string, string> = {};
@@ -244,6 +262,8 @@ export default function StokOpnameDetail({
     let dihitung = 0;
     let selisih = 0;
     let nilai = 0;
+    let kurang = 0;
+    let lebih = 0;
     for (const line of countable) {
       const value = countedValue(line);
       if (value === null) continue;
@@ -252,9 +272,11 @@ export default function StokOpnameDetail({
       if (diff !== 0) {
         selisih += 1;
         nilai += diff * (Number(line.price) || 0);
+        if (diff < 0) kurang += Math.abs(diff);
+        else lebih += diff;
       }
     }
-    return { total: countable.length, dihitung, selisih, nilai };
+    return { total: countable.length, dihitung, selisih, nilai, kurang, lebih };
   }, [lines, counts]);
 
   const progress = summary.total > 0 ? Math.round((summary.dihitung / summary.total) * 100) : 0;
@@ -388,6 +410,66 @@ export default function StokOpnameDetail({
       kain: Array.from(kainCount.entries()).sort((a, b) => b[1] - a[1]),
     };
   }, [rows, counts]);
+
+  /**
+   * Baris "Hasil penerapan": hanya yang benar-benar berubah (dari `stock_movements`).
+   * Nama produk & penyebab diambil dari baris sesi karena movements tidak menyimpannya.
+   */
+  const appliedRows = useMemo(() => {
+    const byKey = new Map<string, Line>();
+    for (const line of lines) byKey.set(`${line.product_id}|${line.color}|${line.size}`, line);
+    return movements.map((m) => {
+      const line = byKey.get(`${m.product_id}|${m.color}|${m.size}`);
+      const delta = m.direction === "out" ? -Math.abs(m.qty) : Math.abs(m.qty);
+      return {
+        id: m.id,
+        product_name: line?.product_name || m.product_id,
+        color: m.color || "default",
+        size: m.size || "-",
+        before: m.before_stock ?? 0,
+        delta,
+        after: m.after_stock ?? 0,
+        price: line?.price || 0,
+        reason: line?.reason || "",
+        note: line?.reason_note || "",
+      };
+    });
+  }, [movements, lines]);
+
+  const appliedTotals = useMemo(() => {
+    return appliedRows.reduce(
+      (acc, row) => ({
+        baris: acc.baris + 1,
+        nilai: acc.nilai + row.delta * row.price,
+      }),
+      { baris: 0, nilai: 0 },
+    );
+  }, [appliedRows]);
+
+  /** Unduh CSV arsip hasil penerapan (dibuat di browser, tidak menyentuh server). */
+  const downloadCsv = () => {
+    const header = ["Produk", "Kain/Warna", "Ukuran", "Stok sebelum", "Selisih", "Stok sesudah", "Penyebab", "Catatan"];
+    const rows = appliedRows.map((row) => [
+      row.product_name,
+      displayColor(row.color, row.product_name),
+      row.size,
+      row.before,
+      row.delta > 0 ? `+${row.delta}` : row.delta,
+      row.after,
+      reasonLabel(row.reason),
+      row.note,
+    ]);
+    const csv = [header, ...rows]
+      .map((cols) => cols.map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\r\n");
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `opname-${session?.code || sessionId}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // ── Aksi server ──────────────────────────────────────────────────────────
   const call = async (body: Record<string, unknown>) => {
@@ -661,41 +743,56 @@ export default function StokOpnameDetail({
         </div>
       </div>
 
+      {/* Legenda tabel — selalu terlihat */}
+      <p className="px-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+        Angka abu-abu = stok di sistem · Kotak = hitungan fisik · Badge = selisih
+      </p>
+
       {/* Tabel hitung — compact ala spreadsheet */}
       <style>{`/* spinner angka disembunyikan: sel terasa seperti sel spreadsheet */
 .opname-table input[type=number]::-webkit-outer-spin-button,
 .opname-table input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .opname-table input[type=number]{-moz-appearance:textfield}`}</style>
       <div className="opname-table rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-[#1a1d28]">
-        {/* Tanpa scroll internal: tinggi tabel penuh, yang scroll halaman utama (sticky header
-            baru jalan kalau tidak ada parent ber-overflow). Di bawah lg boleh geser horizontal. */}
         <div className="overflow-x-auto lg:overflow-visible">
-          <table className="w-full min-w-[640px] table-fixed border-collapse text-[13px] lg:min-w-0">
+          <table className="w-full min-w-[660px] table-fixed border-collapse text-[13px] lg:min-w-0">
             <thead>
               <tr>
                 <th
-                  className="sticky top-0 left-0 z-30 h-8 w-[30%] min-w-[190px] rounded-tl-lg border-b border-r border-[#2d4a6f] bg-[#1e3a5f] px-2 text-left text-[10px] font-bold uppercase tracking-wide text-white"
-                  title="Nama produk, SKU, dan info kategori/kain/series"
+                  className="sticky top-0 left-0 z-30 h-9 w-[28%] min-w-[190px] rounded-tl-lg border-b border-r border-white/25 bg-[#1e3a5f] px-2 text-left text-[10px] font-bold uppercase tracking-wide text-white"
+                  title="Nama produk, varian, SKU, dan kategori/kain"
                 >
                   Produk
                 </th>
                 {visibleSizes.map((size) => (
                   <th
                     key={size}
-                    className="sticky top-0 z-20 h-8 w-[58px] border-b border-r border-[#2d4a6f] bg-[#1e3a5f] px-0.5 text-center text-[10px] font-bold uppercase tracking-wide text-white lg:w-[68px]"
-                    title="Angka abu-abu = stok di sistem. Kotak = hitungan di rak."
+                    className="sticky top-0 z-20 h-9 w-[64px] border-b border-r border-white/25 bg-[#1e3a5f] px-0.5 text-center text-[10px] font-bold uppercase tracking-wide text-white lg:w-[70px]"
+                    title="Sistem = stok di sistem · Kotak = hitungan fisik · Badge = selisih"
                   >
                     {size}
                   </th>
                 ))}
                 <th
-                  className="sticky top-0 z-20 h-8 w-[92px] border-b border-r border-[#2d4a6f] bg-[#1e3a5f] px-1 text-center text-[10px] font-bold uppercase tracking-wide text-white"
-                  title="Stok di sistem / hitungan fisik"
+                  className="sticky top-0 z-20 h-9 w-[68px] border-b border-r border-white/25 bg-[#1e3a5f] px-1 text-center text-[10px] font-bold uppercase tracking-wide text-white"
+                  title="Jumlah stok di sistem satu baris"
                 >
-                  Total
+                  Sistem
                 </th>
                 <th
-                  className="sticky top-0 z-20 h-8 w-[150px] rounded-tr-lg border-b border-[#2d4a6f] bg-[#1e3a5f] px-1 text-left text-[10px] font-bold uppercase tracking-wide text-white lg:w-[165px]"
+                  className="sticky top-0 z-20 hidden h-9 w-[64px] border-b border-r border-white/25 bg-[#1e3a5f] px-1 text-center text-[10px] font-bold uppercase tracking-wide text-white xl:table-cell"
+                  title="Jumlah hitungan fisik satu baris"
+                >
+                  Fisik
+                </th>
+                <th
+                  className="sticky top-0 z-20 h-9 w-[84px] border-b border-r border-white/25 bg-[#1e3a5f] px-1 text-center text-[10px] font-bold uppercase tracking-wide text-white"
+                  title="Total selisih satu baris"
+                >
+                  Selisih
+                </th>
+                <th
+                  className="sticky top-0 z-20 h-9 w-[150px] rounded-tr-lg border-b border-white/25 bg-[#1e3a5f] px-1 text-left text-[10px] font-bold uppercase tracking-wide text-white lg:w-[165px]"
                   title="Pilih penyebab kalau ada selisih"
                 >
                   Penyebab
@@ -705,7 +802,7 @@ export default function StokOpnameDetail({
             <tbody>
               {visibleRows.length === 0 ? (
                 <tr>
-                  <td colSpan={3 + visibleSizes.length} className="px-4 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={5 + visibleSizes.length} className="px-4 py-12 text-center text-sm text-slate-400">
                     Tidak ada baris yang cocok dengan pencarian/filter.
                   </td>
                 </tr>
@@ -716,14 +813,14 @@ export default function StokOpnameDetail({
                   const rowNote = rowDiffLines.length > 0 ? notes[rowDiffLines[0].id] || "" : "";
                   const totals = rowTotals(row);
                   const zebra = index % 2 === 0 ? "bg-white" : "bg-slate-50/80";
-                  const info = [row.category, row.jenis_kain, row.series].filter(Boolean).join(" · ");
+                  const info = [row.category, row.jenis_kain].filter(Boolean).join(" · ");
                   return (
                     <tr key={row.key} className={row.is_derived ? "opacity-70" : undefined}>
                       <td
-                        className={`sticky left-0 z-10 h-14 border-b border-r border-gray-200/70 px-2 py-1 align-middle ${zebra}`}
-                        title={info}
+                        className={`sticky left-0 z-10 h-[72px] border-b border-r border-gray-200/70 px-2 py-1 align-middle ${zebra}`}
+                        title={[info, row.series].filter(Boolean).join(" · ")}
                       >
-                        <div className="flex h-full min-w-0 flex-col justify-center gap-0.5 leading-tight">
+                        <div className="flex h-full min-w-0 flex-col justify-center gap-1 leading-tight">
                           <span className="truncate text-[14px] font-semibold text-gray-900 dark:text-white">
                             {row.product_name}
                             <span className="ml-1 text-[12px] font-normal text-slate-500 dark:text-slate-400">
@@ -731,19 +828,17 @@ export default function StokOpnameDetail({
                             </span>
                           </span>
                           <span className={`truncate text-[12px] ${row.is_derived ? "font-medium text-amber-700" : "text-slate-600 dark:text-slate-300"}`}>
-                            {row.is_derived ? `ikut stok ${row.base_product_name}` : row.sku || "-"}
+                            {row.is_derived ? `ikut stok ${row.base_product_name}` : [row.sku || "-", info].filter(Boolean).join(" · ")}
                           </span>
-                          <span className="truncate text-[12px] text-slate-600 dark:text-slate-300">{info || "-"}</span>
                         </div>
                       </td>
                       {visibleSizes.map((size) => {
                         const line = row.cells[size];
                         if (!line) {
-                          // Ukuran ini memang tidak dipakai produk tersebut: sel abu-abu polos.
                           return (
                             <td
                               key={size}
-                              className="h-14 border-b border-r border-gray-200/70 bg-slate-100/70 dark:bg-slate-800/40"
+                              className="h-[72px] border-b border-r border-gray-200/70 bg-slate-100/70 dark:bg-slate-800/40"
                               title="Produk ini tidak punya ukuran ini"
                             />
                           );
@@ -754,14 +849,14 @@ export default function StokOpnameDetail({
                         return (
                           <td
                             key={size}
-                            className={`relative h-14 border-b border-r border-gray-200/70 p-0 align-middle ${CELL_BG[state] || "bg-white"}`}
+                            className={`h-[72px] border-b border-r border-gray-200/70 p-0 align-middle ${CELL_BG[state] || "bg-white"}`}
                           >
-                            <div className="flex h-14 flex-col items-center justify-center gap-1">
+                            <div className="flex h-[72px] flex-col items-center justify-center gap-1">
                               <span
-                                className="text-[12px] font-medium leading-none text-slate-600 dark:text-slate-300"
+                                className="text-[11px] font-medium leading-none text-slate-600 dark:text-slate-300"
                                 title="Stok di sistem"
                               >
-                                {line.system_stock}
+                                Sistem {line.system_stock}
                               </span>
                               <input
                                 ref={(el) => {
@@ -786,59 +881,75 @@ export default function StokOpnameDetail({
                                 placeholder=""
                                 aria-label={`Hitungan di rak ${row.product_name} ${row.color} ${size}`}
                                 title={row.is_derived ? `Ikut stok ${row.base_product_name}` : "Hitungan di rak"}
-                                className="h-7 w-[52px] rounded-[3px] border border-gray-300 bg-white px-0 text-center text-[14px] font-semibold tabular-nums text-slate-900 outline-none focus:ring-2 focus:ring-blue-400 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                                className="h-7 w-[54px] rounded-[3px] border border-gray-300 bg-white px-0 text-center text-[14px] font-semibold tabular-nums text-slate-900 outline-none focus:ring-2 focus:ring-blue-400 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                               />
+                              {state === "cocok" ? (
+                                <span className="inline-flex h-[18px] items-center rounded-full bg-emerald-100 px-2 text-[12px] font-bold leading-none text-emerald-700">
+                                  Cocok
+                                </span>
+                              ) : diff !== null && diff !== 0 ? (
+                                <span
+                                  className={`inline-flex h-[18px] items-center rounded-full px-2 text-[12px] font-bold leading-none ${diff < 0 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}
+                                  title="Selisih (fisik − sistem)"
+                                >
+                                  {diff > 0 ? `+${diff}` : diff}
+                                </span>
+                              ) : (
+                                <span className="h-[18px]" />
+                              )}
                             </div>
-                            {diff !== null && diff !== 0 ? (
-                              <span
-                                className={`pointer-events-none absolute bottom-[3px] right-[4px] text-[10px] font-bold leading-none ${diff < 0 ? "text-red-600" : "text-orange-600"}`}
-                                title="Selisih (fisik − sistem)"
-                              >
-                                {diff > 0 ? `+${diff}` : diff}
-                              </span>
-                            ) : null}
                           </td>
                         );
                       })}
                       <td
-                        className={`h-14 whitespace-nowrap border-b border-r border-gray-200/70 px-1 text-center align-middle text-[14px] tabular-nums ${zebra}`}
-                        title={
-                          totals.diff === null
-                            ? "Belum dihitung"
-                            : `Selisih ${totals.diff > 0 ? "+" : ""}${totals.diff}`
-                        }
+                        className={`h-[72px] border-b border-r border-gray-200/70 px-1 text-center align-middle text-[14px] font-semibold tabular-nums text-slate-700 dark:text-slate-200 ${zebra}`}
+                        title="Jumlah stok di sistem"
                       >
-                        <span className="text-slate-600 dark:text-slate-300">{totals.sys}</span>
-                        <span className="mx-1.5 text-slate-300">/</span>
-                        <span
-                          className={
-                            totals.fisik === null
-                              ? "text-slate-400"
-                              : totals.diff === 0
-                                ? "font-semibold text-emerald-700"
-                                : (totals.diff ?? 0) < 0
-                                  ? "font-semibold text-red-600"
-                                  : "font-semibold text-orange-600"
-                          }
-                        >
-                          {totals.fisik ?? "–"}
-                        </span>
+                        {totals.sys}
                       </td>
-                      <td className={`h-14 border-b border-gray-200/70 px-1.5 py-1 align-middle ${zebra}`}>
+                      <td
+                        className={`hidden h-[72px] border-b border-r border-gray-200/70 px-1 text-center align-middle text-[14px] font-semibold tabular-nums text-slate-700 dark:text-slate-200 xl:table-cell ${zebra}`}
+                        title="Jumlah hitungan fisik"
+                      >
+                        {totals.fisik ?? "-"}
+                      </td>
+                      <td className={`h-[72px] border-b border-r border-gray-200/70 px-1 text-center align-middle ${zebra}`} title="Total selisih">
+                        {totals.diff === null ? (
+                          <span className="text-[12px] text-slate-400">-</span>
+                        ) : totals.diff === 0 ? (
+                          <span className="inline-flex h-[20px] items-center rounded-full bg-emerald-100 px-2 text-[12px] font-bold text-emerald-700">
+                            Cocok
+                          </span>
+                        ) : (
+                          <span
+                            className={`inline-flex h-[20px] items-center rounded-full px-2 text-[12px] font-bold ${totals.diff < 0 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}
+                          >
+                            {totals.diff > 0 ? `+${totals.diff}` : totals.diff}
+                          </span>
+                        )}
+                      </td>
+                      <td className={`h-[72px] border-b border-gray-200/70 px-1.5 py-1 align-middle ${zebra}`}>
                         {rowDiffLines.length > 0 ? (
                           <div className="flex flex-col gap-1 py-0.5">
                             <select
                               value={rowReason}
                               onChange={(e) => setRowReason(row, e.target.value)}
                               disabled={readOnly}
-                              className="h-7 w-full rounded border border-gray-300 bg-white px-1 text-[11px] font-semibold text-slate-700 outline-none focus:ring-1 focus:ring-blue-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+                              className={`h-7 w-full rounded border bg-white px-1 text-[11px] font-semibold outline-none focus:ring-1 focus:ring-blue-400 dark:bg-slate-900 ${
+                                rowReason
+                                  ? "border-gray-300 text-slate-700 dark:border-slate-600 dark:text-slate-200"
+                                  : "border-red-300 text-red-600"
+                              } dark:border-slate-600`}
                               title="Pilih penyebab selisih"
                             >
-                              <option value="">Penyebab…</option>
+                              <option value="">Pilih penyebab</option>
                               {OPNAME_REASONS.map((r) => (
                                 <option key={r.value} value={r.value}>{r.label}</option>
                               ))}
                             </select>
+                            {!rowReason ? (
+                              <span className="text-[10px] font-medium text-red-600">Pilih penyebab</span>
+                            ) : null}
                             {rowReason === "lainnya" ? (
                               <input
                                 type="text"
@@ -857,9 +968,7 @@ export default function StokOpnameDetail({
                               />
                             ) : null}
                           </div>
-                        ) : (
-                          <span className="block text-center text-[12px] text-slate-400">–</span>
-                        )}
+                        ) : null}
                       </td>
                     </tr>
                   );
@@ -870,6 +979,80 @@ export default function StokOpnameDetail({
         </div>
       </div>
 
+      {/* Hasil penerapan — hanya untuk sesi yang sudah Selesai */}
+      {session.status === "selesai" ? (
+        <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#1a1d28] overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 dark:border-slate-800 px-3 py-2">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-slate-900 dark:text-white">Hasil penerapan</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Diterapkan{session.reviewed_by_name ? ` oleh ${session.reviewed_by_name}` : ""}
+                {session.reviewed_at ? ` · ${new Date(session.reviewed_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}` : ""}
+                {" · "}
+                {appliedTotals.baris} baris berubah · nilai selisih{" "}
+                {appliedTotals.nilai === 0 ? "-" : `${appliedTotals.nilai < 0 ? "−" : "+"}Rp ${formatRupiah(appliedTotals.nilai)}`}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={downloadCsv}
+              disabled={appliedRows.length === 0}
+              className="px-3 py-2 rounded-lg bg-[#1e3a5f] text-white text-xs font-bold disabled:opacity-50"
+            >
+              Unduh CSV
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] border-collapse text-[13px]">
+              <thead>
+                <tr className="bg-[#1e3a5f]">
+                  {["Produk", "Kain/Warna", "Ukuran", "Stok sebelum", "Selisih", "Stok sesudah", "Penyebab"].map((head) => (
+                    <th
+                      key={head}
+                      className="px-2.5 py-2 text-left text-[10px] font-bold uppercase tracking-wide text-white border-r border-white/25 last:border-r-0 whitespace-nowrap"
+                    >
+                      {head}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {appliedRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400">
+                      Tidak ada baris yang berubah pada sesi ini.
+                    </td>
+                  </tr>
+                ) : (
+                  appliedRows.map((row, index) => (
+                    <tr
+                      key={row.id}
+                      className={`${index % 2 === 0 ? "bg-white" : "bg-slate-50/80"} border-b border-gray-200/70`}
+                    >
+                      <td className="px-2.5 py-2 font-semibold text-slate-900 dark:text-white">{row.product_name}</td>
+                      <td className="px-2.5 py-2 text-slate-600 dark:text-slate-300">{displayColor(row.color, row.product_name)}</td>
+                      <td className="px-2.5 py-2 text-center font-semibold text-slate-700 dark:text-slate-200">{row.size}</td>
+                      <td className="px-2.5 py-2 text-center tabular-nums text-slate-600 dark:text-slate-300">{row.before}</td>
+                      <td className="px-2.5 py-2 text-center">
+                        <span
+                          className={`inline-flex h-[20px] items-center rounded-full px-2 text-[12px] font-bold ${row.delta < 0 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"}`}
+                        >
+                          {row.delta > 0 ? `+${row.delta}` : row.delta}
+                        </span>
+                      </td>
+                      <td className="px-2.5 py-2 text-center tabular-nums font-semibold text-slate-700 dark:text-slate-200">{row.after}</td>
+                      <td className="px-2.5 py-2 text-slate-600 dark:text-slate-300">
+                        {reasonLabel(row.reason)}{row.note ? ` (${row.note})` : ""}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+
       {/* Ruang kosong seukuran bar bawah supaya baris terakhir tidak tertutup. */}
       {showActions ? <div className="h-14" aria-hidden="true" /> : null}
 
@@ -879,10 +1062,11 @@ export default function StokOpnameDetail({
           <div className="mx-auto flex max-w-6xl items-center gap-2">
             <div className="min-w-0 flex-1">
               <p className="truncate text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                {summary.dihitung}/{summary.total} dihitung · {summary.selisih} selisih
+                {summary.dihitung}/{summary.total} dihitung · {summary.selisih} baris selisih
               </p>
-              <p className="truncate text-[10px] text-slate-400">
-                Nilai selisih {summary.nilai === 0 ? "-" : `${summary.nilai < 0 ? "−" : "+"}Rp ${formatRupiah(summary.nilai)}`}
+              <p className="truncate text-[10px] text-slate-500 dark:text-slate-400">
+                total kurang {summary.kurang} pcs · total lebih {summary.lebih} pcs · nilai selisih{" "}
+                {summary.nilai === 0 ? "-" : `${summary.nilai < 0 ? "−" : "+"}Rp ${formatRupiah(summary.nilai)}`}
               </p>
             </div>
             <button

@@ -23,6 +23,8 @@ type SessionRow = {
   status: OpnameStatus;
   created_at: string;
   created_by_name?: string | null;
+  reviewed_by_name?: string | null;
+  reviewed_at?: string | null;
   total: number;
   dihitung: number;
   selisih: number;
@@ -185,10 +187,10 @@ export default function StokOpnameList({ basePath }: { basePath: string }) {
           <p className="text-sm font-bold text-slate-900 dark:text-white">Riwayat sesi</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[760px]">
+          <table className="w-full border-collapse min-w-[900px]">
             <thead>
               <tr className="bg-[#1e3a5f]">
-                {["No", "Tanggal", "Baris Dihitung", "Baris Selisih", "Nilai Selisih", "Status", ""].map((h) => (
+                {["No", "Tanggal", "Baris Dihitung", "Baris Selisih", "Nilai Selisih", "Status", "Diterapkan oleh", "Waktu", ""].map((h) => (
                   <th key={h} className="px-3 py-3 text-left font-inter text-xs font-bold text-white uppercase tracking-wide border-r border-[#2d4a6f] last:border-r-0 whitespace-nowrap">
                     {h}
                   </th>
@@ -198,11 +200,11 @@ export default function StokOpnameList({ basePath }: { basePath: string }) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-400">Memuat…</td>
+                  <td colSpan={9} className="px-4 py-10 text-center text-sm text-slate-400">Memuat…</td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-400">
+                  <td colSpan={9} className="px-4 py-10 text-center text-sm text-slate-400">
                     Belum ada sesi. Klik “+ Mulai opname” untuk memulai hitungan pertama.
                   </td>
                 </tr>
@@ -230,6 +232,14 @@ export default function StokOpnameList({ basePath }: { basePath: string }) {
                       </span>
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap">{statusPill(row.status)}</td>
+                    <td className="px-3 py-3 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                      {row.reviewed_by_name || "-"}
+                    </td>
+                    <td className="px-3 py-3 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                      {row.reviewed_at
+                        ? new Date(row.reviewed_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })
+                        : "-"}
+                    </td>
                     <td className="px-3 py-3 text-right">
                       <Link
                         href={`${basePath}/${row.id}`}

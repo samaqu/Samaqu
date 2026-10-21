@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "@/lib/ops-router";
 import { formatWeightExact } from "@/lib/shipping-weight";
 import { resolveColorName } from "@/lib/sku";
+import StockMovementsPanel from "@/components/ops/StockMovementsPanel";
 import {
   Package,
   TrendingUp,
@@ -2055,6 +2056,7 @@ export default function MasterProduk() {
                         </table>
                       </div>
                     </div>
+                    <StockMovementsPanel direction="in" />
                   </>
                 );
               })()}
@@ -2183,6 +2185,7 @@ export default function MasterProduk() {
                   </table>
                 </div>
               </div>
+              <StockMovementsPanel direction="out" />
             </motion.div>
           )}
         </AnimatePresence>

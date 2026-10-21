@@ -80,8 +80,17 @@ export async function GET(req: NextRequest) {
           .in("product_id", productIds)
       : { data: [] as any[] };
 
+    // Riwayat penyesuaian sesi ini (untuk bagian "Hasil penerapan" saat status Selesai).
+    const { data: movements } = await admin
+      .from("stock_movements")
+      .select("id, product_id, color, size, qty, direction, before_stock, after_stock, actor_name, notes, created_at")
+      .eq("ref_type", "stock_opname")
+      .eq("ref_id", id)
+      .order("created_at", { ascending: true });
+
     return NextResponse.json({
       session: { ...session, status: normalizeOpnameStatus(session.status) },
+      movements: movements || [],
       lines: (lines || []).sort((a: any, b: any) =>
         `${a.product_name}|${a.color}|${a.size}`.localeCompare(
           `${b.product_name}|${b.color}|${b.size}`,
