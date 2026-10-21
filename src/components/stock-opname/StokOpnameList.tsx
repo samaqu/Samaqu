@@ -33,23 +33,21 @@ const STEPS = [
   { n: 1, title: "Mulai sesi", desc: "Buat sesi baru, stok sistem dikunci sebagai pembanding." },
   { n: 2, title: "Input hitungan fisik", desc: "Isi jumlah barang yang benar-benar ada di rak." },
   { n: 3, title: "Isi penyebab selisih", desc: "Kalau beda, pilih penyebabnya supaya tercatat." },
-  { n: 4, title: "Admin menyetujui", desc: "Stok baru berubah setelah disetujui admin." },
+  { n: 4, title: "Terapkan ke stok", desc: "Stok langsung berubah setelah kamu menekan tombolnya." },
 ];
 
 const HOW_TO = [
   "Klik “+ Mulai opname” untuk membuat sesi baru. Stok di sistem otomatis dicatat sebagai pembanding.",
   "Hitung barang di rak, lalu isi angkanya di kotak “Hitungan di rak”. Selisih muncul otomatis.",
   "Kalau ada selisih, pilih penyebabnya (salah hitung, rusak, hilang, dan seterusnya).",
-  "Klik “Ajukan persetujuan”. Admin akan memeriksa; stok baru berubah setelah disetujui.",
+  "Klik “Terapkan ke stok” lalu konfirmasi. Stok langsung berubah dan sesi jadi Selesai.",
 ];
 
 function statusPill(status: OpnameStatus) {
   const tone = OPNAME_STATUS[status]?.tone || "draft";
   const style: Record<string, string> = {
     draft: "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-200",
-    wait: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
     ok: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200",
-    reject: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200",
   };
   return (
     <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap ${style[tone]}`}>
@@ -122,7 +120,7 @@ export default function StokOpnameList({ basePath }: { basePath: string }) {
         <div>
           <h1 className="font-inter text-2xl md:text-3xl font-black text-slate-900 dark:text-white">Stok Opname</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
-            Cocokkan stok sistem dengan hitungan fisik. Penyesuaian baru berlaku setelah disetujui Admin.
+            Cocokkan stok sistem dengan hitungan fisik. Stok berubah setelah kamu menekan Terapkan ke stok.
           </p>
         </div>
         <button

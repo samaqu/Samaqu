@@ -4,6 +4,7 @@ import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
 import {
   buildOpnameLines,
   nextOpnameCode,
+  normalizeOpnameStatus,
   type OpnameLine,
 } from "@/lib/stock-opname";
 
@@ -80,7 +81,7 @@ export async function GET(req: NextRequest) {
       : { data: [] as any[] };
 
     return NextResponse.json({
-      session,
+      session: { ...session, status: normalizeOpnameStatus(session.status) },
       lines: (lines || []).sort((a: any, b: any) =>
         `${a.product_name}|${a.color}|${a.size}`.localeCompare(
           `${b.product_name}|${b.color}|${b.size}`,
@@ -112,6 +113,7 @@ export async function GET(req: NextRequest) {
 
   const items = (sessions || []).map((s: any) => ({
     ...s,
+    status: normalizeOpnameStatus(s.status),
     ...summarize(
       (bySession[s.id] || []).map((l: any) => ({
         ...l,
@@ -262,11 +264,15 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ saved: lines.length });
   }
 
-  // ── Ajukan persetujuan ──
-  if (action === "submit") {
-    if (!["draft", "ditolak"].includes(session.status)) {
-      return NextResponse.json({ error: "Sesi ini sudah dikirim atau disetujui." }, { status: 400 });
+  // ── Terapkan ke stok (alur approval dihapus: admin yang input juga yang menerapkan) ──
+  // Penyesuaian dihitung sebagai DELTA dari snapshot, atomik di satu transaksi RPC:
+  // stok baru = stok terkini + (fisik − snapshot). Satu baris negatif → seluruh proses
+  // dibatalkan, tidak ada stok setengah berubah, dan apply dobel ditolak.
+  if (action === "apply") {
+    if (normalizeOpnameStatus(session.status) !== "draft") {
+      return NextResponse.json({ error: "Sesi ini sudah diterapkan (Selesai)." }, { status: 400 });
     }
+
     const { data: lines } = await admin
       .from("stock_opname_lines")
       .select("product_id, color, size, system_stock, counted_stock, reason, reason_note, is_derived")
@@ -288,49 +294,9 @@ export async function PATCH(req: NextRequest) {
     const lainnyaTanpaCatatan = beda.filter((l: any) => l.reason === "lainnya" && !l.reason_note);
     if (lainnyaTanpaCatatan.length > 0) {
       return NextResponse.json(
-        { error: "Penyebab \"Lainnya\" wajib diberi catatan singkat." },
+        { error: 'Penyebab "Lainnya" wajib diberi catatan singkat.' },
         { status: 400 },
       );
-    }
-
-    const { error } = await admin
-      .from("stock_opname_sessions")
-      .update({ status: "menunggu", submitted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq("id", id);
-    if (error) return NextResponse.json({ error: "Gagal mengajukan sesi" }, { status: 500 });
-    return NextResponse.json({ status: "menunggu" });
-  }
-
-  // ── Tolak (wajib alasan; sesi bisa diedit lagi) ──
-  if (action === "reject") {
-    if (session.status !== "menunggu") {
-      return NextResponse.json({ error: "Hanya sesi yang menunggu persetujuan bisa ditolak." }, { status: 400 });
-    }
-    const reason = String(body?.reject_reason || "").trim();
-    if (!reason) return NextResponse.json({ error: "Alasan penolakan wajib diisi." }, { status: 400 });
-
-    await admin
-      .from("stock_opname_sessions")
-      .update({
-        status: "ditolak",
-        reject_reason: reason.slice(0, 500),
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: actor.id,
-        reviewed_by_name: actor.name,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-    return NextResponse.json({ status: "ditolak" });
-  }
-
-  // ── Setujui: penyesuaian dihitung sebagai DELTA dari snapshot, atomik di database ──
-  // "system_stock" = snapshot saat sesi dimulai. Kalau ada transaksi selama proses hitung,
-  // stok terkini sudah beda — jadi stok baru = stok terkini + (fisik − snapshot), bukan
-  // di-set langsung ke angka fisik. Semua baris diproses dalam SATU transaksi RPC:
-  // satu baris gagal/negatif → seluruh approve dibatalkan (tidak ada stok setengah berubah).
-  if (action === "approve") {
-    if (session.status !== "menunggu") {
-      return NextResponse.json({ error: "Sesi ini belum diajukan." }, { status: 400 });
     }
 
     const { data, error } = await admin.rpc("samaqu_apply_stock_opname", {
@@ -353,20 +319,20 @@ export async function PATCH(req: NextRequest) {
         }
         return NextResponse.json(
           {
-            error: "Approve ditahan: ada baris yang stok akhirnya jadi negatif.",
+            error: "Stok belum diterapkan: ada baris yang stok akhirnya jadi negatif.",
             rows,
           },
           { status: 400 },
         );
       }
-      console.error("[OPNAME] approve gagal:", message);
-      return NextResponse.json({ error: `Gagal menyetujui sesi: ${message}` }, { status: 400 });
+      console.error("[OPNAME] apply gagal:", message);
+      return NextResponse.json({ error: `Gagal menerapkan ke stok: ${message}` }, { status: 400 });
     }
 
     const result = (data || {}) as { adjusted?: number; skipped?: number; movements?: number };
-    console.log("[OPNAME] disetujui:", session.code, "baris disesuaikan:", result.adjusted || 0);
+    console.log("[OPNAME] diterapkan:", session.code, "baris disesuaikan:", result.adjusted || 0);
     return NextResponse.json({
-      status: "disetujui",
+      status: "selesai",
       adjusted: result.adjusted || 0,
       skipped: result.skipped || 0,
     });

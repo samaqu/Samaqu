@@ -11,12 +11,21 @@ export const OPNAME_SIZES = ["XS", "S", "M", "L", "XL", "XXL"] as const;
 
 export const OPNAME_STATUS = {
   draft: { label: "Draft", tone: "draft" },
-  menunggu: { label: "Menunggu Persetujuan", tone: "wait" },
-  disetujui: { label: "Disetujui", tone: "ok" },
-  ditolak: { label: "Ditolak", tone: "reject" },
+  selesai: { label: "Selesai", tone: "ok" },
 } as const;
 
 export type OpnameStatus = keyof typeof OPNAME_STATUS;
+
+/**
+ * Alur approval dihapus: admin yang menginput juga yang menerapkan. Status baru hanya
+ * Draft & Selesai. Baris lama dipetakan supaya tampil benar sebelum/sesudah migration:
+ * disetujui → selesai, menunggu/ditolak → draft.
+ */
+export function normalizeOpnameStatus(status?: string | null): OpnameStatus {
+  const value = String(status || "").trim().toLowerCase();
+  if (value === "selesai" || value === "disetujui") return "selesai";
+  return "draft";
+}
 
 /** Penyebab selisih — wajib dipilih kalau hitungan fisik berbeda dari stok sistem. */
 export const OPNAME_REASONS = [

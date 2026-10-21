@@ -80,9 +80,7 @@ function statusPill(status: OpnameStatus) {
   const tone = OPNAME_STATUS[status]?.tone || "draft";
   const style: Record<string, string> = {
     draft: "bg-gray-100 text-gray-600",
-    wait: "bg-amber-100 text-amber-800",
     ok: "bg-emerald-100 text-emerald-800",
-    reject: "bg-red-100 text-red-700",
   };
   return (
     <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap ${style[tone]}`}>
@@ -133,8 +131,6 @@ export default function StokOpnameDetail({
   const [groupOpen, setGroupOpen] = useState(false);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [rejectOpen, setRejectOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
   /** Baris yang membuat approve ditahan (stok akhirnya bakal negatif). */
   const [blockedRows, setBlockedRows] = useState<BlockedRow[]>([]);
   /** Fokus antar sel ala spreadsheet (Enter / panah bawah / panah atas). */
@@ -177,7 +173,7 @@ export default function StokOpnameDetail({
     load();
   }, [load]);
 
-  const readOnly = session ? !["draft", "ditolak"].includes(session.status) : true;
+  const readOnly = session ? session.status !== "draft" : true;
 
   // ── Baris tabel: satu produk × warna ──────────────────────────────────────
   const rows = useMemo<ProductRow[]>(() => {
@@ -281,7 +277,7 @@ export default function StokOpnameDetail({
    * akhir = terkini + (fisik − snapshot).
    */
   const movementRows = useMemo(() => {
-    if (session?.status !== "menunggu") return [];
+    if (session?.status !== "draft") return [];
     const map = new Map<string, number>();
     for (const row of live) {
       map.set(`${row.product_id}|${String(row.color || "default").toLowerCase()}|${row.size}`, Number(row.stock) || 0);
@@ -443,7 +439,7 @@ export default function StokOpnameDetail({
     }
   };
 
-  const openSubmit = () => {
+  const openApply = () => {
     const beda = lines.filter((l) => !l.is_derived && diffOf(l) !== null && diffOf(l) !== 0);
     const tanpa = beda.filter((l) => !reasons[l.id]);
     if (tanpa.length > 0) {
@@ -459,49 +455,23 @@ export default function StokOpnameDetail({
     setConfirmOpen(true);
   };
 
-  const submitSession = async () => {
+  /** Simpan draft lalu terapkan ke stok (satu transaksi di server). */
+  const applySession = async () => {
     setConfirmOpen(false);
     const ok = await saveDraft(true);
     if (!ok) return;
     setBusy(true);
-    try {
-      await call({ action: "submit" });
-      setNotice("Sesi diajukan. Menunggu persetujuan admin — input dikunci sampai diputuskan.");
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal mengajukan sesi.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const decide = async (action: "approve" | "reject") => {
-    if (busy) return;
-    setBusy(true);
-    setError("");
     setBlockedRows([]);
     try {
-      if (action === "reject") {
-        if (!rejectReason.trim()) {
-          setError("Alasan penolakan wajib diisi.");
-          setBusy(false);
-          return;
-        }
-        await call({ action: "reject", reject_reason: rejectReason.trim() });
-        setRejectOpen(false);
-        setRejectReason("");
-        setNotice("Sesi ditolak. Sesi bisa diperbaiki lalu diajukan lagi.");
-      } else {
-        const result = await call({ action: "approve" });
-        setNotice(
-          `Disetujui. ${result?.adjusted ?? 0} baris stok disesuaikan${result?.skipped ? `, ${result.skipped} dilewati` : ""}.`,
-        );
-      }
+      const result = await call({ action: "apply" });
+      setNotice(
+        `Diterapkan. ${result?.adjusted ?? 0} baris stok disesuaikan${result?.skipped ? `, ${result.skipped} dilewati` : ""}.`,
+      );
       await load();
     } catch (e) {
       const rows = (e as Error & { rows?: BlockedRow[] }).rows;
       setBlockedRows(Array.isArray(rows) ? rows : []);
-      setError(e instanceof Error ? e.message : "Gagal memproses keputusan.");
+      setError(e instanceof Error ? e.message : "Gagal menerapkan ke stok.");
     } finally {
       setBusy(false);
     }
@@ -531,8 +501,7 @@ export default function StokOpnameDetail({
     );
   }
 
-  const showActions = session.status === "draft" || session.status === "ditolak";
-  const canDecide = session.status === "menunggu";
+  const showActions = session.status === "draft";
 
   return (
     <div className="space-y-3 pb-2">
@@ -551,42 +520,17 @@ export default function StokOpnameDetail({
             {session.created_by_name ? ` · oleh ${session.created_by_name}` : ""}
           </p>
         </div>
-        {canDecide ? (
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setRejectOpen(true)}
-              disabled={busy}
-              className="px-4 py-2.5 rounded-xl border-2 border-red-200 text-red-600 text-sm font-bold hover:bg-red-50 disabled:opacity-60"
-            >
-              Tolak
-            </button>
-            <button
-              type="button"
-              onClick={() => decide("approve")}
-              disabled={busy}
-              className="px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-60"
-            >
-              {busy ? "Memproses…" : "Setujui"}
-            </button>
-          </div>
-        ) : null}
       </div>
 
-      {session.status === "ditolak" && session.reject_reason ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <b>Ditolak:</b> {session.reject_reason} — perbaiki hitungan lalu ajukan lagi.
-        </div>
-      ) : null}
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>
       ) : null}
       {blockedRows.length > 0 ? (
         <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
-          <p className="text-sm font-bold">Approve ditahan — stok akhir akan negatif</p>
+          <p className="text-sm font-bold">Stok belum diterapkan — ada baris yang stok akhirnya negatif</p>
           <p className="mt-0.5 text-[12px]">
             Penyesuaian dihitung dari stok terkini (bukan angka fisik langsung). Perbaiki hitungan atau stok baris di
-            bawah, lalu ajukan & setujui lagi. Tidak ada stok yang berubah.
+            bawah, lalu terapkan lagi. Tidak ada stok yang berubah.
           </p>
           <ul className="mt-2 space-y-0.5">
             {blockedRows.map((row, index) => (
@@ -618,27 +562,9 @@ export default function StokOpnameDetail({
         </div>
         {movementCount > 0 ? (
           <p className="mt-2 text-[11px] font-semibold text-amber-600">
-            Ada {movementCount} ukuran yang stok sistemnya bergerak setelah sesi dimulai (transaksi baru). Penyesuaian
-            tetap dihitung dari stok terbaru saat disetujui.
+            Ada {movementCount} ukuran yang stok sistemnya bergerak setelah sesi dimulai (transaksi baru). Rinciannya
+            tampil di dialog konfirmasi sebelum diterapkan; penyesuaian memakai stok terbaru.
           </p>
-        ) : null}
-        {movementRows.length > 0 ? (
-          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
-            <p className="text-[11px] font-bold text-amber-800">Ada pergerakan stok sejak sesi dimulai</p>
-            <ul className="mt-1 space-y-0.5">
-              {movementRows.slice(0, 6).map((row) => (
-                <li key={row.key} className="text-[11px] text-amber-800">
-                  {row.name} · {displayColor(row.color, row.name)} · {row.size}: sistem {row.snapshot} → kini{" "}
-                  {row.current} → akhir <b>{row.final}</b>
-                </li>
-              ))}
-              {movementRows.length > 6 ? (
-                <li className="text-[11px] font-semibold text-amber-700">
-                  +{movementRows.length - 6} ukuran lain
-                </li>
-              ) : null}
-            </ul>
-          </div>
         ) : null}
         <div className="mt-1.5 flex flex-wrap gap-2.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
           <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Cocok</span>
@@ -969,11 +895,11 @@ export default function StokOpnameDetail({
             </button>
             <button
               type="button"
-              onClick={openSubmit}
+              onClick={openApply}
               disabled={busy}
               className="px-4 py-2.5 rounded-xl bg-[#1e3a5f] text-white text-sm font-bold disabled:opacity-60"
             >
-              Ajukan persetujuan
+              Terapkan ke stok
             </button>
           </div>
         </div>
@@ -983,7 +909,7 @@ export default function StokOpnameDetail({
       {confirmOpen ? (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setConfirmOpen(false)}>
           <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#1a1d28] p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-black text-slate-900 dark:text-white">Ajukan ke admin?</h3>
+            <h3 className="text-lg font-black text-slate-900 dark:text-white">Terapkan ke stok?</h3>
             <div className="mt-3 space-y-1.5 text-sm">
               <div className="flex justify-between"><span className="text-slate-500">Baris dihitung</span><b>{summary.dihitung} dari {summary.total}</b></div>
               <div className="flex justify-between"><span className="text-slate-500">Baris selisih</span><b className={summary.selisih ? "text-orange-600" : ""}>{summary.selisih}</b></div>
@@ -999,51 +925,42 @@ export default function StokOpnameDetail({
                 Masih ada {summary.total - summary.dihitung} baris belum dihitung. Baris itu dianggap sesuai (stok tidak berubah).
               </p>
             ) : null}
-            <p className="mt-3 text-[12px] text-slate-500">
-              Setelah diajukan, input dikunci sampai admin memutuskan. Stok baru berubah kalau disetujui.
+            {movementRows.length > 0 ? (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                <p className="text-[12px] font-bold text-amber-800">Ada pergerakan stok sejak sesi dimulai</p>
+                <ul className="mt-1 space-y-0.5">
+                  {movementRows.slice(0, 6).map((row) => (
+                    <li key={row.key} className="text-[11px] text-amber-800">
+                      {row.name} · {displayColor(row.color, row.name)} · {row.size}: sistem {row.snapshot} → kini{" "}
+                      {row.current} → akhir <b>{row.final}</b>
+                    </li>
+                  ))}
+                  {movementRows.length > 6 ? (
+                    <li className="text-[11px] font-semibold text-amber-700">+{movementRows.length - 6} ukuran lain</li>
+                  ) : null}
+                </ul>
+              </div>
+            ) : null}
+            <p className="mt-3 rounded-lg bg-[#1e3a5f]/5 px-3 py-2 text-[12px] font-semibold text-[#1e3a5f]">
+              Stok akan LANGSUNG berubah setelah kamu menekan “Ya, terapkan”. Sesi ini jadi Selesai dan tidak bisa diubah lagi.
             </p>
             <div className="mt-4 flex gap-2">
               <button type="button" onClick={() => setConfirmOpen(false)} className="flex-1 px-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-slate-700 text-sm font-bold text-slate-700 dark:text-slate-200">
                 Batal
               </button>
-              <button type="button" onClick={submitSession} disabled={busy} className="flex-1 px-4 py-2.5 rounded-xl bg-[#1e3a5f] text-white text-sm font-bold disabled:opacity-60">
-                Ya, ajukan
+              <button type="button" onClick={applySession} disabled={busy} className="flex-1 px-4 py-2.5 rounded-xl bg-[#1e3a5f] text-white text-sm font-bold disabled:opacity-60">
+                Ya, terapkan
               </button>
             </div>
           </div>
         </div>
       ) : null}
 
-      {/* Tolak */}
-      {rejectOpen ? (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setRejectOpen(false)}>
-          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#1a1d28] p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-black text-slate-900 dark:text-white">Tolak sesi ini?</h3>
-            <p className="mt-1 text-[12px] text-slate-500">Beri alasan supaya staf bisa memperbaiki hitungannya.</p>
-            <textarea
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              rows={3}
-              placeholder="Contoh: hitungan rak B belum lengkap"
-              className="mt-3 w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
-            />
-            <div className="mt-4 flex gap-2">
-              <button type="button" onClick={() => setRejectOpen(false)} className="flex-1 px-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-slate-700 text-sm font-bold text-slate-700 dark:text-slate-200">
-                Batal
-              </button>
-              <button type="button" onClick={() => decide("reject")} disabled={busy} className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold disabled:opacity-60">
-                Tolak sesi
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Riwayat penyesuaian (setelah disetujui) */}
-      {session.status === "disetujui" ? (
+      {/* Catatan sesi selesai */}
+      {session.status === "selesai" ? (
         <p className="text-[11px] text-slate-400">
-          Sesi ini sudah disetujui{session.reviewed_by_name ? ` oleh ${session.reviewed_by_name}` : ""} dan bersifat read-only.
-          Semua penyesuaian tercatat di riwayat stok (Barang Masuk / pergerakan stok) beserta penyebabnya.
+          Sesi ini sudah diterapkan{session.reviewed_by_name ? ` oleh ${session.reviewed_by_name}` : ""} dan bersifat read-only.
+          Semua penyesuaian tercatat di riwayat stok beserta penyebabnya.
         </p>
       ) : null}
     </div>
