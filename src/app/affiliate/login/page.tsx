@@ -12,9 +12,9 @@ import { portalBaseFor, portalPath } from "@/lib/affiliate/site";
  * Halaman masuk portal affiliate — wireframe "Dark Slanted Auth" (1:1).
  */
 const INPUT =
-  "input-field w-full px-5 py-3.5 rounded-xl text-sm font-medium text-gray-700 placeholder-gray-400 border";
+  "w-full h-12 rounded-[10px] border bg-white pl-11 pr-4 text-[14px] font-medium text-[#111827] placeholder:text-[#9ca3af] outline-none transition focus:border-[#1f6274] focus:ring-2 focus:ring-[#1f6274]/15";
 const INPUT_BORDER = { borderColor: "#e5e7eb" };
-const INPUT_ERROR = { borderColor: "#f87171" };
+const INPUT_ERROR = { borderColor: "#ef4444" };
 
 export default function AffiliateLoginPage() {
   const router = useRouter();
@@ -77,61 +77,87 @@ export default function AffiliateLoginPage() {
     toast("Tautan reset kata sandi dikirim ke email kamu.");
   };
 
-  const loginWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/affiliate` },
-    });
-    if (error) {
-      toast("Login dengan Google belum tersedia. Gunakan email & kata sandi.", "err");
-    }
-  };
-
   return (
     <AuthLayout
-      title="Masuk ke akun affiliate"
-      subtitle="Selamat datang di SAMAQU Affiliate Center"
-      navLink={{ href: portalPath(base, "daftar"), label: "Daftar" }}
-      navCta={{ href: portalPath(base, "daftar"), label: "Jadi Affiliate" }}
+      title="Masuk ke portal affiliate"
+      subtitle="Gunakan email dan kata sandi akun affiliate kamu."
+      heroTitle="Tumbuh bareng SAMAQU."
+      heroSubtitle="Bagikan produk ke audiensmu, dapatkan komisi dari setiap pesanan."
       footerLink={{
-        text: "Belum menjadi affiliate?",
+        text: "Belum punya akun affiliate?",
         link: portalPath(base, "daftar"),
-        linkLabel: "Daftar Affiliate",
+        linkLabel: "Daftar di sini",
       }}
-      onGoogle={loginWithGoogle}
+      aside={
+        <button
+          type="button"
+          onClick={forgotPassword}
+          className="text-[12px] font-medium text-[#6b7280] hover:text-[#111827] hover:underline"
+        >
+          Lupa kata sandi?
+        </button>
+      }
     >
       <form
-        className="space-y-4"
+        className="space-y-3.5"
         onSubmit={(e) => {
           e.preventDefault();
           submit();
         }}
       >
         {err.form ? (
-          <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-xs text-blue-900">
+          <div className="rounded-[10px] border border-red-200 bg-red-50 px-3.5 py-2.5 text-[12px] font-medium text-red-700">
             {err.form}
           </div>
         ) : null}
 
         <div>
-          <input
-            type="email"
-            placeholder="Email"
-            className={INPUT}
-            style={err.email ? INPUT_ERROR : INPUT_BORDER}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-          />
-          {err.email ? <p className="mt-1 text-xs text-red-600">{err.email}</p> : null}
+          <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-[#111827]">
+            Email
+          </label>
+          <div className="relative">
+            <svg
+              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9ca3af]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              viewBox="0 0 24 24"
+            >
+              <rect x="3" y="5" width="18" height="14" rx="2" />
+              <path d="m3 7 9 6 9-6" />
+            </svg>
+            <input
+              type="email"
+              placeholder="nama@email.com"
+              className={INPUT}
+              style={err.email ? INPUT_ERROR : INPUT_BORDER}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+            />
+          </div>
+          {err.email ? <p className="mt-1 text-[11px] text-red-600">{err.email}</p> : null}
         </div>
 
         <div>
+          <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-[#111827]">
+            Password
+          </label>
           <div className="relative">
+            <svg
+              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9ca3af]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              viewBox="0 0 24 24"
+            >
+              <rect x="4" y="10" width="16" height="10" rx="2" />
+              <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+            </svg>
             <input
               type={show ? "text" : "password"}
-              placeholder="Password"
-              className={`${INPUT} pr-12`}
+              placeholder="••••••••"
+              className={INPUT}
               style={err.pw ? INPUT_ERROR : INPUT_BORDER}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -140,69 +166,31 @@ export default function AffiliateLoginPage() {
             <button
               type="button"
               onClick={() => setShow((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#111827]"
               aria-label={show ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
-                <circle cx="12" cy="12" r="3" />
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                {show ? (
+                  <>
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </>
+                ) : (
+                  <>
+                    <path d="M17.94 17.94A10.6 10.6 0 0 1 12 19c-6.5 0-10-7-10-7a19.2 19.2 0 0 1 5.06-5.94M9.9 4.24A10.6 10.6 0 0 1 12 4c6.5 0 10 7 10 7a19.6 19.6 0 0 1-2.16 3.19" />
+                    <path d="M1 1l22 22" />
+                  </>
+                )}
               </svg>
             </button>
           </div>
-          <div className="text-right mt-2">
-            <button
-              type="button"
-              onClick={forgotPassword}
-              className="text-xs font-semibold hover:underline"
-              style={{ color: "#eb4d4b" }}
-            >
-              Forgot password ?
-            </button>
-          </div>
-          {err.pw ? <p className="mt-1 text-xs text-red-600">{err.pw}</p> : null}
+          {err.pw ? <p className="mt-1 text-[11px] text-red-600">{err.pw}</p> : null}
         </div>
-
-        <div className="flex items-center my-6 py-2">
-          <div className="flex-grow border-t border-gray-200" />
-          <span className="px-4 text-xs font-medium text-gray-400">or</span>
-          <div className="flex-grow border-t border-gray-200" />
-        </div>
-
-        <button
-          type="button"
-          onClick={loginWithGoogle}
-          className="w-full border border-gray-200 rounded-xl py-3.5 flex justify-center items-center gap-3 hover:bg-gray-50 transition text-sm font-semibold text-gray-600"
-        >
-          Login with Google
-          <svg className="w-4 h-4" viewBox="0 0 24 24">
-            <path
-              fill="#4285F4"
-              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-            />
-            <path
-              fill="#34A853"
-              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-            />
-            <path
-              fill="#FBBC05"
-              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-            />
-            <path
-              fill="#EA4335"
-              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-            />
-          </svg>
-        </button>
 
         <button
           type="submit"
           disabled={busy}
-          className="btn-red w-full rounded-xl py-3.5 mt-2 text-sm font-semibold disabled:opacity-60"
-          style={{
-            backgroundColor: "#eb4d4b",
-            color: "white",
-            boxShadow: "0 10px 15px -3px rgba(235,77,75,0.2)",
-          }}
+          className="mt-2 h-12 w-full rounded-[10px] bg-[#1f6274] text-[14px] font-bold text-white transition-colors hover:bg-[#194f5e] disabled:opacity-60"
         >
           {busy ? "Memproses…" : "Masuk"}
         </button>

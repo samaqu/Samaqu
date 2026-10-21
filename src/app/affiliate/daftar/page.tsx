@@ -12,9 +12,9 @@ import { portalBaseFor, portalPath } from "@/lib/affiliate/site";
  * affiliate berstatus "menunggu" sampai disetujui admin).
  */
 const INPUT =
-  "input-field w-full px-5 py-3.5 rounded-xl text-sm font-medium text-gray-700 placeholder-gray-400 border";
+  "w-full h-12 rounded-[10px] border bg-white px-4 text-[14px] font-medium text-[#111827] placeholder:text-[#9ca3af] outline-none transition focus:border-[#1f6274] focus:ring-2 focus:ring-[#1f6274]/15";
 const INPUT_BORDER = { borderColor: "#e5e7eb" };
-const INPUT_ERROR = { borderColor: "#f87171" };
+const INPUT_ERROR = { borderColor: "#ef4444" };
 
 export default function AffiliateRegisterPage() {
   const router = useRouter();
@@ -85,10 +85,10 @@ export default function AffiliateRegisterPage() {
 
   return (
     <AuthLayout
-      title="Daftar Affiliate"
-      subtitle="Jadilah affiliate resmi SAMAQU dan dapatkan komisi dari setiap penjualan"
-      navLink={{ href: portalPath(base, "login"), label: "Masuk" }}
-      navCta={{ href: portalPath(base, "login"), label: "Cek Status" }}
+      title="Daftar jadi affiliate"
+      subtitle="Isi data diri kamu. Pendaftaran diperiksa admin sebelum aktif."
+      heroTitle="Tumbuh bareng SAMAQU."
+      heroSubtitle="Bagikan produk ke audiensmu, dapatkan komisi dari setiap pesanan."
       footerLink={{
         text: "Sudah punya akun?",
         link: portalPath(base, "login"),
@@ -96,14 +96,14 @@ export default function AffiliateRegisterPage() {
       }}
     >
       <form
-        className="space-y-4"
+        className="space-y-3.5"
         onSubmit={(e) => {
           e.preventDefault();
           submit();
         }}
       >
         {err.form ? (
-          <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-xs text-blue-900">
+          <div className="rounded-[10px] border border-red-200 bg-red-50 px-3.5 py-2.5 text-[12px] font-medium text-red-700">
             {err.form}
           </div>
         ) : null}
@@ -187,7 +187,7 @@ export default function AffiliateRegisterPage() {
             type="checkbox"
             checked={tos}
             onChange={(e) => setTos(e.target.checked)}
-            className="mt-0.5 w-4 h-4 accent-[#eb4d4b]"
+            className="mt-0.5 h-4 w-4 accent-[#1f6274]"
           />
           <span>
             Saya menyetujui Ketentuan Program Affiliate dan Kebijakan Privasi SAMAQU.
@@ -198,12 +198,7 @@ export default function AffiliateRegisterPage() {
         <button
           type="submit"
           disabled={busy}
-          className="btn-red w-full rounded-xl py-3.5 mt-2 text-sm font-semibold disabled:opacity-60"
-          style={{
-            backgroundColor: "#eb4d4b",
-            color: "white",
-            boxShadow: "0 10px 15px -3px rgba(235,77,75,0.2)",
-          }}
+          className="mt-2 h-12 w-full rounded-[10px] bg-[#1f6274] text-[14px] font-bold text-white transition-colors hover:bg-[#194f5e] disabled:opacity-60"
         >
           {busy ? "Mengirim…" : "Daftar"}
         </button>
