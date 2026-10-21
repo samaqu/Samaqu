@@ -93,6 +93,7 @@ export default function Countdown({
   phase,
   variant = "card",
   startInfo,
+  startInfoShort,
   endInfo,
   remindLabel,
   onRemind,
@@ -104,6 +105,8 @@ export default function Countdown({
   variant?: "card" | "pill" | "inline";
   /** "21 Oktober 2026 · 10.00 WIB" — baris info saat event belum dibuka. */
   startInfo?: string;
+  /** Versi bulan singkat ("21 Okt 2026 · 10.00 WIB") — dipakai di layar sempit. */
+  startInfoShort?: string;
   /** "22 Okt 2026 · 23.59 WIB" — baris info saat event sudah berakhir. */
   endInfo?: string;
   /** Label tombol pengingat (default mengikuti fase). */
@@ -204,17 +207,25 @@ export default function Countdown({
       </div>
 
       {phase === "upcoming" && (startInfo || onRemind) && (
-        <div className="mt-4 flex flex-col items-center justify-center gap-3 text-sm sm:flex-row">
+        /* Mobile: "Dibuka … · 20.00 WIB" dan tombol "Ingatkan Saya" SEJAJAR (satu baris).
+           Karena layar HP sempit, tanggalnya pakai bulan singkat ("22 Okt 2026") — supaya
+           dua elemen ini muat baris yang sama. Desktop: bulannya penuh ("22 Oktober 2026")
+           dan ukurannya tetap seperti semula. */
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-2 text-[12px] sm:flex-nowrap sm:gap-3 sm:text-sm">
           {startInfo && (
             <span className="text-neutral-500">
-              Dibuka <b className="font-semibold text-neutral-900">{startInfo}</b>
+              Dibuka{" "}
+              {startInfoShort && (
+                <b className="font-semibold text-neutral-900 sm:hidden">{startInfoShort}</b>
+              )}
+              <b className="hidden font-semibold text-neutral-900 sm:inline">{startInfo}</b>
             </span>
           )}
           {onRemind && (
             <button
               type="button"
               onClick={onRemind}
-              className="inline-flex items-center gap-2 rounded-full border border-black/15 bg-white px-4 py-2 text-xs font-semibold transition hover:bg-black hover:text-white"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-black/15 bg-white px-3 py-1.5 text-[11px] font-semibold transition hover:bg-black hover:text-white sm:gap-2 sm:px-4 sm:py-2 sm:text-xs"
             >
               <Bell size={13} strokeWidth={2} />
               {remindLabel || "Ingatkan Saya"}

@@ -635,6 +635,7 @@ export default function OpenOrderWizard({
             phase={phase}
             countdownTarget={phase === "ended" ? null : phase === "upcoming" ? startDeadline : endDeadline}
             startInfo={formatOpenOrderMoment(startDateProp ?? settings.open_order_start_date, settings.open_order_start_time)}
+            startInfoShort={formatOpenOrderMoment(startDateProp ?? settings.open_order_start_date, settings.open_order_start_time, true)}
             endInfo={formatOpenOrderMoment(endDateProp ?? settings.open_order_end_date, settings.open_order_end_time, true)}
             onRemind={() => showToast(phase === "ended" ? "Siap! Kami kabari periode berikutnya" : "Siap! Kami ingatkan saat Open Order dibuka")}
             onLockedAction={() =>

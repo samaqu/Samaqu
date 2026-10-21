@@ -33,6 +33,7 @@ export default function StepCatalog({
   phase,
   countdownTarget,
   startInfo,
+  startInfoShort,
   endInfo,
   onRemind,
   onLockedAction,
@@ -49,6 +50,8 @@ export default function StepCatalog({
   countdownTarget: number | null;
   /** "21 Oktober 2026 · 10.00 WIB" — baris info saat event belum dibuka. */
   startInfo?: string;
+  /** Versi bulan singkat ("21 Okt 2026 · 10.00 WIB") — buat layar sempit. */
+  startInfoShort?: string;
   /** "22 Okt 2026 · 23.59 WIB" — baris info saat event sudah berakhir. */
   endInfo?: string;
   /** Callback tombol pengingat / kabari periode berikutnya. */
@@ -104,6 +107,7 @@ export default function StepCatalog({
           phase={phase}
           variant="card"
           startInfo={startInfo}
+          startInfoShort={startInfoShort}
           endInfo={endInfo}
           onRemind={onRemind}
         />
