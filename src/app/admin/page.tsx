@@ -116,6 +116,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { label: "Order Management", icon: ShoppingBag, panel: "orders", badge: true },
       { label: "Open Order", icon: Shirt, href: "/admin/open-order" },
       { label: "Produk", icon: Package, panel: "products" },
+      { label: "Stok Opname", icon: Package, href: "/admin/stok-opname" },
       { label: "Pelanggan", icon: Users, panel: "customers" },
       { label: "Live Chat", icon: MessageCircle, panel: "chats" },
     ],

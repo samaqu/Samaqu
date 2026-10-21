@@ -24,6 +24,7 @@ const navGroups = [
       { href: "/admin?panel=orders", label: "Order Management", icon: ShoppingBag },
       { href: "/admin/open-order", label: "Open Order", icon: Shirt },
       { href: "/admin?panel=products", label: "Produk", icon: Package },
+      { href: "/admin/stok-opname", label: "Stok Opname", icon: Package },
       { href: "/admin?panel=customers", label: "Pelanggan", icon: Users },
       { href: "/admin?panel=chats", label: "Live Chat", icon: MessageCircle },
     ],

@@ -105,6 +105,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
     section: "Katalog & Data",
     items: [
       { label: "Produk", href: "/panel-admin/produk", icon: "box" },
+      { label: "Stok Opname", href: "/panel-admin/stok-opname", icon: "box" },
       { label: "Leads", href: "/panel-admin/leads", icon: "users" },
     ],
   },
