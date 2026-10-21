@@ -501,9 +501,10 @@ Page presentation (not obvious from the code):
 - **Countdown (hitung mundur ala marketplace)** di `/open-order` — komponen
   `src/components/open-order/Countdown.tsx`, dipasang di dua tempat: **banner besar** di langkah 1
   (di bawah baris "Periode …", gaya `banner`) dan **strip ringkas** di header lengket pada langkah
-  2–5 (gaya `compact`, disembunyikan di langkah 1 supaya tidak dobel). **Arah timer berubah
+  **3–5 saja** (gaya `compact`; disembunyikan di langkah 1 yang sudah punya banner besar dan di
+  langkah 2 yang sudah punya timer di dalam tombolnya — supaya tidak dobel). **Arah timer berubah
   mengikuti status jendela**: `open` → "Berakhir dalam" ke `23:59:59.999 WIB` pada
-  `open_order_end_date` (`openOrderDeadline()`); `before` → "Buka dalam" ke `00:00:00 WIB` pada
+  `open_order_end_date` (`openOrderDeadline()`); `before` → "Dibuka dalam" ke `00:00:00 WIB` pada
   `open_order_start_date` (`openOrderStartDeadline()`). Keduanya di `src/lib/open-order-window.ts`
   (satu modul dengan aturan jendela); tanggal di `store_settings` dianggap hari lokal toko
   (WIB = UTC+7), jadi batas akhirnya `16:59:59.999 UTC` hari yang sama dan batas mulainya

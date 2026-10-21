@@ -558,7 +558,7 @@ export default function OpenOrderWizard({
   /**
    * **Pemesanan terkunci** — jendela Open Order belum dibuka (hari ini masih sebelum tanggal
    * mulai). Katalog tetap bisa dilihat (produk, harga, Create Your Price), tapi "Tambah ke
-   * Pesanan" mati dan yang tampil instead-of-tombol adalah hitung mundur "Buka dalam …".
+   * Pesanan" mati dan yang tampil instead-of-tombol adalah hitung mundur "Dibuka dalam …".
    */
   const locked = openState === "before";
   // Tanggal mulai untuk caption "Buka <tanggal>" — versi server dulu (client hook-nya
@@ -571,7 +571,7 @@ export default function OpenOrderWizard({
    *
    * Kasus "belum dibuka" TIDAKhandled di sini — katalognya tetap bisa dilihat (customer bisa
    * lihat produk & harga), tapi pemesanan dikunci sampai tanggal mulai. Kuncinya dipakai di
-   * `StepCatalog` (banner "Buka dalam") dan `StepProduct` (tombol "Tambah ke Pesanan" mati).
+   * `StepCatalog` (banner "Dibuka dalam") dan `StepProduct` (tombol "Tambah ke Pesanan" mati).
    */
   if (openState === "closed") {
     return (
@@ -671,14 +671,15 @@ export default function OpenOrderWizard({
               style={{ background: INK, width: `${(step / 6) * 100}%` }}
             />
           </div>
-          {/* Timer ringkas di header lengket — kelihatan di semua langkah (langkah 1 sudah
-              punya banner besar, jadi di sini disembunyikan biar tidak dobel). */}
-          {step !== 1 && (
+          {/* Timer ringkas di header lengket — kelihatan di langkah 3–5. Langkah 1 sudah
+              punya banner besar, langkah 2 (detail produk) sudah punya timer di dalam
+              tombolnya, jadi di dua langkah itu disembunyikan supaya tidak dobel. */}
+          {step !== 1 && step !== 2 && (
             <div className="mt-2 flex justify-center">
               <Countdown
                 deadline={locked ? startDeadline : endDeadline}
                 variant="compact"
-                label={locked ? "Buka dalam" : "Berakhir dalam"}
+                label={locked ? "Dibuka dalam" : "Berakhir dalam"}
               />
             </div>
           )}
@@ -691,8 +692,8 @@ export default function OpenOrderWizard({
             products={products}
             period={period}
             deadline={locked ? startDeadline : endDeadline}
-            countdownLabel={locked ? "Buka dalam" : "Berakhir dalam"}
-            countdownCaption={locked ? (startLabel ? `Buka ${startLabel}` : "Segera dibuka") : undefined}
+            countdownLabel={locked ? "Dibuka dalam" : "Berakhir dalam"}
+            countdownCaption={locked ? (startLabel || "Segera dibuka") : undefined}
             countdownTone={locked ? "soon" : "live"}
             locked={locked}
             cartCount={lines.reduce((sum, line) => sum + line.quantity, 0)}
