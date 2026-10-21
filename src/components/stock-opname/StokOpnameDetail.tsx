@@ -476,7 +476,7 @@ export default function StokOpnameDetail({
   const canDecide = session.status === "menunggu";
 
   return (
-    <div className="space-y-3 pb-24">
+    <div className="space-y-3 pb-2">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
@@ -527,7 +527,7 @@ export default function StokOpnameDetail({
       ) : null}
 
       {/* Progress */}
-      <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#1a1d28] px-4 py-3">
+      <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#1a1d28] px-3 py-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
             {summary.dihitung} dari {summary.total} baris sudah dihitung
@@ -536,7 +536,7 @@ export default function StokOpnameDetail({
           </p>
           <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{progress}%</span>
         </div>
-        <div className="mt-2 h-2.5 w-full rounded-full bg-gray-100 dark:bg-slate-800 overflow-hidden">
+        <div className="mt-1.5 h-2 w-full rounded-full bg-gray-100 dark:bg-slate-800 overflow-hidden">
           <div className="h-full rounded-full bg-[#1e3a5f] transition-all" style={{ width: `${progress}%` }} />
         </div>
         {movementCount > 0 ? (
@@ -545,7 +545,7 @@ export default function StokOpnameDetail({
             tetap dihitung dari stok terbaru saat disetujui.
           </p>
         ) : null}
-        <div className="mt-2 flex flex-wrap gap-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+        <div className="mt-1.5 flex flex-wrap gap-2.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
           <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Cocok</span>
           <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-red-500" /> Kurang dari sistem</span>
           <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-orange-500" /> Lebih dari sistem</span>
@@ -561,25 +561,25 @@ export default function StokOpnameDetail({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari produk, kain, atau series..."
-            className="w-full pl-4 pr-3 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm font-medium text-gray-900 dark:text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-3.5 pr-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[13px] font-medium text-gray-900 dark:text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <select value={kategori} onChange={(e) => setKategori(e.target.value)} className="px-3 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-gray-700 dark:text-slate-200" title="Saring per kategori produk">
+        <select value={kategori} onChange={(e) => setKategori(e.target.value)} className="px-2.5 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[13px] font-semibold text-gray-700 dark:text-slate-200" title="Saring per kategori produk">
           <option value="all">Semua Kategori</option>
           {options.kategori.map((v) => <option key={v} value={v}>{v}</option>)}
         </select>
-        <select value={kain} onChange={(e) => setKain(e.target.value)} className="px-3 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-gray-700 dark:text-slate-200" title="Saring per jenis kain">
+        <select value={kain} onChange={(e) => setKain(e.target.value)} className="px-2.5 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[13px] font-semibold text-gray-700 dark:text-slate-200" title="Saring per jenis kain">
           <option value="all">Semua Jenis Kain</option>
           {options.kain.map((v) => <option key={v} value={v}>{v}</option>)}
         </select>
-        <select value={series} onChange={(e) => setSeries(e.target.value)} className="px-3 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-gray-700 dark:text-slate-200" title="Saring per series">
+        <select value={series} onChange={(e) => setSeries(e.target.value)} className="px-2.5 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[13px] font-semibold text-gray-700 dark:text-slate-200" title="Saring per series">
           <option value="all">Semua Series</option>
           {options.series.map((v) => <option key={v} value={v}>{v}</option>)}
         </select>
         <button
           type="button"
           onClick={() => setOnlyUncounted((v) => !v)}
-          className={`px-3 py-2.5 rounded-xl text-sm font-bold border transition-colors ${onlyUncounted ? "bg-[#1e3a5f] text-white border-[#1e3a5f]" : "bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 border-gray-200 dark:border-slate-700"}`}
+          className={`px-2.5 py-2 rounded-lg text-[13px] font-bold border transition-colors ${onlyUncounted ? "bg-[#1e3a5f] text-white border-[#1e3a5f]" : "bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 border-gray-200 dark:border-slate-700"}`}
           title="Tampilkan hanya baris yang belum diisi hitungannya"
         >
           Belum dihitung
@@ -587,7 +587,7 @@ export default function StokOpnameDetail({
         <button
           type="button"
           onClick={() => setOnlyDiff((v) => !v)}
-          className={`px-3 py-2.5 rounded-xl text-sm font-bold border transition-colors ${onlyDiff ? "bg-orange-600 text-white border-orange-600" : "bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 border-gray-200 dark:border-slate-700"}`}
+          className={`px-2.5 py-2 rounded-lg text-[13px] font-bold border transition-colors ${onlyDiff ? "bg-orange-600 text-white border-orange-600" : "bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 border-gray-200 dark:border-slate-700"}`}
           title="Tampilkan hanya baris yang ada selisihnya"
         >
           Ada selisih
@@ -596,7 +596,7 @@ export default function StokOpnameDetail({
           <button
             type="button"
             onClick={() => setGroupOpen((v) => !v)}
-            className="px-3 py-2.5 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 border border-gray-200 dark:border-slate-700"
+            className="px-2.5 py-2 rounded-lg text-[13px] font-bold bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 border border-gray-200 dark:border-slate-700"
             title="Fokus satu kategori atau satu jenis kain dulu"
           >
             Hitung per kelompok ▾
@@ -645,19 +645,21 @@ export default function StokOpnameDetail({
 .opname-table input[type=number]::-webkit-outer-spin-button,
 .opname-table input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .opname-table input[type=number]{-moz-appearance:textfield}`}</style>
-      <div className="opname-table rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-[#1a1d28] overflow-hidden">
-        <div className="max-h-[calc(100vh-270px)] min-h-[240px] overflow-auto">
-          <table className="w-full min-w-[680px] md:min-w-0 table-fixed border-collapse text-[13px]">
+      <div className="opname-table rounded-lg border border-gray-300 dark:border-slate-800 bg-white dark:bg-[#1a1d28]">
+        {/* Tanpa scroll internal: tinggi tabel penuh, yang scroll halaman utama (sticky header
+            baru jalan kalau tidak ada parent ber-overflow). Di bawah lg boleh geser horizontal. */}
+        <div className="overflow-x-auto lg:overflow-visible">
+          <table className="w-full min-w-[600px] table-fixed border-collapse text-[13px] lg:min-w-0">
             <thead>
               <tr>
                 <th
-                  className="sticky top-0 left-0 z-30 h-9 w-[30%] min-w-[170px] border-b border-r border-gray-300 bg-[#1e3a5f] px-2 text-left text-[10px] font-bold uppercase tracking-wide text-white"
+                  className="sticky top-0 left-0 z-30 h-8 w-[30%] rounded-tl-lg border-b border-r border-gray-300 bg-[#1e3a5f] px-2 text-left text-[10px] font-bold uppercase tracking-wide text-white"
                   title="Nama produk dan SKU. Warna tampil di bawah nama."
                 >
                   Produk
                 </th>
                 <th
-                  className="sticky top-0 z-20 hidden h-9 w-[18%] border-b border-r border-gray-300 bg-[#1e3a5f] px-2 text-left text-[10px] font-bold uppercase tracking-wide text-white lg:table-cell"
+                  className="sticky top-0 z-20 hidden h-8 w-[18%] border-b border-r border-gray-300 bg-[#1e3a5f] px-2 text-left text-[10px] font-bold uppercase tracking-wide text-white lg:table-cell"
                   title="Kategori · jenis kain · series"
                 >
                   Info
@@ -665,20 +667,20 @@ export default function StokOpnameDetail({
                 {visibleSizes.map((size) => (
                   <th
                     key={size}
-                    className="sticky top-0 z-20 h-9 w-[44px] border-b border-r border-gray-300 bg-[#1e3a5f] px-0.5 text-center text-[10px] font-bold uppercase tracking-wide text-white"
+                    className="sticky top-0 z-20 h-8 w-[40px] border-b border-r border-gray-300 bg-[#1e3a5f] px-0.5 text-center text-[10px] font-bold uppercase tracking-wide text-white"
                     title="Angka kecil kiri atas = stok di sistem. Isi hitungan di sel."
                   >
                     {size}
                   </th>
                 ))}
                 <th
-                  className="sticky top-0 z-20 h-9 w-[86px] border-b border-r border-gray-300 bg-[#1e3a5f] px-1 text-center text-[10px] font-bold uppercase tracking-wide text-white"
+                  className="sticky top-0 z-20 h-8 w-[80px] border-b border-r border-gray-300 bg-[#1e3a5f] px-1 text-center text-[10px] font-bold uppercase tracking-wide text-white"
                   title="Jumlah stok sistem / hitungan fisik / selisih"
                 >
                   Total
                 </th>
                 <th
-                  className="sticky top-0 z-20 h-9 w-[128px] border-b border-gray-300 bg-[#1e3a5f] px-1 text-left text-[10px] font-bold uppercase tracking-wide text-white"
+                  className="sticky top-0 z-20 h-8 w-[120px] rounded-tr-lg border-b border-gray-300 bg-[#1e3a5f] px-1 text-left text-[10px] font-bold uppercase tracking-wide text-white"
                   title="Pilih penyebab kalau ada selisih"
                 >
                   Penyebab
@@ -845,6 +847,9 @@ export default function StokOpnameDetail({
           </table>
         </div>
       </div>
+
+      {/* Ruang kosong seukuran bar bawah supaya baris terakhir tidak tertutup. */}
+      {showActions ? <div className="h-14" aria-hidden="true" /> : null}
 
       {/* Bar aksi bawah — selalu terlihat */}
       {showActions ? (
