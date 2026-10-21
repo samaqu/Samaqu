@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Minus, Plus } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Lock, Minus, Plus } from "lucide-react";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import { colorMap } from "@/lib/katalog-data";
 import { openOrderGallery } from "@/lib/open-order-catalog";
@@ -470,29 +470,33 @@ export default function StepProduct({
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={handleAdd}
-            disabled={priceTooLow || locked}
-            className="w-full flex items-center justify-center gap-2.5 py-4 rounded-sm text-[12px] tracking-[0.08em] uppercase font-ui font-semibold transition-all duration-300 hover:scale-[1.01] hover:shadow-lg disabled:opacity-40 disabled:hover:scale-100"
-            style={{ background: "var(--espresso)", color: "white", boxShadow: "0 8px 28px -8px rgba(0,0,0,.35)" }}
-          >
-            {locked ? "Belum Bisa Dipesan" : "Tambah ke Pesanan"}
-          </button>
-
-          {/* Jendela belum dibuka → tombol dimatikan, ganti dengan hitung mundur "Buka dalam". */}
-          {locked && (
-            <div
-              className="mt-3 rounded-xl px-4 py-3.5 flex flex-col items-center gap-2"
-              style={{ background: "var(--cream-bright)", border: "1px solid rgba(0,0,0,.2)" }}
+          {/* Jendela belum dibuka → tombolnya berubah jadi hitung mundur (gaya marketplace):
+              ikon kunci + "Dibuka dalam" + timer DI DALAM tombol, dengan catatan kecil di
+              bawahnya. Jadi tidak ada tombol abu-abu yang terpisah dari timernya. */}
+          {locked ? (
+            <>
+              <div
+                className="flex w-full items-center justify-center gap-2.5 rounded-sm py-4 text-[12px] tracking-[0.08em] uppercase font-ui font-semibold"
+                style={{ background: "var(--espresso)", color: "white", boxShadow: "0 8px 28px -8px rgba(0,0,0,.35)" }}
+              >
+                <Lock size={15} strokeWidth={2.2} className="shrink-0" />
+                <span className="whitespace-nowrap">Dibuka dalam</span>
+                <Countdown deadline={lockDeadline ?? null} variant="inline" />
+              </div>
+              <p className="mt-2.5 text-center text-[11.5px] leading-relaxed" style={{ color: "var(--stone)" }}>
+                {lockCaption || "Tombol pesanan aktif otomatis saat Open Order dimulai."}
+              </p>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={priceTooLow}
+              className="w-full flex items-center justify-center gap-2.5 py-4 rounded-sm text-[12px] tracking-[0.08em] uppercase font-ui font-semibold transition-all duration-300 hover:scale-[1.01] hover:shadow-lg disabled:opacity-40 disabled:hover:scale-100"
+              style={{ background: "var(--espresso)", color: "white", boxShadow: "0 8px 28px -8px rgba(0,0,0,.35)" }}
             >
-              <Countdown deadline={lockDeadline ?? null} variant="compact" label="Buka dalam" />
-              {lockCaption && (
-                <p className="text-center text-[11.5px] leading-relaxed" style={{ color: "var(--stone)" }}>
-                  {lockCaption}
-                </p>
-              )}
-            </div>
+              Tambah ke Pesanan
+            </button>
           )}
         </div>
 
@@ -519,32 +523,50 @@ export default function StepProduct({
       className="md:hidden fixed bottom-0 inset-x-0 z-40"
       style={{ background: "rgba(255,255,255,.95)", backdropFilter: "blur(8px)", borderTop: "1px solid rgba(0,0,0,.12)" }}
     >
-      <div
-        className="flex items-center justify-between gap-4 px-6 pt-4"
-        style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
-      >
-        <div className="min-w-0">
-          <p className="text-[10px] font-ui font-bold uppercase tracking-[0.08em]" style={{ color: "var(--stone)" }}>
-            Total
-          </p>
-          <p className="text-[20px] font-ui font-extrabold leading-none tabular-nums" style={{ color: "var(--gold)" }}>
-            {rupiah(lineTotal)}
-          </p>
+      {locked ? (
+        /* Terkunci: bar sticky jadi satu blok — total di atas, tombol hitung mundur full
+           width di bawahnya (gaya app native: satu aksi utama yang jelas, bukan dua
+           tombol terpisah yang bikin sempit). */
+        <div className="px-5 pt-3.5" style={{ paddingBottom: "calc(0.9rem + env(safe-area-inset-bottom))" }}>
+          <div className="mb-2.5 flex items-baseline justify-between gap-3">
+            <span className="text-[10px] font-ui font-bold uppercase tracking-[0.08em]" style={{ color: "var(--stone)" }}>
+              Total
+            </span>
+            <span className="text-[19px] font-ui font-extrabold leading-none tabular-nums" style={{ color: "var(--gold)" }}>
+              {rupiah(lineTotal)}
+            </span>
+          </div>
+          <div
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-full text-[13px] font-ui font-bold"
+            style={{ background: "var(--espresso)", color: "white" }}
+          >
+            <Lock size={14} strokeWidth={2.2} className="shrink-0" />
+            <span className="whitespace-nowrap uppercase tracking-[0.06em]">Dibuka dalam</span>
+            <Countdown deadline={lockDeadline ?? null} variant="inline" />
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={handleAdd}
-          disabled={priceTooLow || locked}
-          className="shrink-0 h-12 px-6 rounded-full text-[14px] font-ui font-bold transition-all duration-300 active:scale-[.98] disabled:opacity-40"
-          style={{ background: "var(--espresso)", color: "white" }}
+      ) : (
+        <div
+          className="flex items-center justify-between gap-4 px-6 pt-4"
+          style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
         >
-          {locked ? "Belum Bisa Dipesan" : "Tambah ke Pesanan"}
-        </button>
-      </div>
-      {/* Mobile: hitung mundur "Buka dalam" menggantikan aksi saat jendela belum dibuka. */}
-      {locked && (
-        <div className="flex justify-center px-6 pb-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
-          <Countdown deadline={lockDeadline ?? null} variant="compact" label="Buka dalam" />
+          <div className="min-w-0">
+            <p className="text-[10px] font-ui font-bold uppercase tracking-[0.08em]" style={{ color: "var(--stone)" }}>
+              Total
+            </p>
+            <p className="text-[20px] font-ui font-extrabold leading-none tabular-nums" style={{ color: "var(--gold)" }}>
+              {rupiah(lineTotal)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={priceTooLow}
+            className="shrink-0 h-12 px-6 rounded-full text-[14px] font-ui font-bold transition-all duration-300 active:scale-[.98] disabled:opacity-40"
+            style={{ background: "var(--espresso)", color: "white" }}
+          >
+            Tambah ke Pesanan
+          </button>
         </div>
       )}
     </div>

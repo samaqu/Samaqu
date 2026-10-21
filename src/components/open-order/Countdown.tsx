@@ -7,10 +7,11 @@
  * - **"Berakhir dalam"** — event sudah dibuka; ngitung ke `23:59:59.999 WIB` tanggal tutup.
  * - **"Buka dalam"** — event belum dimulai; ngitung ke `00:00:00 WIB` tanggal mulai.
  *
- * Gaya: kartu gelap (espresso) dengan aksen emas, angka jam:menit:detik di dalam kotak
- * (tabular-nums) — biar angka tidak "bergeser" tiap detik. Ada dua varian:
+ * Gaya: kartu putih + aksen emas, angka jam:menit:detik di dalam kotak (tabular-nums) —
+ * biar angka tidak "bergeser" tiap detik. Ada tiga varian:
  * - `banner`  — blok besar di langkah 1 (daftar produk),
- * - `compact` — pil ringkas di header lengket (ikut di semua langkah).
+ * - `compact` — pil ringkas di header lengket (ikut di semua langkah),
+ * - `inline`  — angka polos (tanpa kotak), buat DI DALAM tombol yang terkunci.
  *
  * Countdown ini **murni tampilan**: kalau waktu habis, angka jadi 00:00:00. Yang mengunci
  * pemesanan bukan komponen ini, tapi state jendela (`before` → tombol tambah disabled).
@@ -59,7 +60,7 @@ export default function Countdown({
 }: {
   /** Batas akhir (epoch ms). `null` → tidak ada hitung mundur yang bisa ditampilkan. */
   deadline: number | null;
-  variant?: "banner" | "compact";
+  variant?: "banner" | "compact" | "inline";
   label?: string;
   /** Keterangan singkat di bawah label (mis. tanggal bukanya). */
   caption?: string;
@@ -80,6 +81,21 @@ export default function Countdown({
 
   const parts = remaining == null ? null : splitCountdown(remaining);
   const showDays = parts != null && parts.days > 0;
+
+  // Varian inline — angka polos (tanpa kotak, tanpa label) buat DI DALAM tombol terkunci.
+  // Satu baris, tabular-nums, dan ukurannya menyesuaikan supaya muet di HP tanpa scroll.
+  if (variant === "inline") {
+    const digits = parts
+      ? showDays
+        ? `${pad(parts.days)}:${pad(parts.hours)}:${pad(parts.minutes)}:${pad(parts.seconds)}`
+        : `${pad(parts.hours)}:${pad(parts.minutes)}:${pad(parts.seconds)}`
+      : "--:--:--";
+    return (
+      <span className="tabular-nums" style={{ fontVariantNumeric: "tabular-nums" }}>
+        {digits}
+      </span>
+    );
+  }
 
   if (variant === "compact") {
     return (

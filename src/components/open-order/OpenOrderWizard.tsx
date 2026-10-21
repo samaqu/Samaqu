@@ -702,7 +702,9 @@ export default function OpenOrderWizard({
                 locked={locked}
                 lockDeadline={startDeadline}
                 lockCaption={
-                  locked ? `Open Order dibuka ${startLabel || "segera"} — tombol aktif setelah timer habis.` : undefined
+                  locked
+                    ? `Tombol pesanan aktif otomatis saat Open Order dimulai${startLabel ? ` (${startLabel})` : ""}.`
+                    : undefined
                 }
                 onChange={(patch) => setDraft((prev) => (prev ? { ...prev, ...patch } : prev))}
                 onAdd={addDraftToCart}
