@@ -36,6 +36,7 @@ export default async function OpenOrderPage() {
       startDeadline={openOrderStartDeadline(window)}
       endDeadline={openOrderDeadline(window)}
       period={formatOpenOrderPeriod(window, OPEN_ORDER_PERIOD)}
+      startDate={window.open_order_start_date}
     />
   );
 }

@@ -125,6 +125,7 @@ export default function OpenOrderWizard({
   startDeadline,
   endDeadline,
   period: periodProp,
+  startDate: startDateProp,
 }: {
   /** Status jendela Open Order — dibaca di server (route halaman) supaya tidak pop-in. */
   initialState: OpenOrderState;
@@ -134,6 +135,8 @@ export default function OpenOrderWizard({
   endDeadline: number | null;
   /** Teks periode — dikirim dari server supaya SSR tidak nampilin teks fallback lama. */
   period?: string;
+  /** Tanggal mulai (YYYY-MM-DD) — untuk caption "Buka <tanggal>", dikirim dari server. */
+  startDate?: string | null;
 }) {
   const [step, setStep] = useState<Step>(1);
   const [catalog, setCatalog] = useState<Product[]>([]);
@@ -558,7 +561,9 @@ export default function OpenOrderWizard({
    * Pesanan" mati dan yang tampil instead-of-tombol adalah hitung mundur "Buka dalam …".
    */
   const locked = openState === "before";
-  const startLabel = formatDateLabel(settings.open_order_start_date);
+  // Tanggal mulai untuk caption "Buka <tanggal>" — versi server dulu (client hook-nya
+  // masih kosong saat SSR, jadi tanpa ini caption-nya nampilin "Segera dibuka").
+  const startLabel = formatDateLabel(startDateProp ?? settings.open_order_start_date);
 
   /**
    * Jendela Open Order ditutup (tanggal sudah lewat): halaman publik hanya menampilkan
