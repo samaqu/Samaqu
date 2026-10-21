@@ -19,6 +19,7 @@ import {
   openOrderProductPrice,
   type OpenOrderProduct,
 } from "@/lib/open-order-offering";
+import Countdown from "./Countdown";
 import { Chip, INK, MUTED, PrimaryButton } from "./ui";
 
 const ALL = "semua";
@@ -31,6 +32,10 @@ const rupiah = (value: number) => "Rp " + Math.round(value).toLocaleString("id-I
 export default function StepCatalog({
   products,
   period,
+  deadline,
+  countdownLabel,
+  countdownCaption,
+  locked,
   cartCount,
   onOpen,
   onViewCart,
@@ -38,6 +43,14 @@ export default function StepCatalog({
   products: OpenOrderProduct[];
   /** Periode Open Order — dibaca dari store_settings (diatur di menu admin "Open Order"). */
   period: string;
+  /** Batas hitung mundur (epoch ms) — `null` kalau tanggalnya belum diatur. */
+  deadline: number | null;
+  /** Label hitung mundur — "Berakhir dalam" (dibuka) atau "Buka dalam" (belum dibuka). */
+  countdownLabel?: string;
+  /** Keterangan singkat di bawah label hitung mundur. */
+  countdownCaption?: string;
+  /** Pemesanan terkunci (jendela belum dibuka) — tombol tambah pesanan dimatikan. */
+  locked?: boolean;
   cartCount: number;
   onOpen: (product: OpenOrderProduct, color: string) => void;
   onViewCart: () => void;
@@ -73,6 +86,8 @@ export default function StepCatalog({
         <p className="mt-1.5 text-[13px]" style={{ color: INK }}>
           Periode {period}
         </p>
+        {/* Hitung mundur ala marketplace — countdown murni tampilan, tidak menutup wizard. */}
+        <Countdown deadline={deadline} label={countdownLabel} caption={countdownCaption} />
         <p className="mx-auto mt-3 max-w-xl text-[13px] leading-relaxed" style={{ color: MUTED }}>
           Pilih produk, atur ukuran dan harga, lalu kirim pesanan kamu. Admin akan mengonfirmasi lewat WhatsApp.
         </p>

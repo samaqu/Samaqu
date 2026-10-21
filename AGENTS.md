@@ -498,6 +498,34 @@ Page presentation (not obvious from the code):
   tidak berubah sampai admin mengisi tanggal. `OpenOrderWizard` merender layar pesan (bukan langkah 1)
   untuk `before` ("Open Order belum dibuka" + tanggal mulainya) dan `closed`
   ("Nanti Open Order berikutnya") — murni di klien.
+- **Countdown (hitung mundur ala marketplace)** di `/open-order` — komponen
+  `src/components/open-order/Countdown.tsx`, dipasang di dua tempat: **banner besar** di langkah 1
+  (di bawah baris "Periode …", gaya `banner`) dan **strip ringkas** di header lengket pada langkah
+  2–5 (gaya `compact`, disembunyikan di langkah 1 supaya tidak dobel). **Arah timer berubah
+  mengikuti status jendela**: `open` → "Berakhir dalam" ke `23:59:59.999 WIB` pada
+  `open_order_end_date` (`openOrderDeadline()`); `before` → "Buka dalam" ke `00:00:00 WIB` pada
+  `open_order_start_date` (`openOrderStartDeadline()`). Keduanya di `src/lib/open-order-window.ts`
+  (satu modul dengan aturan jendela); tanggal di `store_settings` dianggap hari lokal toko
+  (WIB = UTC+7), jadi batas akhirnya `16:59:59.999 UTC` hari yang sama dan batas mulainya
+  `17:00:00 UTC` hari sebelumnya. Pecahan jam/menit/detik dari `splitCountdown()` (fungsi murni,
+  bisa diuji tanpa browser); bagian **hari** muncul hanya kalau sisa waktu > 24 jam. Gaya:
+  **kartu putih + aksen emas tipis** (konsisten dengan kartu katalog) — jangan pakai kartu
+  gelap/coklat, pemilik bilang jelek. Tiga aturan penting:
+  (1) tanggalnya kosong → countdown **tidak tampil sama sekali** (`null`), itu beda dengan
+  "waktu habis";
+  (2) **status jendela & deadline dibaca di SERVER** (`src/app/[locale]/(customer)/open-order/page.tsx`
+  → `store_settings`) lalu dikirim sebagai prop ke `OpenOrderWizard` (`initialState`,
+  `startDeadline`, `endDeadline`) — kalau dihitung dari `useStoreSettings()` saja, nilainya baru ada
+  setelah hydration sehingga tombol yang seharusnya terkunci sempat bisa diklik (pop-in);
+  (3) angka baru dihitung setelah komponen ter-mount (SSR tidak punya jam yang sama dengan klien)
+  jadi sebelum mount angkanya `"--"` — mencegah hydration mismatch.
+- **Pemesanan terkunci saat jendela belum dibuka** (`before`) — katalog/harga/Create Your Price
+  tetap bisa dilihat, tapi **"Tambah ke Pesanan" dimatikan** (desktop + bar sticky mobile, teksnya
+  jadi "Belum Bisa Dipesan") dan yang tampil adalah hitung mundur "Buka dalam …" (`StepProduct` +
+  `StepCatalog`). Status `closed` tetap memakai layar "Periode Open Order Telah Berakhir" (wizard
+  tidak dirender). **Server juga menolak**: `POST /api/open-order` membaca `store_settings` dan
+  membalas **403** kalau statusnya `before` atau `closed` — jangan andalkan tombol UI saja, orang
+  bisa POST langsung.
 - **Pilih produk** (dulu "batasi series"): sejak **2026-10-14** yang menentukan produk mana yang
   tampil di `/open-order` adalah kolom **`products.open_order_enabled`** (default `true`), bukan lagi
   `store_settings.open_order_series`. Dua tempat mengaturnya: **checkbox "Tampilkan di Open Order"**

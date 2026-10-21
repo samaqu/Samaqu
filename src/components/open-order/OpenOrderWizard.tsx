@@ -30,6 +30,7 @@ import {
   formatOpenOrderPeriod,
   formatOpenOrderPeriodCompact,
   resolveOpenOrderState,
+  type OpenOrderState,
 } from "@/lib/open-order-window";
 import { useSafeLocale } from "@/lib/safe-i18n";
 import { useStoreSettings } from "@/lib/store-settings";
@@ -45,6 +46,7 @@ import StepCustomer from "./StepCustomer";
 import StepProduct from "./StepProduct";
 import StepReview from "./StepReview";
 import StepSuccess from "./StepSuccess";
+import Countdown from "./Countdown";
 import { EMPTY_CUSTOMER, type CartLine, type CustomerData, type DraftShipping, type ProductDraft, type SavedAddress } from "./types";
 import { INK, LINE, MUTED } from "./ui";
 
@@ -118,7 +120,18 @@ function defaultDraft(products: OpenOrderProduct[], productId: string, color: st
   };
 }
 
-export default function OpenOrderWizard() {
+export default function OpenOrderWizard({
+  initialState,
+  startDeadline,
+  endDeadline,
+}: {
+  /** Status jendela Open Order — dibaca di server (route halaman) supaya tidak pop-in. */
+  initialState: OpenOrderState;
+  /** 00:00:00 WIB tanggal mulai (epoch ms) — untuk hitung mundur "Buka dalam". */
+  startDeadline: number | null;
+  /** 23:59:59.999 WIB tanggal tutup (epoch ms) — untuk hitung mundur "Berakhir dalam". */
+  endDeadline: number | null;
+}) {
   const [step, setStep] = useState<Step>(1);
   const [catalog, setCatalog] = useState<Product[]>([]);
   /** Baris `product_variants` — sumber daftar ukuran per warna (produk lintas kategori). */
@@ -150,7 +163,18 @@ export default function OpenOrderWizard() {
   // selama tanggalnya belum diisi.
   const period = formatOpenOrderPeriod(settings, settings.open_order_period || OPEN_ORDER_PERIOD);
   const periodCompact = formatOpenOrderPeriodCompact(settings, settings.open_order_period || OPEN_ORDER_PERIOD);
-  const openState = resolveOpenOrderState(settings);
+
+  // Status jendela: server (route halaman) yang jadi acuan awal supaya tidak "pop-in" —
+  // hook `useStoreSettings()` baru terisi setelah hydration, dan selama itu statusnya masih
+  // default (dibuka), jadi tombol yang seharusnya terkunci sempat bisa diklik.
+  const [openState, setOpenState] = useState<OpenOrderState>(initialState);
+  // Begitu setting-nya termuat (tanggalnya berubah dari default), status dihitung ulang
+  // di klien — jadi kalau admin mengubah jendela tanpa customer me-refresh, halamannya
+  // ikut menyesuaikan. Kalau admin belum pernah mengisi tanggal, status server yang dipakai.
+  useEffect(() => {
+    if (!settings.open_order_start_date && !settings.open_order_end_date) return;
+    setOpenState(resolveOpenOrderState(settings));
+  }, [settings.open_order_start_date, settings.open_order_end_date, settings.open_order_active]);
 
   // Produk + varian dibaca dari katalog yang sama dengan halaman detail (harga, warna, series,
   // stok). Produk yang diikutkan admin (`open_order_enabled`) yang tampil di sini.
@@ -523,12 +547,22 @@ export default function OpenOrderWizard() {
   const stepTitle = step === 4 && !account ? "Masuk / Daftar" : STEP_TITLES[step];
 
   /**
-   * Di luar jendela Open Order (tanggal diatur di menu admin "Open Order"): sebelum tanggal
-   * mulai → belum dibuka, setelah tanggal tutup → tunggu periode berikutnya. Halaman publik
-   * hanya menampilkan pesannya, bukan wizardnya.
+   * **Pemesanan terkunci** — jendela Open Order belum dibuka (hari ini masih sebelum tanggal
+   * mulai). Katalog tetap bisa dilihat (produk, harga, Create Your Price), tapi "Tambah ke
+   * Pesanan" mati dan yang tampil instead-of-tombol adalah hitung mundur "Buka dalam …".
    */
-  if (openState !== "open") {
-    const startLabel = formatDateLabel(settings.open_order_start_date);
+  const locked = openState === "before";
+  const startLabel = formatDateLabel(settings.open_order_start_date);
+
+  /**
+   * Jendela Open Order ditutup (tanggal sudah lewat): halaman publik hanya menampilkan
+   * pesannya, bukan wizardnya.
+   *
+   * Kasus "belum dibuka" TIDAKhandled di sini — katalognya tetap bisa dilihat (customer bisa
+   * lihat produk & harga), tapi pemesanan dikunci sampai tanggal mulai. Kuncinya dipakai di
+   * `StepCatalog` (banner "Buka dalam") dan `StepProduct` (tombol "Tambah ke Pesanan" mati).
+   */
+  if (openState === "closed") {
     return (
       <section
         className="grid min-h-screen place-items-center px-5"
@@ -555,28 +589,12 @@ export default function OpenOrderWizard() {
             >
               <Calendar size={20} />
             </span>
-            {openState === "before" ? (
-              <>
-                <p className="mt-4 text-[15px] font-semibold" style={{ color: "var(--espresso)" }}>
-                  Open Order belum dibuka
-                </p>
-                <p className="mt-2 text-[13px] leading-relaxed" style={{ color: MUTED }}>
-                  Jendela Open Order periode ini dibuka {startLabel || "segera"}.
-                </p>
-                <p className="mt-4 text-[13.5px] font-medium leading-relaxed" style={{ color: "var(--espresso)" }}>
-                  Nanti Open Order berikutnya — pantau Instagram SAMAQU untuk jadwalnya.
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="mt-4 text-[15px] font-semibold" style={{ color: "var(--espresso)" }}>
-                  Periode Open Order Telah Berakhir
-                </p>
-                <p className="mt-2 text-[13px] leading-relaxed" style={{ color: MUTED }}>
-                  Periode Open Order {periodCompact} telah berakhir. Nantikan informasi periode Open Order berikutnya melalui Instagram SAMAQU.
-                </p>
-              </>
-            )}
+            <p className="mt-4 text-[15px] font-semibold" style={{ color: "var(--espresso)" }}>
+              Periode Open Order Telah Berakhir
+            </p>
+            <p className="mt-2 text-[13px] leading-relaxed" style={{ color: MUTED }}>
+              Periode Open Order {periodCompact} telah berakhir. Nantikan informasi periode Open Order berikutnya melalui Instagram SAMAQU.
+            </p>
           </div>
 
           <div className="mt-7 flex justify-center gap-2.5">
@@ -642,6 +660,17 @@ export default function OpenOrderWizard() {
               style={{ background: INK, width: `${(step / 6) * 100}%` }}
             />
           </div>
+          {/* Timer ringkas di header lengket — kelihatan di semua langkah (langkah 1 sudah
+              punya banner besar, jadi di sini disembunyikan biar tidak dobel). */}
+          {step !== 1 && (
+            <div className="mt-2 flex justify-center">
+              <Countdown
+                deadline={locked ? startDeadline : endDeadline}
+                variant="compact"
+                label={locked ? "Buka dalam" : "Berakhir dalam"}
+              />
+            </div>
+          )}
         </div>
       </header>
 
@@ -650,6 +679,14 @@ export default function OpenOrderWizard() {
           <StepCatalog
             products={products}
             period={period}
+            deadline={locked ? startDeadline : endDeadline}
+            countdownLabel={locked ? "Buka dalam" : "Berakhir dalam"}
+            countdownCaption={
+              locked
+                ? `Open Order dibuka ${startLabel || "segera"} — sudah bisa pesan setelah timer habis.`
+                : undefined
+            }
+            locked={locked}
             cartCount={lines.reduce((sum, line) => sum + line.quantity, 0)}
             onOpen={(product, color) => openDetail(product.id, color)}
             onViewCart={() => setStep(3)}
@@ -662,6 +699,11 @@ export default function OpenOrderWizard() {
               <StepProduct
                 draft={draft}
                 products={products}
+                locked={locked}
+                lockDeadline={startDeadline}
+                lockCaption={
+                  locked ? `Open Order dibuka ${startLabel || "segera"} — tombol aktif setelah timer habis.` : undefined
+                }
                 onChange={(patch) => setDraft((prev) => (prev ? { ...prev, ...patch } : prev))}
                 onAdd={addDraftToCart}
               />

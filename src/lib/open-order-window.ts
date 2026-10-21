@@ -12,6 +12,9 @@
 
 export type OpenOrderState = "open" | "before" | "closed";
 
+/** Selisih WIB dari UTC dalam milidetik (WIB = UTC+7). */
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+
 /** Subset `store_settings` yang mengatur jendela Open Order. */
 export interface OpenOrderWindow {
   open_order_start_date?: string | null;
@@ -103,5 +106,62 @@ export function resolveOpenOrderState(window: OpenOrderWindow, today = todayIso(
   if (start || end) return "open";
   // Tanggalnya belum diatur → ikut toggle lama supaya perilaku sebelumnya tetap jalan.
   return window.open_order_active === false ? "closed" : "open";
+}
+
+/**
+ * Batas akhir jendela Open Order dalam epoch ms — 23:59:59.999 **WIB** pada tanggal tutup.
+ *
+ * Tanggal di `store_settings` dianggap hari lokal toko (WIB), jadi batas akhirnya dihitung
+ * sebagai 16:59:59.999 UTC hari yang sama. `null` kalau tanggal tutup belum diisi — artinya
+ * tidak ada hitung mundur yang bisa ditampilkan (bukan berarti sudah habis).
+ */
+export function openOrderDeadline(window: OpenOrderWindow): number | null {
+  const end = (window.open_order_end_date ?? "").trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(end);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  // 23:59:59.999 WIB = 16:59:59.999 UTC pada hari yang sama.
+  return Date.UTC(year, month - 1, day, 16, 59, 59, 999);
+}
+
+/**
+ * Batas **mulai** jendela Open Order dalam epoch ms — 00:00:00.000 **WIB** pada tanggal mulai.
+ *
+ * Dipakai untuk hitung mundur "Buka dalam …" saat periode belum dibuka. `null` kalau tanggal
+ * mulainya belum diisi (jadualnya belum diatur → tidak ada hitung mundur yang bisa ditampilkan).
+ */
+export function openOrderStartDeadline(window: OpenOrderWindow): number | null {
+  const start = (window.open_order_start_date ?? "").trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(start);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  // 00:00:00.000 WIB = 17:00:00.000 UTC pada hari SEBELUMNYA.
+  return Date.UTC(year, month - 1, day) - WIB_OFFSET_MS;
+}
+
+/** Pecahan sisa waktu (ms) untuk countdown: hari / jam / menit / detik. */
+export interface CountdownParts {
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+}
+
+/**
+ * Pecah sisa waktu (ms) jadi satuan countdown. Nilai negatif → 0 semua (waktu habis).
+ * Fungsi murni, tanpa akses jam sistem, jadi bisa diuji tanpa browser.
+ */
+export function splitCountdown(remainingMs: number): CountdownParts {
+  const total = Math.max(0, Math.floor(remainingMs / 1000));
+  return {
+    days: Math.floor(total / 86400),
+    hours: Math.floor((total % 86400) / 3600),
+    minutes: Math.floor((total % 3600) / 60),
+    seconds: total % 60,
+  };
 }
 

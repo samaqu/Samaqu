@@ -24,6 +24,7 @@ import {
   type OpenOrderProduct,
 } from "@/lib/open-order-offering";
 import type { ProductDraft } from "./types";
+import Countdown from "./Countdown";
 
 /** Format harga sama dengan halaman detail Katalog ("Rp 329.000"). */
 const rupiah = (value: number) => "Rp " + Math.round(value).toLocaleString("id-ID");
@@ -59,11 +60,20 @@ function InfoAccordionItem({ title, children }: { title: string; children: React
 export default function StepProduct({
   draft,
   products,
+  locked,
+  lockDeadline,
+  lockCaption,
   onChange,
   onAdd,
 }: {
   draft: ProductDraft;
   products: OpenOrderProduct[];
+  /** Jendela Open Order belum dibuka → tombol "Tambah ke Pesanan" dimatikan. */
+  locked?: boolean;
+  /** Batas mulai jendela (epoch ms) — untuk hitung mundur "Buka dalam". */
+  lockDeadline?: number | null;
+  /** Keterangan singkat di bawah hitung mundur. */
+  lockCaption?: string;
   onChange: (patch: Partial<ProductDraft>) => void;
   onAdd: (line: ProductDraft) => void;
 }) {
@@ -119,7 +129,7 @@ export default function StepProduct({
   }
 
   function handleAdd() {
-    if (priceTooLow) return;
+    if (priceTooLow || locked) return;
     onAdd({ ...draft, price: finalPrice, series: series?.name ?? "" });
   }
 
@@ -463,12 +473,27 @@ export default function StepProduct({
           <button
             type="button"
             onClick={handleAdd}
-            disabled={priceTooLow}
+            disabled={priceTooLow || locked}
             className="w-full flex items-center justify-center gap-2.5 py-4 rounded-sm text-[12px] tracking-[0.08em] uppercase font-ui font-semibold transition-all duration-300 hover:scale-[1.01] hover:shadow-lg disabled:opacity-40 disabled:hover:scale-100"
             style={{ background: "var(--espresso)", color: "white", boxShadow: "0 8px 28px -8px rgba(0,0,0,.35)" }}
           >
-            Tambah ke Pesanan
+            {locked ? "Belum Bisa Dipesan" : "Tambah ke Pesanan"}
           </button>
+
+          {/* Jendela belum dibuka → tombol dimatikan, ganti dengan hitung mundur "Buka dalam". */}
+          {locked && (
+            <div
+              className="mt-3 rounded-xl px-4 py-3.5 flex flex-col items-center gap-2"
+              style={{ background: "var(--cream-bright)", border: "1px solid rgba(0,0,0,.2)" }}
+            >
+              <Countdown deadline={lockDeadline ?? null} variant="compact" label="Buka dalam" />
+              {lockCaption && (
+                <p className="text-center text-[11.5px] leading-relaxed" style={{ color: "var(--stone)" }}>
+                  {lockCaption}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Info tambahan */}
@@ -509,13 +534,19 @@ export default function StepProduct({
         <button
           type="button"
           onClick={handleAdd}
-          disabled={priceTooLow}
+          disabled={priceTooLow || locked}
           className="shrink-0 h-12 px-6 rounded-full text-[14px] font-ui font-bold transition-all duration-300 active:scale-[.98] disabled:opacity-40"
           style={{ background: "var(--espresso)", color: "white" }}
         >
-          Tambah ke Pesanan
+          {locked ? "Belum Bisa Dipesan" : "Tambah ke Pesanan"}
         </button>
       </div>
+      {/* Mobile: hitung mundur "Buka dalam" menggantikan aksi saat jendela belum dibuka. */}
+      {locked && (
+        <div className="flex justify-center px-6 pb-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
+          <Countdown deadline={lockDeadline ?? null} variant="compact" label="Buka dalam" />
+        </div>
+      )}
     </div>
 
     {/* Ruang bawah supaya isi terakhir tidak ketutup bar sticky (mobile). */}
