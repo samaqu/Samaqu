@@ -107,8 +107,17 @@ export default function StepCatalog({
         </div>
       )}
 
-      {/* Grid produk — kartu sama seperti halaman katalog */}
-      <div className="mt-6 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
+      {/* Grid produk — kartu sama seperti halaman katalog.
+          Kalau cuma satu produk yang tampil, kartunya DIPUSAT (bukan nempel di kolom
+          kiri) — kalau tetap pakai grid, satu-satunya kartu terlihat "yatim" di sisi kiri
+          dan halaman terasa kosong. */}
+      <div
+        className={
+          shown.length === 1
+            ? "mt-6 flex justify-center"
+            : "mt-6 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6"
+        }
+      >
         {shown.map((product) => {
           const label = product.kain ? `Kain ${product.kain}` : product.category;
           const totalStock = product.totalStock;
@@ -132,7 +141,9 @@ export default function StepCatalog({
               key={product.id}
               type="button"
               onClick={() => onOpen(product, initialColor)}
-              className="group relative flex flex-col h-full rounded-2xl overflow-hidden cursor-pointer text-left"
+              className={`group relative flex flex-col h-full rounded-2xl overflow-hidden cursor-pointer text-left ${
+                shown.length === 1 ? "w-full max-w-[260px] sm:max-w-[280px] md:max-w-[300px] lg:max-w-[280px]" : ""
+              }`}
               style={{ background: "#ffffff", border: "1px solid rgba(0,0,0,.1)" }}
             >
               {/* Foto */}
