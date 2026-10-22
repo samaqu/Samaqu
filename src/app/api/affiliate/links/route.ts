@@ -97,8 +97,8 @@ export async function POST(req: NextRequest) {
   // lewat API bila perlu.
   const fallbackCampaign = String((product as { name?: string }).name || "Tautan affiliate").trim();
   const campaign = (campaignInput || fallbackCampaign).slice(0, 40);
-  const source = sourceInput || "Lainnya";
-  if (!AFFILIATE_LINK_SOURCES.includes(source as (typeof AFFILIATE_LINK_SOURCES)[number])) {
+  const source = sourceInput || null;
+  if (source && !AFFILIATE_LINK_SOURCES.includes(source as (typeof AFFILIATE_LINK_SOURCES)[number])) {
     return NextResponse.json({ error: "Sumber promosi tidak dikenal." }, { status: 400 });
   }
 

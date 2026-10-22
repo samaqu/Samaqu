@@ -98,26 +98,6 @@ export default function AffiliateLinksPage() {
     });
   };
 
-  const rename = async (link: AffiliateLink) => {
-    const next = window.prompt("Nama kampanye baru:", link.campaign);
-    if (next === null) return;
-    const value = next.trim();
-    if (value.length < 3) {
-      toast("Nama kampanye minimal 3 karakter.", "err");
-      return;
-    }
-    try {
-      await affiliateFetch("/api/affiliate/links", {
-        method: "PATCH",
-        body: JSON.stringify({ id: link.id, campaign: value }),
-      });
-      toast("Nama kampanye berhasil diperbarui");
-      await load();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Gagal memperbarui tautan", "err");
-    }
-  };
-
   const remove = async (link: AffiliateLink) => {
     if (!window.confirm(`Tautan "${link.campaign}" akan dinonaktifkan. Pesanan dan komisi tetap tersimpan.`)) {
       return;
@@ -206,13 +186,8 @@ export default function AffiliateLinksPage() {
             <Table
               columns={[
                 {
-                  label: "Kampanye",
-                  render: (l) => (
-                    <div>
-                      <div className="b dark">{l.campaign}</div>
-                      <div className="small muted">{l.product_name || "-"}</div>
-                    </div>
-                  ),
+                  label: "Produk",
+                  render: (l) => <div className="b dark">{l.product_name || l.campaign}</div>,
                 },
                 {
                   label: "Tautan Affiliate",
@@ -236,9 +211,6 @@ export default function AffiliateLinksPage() {
                   label: "Aksi",
                   render: (l) => (
                     <div className="row" style={{ gap: 4 }}>
-                      <button className="btn s sm" onClick={() => rename(l)} title="Edit nama kampanye" type="button">
-                        <Icon name="edit" className="sm" />
-                      </button>
                       <button
                         className="btn s sm"
                         style={{ color: "var(--af-err)" }}
@@ -271,7 +243,6 @@ function LinkFormInline({
   onCreated: () => Promise<void>;
 }) {
   const [productId, setProductId] = useState("");
-  const [campaign, setCampaign] = useState("");
   const [source, setSource] = useState("");
   const [note, setNote] = useState("");
   const [err, setErr] = useState<Record<string, string>>({});
@@ -282,8 +253,6 @@ function LinkFormInline({
   const submit = async () => {
     const next: Record<string, string> = {};
     if (!productId) next.productId = "Pilih produk yang ingin dipromosikan.";
-    if (campaign.trim().length < 3) next.campaign = "Nama kampanye minimal 3 karakter.";
-    if (!source) next.source = "Pilih sumber promosi.";
     setErr(next);
     if (Object.keys(next).length) {
       toast("Periksa kembali formulir tautan", "err");
@@ -294,10 +263,10 @@ function LinkFormInline({
     try {
       const res = await affiliateFetch<{ link: { code: string } }>("/api/affiliate/links", {
         method: "POST",
-        body: JSON.stringify({ productId, campaign: campaign.trim(), source, note: note.trim() }),
+        body: JSON.stringify({ productId, source, note: note.trim() }),
       });
       setLastUrl(referralUrl(res.link.code));
-      setCampaign("");
+      setSource("");
       setNote("");
       toast("Tautan affiliate berhasil dibuat");
       await onCreated();
@@ -320,7 +289,9 @@ function LinkFormInline({
           <option value="">— Pilih produk —</option>
           {products.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.name} · {p.rate}%
+              {p.name}
+              {p.series ? ` · ${p.series}` : ""}
+              {p.kain ? ` · ${p.kain}` : ""} · {p.rate}%
             </option>
           ))}
         </select>
@@ -328,32 +299,15 @@ function LinkFormInline({
       </div>
 
       <div className="fg">
-        <label className="fl">Nama Kampanye</label>
-        <input
-          className={`inp ${err.campaign ? "e" : ""}`}
-          maxLength={40}
-          placeholder="Contoh: Promo Payday Oktober"
-          value={campaign}
-          onChange={(e) => setCampaign(e.target.value)}
-        />
-        {err.campaign ? <div className="fe">{err.campaign}</div> : <div className="fh">Maksimal 40 karakter.</div>}
-      </div>
-
-      <div className="fg">
-        <label className="fl">Sumber Promosi</label>
-        <select
-          className={`sel ${err.source ? "e" : ""}`}
-          value={source}
-          onChange={(e) => setSource(e.target.value)}
-        >
-          <option value="">— Pilih sumber —</option>
+        <label className="fl">Sumber Promosi (opsional)</label>
+        <select className="sel" value={source} onChange={(e) => setSource(e.target.value)}>
+          <option value="">— Tanpa sumber —</option>
           {["TikTok", "Instagram", "WhatsApp", "Facebook", "YouTube", "Lainnya"].map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
           ))}
         </select>
-        {err.source ? <div className="fe">{err.source}</div> : null}
       </div>
 
       <div className="fg">
