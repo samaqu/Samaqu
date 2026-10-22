@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -130,6 +131,9 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
   const [drawer, setDrawer] = useState(false);
   const [menu, setMenu] = useState(false);
   const [unread, setUnread] = useState(0);
+  // Sesi affiliate cukup dimuat sekali per mount; pindah menu tidak boleh
+  // memicu spinner/refetch penuh.
+  const loadedRef = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -153,6 +157,8 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
+    if (loadedRef.current) return;
+    loadedRef.current = true;
     setLoading(true);
     load();
   }, [pathname, load]);
@@ -255,6 +261,8 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await supabase.auth.signOut();
+    loadedRef.current = false;
+    setMe(null);
     router.push(portalPath(base, "login"));
   };
 
