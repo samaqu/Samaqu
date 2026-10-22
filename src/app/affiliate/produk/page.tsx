@@ -20,6 +20,7 @@ interface AffiliateProduct {
   name: string;
   category: string;
   series: string | null;
+  kain: string | null;
   price: number;
   description: string | null;
   image: string;
@@ -38,6 +39,7 @@ interface CatalogGroup {
   id: string;
   name: string;
   category: string;
+  kain: string | null;
   image: string;
   price: number;
   stock: number;
@@ -68,6 +70,7 @@ function groupProducts(items: AffiliateProduct[]): CatalogGroup[] {
       id: rep.id,
       name: rep.name,
       category: rep.category,
+      kain: cheapest.kain,
       image: rep.image,
       price: cheapest.price,
       stock,
@@ -237,7 +240,7 @@ export default function AffiliateCatalogPage() {
                 <div className="bd">
                   <div className="nm">{p.name}</div>
                   <div className="pc-meta">
-                    {p.category}
+                    {p.kain ? `Kain ${p.kain}` : p.category}
                     {p.series.length > 1 ? ` · ${p.series.length} series` : ""}
                   </div>
                   <div

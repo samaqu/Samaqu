@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   const { data: productRows } = await supabase
     .from("products")
-    .select("id, name, category, series, price, description, image, colors, minimum_price, create_your_price_enabled, created_at")
+    .select("id, name, category, series, price, description, image, colors, kain, jenis_kain(name), minimum_price, create_your_price_enabled, created_at")
     .eq("is_published", true)
     .order("created_at", { ascending: true });
 
@@ -31,6 +31,8 @@ export async function GET(req: NextRequest) {
     description: string | null;
     image: string | null;
     colors: string[] | null;
+    kain: string | null;
+    jenis_kain: { name: string | null } | { name: string | null }[] | null;
     minimum_price: number | null;
     create_your_price_enabled: boolean;
     created_at: string;
@@ -92,11 +94,13 @@ export async function GET(req: NextRequest) {
   const result = products.map((p) => {
     const media = mediaMap.get(p.id) || [];
     const rate = rateForProduct(settings, p.id);
+    const fabric = Array.isArray(p.jenis_kain) ? p.jenis_kain[0]?.name : p.jenis_kain?.name;
     return {
       id: p.id,
       name: p.name,
       category: p.category,
       series: p.series,
+      kain: fabric || p.kain || null,
       price: p.price,
       description: p.description,
       image: media.find((m) => m.type === "image")?.src || p.image || "",

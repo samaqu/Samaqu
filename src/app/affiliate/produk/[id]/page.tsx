@@ -17,6 +17,7 @@ interface AffiliateProduct {
   name: string;
   category: string;
   series: string | null;
+  kain: string | null;
   price: number;
   description: string | null;
   image: string;
@@ -176,6 +177,7 @@ export default function AffiliateProductDetailPage({
           <div>
             <span className="small muted">
               {product.category}
+              {product.kain ? ` · Kain ${product.kain}` : ""}
               {product.series ? ` · ${product.series}` : ""}
             </span>
 
