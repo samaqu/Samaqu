@@ -24,6 +24,7 @@ export interface ResolvedReferral {
   affiliateId: string;
   linkId: string | null;
   code: string;
+  productId: string | null;
 }
 
 /** Validasi kode referral ke database. Null kalau kode tidak dikenal / affiliate tidak aktif. */
@@ -36,7 +37,7 @@ export async function resolveReferralCode(
 
   const { data: link } = await supabase
     .from("affiliate_links")
-    .select("id, affiliate_id, is_active")
+    .select("id, affiliate_id, is_active, product_id")
     .eq("code", code)
     .maybeSingle();
 
@@ -64,7 +65,7 @@ export async function resolveReferralCode(
 
   if (!affiliate || affiliate.status !== "aktif") return null;
 
-  return { affiliateId, linkId, code };
+  return { affiliateId, linkId, code, productId: link?.product_id ?? null };
 }
 
 /** Baca kode referral dari request (cookie dulu, lalu fallback body). */

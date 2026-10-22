@@ -35,9 +35,23 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ code: strin
     return NextResponse.redirect(home);
   }
 
+  // Tautan produk → langsung ke halaman detail produk di toko. Kalau produk
+  // sudah tidak published, tetap ke beranda supaya tidak 404.
+  let target = home;
+  if (referral.productId) {
+    const { data: product } = await supabase
+      .from("products")
+      .select("id, is_published")
+      .eq("id", referral.productId)
+      .maybeSingle();
+    if (product?.is_published) {
+      target = new URL(`/katalog/${referral.productId}`, req.url);
+    }
+  }
+
   await recordReferralClick(supabase, referral);
 
-  const response = NextResponse.redirect(home);
+  const response = NextResponse.redirect(target);
   const maxAge = referralCookieMaxAge(settings);
   const existing = req.cookies.get(REF_COOKIE)?.value;
 
