@@ -398,7 +398,6 @@ export default function PanelShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className={styles.foot}>
-          <img className={styles.footAv} src={AVATAR} alt="" width={44} height={44} />
           <div className={styles.footText}>
             Engineered by <b>Surya</b>
           </div>
