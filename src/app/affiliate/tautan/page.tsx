@@ -44,6 +44,7 @@ interface CatalogProduct {
   name: string;
   rate: number;
   series?: string | null;
+  kain?: string | null;
 }
 
 export default function AffiliateLinksPage() {

@@ -324,6 +324,7 @@ export default function AffiliateCatalogPage() {
                                 name: x.name,
                                 rate: x.rate,
                                 series: x.series,
+                                kain: x.kain,
                               }))}
                               initialProductId={p.id}
                             />

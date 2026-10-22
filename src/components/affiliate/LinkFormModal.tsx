@@ -16,6 +16,7 @@ interface AffiliateProduct {
   name: string;
   rate: number;
   series?: string | null;
+  kain?: string | null;
 }
 
 const SOURCES = ["TikTok", "Instagram", "WhatsApp", "Facebook", "YouTube", "Lainnya"];
@@ -97,7 +98,7 @@ export default function LinkFormModal({ products, initialProductId }: {
               (p) =>
                 [
                   p.id,
-                  `${p.name}${p.series ? ` · ${p.series}` : ""} · ${p.rate}%`,
+                  `${p.name}${p.series ? ` · ${p.series}` : ""}${p.kain ? ` · ${p.kain}` : ""} · ${p.rate}%`,
                 ] as [string, string],
             ),
           ]}
