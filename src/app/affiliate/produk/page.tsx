@@ -272,7 +272,12 @@ export default function AffiliateCatalogPage() {
                           title: "Buat Tautan Affiliate",
                           body: (
                             <LinkFormModal
-                              products={products.map((x) => ({ id: x.id, name: x.name, rate: x.rate }))}
+                              products={products.map((x) => ({
+                                id: x.id,
+                                name: x.name,
+                                rate: x.rate,
+                                series: x.series,
+                              }))}
                               initialProductId={p.id}
                             />
                           ),

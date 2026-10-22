@@ -43,6 +43,7 @@ interface CatalogProduct {
   id: string;
   name: string;
   rate: number;
+  series?: string | null;
 }
 
 export default function AffiliateLinksPage() {

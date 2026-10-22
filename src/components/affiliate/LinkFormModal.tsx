@@ -15,6 +15,7 @@ interface AffiliateProduct {
   id: string;
   name: string;
   rate: number;
+  series?: string | null;
 }
 
 const SOURCES = ["TikTok", "Instagram", "WhatsApp", "Facebook", "YouTube", "Lainnya"];
@@ -92,7 +93,13 @@ export default function LinkFormModal({ products, initialProductId }: {
           onChange={setProductId}
           options={[
             ["", "— Pilih produk —"],
-            ...products.map((p) => [p.id, `${p.name} · ${p.rate}%`] as [string, string]),
+            ...products.map(
+              (p) =>
+                [
+                  p.id,
+                  `${p.name}${p.series ? ` · ${p.series}` : ""} · ${p.rate}%`,
+                ] as [string, string],
+            ),
           ]}
         />
       </Field>
