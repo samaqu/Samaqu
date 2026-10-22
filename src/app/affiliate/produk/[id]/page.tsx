@@ -135,14 +135,14 @@ export default function AffiliateProductDetailPage({
       </Link>
 
       <div className="card cp">
-        <div className="grid g2" style={{ gap: 28 }}>
-          <div>
+        <div className="grid g2" style={{ gap: 40, alignItems: "start" }}>
+          <div className="prod-media">
             <div
               style={{
-                aspectRatio: "1",
-                borderRadius: 14,
+                aspectRatio: "3 / 4",
+                borderRadius: 24,
                 overflow: "hidden",
-                background: "#F3F4F6",
+                background: "#e5e5e5",
               }}
             >
               {main ? (
@@ -157,8 +157,8 @@ export default function AffiliateProductDetailPage({
                     type="button"
                     onClick={() => setActive(i)}
                     style={{
-                      border: `2px solid ${active === i ? "var(--af-pri)" : "transparent"}`,
-                      borderRadius: 10,
+                      border: `2px solid ${active === i ? "#111827" : "transparent"}`,
+                      borderRadius: 12,
                       padding: 0,
                       cursor: "pointer",
                       overflow: "hidden",
@@ -174,18 +174,24 @@ export default function AffiliateProductDetailPage({
           </div>
 
           <div>
-            <div className="row">
-              {product.series ? <span className="tag n">BARU</span> : null}
-              <span className="small muted">
-                {product.category}
-                {product.series ? ` · ${product.series}` : ""} · {product.id}
-              </span>
-            </div>
+            <span className="small muted">
+              {product.category}
+              {product.series ? ` · ${product.series}` : ""}
+            </span>
 
-            <h2 style={{ fontSize: 24, fontWeight: 800, color: "#111827", marginTop: 10 }}>
+            <h2
+              style={{
+                fontFamily: "var(--font-cormorant), Georgia, serif",
+                fontSize: 30,
+                fontWeight: 600,
+                lineHeight: 1.15,
+                color: "#000",
+                marginTop: 8,
+              }}
+            >
               {product.name}
             </h2>
-            <div style={{ fontSize: 22, fontWeight: 800, color: "var(--af-pri)", marginTop: 6 }}>
+            <div style={{ fontSize: 20, fontWeight: 600, color: "#000", marginTop: 8 }}>
               {money(product.price)}
             </div>
 

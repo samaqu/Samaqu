@@ -74,3 +74,8 @@
 .af-root .pc .pc-btn:hover{background:#000;color:#fff}
 .af-root .pc .pc-btn.solid{background:#000;color:#fff}
 .af-root .pc .pc-btn.solid:hover{background:#26272a}
+
+/* Detail produk affiliate: galeri 3:4, sticky di desktop */
+@media(min-width:1101px){
+  .af-root .prod-media{position:sticky;top:24px;align-self:start}
+}
