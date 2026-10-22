@@ -42,8 +42,8 @@ export default function AffiliateProductDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const [product, setProduct] = useState<AffiliateProduct | null>(null);
   const [products, setProducts] = useState<AffiliateProduct[]>([]);
+  const [activeId, setActiveId] = useState("");
   const [active, setActive] = useState(0);
   const [variant, setVariant] = useState("");
   const [loading, setLoading] = useState(true);
@@ -58,8 +58,7 @@ export default function AffiliateProductDetailPage({
         if (!alive) return;
         setProducts(json.products || []);
         const id = (await params).id;
-        const found = (json.products || []).find((p) => p.id === id) || null;
-        setProduct(found);
+        setActiveId(id);
       } catch (e) {
         console.error("[AFFILIATE] Gagal memuat detail produk:", e);
       } finally {
@@ -70,6 +69,29 @@ export default function AffiliateProductDetailPage({
       alive = false;
     };
   }, [params]);
+
+  const product = useMemo(
+    () => products.find((p) => p.id === activeId) || null,
+    [products, activeId],
+  );
+
+  // Semua baris dengan kategori + nama sama = satu produk utama; tiap baris
+  // membawa series sendiri (sama seperti katalog toko).
+  const group = useMemo(
+    () =>
+      product
+        ? products.filter((p) => p.category === product.category && p.name === product.name)
+        : [],
+    [products, product],
+  );
+
+  const seriesOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of group) {
+      if (row.series && !map.has(row.series)) map.set(row.series, row.id);
+    }
+    return Array.from(map.entries());
+  }, [group]);
 
   const gallery = useMemo(() => {
     if (!product) return [];
@@ -172,6 +194,28 @@ export default function AffiliateProductDetailPage({
                 {product.description}
               </p>
             ) : null}
+
+            {seriesOptions.length > 1 && (
+              <div className="mt">
+                <div className="fl">Pilihan Series</div>
+                <div className="row wrap">
+                  {seriesOptions.map(([series, memberId]) => (
+                    <button
+                      key={series}
+                      className={`chip ${product.series === series ? "on" : ""}`}
+                      onClick={() => {
+                        setActiveId(memberId);
+                        setActive(0);
+                        setVariant("");
+                      }}
+                      type="button"
+                    >
+                      {series}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {product.sizes.length > 0 && (
               <div className="mt">

@@ -3,13 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/affiliate/icons";
-import { Badge, Empty, Pager, Search, Select, paginate, useModal, useToast } from "@/components/affiliate/ui";
+import { Empty, Pager, Search, Select, paginate, useModal, useToast } from "@/components/affiliate/ui";
 import LinkFormModal from "@/components/affiliate/LinkFormModal";
 import { affiliateFetch } from "@/lib/affiliate/client";
 import { money } from "@/lib/affiliate/format";
 
 /**
- * Katalog produk affiliate — mengikuti mockup (filter bar + grid kartu produk).
+ * Katalog produk affiliate — mengikuti katalog toko: SATU kartu per produk
+ * utama (kategori + nama), bukan satu kartu per baris series/varian.
+ * Series & varian ditampilkan di halaman detail setelah kartu diklik.
  * Data produk & stok berasal dari katalog SAMAQU sungguhan.
  */
 
@@ -32,10 +34,49 @@ interface AffiliateProduct {
   minimumPrice: number | null;
 }
 
-function stockLabel(stock: number) {
-  if (stock === 0) return "Habis";
-  if (stock < 15) return "Stok Terbatas";
-  return "Tersedia";
+interface CatalogGroup {
+  id: string;
+  name: string;
+  category: string;
+  image: string;
+  price: number;
+  stock: number;
+  rate: number;
+  estimatedCommission: number;
+  series: string[];
+  promoted: boolean;
+}
+
+/** Gabungkan semua baris series/varian menjadi satu kartu produk utama. */
+function groupProducts(items: AffiliateProduct[]): CatalogGroup[] {
+  const map = new Map<string, AffiliateProduct[]>();
+  for (const item of items) {
+    const key = `${item.category}::${item.name}`;
+    const list = map.get(key);
+    if (list) list.push(item);
+    else map.set(key, [item]);
+  }
+
+  return Array.from(map.values()).map((members) => {
+    const rep = members[0];
+    const cheapest = members.reduce((a, b) => (b.price < a.price ? b : a), members[0]);
+    const stock = members.reduce((sum, m) => sum + m.stock, 0);
+    const series = Array.from(
+      new Set(members.map((m) => m.series).filter((s): s is string => Boolean(s))),
+    ).sort();
+    return {
+      id: rep.id,
+      name: rep.name,
+      category: rep.category,
+      image: rep.image,
+      price: cheapest.price,
+      stock,
+      rate: cheapest.rate,
+      estimatedCommission: Math.round((cheapest.price * cheapest.rate) / 100),
+      series,
+      promoted: members.some((m) => m.promoted),
+    };
+  });
 }
 
 export default function AffiliateCatalogPage() {
@@ -68,14 +109,18 @@ export default function AffiliateCatalogPage() {
     };
   }, []);
 
+  const groups = useMemo(() => groupProducts(products), [products]);
+
   const categories = useMemo(
-    () => Array.from(new Set(products.map((p) => p.category).filter(Boolean))),
-    [products],
+    () => Array.from(new Set(groups.map((p) => p.category).filter(Boolean))),
+    [groups],
   );
 
   const list = useMemo(() => {
-    let rows = products.filter((p) => {
-      if (q && !`${p.name} ${p.category}`.toLowerCase().includes(q.toLowerCase())) return false;
+    let rows = groups.filter((p) => {
+      if (q && !`${p.name} ${p.category} ${p.series.join(" ")}`.toLowerCase().includes(q.toLowerCase())) {
+        return false;
+      }
       if (cat && p.category !== cat) return false;
       if (price) {
         const [lo, hi] = price.split("-").map(Number);
@@ -93,7 +138,7 @@ export default function AffiliateCatalogPage() {
     else if (sortBy === "rate") rows.sort((a, b) => b.rate - a.rate || b.price - a.price);
     else rows.sort((a, b) => b.estimatedCommission - a.estimatedCommission);
     return rows;
-  }, [products, q, cat, price, rate, avail, sortBy]);
+  }, [groups, q, cat, price, rate, avail, sortBy]);
 
   const pg = paginate(list, page, 8);
 
@@ -184,37 +229,43 @@ export default function AffiliateCatalogPage() {
         <>
           <div className="grid g4 mt">
             {pg.rows.map((p) => (
-              <div className="card pc" key={p.id}>
+              <div className="card pc" key={`${p.category}::${p.name}`}>
                 <Link href={`/affiliate/produk/${p.id}`} className="im">
-                  {p.image ? (
-                    <img src={p.image} alt={p.name} loading="lazy" />
-                  ) : null}
+                  {p.image ? <img src={p.image} alt={p.name} loading="lazy" /> : null}
+                  {p.stock === 0 ? <span className="pc-sold">Habis</span> : null}
                 </Link>
                 <div className="bd">
-                  <div className="small muted">
-                    {p.category} · <Badge label={stockLabel(p.stock)} />
-                  </div>
                   <div className="nm">{p.name}</div>
-                  <div className="pr">{money(p.price)}</div>
+                  <div className="pc-meta">
+                    {p.category}
+                    {p.series.length > 1 ? ` · ${p.series.length} series` : ""}
+                  </div>
+                  <div
+                    className={`pc-stock${p.stock === 0 ? " out" : p.stock < 15 ? " low" : ""}`}
+                  >
+                    {p.stock === 0
+                      ? "Stok habis"
+                      : p.stock < 15
+                        ? `Stok terbatas · ${p.stock}`
+                        : "Stok tersedia"}
+                  </div>
+                  <div className="pr">
+                    Mulai <b>{money(p.price)}</b>
+                  </div>
                   <div className="cmb">
                     <span>
-                      Komisi <b style={{ color: "var(--af-pri)" }}>{p.rate}%</b>
+                      Komisi <b>{p.rate}%</b>
                     </span>
                     <span>
-                      ±<b className="dark">{money(p.estimatedCommission)}</b>/terjual
+                      ±<b>{money(p.estimatedCommission)}</b>/terjual
                     </span>
                   </div>
-                  <div className="row" style={{ marginTop: 6 }}>
-                    <Link
-                      href={`/affiliate/produk/${p.id}`}
-                      className="btn s sm"
-                      style={{ flex: 1 }}
-                    >
+                  <div className="pc-actions">
+                    <Link href={`/affiliate/produk/${p.id}`} className="pc-btn">
                       Lihat Detail
                     </Link>
                     <button
-                      className="btn p sm"
-                      style={{ flex: 1 }}
+                      className="pc-btn solid"
                       type="button"
                       onClick={() =>
                         open({
