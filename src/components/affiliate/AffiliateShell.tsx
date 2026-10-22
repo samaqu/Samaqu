@@ -38,6 +38,37 @@ export const AFFILIATE_NAV: [string, string, string][] = [
   ["pengaturan", "Pengaturan Akun", "gear"],
 ];
 
+/** Menu dikelompokkan seperti sidebar /ops (label grup + item rounded). */
+const NAV_GROUPS: { label: string; items: [string, string, string][] }[] = [
+  { label: "Utama", items: [["", "Ringkasan", "dash"]] },
+  {
+    label: "Afiliasi",
+    items: [
+      ["produk", "Katalog Produk", "bag"],
+      ["produk-saya", "Produk Saya", "pkg"],
+      ["tautan", "Tautan Affiliate", "link"],
+      ["pesanan", "Pesanan", "receipt"],
+      ["komisi", "Komisi Saya", "coins"],
+      ["penarikan", "Penarikan Dana", "cash"],
+    ],
+  },
+  {
+    label: "Konten",
+    items: [
+      ["materi", "Materi Promosi", "image"],
+      ["performa", "Performa", "chart"],
+      ["notifikasi", "Pusat Notifikasi", "bell"],
+    ],
+  },
+  {
+    label: "Akun",
+    items: [
+      ["bantuan", "Pusat Bantuan", "help"],
+      ["pengaturan", "Pengaturan Akun", "gear"],
+    ],
+  },
+];
+
 const AffiliateContext = createContext<{
   me: MePayload | null;
   refresh: () => Promise<void>;
@@ -98,7 +129,6 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [drawer, setDrawer] = useState(false);
   const [menu, setMenu] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
   const [unread, setUnread] = useState(0);
 
   const load = useCallback(async () => {
@@ -202,8 +232,7 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
     <Link
       key={key}
       href={portalPath(base, key)}
-      className={`ni ${key === seg ? "on" : ""}`}
-      data-tip={label}
+      className={`sbn-item ${key === seg ? "on" : ""}`}
       onClick={() => {
         setDrawer(false);
         setMenu(false);
@@ -215,6 +244,15 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
     </Link>
   );
 
+  const statusLabel =
+    affiliate.status === "aktif"
+      ? "Affiliate Aktif"
+      : affiliate.status === "menunggu"
+        ? "Menunggu Persetujuan"
+        : affiliate.status === "ditolak"
+          ? "Ditolak"
+          : "Nonaktif";
+
   const logout = async () => {
     await supabase.auth.signOut();
     router.push(portalPath(base, "login"));
@@ -223,59 +261,38 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
   return (
     <AffiliateContext.Provider value={value}>
       <div className="af-root">
-      <div className={`app ${collapsed ? "colp" : ""}`}>
+      <div className="app">
         <div className={`ovl ${drawer ? "show" : ""}`} onClick={() => setDrawer(false)} />
 
-        <aside className={`sb ${collapsed ? "col" : ""} ${drawer ? "open" : ""}`}>
-          <div className="brand">
-            <div className="logo">S</div>
-            <div>
-              <b>SAMAQU</b>
-              <small>AFFILIATE CENTER</small>
-            </div>
-          </div>
-
-          <div className="prof">
-            <div className="av">{initial}</div>
-            <div style={{ minWidth: 0 }}>
-              <div className="n">{displayName}</div>
-              <div className="id">ID Affiliate: {affiliate.affiliate_code}</div>
-              <div style={{ marginTop: 5 }}>
-                <Badge
-                  label={
-                    affiliate.status === "aktif"
-                      ? "Affiliate Aktif"
-                      : affiliate.status === "menunggu"
-                        ? "Menunggu Persetujuan"
-                        : affiliate.status === "ditolak"
-                          ? "Ditolak"
-                          : "Nonaktif"
-                  }
-                />
-              </div>
-            </div>
-          </div>
-
-          <nav className="nav">
-            <div className="lbl">MENU UTAMA</div>
-            {AFFILIATE_NAV.slice(0, 10).map(navItem)}
-          </nav>
-
-          <div className="sbf">
-            {navItem(AFFILIATE_NAV[10])}
-            {navItem(AFFILIATE_NAV[11])}
-            <button className="ni" data-tip="Keluar" onClick={logout} type="button">
-              <Icon name="logout" />
-              <span>Keluar</span>
-            </button>
+        <aside className={`sb ${drawer ? "open" : ""}`}>
+          <div className="sbn-head">
+            <Link href={portalPath(base)} aria-label="SAMAQU Affiliate Center">
+              <img src="/logo.svg" alt="SAMAQU" />
+            </Link>
+            <p className="sbn-kicker">Affiliate Center</p>
             <button
-              className="ni hide-m"
-              data-tip="Perluas menu"
-              onClick={() => setCollapsed((v) => !v)}
+              className="sbn-close show-m"
+              onClick={() => setDrawer(false)}
+              aria-label="Tutup menu"
               type="button"
             >
-              <Icon name="panel" />
-              <span>Ciutkan menu</span>
+              <Icon name="x" />
+            </button>
+          </div>
+
+          <div className="sbn-scroll">
+            {NAV_GROUPS.map((group) => (
+              <div className="sbn-group" key={group.label}>
+                <p className="sbn-label">{group.label}</p>
+                <div className="sbn-items">{group.items.map(navItem)}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="sbn-foot">
+            <button className="sbn-item sbn-logout" onClick={logout} type="button">
+              <Icon name="logout" />
+              <span>Keluar</span>
             </button>
           </div>
         </aside>
@@ -345,6 +362,12 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
                   >
                     <div className="b dark">{affiliate.full_name}</div>
                     <div className="small muted">{affiliate.email}</div>
+                    <div className="small muted" style={{ marginTop: 2 }}>
+                      {affiliate.affiliate_code}
+                    </div>
+                    <div style={{ marginTop: 5 }}>
+                      <Badge label={statusLabel} />
+                    </div>
                   </div>
                   <Link href={portalPath(base, "pengaturan")} onClick={() => setMenu(false)}>
                     <Icon name="user" className="sm" />
