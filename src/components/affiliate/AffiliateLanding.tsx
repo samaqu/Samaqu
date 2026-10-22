@@ -147,7 +147,8 @@ export default function AffiliateLanding() {
 
   const daftarHref = portalPath(base, "daftar");
   const loginHref = portalPath(base, "login");
-  const bantuanHref = portalPath(base, "bantuan");
+  const syaratHref = portalPath(base, "syarat-ketentuan");
+  const kebijakanHref = portalPath(base, "kebijakan-privasi");
 
   useEffect(() => {
     setBase(portalBaseFor(window.location.hostname));
@@ -579,7 +580,7 @@ export default function AffiliateLanding() {
               <p className="mt-5 leading-relaxed" style={{ color: "var(--c-text-2)" }}>
                 Selengkapnya baca{" "}
                 <Link
-                  href={bantuanHref}
+                  href={syaratHref}
                   className="font-semibold text-black underline underline-offset-4"
                 >
                   Syarat &amp; Ketentuan program
@@ -712,12 +713,12 @@ export default function AffiliateLanding() {
                 </Link>
               </li>
               <li>
-                <Link href={bantuanHref} className="link">
+                <Link href={syaratHref} className="link">
                   Syarat &amp; Ketentuan
                 </Link>
               </li>
               <li>
-                <Link href={bantuanHref} className="link">
+                <Link href={kebijakanHref} className="link">
                   Kebijakan Privasi
                 </Link>
               </li>
@@ -747,7 +748,7 @@ export default function AffiliateLanding() {
         >
           <p>
             Kami memakai cookie untuk mencatat link referral dan meningkatkan pengalamanmu. Baca{" "}
-            <Link href={bantuanHref}>Kebijakan Privasi</Link>.
+            <Link href={kebijakanHref}>Kebijakan Privasi</Link>.
           </p>
           <div className="cookie-actions">
             <button type="button" className="cookie-btn ghost" onClick={() => chooseCookie("ditolak")}>

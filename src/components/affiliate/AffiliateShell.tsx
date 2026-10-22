@@ -68,6 +68,17 @@ function isAuthPath(pathname: string): boolean {
   return seg === "login" || seg === "daftar";
 }
 
+/** Halaman legal publik (tanpa sesi), sama seperti login/daftar. */
+function isLegalPath(pathname: string): boolean {
+  const seg = pathname.replace(/\/+$/, "").split("/").filter(Boolean).pop() || "";
+  return seg === "syarat-ketentuan" || seg === "kebijakan-privasi";
+}
+
+/** Semua halaman publik yang tidak butuh sidebar/sesi. */
+function isPublicPath(pathname: string): boolean {
+  return isAuthPath(pathname) || isLegalPath(pathname);
+}
+
 /** Halaman depan portal: `/affiliate` (atau `/` di subdomain) → landing publik. */
 function isLandingPath(pathname: string): boolean {
   const parts = pathname.replace(/\/+$/, "").split("/").filter(Boolean);
@@ -108,7 +119,7 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (isAuthPath(pathname)) {
+    if (isPublicPath(pathname)) {
       setLoading(false);
       return;
     }
@@ -119,7 +130,7 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
   // Halaman dalam portal tanpa sesi → langsung ke halaman masuk (bukan kartu fallback).
   useEffect(() => {
     if (loading || me) return;
-    if (isAuthPath(pathname) || isLandingPath(pathname)) return;
+    if (isPublicPath(pathname) || isLandingPath(pathname)) return;
     router.replace(portalPath(portalBaseFor(window.location.hostname), "login"));
   }, [loading, me, pathname, router]);
 
@@ -151,7 +162,7 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({ me, refresh }), [me, refresh]);
 
-  if (isAuthPath(pathname)) {
+  if (isPublicPath(pathname)) {
     return <>{children}</>;
   }
 

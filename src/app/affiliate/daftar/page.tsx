@@ -305,7 +305,7 @@ export default function AffiliateRegisterPage() {
             <span>
               Saya menyetujui{" "}
               <Link
-                href={portalPath(base, "bantuan")}
+                href={portalPath(base, "syarat-ketentuan")}
                 target="_blank"
                 rel="noopener"
                 className="font-semibold text-black underline underline-offset-4"

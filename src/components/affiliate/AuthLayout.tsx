@@ -40,7 +40,7 @@ export default function AuthLayout({
 }) {
   return (
     <div className="af-public min-h-screen bg-white">
-      <header className="nav solid auth-nav">
+      <header className="nav auth-nav">
         <div className="container h-full flex items-center justify-between">
           <Link href={backHref} className="wordmark" aria-label="SAMAQU, ke beranda">
             SAMAQU

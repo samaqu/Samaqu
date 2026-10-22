@@ -21,8 +21,25 @@
 .af-public{font-size:16px;background:#fff}
 .af-public section[id]{scroll-margin-top:var(--nav-h)}
 .af-public .auth-visual::before{content:"";position:absolute;inset:0 0 auto 0;height:160px;z-index:1;background:linear-gradient(180deg,rgba(10,10,11,.75),transparent)}
+/* Header halaman auth: transparan di desktop (foto tembus, tanpa blur), solid di mobile. */
+.af-public header.nav.auth-nav{box-shadow:none}
+@media (max-width:1023px){
+  .af-public header.nav.auth-nav{background:#fff;color:#000;box-shadow:0 1px 0 var(--c-bg-3)}
+  .af-public header.nav.auth-nav .wordmark{color:#000!important}
+}
 @media (min-width:1024px){
-  .af-public header.nav.auth-nav{background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;box-shadow:none!important}
+  .af-public header.nav.auth-nav{background:transparent;color:#000}
   .af-public header.nav.auth-nav .wordmark{color:#fff!important}
 }
+
+/* Halaman legal (syarat & ketentuan, kebijakan privasi) */
+.af-public .toc a{display:block;padding:.55rem 0 .55rem 1rem;border-left:2px solid var(--c-bg-3);font-size:.9rem;color:var(--c-text-2);text-decoration:none;transition:.2s}
+.af-public .toc a:hover{color:#000;border-left-color:#000}
+.af-public .terms h2{font-size:1.6rem;font-weight:800;letter-spacing:-.03em;color:var(--c-ink);scroll-margin-top:100px}
+.af-public .terms ol,.af-public .terms ul{display:grid;gap:.7rem;margin-top:1.1rem;padding-left:1.25rem;color:var(--c-text);line-height:1.75}
+.af-public .terms ul{list-style:disc}
+.af-public .terms ol{list-style:decimal}
+.af-public .terms section+section{margin-top:3.5rem;padding-top:3.5rem;border-top:1px solid var(--c-bg-3)}
+.af-public .tbd{display:inline-block;background:var(--c-bg-2);border:1px dashed var(--c-border);border-radius:6px;padding:0 .4rem;font-size:.85em;color:var(--c-text-2)}
 }
+
