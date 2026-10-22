@@ -64,6 +64,25 @@ export async function GET(req: NextRequest) {
   const clicks = (clickRows || []) as { created_at: string; link_id: string | null }[];
   const linkMap = new Map(links.map((l) => [l.id, l]));
 
+  // Rentang opsional untuk tabel pengelompokan (produk/tautan/kampanye/sumber).
+  // Grafik tetap memakai jendela `days` (7/30/90) supaya series-nya utuh.
+  const fromParam = req.nextUrl.searchParams.get("from");
+  const toParam = req.nextUrl.searchParams.get("to");
+  const rangeFrom = fromParam ? new Date(fromParam) : null;
+  const rangeTo = toParam ? new Date(toParam) : null;
+  const hasRange =
+    rangeFrom !== null &&
+    rangeTo !== null &&
+    !Number.isNaN(rangeFrom.getTime()) &&
+    !Number.isNaN(rangeTo.getTime());
+  const inRange = (value: string) => {
+    if (!hasRange) return true;
+    const d = new Date(value);
+    return !Number.isNaN(d.getTime()) && d >= rangeFrom! && d <= rangeTo!;
+  };
+  const rangeOrders = orders.filter((o) => inRange(o.created_at));
+  const rangeClicks = clicks.filter((c) => inRange(c.created_at));
+
   const series = buildDays(from, to).map((day) => {
     const dayOrders = orders.filter((o) => dayKey(o.created_at) === day.key);
     const dayClicks = clicks.filter((c) => dayKey(c.created_at) === day.key);
@@ -85,9 +104,9 @@ export async function GET(req: NextRequest) {
   });
 
   // Pengelompokan: per produk / tautan / kampanye / sumber
-  const group = (keyOf: (order: (typeof orders)[number]) => string | null) => {
+  const group = (keyOf: (order: (typeof rangeOrders)[number]) => string | null) => {
     const map = new Map<string, { orders: number; sales: number; commission: number }>();
-    for (const order of orders) {
+    for (const order of rangeOrders) {
       const key = keyOf(order);
       if (!key) continue;
       const current = map.get(key) || { orders: 0, sales: 0, commission: 0 };
@@ -126,7 +145,7 @@ export async function GET(req: NextRequest) {
 
   // Klik per tautan
   const clicksByLink = new Map<string, number>();
-  for (const click of clicks) {
+  for (const click of rangeClicks) {
     if (!click.link_id) continue;
     clicksByLink.set(click.link_id, (clicksByLink.get(click.link_id) || 0) + 1);
   }

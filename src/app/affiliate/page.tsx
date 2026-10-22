@@ -87,29 +87,41 @@ export default function AffiliateDashboardPage() {
   const [chart, setChart] = useState("sales");
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [performa, setPerforma] = useState<PerformaPayload | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const [ordersJson, performaJson] = await Promise.all([
-          affiliateFetch<{ orders: OrderRow[] }>("/api/affiliate/orders"),
-          affiliateFetch<PerformaPayload>("/api/affiliate/performa?days=90"),
-        ]);
-        if (!alive) return;
-        setOrders(ordersJson.orders || []);
-        setPerforma(performaJson);
+        const json = await affiliateFetch<{ orders: OrderRow[] }>("/api/affiliate/orders");
+        if (alive) setOrders(json.orders || []);
       } catch (e) {
-        console.error("[AFFILIATE] Gagal memuat ringkasan:", e);
-      } finally {
-        if (alive) setLoading(false);
+        console.error("[AFFILIATE] Gagal memuat pesanan:", e);
       }
     })();
     return () => {
       alive = false;
     };
   }, []);
+
+  // Performa (grafik & produk teratas) mengikuti periode yang dipilih, supaya
+  // angka di tabel "Produk dengan Performa Terbaik" sama dengan filter di atas.
+  useEffect(() => {
+    let alive = true;
+    const r = rangeFor(period);
+    (async () => {
+      try {
+        const json = await affiliateFetch<PerformaPayload>(
+          `/api/affiliate/performa?days=90&from=${encodeURIComponent(r.from.toISOString())}&to=${encodeURIComponent(r.to.toISOString())}`,
+        );
+        if (alive) setPerforma(json);
+      } catch (e) {
+        console.error("[AFFILIATE] Gagal memuat performa:", e);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [period]);
 
   const range = useMemo(() => rangeFor(period), [period]);
   const prev = useMemo(() => prevRange(range), [range]);
@@ -274,7 +286,7 @@ export default function AffiliateDashboardPage() {
           icon="coins"
           label="Total Komisi"
           value={money(metrics.commission)}
-          sub={`Disetujui ${money(me.balance.approved + me.balance.paid)}`}
+          sub={`Disetujui ${money(me.balance.approved)}`}
           delta={pct(metrics.commission, metrics.prevCommission)}
         />
       </div>
@@ -543,8 +555,6 @@ export default function AffiliateDashboardPage() {
           />
         )}
       </div>
-
-      {loading ? null : null}
     </div>
   );
 }
