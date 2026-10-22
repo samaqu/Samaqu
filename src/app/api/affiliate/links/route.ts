@@ -73,46 +73,33 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const productId = String(body.productId || "").trim();
-  const campaign = String(body.campaign || "").trim();
-  const source = String(body.source || "").trim();
+  const campaignInput = String(body.campaign || "").trim();
+  const sourceInput = String(body.source || "").trim();
   const note = String(body.note || "").trim();
 
   if (!productId) {
     return NextResponse.json({ error: "Pilih produk yang ingin dipromosikan." }, { status: 400 });
-  }
-  if (campaign.length < 3) {
-    return NextResponse.json({ error: "Nama kampanye minimal 3 karakter." }, { status: 400 });
-  }
-  if (campaign.length > 40) {
-    return NextResponse.json({ error: "Nama kampanye maksimal 40 karakter." }, { status: 400 });
-  }
-  if (!AFFILIATE_LINK_SOURCES.includes(source as (typeof AFFILIATE_LINK_SOURCES)[number])) {
-    return NextResponse.json({ error: "Pilih sumber promosi." }, { status: 400 });
   }
 
   const supabase = getSupabaseAdmin();
 
   const { data: product } = await supabase
     .from("products")
-    .select("id")
+    .select("id, name")
     .eq("id", productId)
     .maybeSingle();
   if (!product) {
     return NextResponse.json({ error: "Produk tidak ditemukan." }, { status: 404 });
   }
 
-  const { data: duplicate } = await supabase
-    .from("affiliate_links")
-    .select("id")
-    .eq("affiliate_id", session.affiliate.id)
-    .eq("product_id", productId)
-    .eq("campaign", campaign)
-    .maybeSingle();
-  if (duplicate) {
-    return NextResponse.json(
-      { error: "Kampanye dengan nama ini sudah ada untuk produk tersebut." },
-      { status: 400 },
-    );
+  // Nama kampanye tidak lagi diminta ke affiliate — otomatis pakai nama produk
+  // (dipotong 40 karakter). Affiliate tetap boleh mengirim campaign eksplisit
+  // lewat API bila perlu.
+  const fallbackCampaign = String((product as { name?: string }).name || "Tautan affiliate").trim();
+  const campaign = (campaignInput || fallbackCampaign).slice(0, 40);
+  const source = sourceInput || "Lainnya";
+  if (!AFFILIATE_LINK_SOURCES.includes(source as (typeof AFFILIATE_LINK_SOURCES)[number])) {
+    return NextResponse.json({ error: "Sumber promosi tidak dikenal." }, { status: 400 });
   }
 
   const code = await nextLinkCode(session.affiliate.affiliate_code, session.affiliate.id);

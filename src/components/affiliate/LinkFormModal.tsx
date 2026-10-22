@@ -26,7 +26,6 @@ export default function LinkFormModal({ products, initialProductId }: {
   const { open, close } = useModal();
   const { toast } = useToast();
   const [productId, setProductId] = useState(initialProductId || "");
-  const [campaign, setCampaign] = useState("");
   const [source, setSource] = useState("");
   const [note, setNote] = useState("");
   const [err, setErr] = useState<Record<string, string>>({});
@@ -35,7 +34,6 @@ export default function LinkFormModal({ products, initialProductId }: {
 
   useEffect(() => {
     setProductId(initialProductId || "");
-    setCampaign("");
     setSource("");
     setNote("");
     setErr({});
@@ -45,9 +43,6 @@ export default function LinkFormModal({ products, initialProductId }: {
   const submit = async () => {
     const next: Record<string, string> = {};
     if (!productId) next.productId = "Pilih produk yang ingin dipromosikan.";
-    if (campaign.trim().length < 3) next.campaign = "Nama kampanye minimal 3 karakter.";
-    else if (campaign.trim().length > 40) next.campaign = "Nama kampanye maksimal 40 karakter.";
-    if (!source) next.source = "Pilih sumber promosi.";
     setErr(next);
     if (Object.keys(next).length) {
       toast("Periksa kembali formulir tautan", "err");
@@ -60,7 +55,6 @@ export default function LinkFormModal({ products, initialProductId }: {
         method: "POST",
         body: JSON.stringify({
           productId,
-          campaign: campaign.trim(),
           source,
           note: note.trim(),
         }),
@@ -103,21 +97,11 @@ export default function LinkFormModal({ products, initialProductId }: {
         />
       </Field>
 
-      <Field label="Nama Kampanye" error={err.campaign} help="Maksimal 40 karakter.">
-        <input
-          className={`inp ${err.campaign ? "e" : ""}`}
-          maxLength={40}
-          placeholder="Contoh: Promo Payday Oktober"
-          value={campaign}
-          onChange={(e) => setCampaign(e.target.value)}
-        />
-      </Field>
-
-      <Field label="Sumber Promosi" error={err.source}>
+      <Field label="Sumber Promosi (opsional)">
         <Select
           value={source}
           onChange={setSource}
-          options={[["", "— Pilih sumber —"], ...SOURCES.map((s) => [s, s] as [string, string])]}
+          options={[["", "— Tanpa sumber —"], ...SOURCES.map((s) => [s, s] as [string, string])]}
         />
       </Field>
 
