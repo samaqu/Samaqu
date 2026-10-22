@@ -4,112 +4,98 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 /**
- * Kerangka halaman auth portal affiliate.
- *
- * Mengikuti referensi desain terbaru: halaman gelap, satu kartu putih dengan panel kiri
- * menyudut (teal) berisi brand + headline, dan panel kanan berisi formulir. Dibuat polos
- * dan lapang supaya mudah dibaca — tanpa foto, avatar, sosial, atau elemen dekoratif lain.
+ * Kerangka halaman auth portal affiliate — port 1:1 dari mockup
+ * "samaqu-affiliate-mockup/pages/{masuk,daftar}": panel foto gelap di kiri,
+ * formulir di kanan, dan header transparan di atas foto (desktop).
  */
-
-const WHATSAPP_URL = "https://wa.me/6285212150100";
-
 export default function AuthLayout({
+  backHref,
+  eyebrow,
   title,
   subtitle,
+  topSlot,
+  visualImage,
+  visualImageAlt,
+  visualPosition,
+  visualEyebrow,
+  visualTitle,
+  visualText,
+  visualList,
   children,
-  footerLink,
-  heroTitle = "Program Affiliate SAMAQU.",
-  heroSubtitle = "Bagikan produk, dapatkan komisi.",
-  aside,
 }: {
+  backHref: string;
+  eyebrow: string;
   title: string;
-  subtitle: string;
+  subtitle: ReactNode;
+  /** Elemen di atas judul (mis. stepper pendaftaran). */
+  topSlot?: ReactNode;
+  visualImage: string;
+  visualImageAlt: string;
+  visualPosition?: string;
+  visualEyebrow: string;
+  visualTitle: ReactNode;
+  visualText?: string;
+  visualList?: string[];
   children: ReactNode;
-  /** Link kecil di bawah form (mis. "Belum punya akun? Daftar"). */
-  footerLink: { text: string; link: string; linkLabel: string };
-  heroTitle?: string;
-  heroSubtitle?: string;
-  /** Baris kecil tambahan di panel kanan (mis. link lupa kata sandi). */
-  aside?: ReactNode;
 }) {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#0b0b0c] p-4 md:p-8">
-      <div className="w-full max-w-[1000px] rounded-[22px] bg-white p-2.5 md:p-3 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]">
-        <div className="overflow-hidden rounded-[16px] flex flex-col md:flex-row md:min-h-[520px]">
-          {/* Panel kiri — bersudut miring di desktop */}
-          <div className="relative w-full md:w-[46%] min-h-[280px] md:min-h-0">
-            <div
-              className="absolute inset-0 md:hidden"
-              style={{
-                background: "linear-gradient(165deg, #2f7183 0%, #1f5a6c 42%, #123b49 100%)",
-              }}
-            />
-            <div
-              className="hidden md:block absolute inset-0"
-              style={{
-                background: "linear-gradient(165deg, #2f7183 0%, #1f5a6c 42%, #123b49 100%)",
-                clipPath: "polygon(0 0, 100% 0, 84% 100%, 0 100%)",
-              }}
-            />
-            <div className="relative flex h-full flex-col justify-between gap-10 p-7 md:p-9 md:pr-14">
-              <div className="flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-lg bg-white text-[17px] font-black text-[#1f5a6c]">
-                  S
-                </span>
-                <span className="text-[12px] font-semibold uppercase tracking-[0.18em] text-white/90">
-                  SAMAQU
-                </span>
-              </div>
-
-              <div>
-                <h2 className="text-[30px] md:text-[38px] font-extrabold leading-[1.12] text-white">
-                  {heroTitle}
-                </h2>
-                <p className="mt-3 max-w-[300px] text-[13px] md:text-[14px] leading-relaxed text-white/70">
-                  {heroSubtitle}
-                </p>
-              </div>
-
-              <p className="text-[12px] leading-relaxed text-white/60">
-                Belum punya akses? Hubungi admin via{" "}
-                <a
-                  href={WHATSAPP_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-white underline decoration-white/40 underline-offset-2 hover:decoration-white"
-                >
-                  WhatsApp
-                </a>
-                .
-              </p>
-            </div>
-          </div>
-
-          {/* Panel kanan — formulir */}
-          <div className="flex w-full md:w-[54%] flex-col justify-center bg-white px-6 py-9 md:px-12 md:py-12">
-            <div className="w-full max-w-[360px]">
-              <h1 className="text-[26px] md:text-[30px] font-extrabold leading-tight text-[#111827]">
-                {title}
-              </h1>
-              <p className="mt-2 text-[13px] leading-relaxed text-[#6b7280]">{subtitle}</p>
-
-              <div className="mt-7">{children}</div>
-
-              {aside ? <div className="mt-3 text-right">{aside}</div> : null}
-
-              <p className="mt-6 text-[12px] text-[#6b7280]">
-                {footerLink.text}{" "}
-                <Link
-                  href={footerLink.link}
-                  className="font-semibold text-[#111827] hover:underline"
-                >
-                  {footerLink.linkLabel} →
-                </Link>
-              </p>
-            </div>
-          </div>
+    <div className="af-public min-h-screen bg-white">
+      <header className="nav solid auth-nav">
+        <div className="container h-full flex items-center justify-between">
+          <Link href={backHref} className="wordmark" aria-label="SAMAQU, ke beranda">
+            SAMAQU
+          </Link>
+          <Link href={backHref} className="link">
+            ← Kembali ke beranda
+          </Link>
         </div>
-      </div>
+      </header>
+
+      <main className="auth">
+        <aside className="auth-visual on-dark hidden lg:block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={visualImage}
+            alt={visualImageAlt}
+            style={visualPosition ? { objectPosition: visualPosition } : undefined}
+          />
+          <div className="relative z-10 h-full flex flex-col justify-end p-14">
+            <p className="eyebrow mb-4" style={{ color: "var(--c-on-dark)" }}>
+              {visualEyebrow}
+            </p>
+            <h2 className="display text-white text-5xl xl:text-6xl max-w-lg">{visualTitle}</h2>
+            {visualText ? (
+              <p className="mt-5 max-w-md" style={{ color: "var(--c-on-dark)" }}>
+                {visualText}
+              </p>
+            ) : null}
+            {visualList ? (
+              <ul className="mt-8 grid gap-3 max-w-md text-sm" style={{ color: "var(--c-on-dark)" }}>
+                {visualList.map((item, index) => (
+                  <li key={item} className="flex gap-3">
+                    <span className="text-white font-bold">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        </aside>
+
+        <section className="auth-form">
+          <div>
+            {topSlot}
+            <p className="eyebrow mb-4">{eyebrow}</p>
+            <h1 className="display text-4xl sm:text-5xl">{title}</h1>
+            <p className="mt-3" style={{ color: "var(--c-text-2)" }}>
+              {subtitle}
+            </p>
+            {children}
+          </div>
+        </section>
+      </main>
     </div>
   );
 }

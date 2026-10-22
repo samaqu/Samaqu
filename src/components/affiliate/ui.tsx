@@ -438,16 +438,18 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     <ModalContext.Provider value={{ open, close }}>
       {children}
       {content ? (
-        <div className="mbg" onClick={(e) => e.target === e.currentTarget && close()}>
-          <div className={`md ${content.size || ""}`} role="dialog" aria-modal="true">
-            <div className="mh">
-              <h3>{content.title}</h3>
-              <button className="iconbtn" onClick={close} aria-label="Tutup" type="button">
-                <Icon name="x" />
-              </button>
+        <div className="af-root">
+          <div className="mbg" onClick={(e) => e.target === e.currentTarget && close()}>
+            <div className={`md ${content.size || ""}`} role="dialog" aria-modal="true">
+              <div className="mh">
+                <h3>{content.title}</h3>
+                <button className="iconbtn" onClick={close} aria-label="Tutup" type="button">
+                  <Icon name="x" />
+                </button>
+              </div>
+              <div className="mb">{content.body}</div>
+              {content.foot ? <div className="mf">{content.foot}</div> : null}
             </div>
-            <div className="mb">{content.body}</div>
-            {content.foot ? <div className="mf">{content.foot}</div> : null}
           </div>
         </div>
       ) : null}
@@ -490,13 +492,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="toasts" aria-live="polite">
-        {items.map((t) => (
-          <div key={t.id} className={`toast ${t.type}`}>
-            <Icon name={t.type === "ok" ? "cc" : t.type === "err" ? "xc" : "info"} className="sm" />
-            <span>{t.message}</span>
-          </div>
-        ))}
+      <div className="af-root">
+        <div className="toasts" aria-live="polite">
+          {items.map((t) => (
+            <div key={t.id} className={`toast ${t.type}`}>
+              <Icon name={t.type === "ok" ? "cc" : t.type === "err" ? "xc" : "info"} className="sm" />
+              <span>{t.message}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </ToastContext.Provider>
   );

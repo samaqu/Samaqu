@@ -85,7 +85,6 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
   }, []);
   const [me, setMe] = useState<MePayload | null>(null);
   const [loading, setLoading] = useState(true);
-  const [authError, setAuthError] = useState("");
   const [drawer, setDrawer] = useState(false);
   const [menu, setMenu] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -93,19 +92,16 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
 
   const load = useCallback(async () => {
     try {
+      // Tanpa sesi lokal, jangan panggil API (menghindari 401 yang tidak perlu).
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) {
+        setMe(null);
+        return;
+      }
       const payload = await affiliateFetch<MePayload>("/api/affiliate/me");
       setMe(payload);
-      setAuthError("");
-    } catch (e) {
+    } catch {
       setMe(null);
-      const message = e instanceof Error ? e.message : "";
-      // 401 = sesi tidak valid / bukan akun affiliate → pakai kalimat yang ramah,
-      // bukan "Unauthorized" mentah dari API.
-      setAuthError(
-        !message || /unauthorized|401/i.test(message)
-          ? ""
-          : message,
-      );
     } finally {
       setLoading(false);
     }
@@ -119,6 +115,13 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
     setLoading(true);
     load();
   }, [pathname, load]);
+
+  // Halaman dalam portal tanpa sesi → langsung ke halaman masuk (bukan kartu fallback).
+  useEffect(() => {
+    if (loading || me) return;
+    if (isAuthPath(pathname) || isLandingPath(pathname)) return;
+    router.replace(portalPath(portalBaseFor(window.location.hostname), "login"));
+  }, [loading, me, pathname, router]);
 
   // Notifikasi belum dibaca (dihitung dari data nyata, disimpan di browser).
   useEffect(() => {
@@ -171,66 +174,9 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
   }
 
   if (!me) {
-    // Halaman depan portal = landing publik (ajakan daftar/masuk). Halaman dalam lain
-    // tetap menampilkan kartu "masuk dulu" seperti sebelumnya.
+    // Halaman depan portal = landing publik; halaman dalam sudah diarahkan ke login.
     if (isLandingPath(pathname)) return <AffiliateLanding />;
-
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center p-5 relative"
-        style={{ background: "#f0f2f5" }}
-      >
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div
-            className="absolute left-0 top-0 w-[65%] h-full"
-            style={{ clipPath: "polygon(0 0, 55% 0, 48% 100%, 0 100%)" }}
-          >
-            <img
-              src="/affiliate/auth-hero.jpg"
-              alt=""
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-black/30" />
-          </div>
-        </div>
-
-        <div className="main-card relative w-full max-w-[520px] bg-white rounded-[2.5rem] shadow-lg p-4 md:p-5">
-          <div className="w-full px-4 py-6 flex flex-col justify-center">
-            <div className="flex items-center justify-between mb-12">
-              <span className="font-extrabold text-xl tracking-widest text-gray-900 uppercase">
-                SAMAQU
-              </span>
-              <span className="flex items-center gap-2 border border-gray-200 rounded-full px-3 py-1 text-xs font-medium text-gray-600">
-                🇮🇩 ID
-              </span>
-            </div>
-
-            <div className="w-full max-w-[340px] mx-auto text-center mb-10">
-              <h1 className="text-4xl font-extrabold text-gray-900 mb-2">
-                Masuk ke akun affiliate
-              </h1>
-              <p className="text-sm text-gray-500 font-medium">
-                {authError || "Sesi affiliate tidak ditemukan. Silakan masuk kembali."}
-              </p>
-            </div>
-
-            <div className="w-full max-w-[340px] mx-auto">
-              <Link
-                href={portalPath(base, "login")}
-                className="w-full rounded-xl py-3.5 text-sm font-semibold flex items-center justify-center"
-                style={{
-                  backgroundColor: "#eb4d4b",
-                  color: "white",
-                  boxShadow: "0 10px 15px -3px rgba(235,77,75,0.2)",
-                }}
-              >
-                Masuk
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   const affiliate = me.affiliate;
@@ -265,6 +211,7 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
 
   return (
     <AffiliateContext.Provider value={value}>
+      <div className="af-root">
       <div className={`app ${collapsed ? "colp" : ""}`}>
         <div className={`ovl ${drawer ? "show" : ""}`} onClick={() => setDrawer(false)} />
 
@@ -411,6 +358,7 @@ export default function AffiliateShell({ children }: { children: ReactNode }) {
 
           <main className="content">{children}</main>
         </div>
+      </div>
       </div>
     </AffiliateContext.Provider>
   );

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./affiliate.css";
+import "./public.css";
 import AffiliateShell from "@/components/affiliate/AffiliateShell";
 import { ModalProvider, ToastProvider } from "@/components/affiliate/ui";
 
@@ -18,12 +19,10 @@ export const metadata: Metadata = {
  */
 export default function AffiliateLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="af-root">
-      <ToastProvider>
-        <ModalProvider>
-          <AffiliateShell>{children}</AffiliateShell>
-        </ModalProvider>
-      </ToastProvider>
-    </div>
+    <ToastProvider>
+      <ModalProvider>
+        <AffiliateShell>{children}</AffiliateShell>
+      </ModalProvider>
+    </ToastProvider>
   );
 }
