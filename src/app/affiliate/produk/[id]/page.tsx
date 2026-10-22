@@ -18,6 +18,7 @@ interface AffiliateProduct {
   category: string;
   series: string | null;
   kain: string | null;
+  badge: string | null;
   price: number;
   description: string | null;
   image: string;
@@ -47,6 +48,7 @@ export default function AffiliateProductDetailPage({
   const [activeId, setActiveId] = useState("");
   const [active, setActive] = useState(0);
   const [variant, setVariant] = useState("");
+  const [zoom, setZoom] = useState(false);
   const [loading, setLoading] = useState(true);
   const { open } = useModal();
   const { toast } = useToast();
@@ -96,10 +98,60 @@ export default function AffiliateProductDetailPage({
 
   const gallery = useMemo(() => {
     if (!product) return [];
-    const media = product.media.filter((m) => m.type === "image");
-    const list = media.length ? media : product.image ? [{ src: product.image, type: "image" as const }] : [];
-    return list.slice(0, 4);
+    const list = product.media.length
+      ? product.media
+      : product.image
+        ? [{ src: product.image, type: "image" as const }]
+        : [];
+    return list.slice(0, 6);
   }, [product]);
+
+  const showInfo = (kind: "series" | "kain") => {
+    if (!product) return;
+    const fabrics = Array.from(
+      new Set(group.map((row) => row.kain).filter((k): k is string => Boolean(k))),
+    );
+    open({
+      title: kind === "series" ? "Perbedaan Series" : "Jenis Kain",
+      body: (
+        <div>
+          <p className="muted" style={{ lineHeight: 1.7 }}>
+            {kind === "series"
+              ? "Series menentukan potongan, siluet, dan harga. Pilih series yang paling cocok dengan gayamu."
+              : "Jenis kain memengaruhi ketebalan, jatuh kain, dan kenyamanan saat dipakai."}
+          </p>
+          <div className="box mt" style={{ display: "grid", gap: 8 }}>
+            {kind === "series"
+              ? seriesOptions.map(([series, memberId]) => {
+                  const row = group.find((r) => r.id === memberId);
+                  return (
+                    <div key={series} className="row between" style={{ gap: 10 }}>
+                      <span className="b dark">{series}</span>
+                      <span className="small muted">
+                        {row ? `${money(row.price)} · ${row.stock > 0 ? `${row.stock} unit` : "Habis"}` : ""}
+                      </span>
+                    </div>
+                  );
+                })
+              : (fabrics.length ? fabrics : [product.category]).map((fabric) => (
+                  <div key={fabric} className="b dark">
+                    {fabrics.length ? `Kain ${fabric}` : fabric}
+                  </div>
+                ))}
+          </div>
+        </div>
+      ),
+    });
+  };
+
+  useEffect(() => {
+    if (!zoom) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setZoom(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [zoom]);
 
   if (loading) {
     return <div className="card p-10 text-center muted">Memuat detail produk…</div>;
@@ -147,7 +199,27 @@ export default function AffiliateProductDetailPage({
               }}
             >
               {main ? (
-                <img src={main.src} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                main.type === "video" ? (
+                  <video
+                    src={main.src}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    style={{ width: "100%", height: "100%", objectFit: "cover", background: "#000" }}
+                  />
+                ) : (
+                  <img
+                    src={main.src}
+                    alt={product.name}
+                    onClick={() => setZoom(true)}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      cursor: "zoom-in",
+                    }}
+                  />
+                )
               ) : null}
             </div>
             {gallery.length > 1 && (
@@ -163,11 +235,23 @@ export default function AffiliateProductDetailPage({
                       padding: 0,
                       cursor: "pointer",
                       overflow: "hidden",
+                      position: "relative",
                       width: 68,
                       height: 68,
                     }}
                   >
-                    <img src={g.src} alt={`Foto ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    {g.type === "video" ? (
+                      <video
+                        src={g.src}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        style={{ width: "100%", height: "100%", objectFit: "cover", background: "#000" }}
+                      />
+                    ) : (
+                      <img src={g.src} alt={`Foto ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    )}
+                    {g.type === "video" ? <span className="pd-play">▶</span> : null}
                   </button>
                 ))}
               </div>
@@ -175,11 +259,27 @@ export default function AffiliateProductDetailPage({
           </div>
 
           <div>
-            <span className="small muted">
-              {product.category}
-              {product.kain ? ` · Kain ${product.kain}` : ""}
-              {product.series ? ` · ${product.series}` : ""}
-            </span>
+            <div className="row wrap" style={{ gap: 8 }}>
+              {product.badge ? (
+                <span className="tag">
+                  {product.badge === "terlaris"
+                    ? "Terlaris"
+                    : product.badge === "rekomendasi"
+                      ? "Rekomendasi"
+                      : "New"}
+                </span>
+              ) : null}
+              <span className="small muted">
+                {product.category}
+                {product.kain ? ` · Kain ${product.kain}` : ""}
+                {product.series ? ` · ${product.series}` : ""}
+              </span>
+            </div>
+            {product.kain ? (
+              <button type="button" className="aff-info" onClick={() => showInfo("kain")}>
+                Info jenis kain
+              </button>
+            ) : null}
 
             <h2
               style={{
@@ -203,9 +303,16 @@ export default function AffiliateProductDetailPage({
               </p>
             ) : null}
 
-            {seriesOptions.length > 1 && (
+            {seriesOptions.length > 0 && (
               <div className="mt">
-                <div className="fl">Pilihan Series</div>
+                <div className="row between" style={{ marginBottom: 6 }}>
+                  <div className="fl" style={{ margin: 0 }}>
+                    Pilihan Series
+                  </div>
+                  <button type="button" className="aff-info" onClick={() => showInfo("series")}>
+                    Info series
+                  </button>
+                </div>
                 <div className="row wrap">
                   {seriesOptions.map(([series, memberId]) => (
                     <button
@@ -215,6 +322,7 @@ export default function AffiliateProductDetailPage({
                         setActiveId(memberId);
                         setActive(0);
                         setVariant("");
+                        setZoom(false);
                       }}
                       type="button"
                     >
@@ -329,6 +437,27 @@ export default function AffiliateProductDetailPage({
           </div>
         </div>
       </div>
+
+      {zoom && main && main.type === "image" ? (
+        <div
+          className="pd-zoom"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setZoom(false)}
+        >
+          <button
+            type="button"
+            aria-label="Tutup"
+            onClick={(e) => {
+              e.stopPropagation();
+              setZoom(false);
+            }}
+          >
+            ✕
+          </button>
+          <img src={main.src} alt={product.name} />
+        </div>
+      ) : null}
     </div>
   );
 }

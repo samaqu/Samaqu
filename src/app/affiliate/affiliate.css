@@ -79,3 +79,19 @@
 @media(min-width:1101px){
   .af-root .prod-media{position:sticky;top:24px;align-self:start}
 }
+
+/* Badge produk di kartu katalog affiliate */
+.af-root .pc .pc-badge{position:absolute;top:10px;left:10px;z-index:2;padding:4px 10px;border-radius:999px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+.af-root .pc .pc-badge.terlaris{background:#000;color:#fff}
+.af-root .pc .pc-badge.rekomendasi{background:#fff;color:#000;border:1px solid rgba(0,0,0,.15)}
+.af-root .pc .pc-badge.new{background:#e7ecdf;color:#5b6b45}
+
+/* Lightbox foto detail */
+.af-root .pd-zoom{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.92);display:grid;place-items:center;padding:24px;cursor:zoom-out}
+.af-root .pd-zoom img{max-width:100%;max-height:90vh;object-fit:contain;border-radius:12px}
+.af-root .pd-zoom button{position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:999px;border:0;background:rgba(255,255,255,.14);color:#fff;cursor:pointer;display:grid;place-items:center}
+.af-root .pd-zoom button:hover{background:rgba(255,255,255,.25)}
+
+/* Link kecil 'Info' di detail produk affiliate */
+.af-root .aff-info{border:0;background:none;padding:0;margin-top:4px;font-size:11px;font-weight:600;color:#111827;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.af-root .pd-play{position:absolute;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.28);color:#fff;font-size:15px;pointer-events:none}

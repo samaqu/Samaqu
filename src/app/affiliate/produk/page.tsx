@@ -21,6 +21,7 @@ interface AffiliateProduct {
   category: string;
   series: string | null;
   kain: string | null;
+  badge: string | null;
   price: number;
   description: string | null;
   image: string;
@@ -40,6 +41,7 @@ interface CatalogGroup {
   name: string;
   category: string;
   kain: string | null;
+  badge: string | null;
   image: string;
   price: number;
   stock: number;
@@ -66,11 +68,17 @@ function groupProducts(items: AffiliateProduct[]): CatalogGroup[] {
     const series = Array.from(
       new Set(members.map((m) => m.series).filter((s): s is string => Boolean(s))),
     ).sort();
+    const badge =
+      members.find((m) => m.badge === "terlaris")?.badge ||
+      members.find((m) => m.badge === "rekomendasi")?.badge ||
+      members.find((m) => m.badge === "new")?.badge ||
+      null;
     return {
       id: rep.id,
       name: rep.name,
       category: rep.category,
       kain: cheapest.kain,
+      badge,
       image: rep.image,
       price: cheapest.price,
       stock,
@@ -87,6 +95,8 @@ export default function AffiliateCatalogPage() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
+  const [kainF, setKainF] = useState("");
+  const [seriesF, setSeriesF] = useState("");
   const [price, setPrice] = useState("");
   const [rate, setRate] = useState("");
   const [avail, setAvail] = useState("");
@@ -119,12 +129,25 @@ export default function AffiliateCatalogPage() {
     [groups],
   );
 
+  const kainOptions = useMemo(
+    () =>
+      Array.from(new Set(groups.map((p) => p.kain).filter((k): k is string => Boolean(k)))).sort(),
+    [groups],
+  );
+
+  const seriesOptions = useMemo(
+    () => Array.from(new Set(groups.flatMap((p) => p.series))).sort(),
+    [groups],
+  );
+
   const list = useMemo(() => {
     let rows = groups.filter((p) => {
       if (q && !`${p.name} ${p.category} ${p.series.join(" ")}`.toLowerCase().includes(q.toLowerCase())) {
         return false;
       }
       if (cat && p.category !== cat) return false;
+      if (kainF && p.kain !== kainF) return false;
+      if (seriesF && !p.series.includes(seriesF)) return false;
       if (price) {
         const [lo, hi] = price.split("-").map(Number);
         if (p.price < lo || p.price > hi) return false;
@@ -141,13 +164,15 @@ export default function AffiliateCatalogPage() {
     else if (sortBy === "rate") rows.sort((a, b) => b.rate - a.rate || b.price - a.price);
     else rows.sort((a, b) => b.estimatedCommission - a.estimatedCommission);
     return rows;
-  }, [groups, q, cat, price, rate, avail, sortBy]);
+  }, [groups, q, cat, kainF, seriesF, price, rate, avail, sortBy]);
 
   const pg = paginate(list, page, 8);
 
   const reset = () => {
     setQ("");
     setCat("");
+    setKainF("");
+    setSeriesF("");
     setPrice("");
     setRate("");
     setAvail("");
@@ -165,6 +190,16 @@ export default function AffiliateCatalogPage() {
             value={cat}
             onChange={(v) => { setCat(v); setPage(1); }}
             options={[["", "Semua Kategori"], ...categories.map((c) => [c, c] as [string, string])]}
+          />
+          <Select
+            value={kainF}
+            onChange={(v) => { setKainF(v); setPage(1); }}
+            options={[["", "Semua Kain"], ...kainOptions.map((k) => [k, k] as [string, string])]}
+          />
+          <Select
+            value={seriesF}
+            onChange={(v) => { setSeriesF(v); setPage(1); }}
+            options={[["", "Semua Series"], ...seriesOptions.map((s) => [s, s] as [string, string])]}
           />
           <Select
             value={price}
@@ -235,6 +270,15 @@ export default function AffiliateCatalogPage() {
               <div className="card pc" key={`${p.category}::${p.name}`}>
                 <Link href={`/affiliate/produk/${p.id}`} className="im">
                   {p.image ? <img src={p.image} alt={p.name} loading="lazy" /> : null}
+                  {p.stock > 0 && p.badge ? (
+                    <span className={`pc-badge ${p.badge}`}>
+                      {p.badge === "terlaris"
+                        ? "Terlaris"
+                        : p.badge === "rekomendasi"
+                          ? "Rekomendasi"
+                          : "New"}
+                    </span>
+                  ) : null}
                   {p.stock === 0 ? <span className="pc-sold">Habis</span> : null}
                 </Link>
                 <div className="bd">
