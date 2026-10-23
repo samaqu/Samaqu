@@ -1421,7 +1421,9 @@ diakui sebagai transaksi (`saleCount`, `SALE_STATUSES`), jadi 143 − 126 = 17 (
 **"Pesanan Masuk"** bernilai 143 dengan keterangan **"126 transaksi diakui"** (tooltip kartunya
 menyebut rincian 126/5/12), sedangkan kartu `Pendapatan` berketerangan "126 transaksi · tanpa
 ongkir" dan donut `Per Status` memecah 143 per status. Jangan "menyamakan" 143 dan 126: angkanya
-memang beda per definisi.
+memang beda per definisi. **Revisi 2026-10-24 (malam):** kartu "Pesanan Masuk" tidak lagi 143 maupun
+132 — nilainya sekarang `saleCount()` = **126** (belum bayar & batal sama-sama tidak dihitung),
+lihat butir terakhir di bagian ini.
 
 - **Keterangan kartu satu baris** (permintaan pemilik: "tulisan keterangan di card bikin sejajar
   1 baris"): kartu metrik di `src/components/admin/DashboardView.tsx` sekarang label (uppercase) +
@@ -1469,6 +1471,27 @@ memang beda per definisi.
   diakui"; donut **132 pesanan masuk** (selesai 99 · 75%, dikirim 14 · 11%, diproses 13 · 10%,
   pending 6 · 5%, tanpa baris dibatalkan); klik `<` → September 2026 **13** (16 − 3 batal) dengan
   donut 13 (selesai 13 · 100%); 0 error console.
+- **Kartu "Pesanan Masuk" juga TIDAK menghitung pesanan BELUM BAYAR** (permintaan pemilik
+  2026-10-24: "blm bayar juga jgn harus nya broo"). Nilai kartunya sekarang `saleCount(orders)`
+  (`SALE_STATUSES` — diproses/dikirim/selesai; Oktober 2026: 132 → **126**), keterangan satu baris
+  **"tanpa belum bayar & batal"**, tooltipnya menyebut rinciannya ("6 belum bayar dan 12 dibatalkan
+  tidak dihitung"), dan chip tren membandingkan himpunan yang sama (126 vs 13 September = 869,2%;
+  dulu 132 vs 13 = 915,4%). Pemilik memilih **hanya kartu ini** yang berubah lewat pertanyaan
+  klarifikasi — donut `Per Status` (angka tengah 132 + irisan `pending` 6), jumlah pesanan di
+  tooltip grafik tren, dan keterangan *"dari N pesanan masuk"* di panel Order Management **tetap**
+  "semua pesanan minus dibatalkan". Jadi kartu (126) memang lebih kecil dari donut (132) tepat
+  sebesar 6 pesanan belum bayar — disengaja, **jangan** "disamakan". Di kode, `incomingOrders`
+  (semua minus batal) hanya dipakai donut + grafik; kartu dan chip-nya memakai `saleOrders` /
+  `prevSales`.
+  Verifikasi (2026-10-24, sesi admin diputar ulang, tablet 867 px): kartu "Pesanan Masuk" **126** /
+  "tanpa belum bayar & batal" · Pendapatan Rp 48.331.123 / "126 transaksi · tanpa ongkir" ·
+  Rata-rata Rp 383.580 / "per transaksi diakui" · Belum di Packing 10; donut tetap **132**
+  (selesai 99 · 75%, diproses 13 · 10%, dikirim 14 · 11%, pending 6 · 5%) = 126 + 6; klik `<` →
+  September kartu **13** (0 belum bayar, 3 batal) dan donut 13; caption keempat kartu **tidak
+  terpotong** di 4 kolom desktop maupun 375 px; 0 error console. **Belum diuji**: kartu "Pesanan
+  masuk" di panel-admin (sengaja belum diubah — masih menghitung semua pesanan hari itu) dan angka
+  mentah REST (`/api/ops/orders` membalas 401 untuk sesi preview, jadi kecocokan 132 − 6 = 126
+  dibuktikan dari donut di halaman yang sama, bukan dari query terpisah).
 - **Verifikasi (2026-10-23, sesi admin diputar ulang via preview)**: `npx tsc --noEmit` bersih;
   `curl /admin` & `/id/admin` = 200; di `/admin` kartu berbunyi Pendapatan Rp 48.331.123
   (+615,8% vs Sep) · Pesanan Masuk 143 / "126 transaksi diakui" · Rata-rata Rp 383.580 (−26,1% vs

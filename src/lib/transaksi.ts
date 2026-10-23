@@ -91,9 +91,10 @@ export const SALE_STATUSES: string[] = ["diproses", "dikirim", "selesai"];
  * Jumlah TRANSAKSI (pesanan sah) dari sekumpulan pesanan — satu aturan bersama `SALE_STATUSES`.
  *
  * Angkanya sama persis dengan kartu "Total Transaksi" di dashboard ops dan "N transaksi" di
- * Laporan Keuangan. Dashboard admin & panel admin menampilkan angka ini sebagai keterangan di
- * kartu pesanannya, supaya "jumlah transaksi" tidak pernah beda antar layar; kartu pesanannya
- * sendiri tetap menghitung SEMUA pesanan masuk (termasuk yang belum bayar/dibatalkan).
+ * Laporan Keuangan, dan sejak 2026-10-24 juga jadi NILAI kartu "Pesanan Masuk" di dashboard admin
+ * (permintaan pemilik: "belum bayar juga jangan dihitung") — pesanan yang belum dibayar/batal
+ * memang bukan pesanan masuk. Kartu "Pesanan masuk" di panel admin masih menghitung semua pesanan
+ * hari itu dengan angka ini sebagai keterangannya.
  */
 export function saleCount(orders: { status?: string | null }[] | null | undefined): number {
   return (orders || []).filter((o) => SALE_STATUSES.includes(String(o?.status || "").toLowerCase())).length;

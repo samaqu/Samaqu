@@ -13,7 +13,9 @@
  *
  * Aturan angka dipakai bersama layar lain supaya tidak beda antar dashboard — jangan hitung ulang
  * di komponen ini:
- *  - pesanan masuk   = semua pesanan periode terpilih KECUALI yang dibatalkan (`isCancelledOrder`);
+ *  - pesanan masuk   = KARTU "Pesanan Masuk" hanya menghitung pesanan yang SUDAH DIBAYAR
+ *    (`SALE_STATUSES`): belum bayar & dibatalkan tidak dihitung. Donut "Per Status" dan jumlah
+ *    pesanan di grafik tren tetap memakai himpunan "semua pesanan minus dibatalkan";
  *  - transaksi sah   = `saleCount()` (`SALE_STATUSES`: diproses/dikirim/selesai);
  *  - omset           = `orderRevenue()` (harga produk saja: `total − ongkir`);
  *  - tahap pesanan   = `orderStage()` (`src/lib/order-flow.ts`, sama dengan tab panel Order Management);
@@ -142,13 +144,14 @@ export default function DashboardView({
   const chartSource = chartOrders ?? orders;
 
   /* ── metrik periode terpilih ── */
-  /* "Pesanan masuk" = semua pesanan bulan itu KECUALI yang dibatalkan (pesanan batal bukan
-     pesanan masuk). Satu himpunan ini dipakai kartu "Pesanan Masuk", angka tengah donut
-     "Per Status", chip tren "vs bulan lalu", dan jumlah pesanan di tooltip grafik tren. */
-  const incomingOrders = orders.filter((o) => !isCancelledOrder(o.status));
-  const orderCount = incomingOrders.length;
+  /* Kartu "Pesanan Masuk" menghitung HANYA pesanan yang sudah dibayar (permintaan pemilik
+     2026-10-24: "belum bayar juga jangan dihitung"). Pesanan `pending` (Belum Bayar) maupun
+     `dibatalkan` bukan pesanan masuk, jadi angka kartunya = transaksi diakui (`saleOrders`). */
   const pendingOrders = orders.filter((o) => o.status === "pending").length;
   const cancelledOrders = orders.filter((o) => o.status === "dibatalkan").length;
+  /* Himpunan "semua pesanan minus dibatalkan" — dipakai donut "Per Status" dan jumlah pesanan di
+     tooltip grafik tren; kartu "Pesanan Masuk" tidak memakainya lagi (lihat di atas). */
+  const incomingOrders = orders.filter((o) => !isCancelledOrder(o.status));
   /* Transaksi sah: SATU aturan bersama `saleCount()` (diproses/dikirim/selesai) — sama dengan
      menu Transaksi, Laporan Keuangan, dan panel Order Management. Inilah angka yang dipakai
      sebagai pembagi rata-rata, jadi rata-rata sejalan dengan `revenue`. */
@@ -224,17 +227,16 @@ export default function DashboardView({
     },
     {
       label: "Pesanan Masuk",
-      value: String(orderCount),
-      // Keterangan sengaja pendek ("126 transaksi diakui"): kartu ini juga sempit di layar 4 kolom,
-      // jadi kalimat panjang akan terpotong. Rincian lengkapnya ada di tooltip kartu + donut "Per Status".
-      caption: `${saleOrders} ${SALE_COUNT_NOTE}`,
+      value: String(saleOrders),
+      // Keterangan sengaja pendek: kartu ini sempit di layar 4 kolom, jadi kalimat panjang akan
+      // terpotong. Rincian lengkapnya ada di tooltip kartu + donut "Per Status".
+      caption: "tanpa belum bayar & batal",
       detail:
-        `${orderCount} pesanan masuk bulan ${periodLabel} (${cancelledOrders} dibatalkan tidak ` +
-        `dihitung): ${saleOrders} diakui sebagai transaksi (diproses/dikirim/selesai), ` +
-        `${pendingOrders} belum bayar`,
-      delta: delta(orderCount, prevOrders.length),
+        `${saleOrders} pesanan masuk bulan ${periodLabel} (sudah dibayar: diproses/dikirim/selesai) ` +
+        `· ${pendingOrders} belum bayar dan ${cancelledOrders} dibatalkan tidak dihitung`,
+      delta: delta(saleOrders, prevSales),
       deltaLabel: prevLabel,
-      deltaTitle: prevDetail(`${prevOrders.length} pesanan masuk`),
+      deltaTitle: prevDetail(`${prevSales} pesanan masuk sudah dibayar`),
     },
     {
       label: "Rata-rata Pesanan",
