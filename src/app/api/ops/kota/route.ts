@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
 import { KOTA_KOSONG, kotaFromShipping, kotaKey, prettifyCity, prettifyProvince, provinceOfCity } from "@/lib/kota";
-import { SALE_STATUSES, sourceKey, sourceLabel } from "@/lib/transaksi";
+import { ORDER_SOURCE_LABEL, SALE_STATUSES, orderSourceKey } from "@/lib/transaksi";
 
 /**
  * "Database Kota" — sebaran pesanan per kota, dihitung langsung dari pesanan yang sudah ada
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
       name: order.customer_name || "",
       whatsapp: order.customer_whatsapp || "",
       status: String(order.status || ""),
-      source: sourceKey(order.source),
+      source: orderSourceKey(order),
       total: Number(order.total) || 0,
       paid: SALE_STATUSES.includes(String(order.status || "")),
       cityKey: key || "__kosong__",
@@ -172,7 +172,7 @@ export async function GET(req: NextRequest) {
     sources: [...entry.sources.values()]
       .map((source) => ({
         key: source.key,
-        label: sourceLabel(source.key),
+        label: ORDER_SOURCE_LABEL[source.key] || source.key,
         orders: source.orders,
         revenue: source.revenue,
       }))
@@ -197,7 +197,7 @@ export async function GET(req: NextRequest) {
     totals,
     options: {
       provinces: provinceOptions,
-      sources: sourceOptions.map((key) => ({ key, label: sourceLabel(key) })),
+      sources: sourceOptions.map((key) => ({ key, label: ORDER_SOURCE_LABEL[key] || key })),
     },
   });
 }

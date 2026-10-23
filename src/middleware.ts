@@ -18,6 +18,12 @@ export default function middleware(request: NextRequest) {
   const headers = new Headers(request.headers);
   headers.set("x-pathname", request.nextUrl.pathname);
 
+  // Route API tidak boleh diproses next-intl. `/api/*` sudah dikecualikan lewat matcher;
+  // guard ini menutup varian lama `/id/api/*` dan `/en/api/*` supaya tidak di-rewrite.
+  if (/^\/(id|en)\/api(\/|$)/.test(request.nextUrl.pathname)) {
+    return NextResponse.next({ request: { headers } });
+  }
+
   const host = (request.headers.get("host") || "").split(":")[0].toLowerCase();
   if (host === AFFILIATE_HOST) {
     // Portal affiliate: tanpa locale, URL bersih (affiliate.samaqu.id/komisi, dst).
