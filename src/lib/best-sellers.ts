@@ -223,7 +223,7 @@ export function aggregateBestSellers(
 
     const rawName = text(item.product_name);
     const price = Number(item.price) > 0 ? Number(item.price) : Number(item.customer_price) || 0;
-    const sizeLabel = normalizeSize(item.size, rawName) || "Tanpa ukuran";
+    const rawSize = normalizeSize(item.size, rawName);
 
     const productId = text(item.product_id);
     const master = productId ? catalogById.get(productId) : undefined;
@@ -263,6 +263,16 @@ export function aggregateBestSellers(
       fallbackItems += 1;
       fallbackUnits += qty;
     }
+
+    // Cover & Hanger / Kabak memakai `size = "ALL SIZE"` hanya sebagai placeholder;
+    // varian sebenarnya ada di `color` (mis. "Set Hanger + Cover", "Kabak 12").
+    const paketVariant = text(item.color) || text(item.series);
+    const isPaket =
+      category === "Cover & Hanger" ||
+      category === "Kabak" ||
+      productId === OPEN_ORDER_ADDON.id ||
+      rawSize === "ALL SIZE";
+    const sizeLabel = isPaket ? paketVariant || "Paket" : rawSize || "Tanpa ukuran";
 
     const seriesEntry =
       seriesGroups.get(seriesKey) ||

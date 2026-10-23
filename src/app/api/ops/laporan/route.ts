@@ -133,6 +133,7 @@ function buildPaymentBreakdown(
   orders: OrderRow[],
   methodById: Map<string, string>,
   bankMethodIds: Set<string> = new Set(),
+  mayarMethodIds: Set<string> = new Set(),
 ) {
   const groups = new Map<string, { key: string; label: string; count: number; amount: number }>();
   for (const order of orders) {
@@ -142,7 +143,19 @@ function buildPaymentBreakdown(
     const channelLabel = channel ? paymentChannelLabel(channel) : "";
     // Transfer bank lama (`bank`) dan metode bank baru digabung satu baris.
     const isTransferBank = raw.toLowerCase() === "bank" || bankMethodIds.has(raw);
-    const label = isTransferBank ? "Transfer Bank" : channelLabel ? `${base} · ${channelLabel}` : base;
+    // Pesanan online lama bisa belum punya `payment_channel` (mis. ditandai lunas manual).
+    // Jangan sembunyikan detailnya: beri label eksplisit supaya tidak terbaca sebagai
+    // "Pembayaran Online" tanpa keterangan.
+    const isOnlineWithoutChannel =
+      !channelLabel &&
+      (String(order.payment_provider || "").toLowerCase() === "mayar" || mayarMethodIds.has(raw));
+    const label = isTransferBank
+      ? "Transfer Bank"
+      : channelLabel
+        ? `${base} · ${channelLabel}`
+        : isOnlineWithoutChannel
+          ? `${base} · channel belum tercatat`
+          : base;
     const key = isTransferBank ? "transfer-bank" : `${raw}|${channel}`;
     const entry = groups.get(key) || { key, label, count: 0, amount: 0 };
     entry.count += 1;
@@ -476,14 +489,44 @@ export async function GET(req: NextRequest) {
   try {
     const sp = new URL(req.url).searchParams;
     const today = todayWibKey();
-    const to = validDateKey(sp.get("to")) || today;
-    const from = validDateKey(sp.get("from")) || addDaysKey(to, -29);
+    const rawMonth = String(sp.get("month") || "").trim();
+    const monthMode = /^\d{4}-(0[1-9]|1[0-2])$/.test(rawMonth);
+
+    // Mode bulan: laporan selalu per bulan. Bulan berjalan dipotong sampai hari ini
+    // (WIB); bulan yang sudah lewat memakai bulan penuh.
+    let from: string;
+    let to: string;
+    if (monthMode) {
+      const [year, month] = rawMonth.split("-").map(Number);
+      const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      const monthEnd = `${rawMonth}-${String(lastDay).padStart(2, "0")}`;
+      from = `${rawMonth}-01`;
+      to = rawMonth === today.slice(0, 7) ? today : monthEnd;
+    } else {
+      to = validDateKey(sp.get("to")) || today;
+      from = validDateKey(sp.get("from")) || addDaysKey(to, -29);
+    }
     if (from > to) return NextResponse.json({ error: "Tanggal awal harus sebelum tanggal akhir" }, { status: 400 });
     const days = daysBetween(from, to);
     if (days > 366) return NextResponse.json({ error: "Rentang maksimal 366 hari" }, { status: 400 });
 
-    const prevTo = addDaysKey(from, -1);
-    const prevFrom = addDaysKey(prevTo, -(days - 1));
+    // Pembanding: apple-to-apple. Mode bulan → tanggal yang sama di bulan sebelumnya
+    // (1–23 Okt vs 1–23 Sep), dipotong akhir bulan bila bulan sebelumnya lebih pendek.
+    let prevTo: string;
+    let prevFrom: string;
+    if (monthMode) {
+      const [year, month] = rawMonth.split("-").map(Number);
+      const prev = new Date(Date.UTC(year, month - 2, 1));
+      const prevMonth = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, "0")}`;
+      const prevLastDay = new Date(Date.UTC(prev.getUTCFullYear(), prev.getUTCMonth() + 1, 0)).getUTCDate();
+      const prevEnd = `${prevMonth}-${String(prevLastDay).padStart(2, "0")}`;
+      prevFrom = `${prevMonth}-01`;
+      prevTo = addDaysKey(prevFrom, days - 1);
+      if (prevTo > prevEnd) prevTo = prevEnd;
+    } else {
+      prevTo = addDaysKey(from, -1);
+      prevFrom = addDaysKey(prevTo, -(days - 1));
+    }
 
     const [current, previous] = await Promise.all([
       loadPeriod(admin, from, to, true),
@@ -497,9 +540,11 @@ export async function GET(req: NextRequest) {
       .select("id, label, bank_name, method_type");
     const methodById = new Map<string, string>();
     const bankMethodIds = new Set<string>();
+    const mayarMethodIds = new Set<string>();
     for (const pm of methodRows || []) {
       const type = String(pm.method_type || "");
       if (type === "bank" && pm.id) bankMethodIds.add(String(pm.id));
+      if (type === "mayar" && pm.id) mayarMethodIds.add(String(pm.id));
       const fallback =
         type === "mayar"
           ? "Pembayaran Online"
@@ -516,7 +561,7 @@ export async function GET(req: NextRequest) {
         fallback;
       if (pm.id) methodById.set(String(pm.id), label);
     }
-    const payments = buildPaymentBreakdown(current.validOrders, methodById, bankMethodIds);
+    const payments = buildPaymentBreakdown(current.validOrders, methodById, bankMethodIds, mayarMethodIds);
 
     const trend = buildTrend(
       from,

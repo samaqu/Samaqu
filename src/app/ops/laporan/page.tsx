@@ -119,7 +119,6 @@ type ReportData = {
   };
 };
 
-type Preset = "today" | "7d" | "30d" | "month" | "lastMonth" | "custom";
 type Tab = "returns" | "exchanges" | "sales";
 
 /* ───────────────────────── helpers ───────────────────────── */
@@ -167,26 +166,23 @@ function todayKey() {
   return new Date(Date.now() + BIZ_OFFSET_MS).toISOString().slice(0, 10);
 }
 
-function addDays(key: string, n: number) {
-  const [y, m, d] = key.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d) + n * DAY_MS).toISOString().slice(0, 10);
+function currentMonthKey() {
+  return todayKey().slice(0, 7);
 }
 
-function monthStart(key: string) {
-  return `${key.slice(0, 7)}-01`;
+function shiftMonth(value: string, delta: number) {
+  const [year, month] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1 + delta, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-function presetRange(preset: Preset, currentFrom: string, currentTo: string) {
-  const today = todayKey();
-  if (preset === "today") return { from: today, to: today };
-  if (preset === "7d") return { from: addDays(today, -6), to: today };
-  if (preset === "30d") return { from: addDays(today, -29), to: today };
-  if (preset === "month") return { from: monthStart(today), to: today };
-  if (preset === "lastMonth") {
-    const last = addDays(monthStart(today), -1);
-    return { from: monthStart(last), to: last };
-  }
-  return { from: currentFrom, to: currentTo };
+function monthLabel(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("id-ID", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 const RETURN_STATUS: Record<string, { label: string; tone: string }> = {
@@ -217,11 +213,11 @@ function Badge({ tone = "gray", children }: { tone?: string; children: ReactNode
   );
 }
 
-async function fetchReport(from: string, to: string): Promise<ReportData> {
+async function fetchReport(month: string): Promise<ReportData> {
   const { supabase } = await import("@/lib/supabase");
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
-  const params = new URLSearchParams({ from, to });
+  const params = new URLSearchParams({ month });
   const res = await fetch(`/api/ops/laporan?${params.toString()}`, {
     cache: "no-store",
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -234,9 +230,12 @@ async function fetchReport(from: string, to: string): Promise<ReportData> {
 /* ───────────────────────── page ───────────────────────── */
 
 export default function LaporanKeuanganPage() {
-  const [preset, setPreset] = useState<Preset>("30d");
-  const [from, setFrom] = useState(() => addDays(todayKey(), -29));
-  const [to, setTo] = useState(() => todayKey());
+  const thisMonth = currentMonthKey();
+  const [month, setMonth] = useState(thisMonth);
+  const monthOptions = useMemo(
+    () => Array.from({ length: 12 }, (_, index) => shiftMonth(thisMonth, -index)),
+    [thisMonth],
+  );
   const [tab, setTab] = useState<Tab>("returns");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -247,8 +246,8 @@ export default function LaporanKeuanganPage() {
   const tableRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading, isError, error, isFetching, refetch } = useQuery<ReportData>({
-    queryKey: ["ops-laporan", from, to],
-    queryFn: () => fetchReport(from, to),
+    queryKey: ["ops-laporan", month],
+    queryFn: () => fetchReport(month),
     staleTime: 30_000,
   });
 
@@ -256,7 +255,7 @@ export default function LaporanKeuanganPage() {
     setPage(1);
     setStatusFilter("all");
     setSort({ key: "created_at", dir: "desc" });
-  }, [tab, search, from, to]);
+  }, [tab, search, month]);
 
   useEffect(() => {
     setPage(1);
@@ -270,14 +269,6 @@ export default function LaporanKeuanganPage() {
       document.body.style.overflow = previous;
     };
   }, [selected]);
-
-  const applyPreset = (next: Preset) => {
-    setPreset(next);
-    if (next === "custom") return;
-    const range = presetRange(next, from, to);
-    setFrom(range.from);
-    setTo(range.to);
-  };
 
   const goToTab = (next: Tab) => {
     setTab(next);
@@ -358,19 +349,15 @@ export default function LaporanKeuanganPage() {
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
           {[
-            { key: "today", label: "Hari ini" },
-            { key: "7d", label: "7 hari" },
-            { key: "30d", label: "30 hari" },
-            { key: "month", label: "Bulan ini" },
-            { key: "lastMonth", label: "Bulan lalu" },
-            { key: "custom", label: "Custom" },
+            { key: thisMonth, label: "Bulan Ini" },
+            { key: shiftMonth(thisMonth, -1), label: "Bulan Lalu" },
           ].map((item) => (
             <button
               key={item.key}
               type="button"
-              onClick={() => applyPreset(item.key as Preset)}
+              onClick={() => setMonth(item.key)}
               className={`rounded-full border px-3 py-1.5 text-xs font-bold transition-colors ${
-                preset === item.key
+                month === item.key
                   ? "border-slate-900 bg-slate-900 text-white"
                   : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
               }`}
@@ -378,6 +365,18 @@ export default function LaporanKeuanganPage() {
               {item.label}
             </button>
           ))}
+          <select
+            value={month}
+            onChange={(event) => setMonth(event.target.value)}
+            aria-label="Pilih bulan laporan"
+            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 outline-none"
+          >
+            {monthOptions.map((value) => (
+              <option key={value} value={value}>
+                {monthLabel(value)}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
@@ -386,32 +385,6 @@ export default function LaporanKeuanganPage() {
           <span>{data.period.days} hari</span>
           <span>·</span>
           <span>dibanding {data.period.previous.label}</span>
-          {preset === "custom" ? (
-            <span className="ml-auto flex flex-wrap items-center gap-1.5">
-              <input
-                type="date"
-                value={from}
-                max={to}
-                onChange={(event) => {
-                  setPreset("custom");
-                  setFrom(event.target.value);
-                }}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700"
-              />
-              <span>–</span>
-              <input
-                type="date"
-                value={to}
-                min={from}
-                max={todayKey()}
-                onChange={(event) => {
-                  setPreset("custom");
-                  setTo(event.target.value);
-                }}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700"
-              />
-            </span>
-          ) : null}
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
