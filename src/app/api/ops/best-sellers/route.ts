@@ -125,7 +125,6 @@ type MergeableRow = {
   units: number;
   revenue: number;
   sizes: BestSellerBreakdown[];
-  covers: BestSellerBreakdown[];
   seriesBreakdown?: BestSellerSeriesBreakdown[];
 };
 
@@ -221,14 +220,14 @@ export async function GET(req: NextRequest) {
       previousAgg.series.rows,
       currentAgg.series.totals,
       previousAgg.series.totals,
-      (row) => ({ ...row, units: 0, revenue: 0, sizes: [], covers: [] }),
+      (row) => ({ ...row, units: 0, revenue: 0, sizes: [] }),
     );
     const productMode = mergeMode<BestSellerProductRow>(
       currentAgg.product.rows,
       previousAgg.product.rows,
       currentAgg.product.totals,
       previousAgg.product.totals,
-      (row) => ({ ...row, units: 0, revenue: 0, sizes: [], covers: [], seriesBreakdown: [] }),
+      (row) => ({ ...row, units: 0, revenue: 0, sizes: [], seriesBreakdown: [] }),
     );
 
     const orderCounts = { validOrders: currentSales.validOrders, orders: currentSales.orders };

@@ -64,7 +64,6 @@ interface BestSellerRowBase {
   units: number;
   revenue: number;
   sizes: BestSellerBreakdown[];
-  covers: BestSellerBreakdown[];
   /** true = item lama tanpa relasi master; sengaja tidak digabung. */
   fallback: boolean;
 }
@@ -115,14 +114,6 @@ export function normalizeSize(raw?: string | null, fallbackName?: string | null)
   if (value) return value.toUpperCase();
   const fromName = String(fallbackName || "").match(SIZE_IN_NAME_RE)?.[1];
   return fromName ? fromName.toUpperCase() : "";
-}
-
-/** Opsi cover & hanger yang tercatat di nama item ("Tanpa Cover" / "Include Cover"). */
-export function normalizeCoverOption(rawName?: string | null): string {
-  const match = String(rawName || "").match(COVER_IN_NAME_RE);
-  if (!match) return "";
-  const word = match[1].toLowerCase();
-  return word === "tanpa" || word === "without" ? "Tanpa Cover" : "Include Cover";
 }
 
 /** Series dari teks nama — hanya dipakai kalau item tidak punya relasi master. */
@@ -178,7 +169,6 @@ interface Acc {
   units: number;
   revenue: number;
   sizes: Map<string, number>;
-  covers: Map<string, number>;
 }
 
 interface SeriesAcc extends Acc {
@@ -234,7 +224,6 @@ export function aggregateBestSellers(
     const rawName = text(item.product_name);
     const price = Number(item.price) > 0 ? Number(item.price) : Number(item.customer_price) || 0;
     const sizeLabel = normalizeSize(item.size, rawName) || "Tanpa ukuran";
-    const coverLabel = normalizeCoverOption(rawName) || "Standar";
 
     const productId = text(item.product_id);
     const master = productId ? catalogById.get(productId) : undefined;
@@ -288,12 +277,10 @@ export function aggregateBestSellers(
         units: 0,
         revenue: 0,
         sizes: new Map(),
-        covers: new Map(),
       } as SeriesAcc);
     seriesEntry.units += qty;
     seriesEntry.revenue += price * qty;
     bump(seriesEntry.sizes, sizeLabel, qty);
-    bump(seriesEntry.covers, coverLabel, qty);
     seriesGroups.set(seriesKey, seriesEntry);
 
     const productEntry =
@@ -308,13 +295,11 @@ export function aggregateBestSellers(
         units: 0,
         revenue: 0,
         sizes: new Map(),
-        covers: new Map(),
         series: new Map(),
       } as ProductAcc);
     productEntry.units += qty;
     productEntry.revenue += price * qty;
     bump(productEntry.sizes, sizeLabel, qty);
-    bump(productEntry.covers, coverLabel, qty);
 
     const seriesLabel = seriesName || "Tanpa series";
     const seriesBreakdown =
@@ -339,7 +324,6 @@ export function aggregateBestSellers(
       units: entry.units,
       revenue: entry.revenue,
       sizes: toBreakdown(entry.sizes),
-      covers: toBreakdown(entry.covers),
     }))
     .sort((a, b) => b.units - a.units || b.revenue - a.revenue || a.name.localeCompare(b.name));
 
@@ -354,7 +338,6 @@ export function aggregateBestSellers(
       units: entry.units,
       revenue: entry.revenue,
       sizes: toBreakdown(entry.sizes),
-      covers: toBreakdown(entry.covers),
       seriesBreakdown: [...entry.series.entries()]
         .map(([key, value]) => ({
           key,

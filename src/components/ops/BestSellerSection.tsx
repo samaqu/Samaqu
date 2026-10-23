@@ -31,7 +31,6 @@ type BestSellerRow = {
   deltaPct: number | null;
   isNew: boolean;
   sizes: Breakdown[];
-  covers: Breakdown[];
   fallback: boolean;
   seriesBreakdown?: SeriesBreakdown[];
 };
@@ -210,7 +209,7 @@ export default function BestSellerSection() {
           <div>
             <h2 className="text-lg font-black tracking-tight text-[#374151]">Produk Terlaris</h2>
             <p className="text-xs font-medium text-slate-500">
-              Peringkat produk terlaris — dikelompokkan dari data master, ukuran &amp; cover jadi rincian — pada{" "}
+              Peringkat produk terlaris — dikelompokkan dari data master, ukuran jadi rincian — pada{" "}
               {data?.period.label || monthLabel(month)}.
             </p>
           </div>
@@ -506,48 +505,42 @@ export default function BestSellerSection() {
                     </button>
 
                     {isOpen ? (
-                      <div className="mb-3 grid gap-2 pl-9 sm:grid-cols-2">
+                      <div className="mb-3 grid gap-2 pl-9">
                         {groupMode === "product" && row.seriesBreakdown && row.seriesBreakdown.length > 0 ? (
-                          <>
-                            <div className="rounded-2xl bg-[#F9FAFB] p-3 sm:col-span-2">
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Per series</p>
-                              <ul className="mt-2 space-y-2">
-                                {row.seriesBreakdown.map((item) => (
-                                  <li key={item.key} className="rounded-xl bg-white px-3 py-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="truncate text-[11px] font-bold text-slate-700" title={item.label}>
-                                        {item.label}
-                                      </span>
-                                      <span className="shrink-0 text-[11px] font-bold tabular-nums text-slate-600">
-                                        {nfmt(item.units)} unit · {rp(item.revenue)}
-                                      </span>
+                          <div className="rounded-2xl bg-[#F9FAFB] p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Per series</p>
+                            <ul className="mt-2 space-y-2">
+                              {row.seriesBreakdown.map((item) => (
+                                <li key={item.key} className="rounded-xl bg-white px-3 py-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="truncate text-[11px] font-bold text-slate-700" title={item.label}>
+                                      {item.label}
+                                    </span>
+                                    <span className="shrink-0 text-[11px] font-bold tabular-nums text-slate-600">
+                                      {nfmt(item.units)} unit · {rp(item.revenue)}
+                                    </span>
+                                  </div>
+                                  {item.sizes.length > 0 ? (
+                                    <div className="mt-1.5 flex flex-wrap gap-1">
+                                      {item.sizes.map((size) => (
+                                        <span
+                                          key={size.label}
+                                          className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[10px] font-semibold text-slate-600"
+                                        >
+                                          {size.label} · {nfmt(size.units)}
+                                        </span>
+                                      ))}
                                     </div>
-                                    {item.sizes.length > 0 ? (
-                                      <div className="mt-1.5 flex flex-wrap gap-1">
-                                        {item.sizes.map((size) => (
-                                          <span
-                                            key={size.label}
-                                            className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[10px] font-semibold text-slate-600"
-                                          >
-                                            {size.label} · {nfmt(size.units)}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    ) : null}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                            <BreakdownColumn title="Per cover & hanger" items={row.covers} accent="#94A3B8" />
-                          </>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
                         ) : (
-                          <>
-                            <BreakdownColumn title="Per ukuran" items={row.sizes} accent="#475569" />
-                            <BreakdownColumn title="Per cover & hanger" items={row.covers} accent="#94A3B8" />
-                          </>
+                          <BreakdownColumn title="Per ukuran" items={row.sizes} accent="#475569" />
                         )}
                         {compareVisible ? (
-                          <div className="sm:col-span-2">
+                          <div>
                             <p className="text-[11px] font-semibold text-slate-500">
                               {row.isNew
                                 ? `Baru di periode ini — belum terjual di ${comparison?.shortLabel}.`
