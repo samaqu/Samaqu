@@ -13,6 +13,7 @@
  *
  * Aturan angka dipakai bersama layar lain supaya tidak beda antar dashboard — jangan hitung ulang
  * di komponen ini:
+ *  - pesanan masuk   = semua pesanan periode terpilih KECUALI yang dibatalkan (`isCancelledOrder`);
  *  - transaksi sah   = `saleCount()` (`SALE_STATUSES`: diproses/dikirim/selesai);
  *  - omset           = `orderRevenue()` (harga produk saja: `total − ongkir`);
  *  - tahap pesanan   = `orderStage()` (`src/lib/order-flow.ts`, sama dengan tab panel Order Management);
@@ -28,6 +29,10 @@ const money = (n: number) => "Rp " + Math.round(n).toLocaleString("id-ID");
 
 /** Aturan bersama "sudah dibayar" — lihat SALE_STATUSES (src/lib/transaksi.ts). */
 const isPaidOrder = (status?: string | null) => SALE_STATUSES.includes(String(status || "").toLowerCase());
+
+/** Pesanan DIBATALKAN bukan pesanan masuk — tidak dihitung di kartu "Pesanan Masuk", angka
+ *  tengah donut "Per Status", chip tren "vs bulan lalu", dan jumlah pesanan di grafik tren. */
+const isCancelledOrder = (status?: string | null) => String(status || "").toLowerCase() === "dibatalkan";
 
 /** Warna irisan donut — palet wireframe (#1c1c1c, #5f5f5d, #f59e0b, #22c55e). */
 const SLICE_COLORS: Record<string, string> = {
@@ -137,7 +142,11 @@ export default function DashboardView({
   const chartSource = chartOrders ?? orders;
 
   /* ── metrik periode terpilih ── */
-  const orderCount = orders.length;
+  /* "Pesanan masuk" = semua pesanan bulan itu KECUALI yang dibatalkan (pesanan batal bukan
+     pesanan masuk). Satu himpunan ini dipakai kartu "Pesanan Masuk", angka tengah donut
+     "Per Status", chip tren "vs bulan lalu", dan jumlah pesanan di tooltip grafik tren. */
+  const incomingOrders = orders.filter((o) => !isCancelledOrder(o.status));
+  const orderCount = incomingOrders.length;
   const pendingOrders = orders.filter((o) => o.status === "pending").length;
   const cancelledOrders = orders.filter((o) => o.status === "dibatalkan").length;
   /* Transaksi sah: SATU aturan bersama `saleCount()` (diproses/dikirim/selesai) — sama dengan
@@ -152,7 +161,9 @@ export default function DashboardView({
   /* ── bulan sebelum periode terpilih, untuk tren naik/turun ── */
   const prevKey = monthShift(periodValue, -1);
   const prevLabel = monthShortID(prevKey);
-  const prevOrders = chartSource.filter((o) => monthKeyWIB(o.created_at) === prevKey);
+  const prevOrders = chartSource.filter(
+    (o) => monthKeyWIB(o.created_at) === prevKey && !isCancelledOrder(o.status)
+  );
   const prevRevenue = prevOrders.filter((o) => isPaidOrder(o.status)).reduce((sum, o) => sum + orderRevenue(o), 0);
   const prevSales = saleCount(prevOrders);
   const prevAvg = prevSales ? prevRevenue / prevSales : 0;
@@ -170,7 +181,7 @@ export default function DashboardView({
     for (const o of chartSource) {
       const key = monthKeyWIB(o.created_at);
       if (!(key in rev)) continue;
-      count[key] += 1;
+      if (!isCancelledOrder(o.status)) count[key] += 1;
       if (isPaidOrder(o.status)) rev[key] += orderRevenue(o);
     }
     return keys.map((k) => ({ label: monthShortID(k), revenue: rev[k], orders: count[k] }));
@@ -179,7 +190,7 @@ export default function DashboardView({
 
   /* ── irisan donut: pesanan per status (data asli) ── */
   const statusMap: Record<string, number> = {};
-  orders.forEach((o) => { statusMap[o.status] = (statusMap[o.status] || 0) + 1; });
+  incomingOrders.forEach((o) => { statusMap[o.status] = (statusMap[o.status] || 0) + 1; });
   const preferred = ["selesai", "diproses", "dikirim", "pending", "dibatalkan"];
   const slices = [
     ...preferred.filter((s) => statusMap[s]).map((s) => ({ label: s, value: statusMap[s] })),
@@ -218,8 +229,9 @@ export default function DashboardView({
       // jadi kalimat panjang akan terpotong. Rincian lengkapnya ada di tooltip kartu + donut "Per Status".
       caption: `${saleOrders} ${SALE_COUNT_NOTE}`,
       detail:
-        `${orderCount} pesanan masuk bulan ${periodLabel}: ${saleOrders} diakui sebagai transaksi ` +
-        `(diproses/dikirim/selesai), ${pendingOrders} belum bayar, ${cancelledOrders} dibatalkan`,
+        `${orderCount} pesanan masuk bulan ${periodLabel} (${cancelledOrders} dibatalkan tidak ` +
+        `dihitung): ${saleOrders} diakui sebagai transaksi (diproses/dikirim/selesai), ` +
+        `${pendingOrders} belum bayar`,
       delta: delta(orderCount, prevOrders.length),
       deltaLabel: prevLabel,
       deltaTitle: prevDetail(`${prevOrders.length} pesanan masuk`),
@@ -343,7 +355,7 @@ export default function DashboardView({
         <div className="p-6" style={{ background: "var(--card)", border: "1px solid var(--bd)", borderRadius: "var(--rad3)" }}>
           <h3 className="font-extrabold text-sm" style={{ color: "var(--fg)" }}>Per Status</h3>
           <p className="text-[11px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--fg3)" }}>
-            {periodLabel} · semua pesanan masuk
+            {periodLabel} · tanpa pesanan dibatalkan
           </p>
           {loading ? (
             <p className="text-xs font-bold mt-4" style={{ color: "var(--fg3)" }}>Memuat…</p>

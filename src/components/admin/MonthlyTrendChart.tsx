@@ -21,7 +21,7 @@ export interface MonthlyTrendPoint {
   label: string;
   /** Omzet produk bulan itu (Rp) — harga produk saja, tanpa ongkir. */
   revenue: number;
-  /** Jumlah pesanan masuk bulan itu (semua status). */
+  /** Jumlah pesanan masuk bulan itu (tanpa pesanan dibatalkan). */
   orders: number;
 }
 

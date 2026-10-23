@@ -1455,6 +1455,20 @@ memang beda per definisi.
   tidak bisa berbeda. Dashboard ops masih punya perhitungannya sendiri (belum diubah).
 - **Donut `Per Status`** tetap seperti sebelumnya (irisan per status + total di tengah), hanya
   keterangannya ditambah "semua pesanan masuk" dan **persen** per baris legenda.
+- **Pesanan DIBATALKAN tidak dihitung sebagai "pesanan masuk"** (permintaan pemilik 2026-10-24:
+  "harusnya yg batal jgn di itung dong"). Satu predikat `isCancelledOrder()` di
+  `src/components/admin/DashboardView.tsx` dipakai untuk EMPAT angka sekaligus supaya tidak bisa
+  beda lagi: kartu **"Pesanan Masuk"** (Oktober 2026: 144 → **132**), angka tengah + irisan donut
+  `Per Status` (subjudulnya jadi "{periode} · tanpa pesanan dibatalkan"; irisan `dibatalkan` tidak
+  lagi digambar), chip tren **"vs bulan lalu"** (bulan pembanding dihitung dari himpunan yang
+  sama — terbukti "+915,4% vs Sep" = 132 vs 13, bukan 132 vs 16), dan jumlah pesanan di tooltip
+  grafik tren (`MonthlyTrendChart`). Jumlah pesanan batal tetap terbaca di tooltip kartu
+  ("12 dibatalkan tidak dihitung"), di tab **Dibatalkan** panel Order Management, dan di donut
+  bulan lain. **Jangan** mengembalikan `orders.length` untuk kartu itu.
+  Verifikasi (2026-10-24, sesi admin diputar ulang): kartu "Pesanan Masuk" **132** / "126 transaksi
+  diakui"; donut **132 pesanan masuk** (selesai 99 · 75%, dikirim 14 · 11%, diproses 13 · 10%,
+  pending 6 · 5%, tanpa baris dibatalkan); klik `<` → September 2026 **13** (16 − 3 batal) dengan
+  donut 13 (selesai 13 · 100%); 0 error console.
 - **Verifikasi (2026-10-23, sesi admin diputar ulang via preview)**: `npx tsc --noEmit` bersih;
   `curl /admin` & `/id/admin` = 200; di `/admin` kartu berbunyi Pendapatan Rp 48.331.123
   (+615,8% vs Sep) · Pesanan Masuk 143 / "126 transaksi diakui" · Rata-rata Rp 383.580 (−26,1% vs
