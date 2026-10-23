@@ -48,17 +48,10 @@ export async function GET(req: NextRequest) {
     .maybeSingle();
 
   if (secretError) {
-    // Tabel belum dibuat → pakai status kolom lama (tanpa mengirim nilainya ke browser).
+    // Tabel belum dibuat. Token tidak lagi disimpan di store_settings.
     tableReady = false;
-    const { data: legacy } = await admin
-      .from("store_settings")
-      .select("meta_access_token")
-      .eq("id", 1)
-      .maybeSingle();
-    hasToken = !!legacy?.meta_access_token;
-  } else {
-    hasToken = !!secret?.access_token;
   }
+  hasToken = !!secret?.access_token;
 
   return NextResponse.json({
     tableReady,

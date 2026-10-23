@@ -74,8 +74,7 @@ function validTestEventCode(value: string | null | undefined): string {
 
 /**
  * Pixel ID + status aktif dibaca dari store_settings (bisa diatur admin), token akses dari
- * `meta_settings` (tabel tanpa policy RLS = service-role only). Fallback ke kolom lama
- * `store_settings.meta_access_token` selama migration belum dijalankan.
+ * `meta_settings` (tabel tanpa policy RLS = service-role only).
  */
 export async function getMetaCapiConfig(): Promise<MetaCapiConfig | null> {
   const now = Date.now();
@@ -105,14 +104,6 @@ export async function getMetaCapiConfig(): Promise<MetaCapiConfig | null> {
       .maybeSingle();
     if (!secretError) accessToken = (secret?.access_token || "").trim() || null;
 
-    if (!accessToken) {
-      const { data: legacy } = await supabase
-        .from("store_settings")
-        .select("meta_access_token")
-        .eq("id", 1)
-        .maybeSingle();
-      accessToken = (legacy?.meta_access_token || "").trim() || null;
-    }
 
     if (!accessToken) return null;
 
