@@ -669,24 +669,40 @@ function MetaPixelSection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showToken, setShowToken] = useState(false);
-  const [maskedToken, setMaskedToken] = useState("");
+  const [hasToken, setHasToken] = useState(false);
+  const [tableReady, setTableReady] = useState(true);
   const toast = useToast();
 
+  // Lewat API admin — access token CAPI disimpan di `meta_settings` (service-role only) dan
+  // tidak pernah dikirim balik ke browser.
+  async function authHeaders() {
+    const { data: { session } } = await supabase.auth.getSession();
+    return { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token || ""}` };
+  }
+
   useEffect(() => {
-    supabase.from("store_settings").select("meta_pixel_id, meta_access_token, meta_pixel_enabled, meta_test_event_code").eq("id", 1).single().then(({ data }) => {
-      if (data) {
-        setPixelId(data.meta_pixel_id || "");
-        setEnabled(data.meta_pixel_enabled || false);
-        setTestEventCode(data.meta_test_event_code || "");
-        setOriginal({ pixelId: data.meta_pixel_id || "", testEventCode: data.meta_test_event_code || "", enabled: data.meta_pixel_enabled || false });
-        const token = data.meta_access_token || "";
-        if (token) {
-          setMaskedToken(`${token.slice(0, 10)}${"*".repeat(Math.max(0, token.length - 14))}${token.slice(-4)}`);
-        }
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/meta-settings", { headers: await authHeaders() });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Gagal memuat pengaturan Meta Pixel");
+        setPixelId(json.pixelId || "");
+        setEnabled(json.enabled === true);
+        setTestEventCode(json.testEventCode || "");
+        setHasToken(json.hasToken === true);
+        setTableReady(json.tableReady !== false);
+        setOriginal({
+          pixelId: json.pixelId || "",
+          testEventCode: json.testEventCode || "",
+          enabled: json.enabled === true,
+        });
+      } catch {
+        toast.showToast("error", "Gagal memuat pengaturan Meta Pixel");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
-  }, []);
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSave() {
     if (enabled && !pixelId.trim()) {
@@ -694,31 +710,34 @@ function MetaPixelSection() {
       return;
     }
     setSaving(true);
-    const updates: Record<string, any> = {
-      id: 1,
-      meta_pixel_id: pixelId.trim() || null,
-      meta_pixel_enabled: enabled,
-      meta_test_event_code: testEventCode.trim() || null,
-      updated_at: new Date().toISOString(),
-    };
-    if (accessToken.trim()) {
-      updates.meta_access_token = accessToken.trim();
-    }
-    const { error } = await supabase.from("store_settings").upsert(updates);
-    if (error) {
-      toast.showToast("error", "Gagal menyimpan pengaturan Meta Pixel");
-    } else {
+    try {
+      const res = await fetch("/api/admin/meta-settings", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({
+          pixelId: pixelId.trim(),
+          enabled,
+          testEventCode: testEventCode.trim(),
+          accessToken: accessToken.trim() || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Gagal menyimpan pengaturan Meta Pixel");
+
       if (accessToken.trim()) {
-        const token = accessToken.trim();
-        setMaskedToken(`${token.slice(0, 10)}${"*".repeat(Math.max(0, token.length - 14))}${token.slice(-4)}`);
+        setHasToken(true);
         setAccessToken("");
         setShowToken(false);
+        setTableReady(true);
       }
       setOriginal({ pixelId: pixelId.trim(), testEventCode: testEventCode.trim(), enabled });
       setEditing(false);
       toast.showToast("success", "Pengaturan Meta Pixel disimpan");
+    } catch (e) {
+      toast.showToast("error", e instanceof Error ? e.message : "Gagal menyimpan pengaturan Meta Pixel");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   function handleCancel() {
@@ -778,18 +797,23 @@ function MetaPixelSection() {
               onChange={(e) => setAccessToken(e.target.value)}
               className="w-full rounded-xl px-4 py-2.5 pr-10 bg-white text-sm outline-none font-mono"
               style={{ border: "1px solid #e4e4e7" }}
-              placeholder={maskedToken ? "Masukkan token baru untuk mengganti" : "Masukkan System User Access Token"}
+              placeholder={hasToken ? "Masukkan token baru untuk mengganti" : "Masukkan System User Access Token"}
             />
             <button type="button" onClick={() => setShowToken(!showToken)} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--text-muted)" }}>
               {showToken ? "🙈" : "👁️"}
             </button>
           </div>
           <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
-            {maskedToken ? `Token tersimpan saat ini: ${maskedToken}` : "Belum ada token tersimpan."} Digunakan untuk Conversions API (CAPI). Buat di Meta Business Suite → System Users.
+            {hasToken ? "Token tersimpan (tidak pernah dikirim ke browser)." : "Belum ada token tersimpan."} Digunakan untuk Conversions API (CAPI). Buat di Meta Business Suite → System Users.
           </p>
+          {!tableReady && (
+            <p className="text-[11px] mt-1" style={{ color: "#b45309" }}>
+              Jalankan migration <span className="font-mono">supabase/migrations/20261023_meta_settings.sql</span> di Supabase SQL Editor agar token bisa disimpan.
+            </p>
+          )}
         </div>
       ) : (
-        <Field label="Access Token (CAPI)" value={maskedToken} editing={false} mono />
+        <Field label="Access Token (CAPI)" value={hasToken ? "••••••••" : ""} editing={false} mono />
       )}
 
       <Field

@@ -1,136 +1,114 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHash } from "crypto";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import {
+  buildFbc,
+  checkCapiRateLimit,
+  CLIENT_CAPI_EVENTS,
+  getClientIp,
+  getMetaCookies,
+  sendMetaCapiEvent,
+} from "@/lib/meta-capi";
 
-// ── Config cache (server-side, 5 min TTL) ──
+/**
+ * Endpoint CAPI untuk event yang dipicu dari browser (ViewContent, AddToCart,
+ * InitiateCheckout, CompleteRegistration, dst).
+ *
+ * Purchase TIDAK dilayani di sini — Purchase dikirim server-side sekali saat order dibuat
+ * (/api/orders & /api/open-order) supaya tidak bisa dipalsukan dan tidak dobel.
+ *
+ * Keamanan: token akses tidak pernah dikirim balik; hanya event yang dikenal yang diteruskan;
+ * origin harus sama; ada rate limit dasar per IP; custom_data dibersihkan oleh `sanitizeCustomData`.
+ */
 
-interface CachedConfig {
-  pixelId: string;
-  accessToken: string;
-  testEventCode?: string;
+const MAX_BODY_BYTES = 32 * 1024;
+const EVENT_ID_PATTERN = /^[A-Za-z0-9._:-]{1,200}$/;
+
+function bad(message: string, status = 400) {
+  return NextResponse.json({ ok: false, error: message }, { status });
 }
 
-let cachedConfig: CachedConfig | null = null;
-let cacheTimestamp = 0;
-const CACHE_TTL = 5 * 60 * 1000;
-
-async function getConfig(): Promise<CachedConfig | null> {
-  const now = Date.now();
-  if (cachedConfig && now - cacheTimestamp < CACHE_TTL) return cachedConfig;
-
-  try {
-    const supabase = getSupabaseAdmin();
-    const { data } = await supabase
-      .from("store_settings")
-      .select("meta_pixel_id, meta_access_token, meta_pixel_enabled, meta_test_event_code")
-      .eq("id", 1)
-      .single();
-
-    if (data?.meta_pixel_id && data?.meta_pixel_enabled && data?.meta_access_token) {
-      cachedConfig = {
-        pixelId: data.meta_pixel_id,
-        accessToken: data.meta_access_token,
-        testEventCode: data.meta_test_event_code || undefined,
-      };
-      cacheTimestamp = now;
-      return cachedConfig;
-    }
-
-    // Fallback: Pixel ID dari environment (NEXT_PUBLIC_META_PIXEL_ID / META_PIXEL_ID) —
-    // dipakai kalau dashboard belum menyimpan Pixel ID. Access token tetap wajib ada.
-    const envPixelId = (process.env.META_PIXEL_ID || process.env.NEXT_PUBLIC_META_PIXEL_ID || "").trim();
-    const dbPixelId = (data?.meta_pixel_id || "").trim();
-    const pixelId = dbPixelId || envPixelId;
-    const enabled = dbPixelId ? Boolean(data?.meta_pixel_enabled) : Boolean(envPixelId);
-    if (pixelId && enabled && data?.meta_access_token) {
-      cachedConfig = {
-        pixelId,
-        accessToken: data.meta_access_token,
-        testEventCode: data.meta_test_event_code || undefined,
-      };
-      cacheTimestamp = now;
-      return cachedConfig;
-    }
-  } catch {
-    // Return cached if available
+function sameOrigin(request: NextRequest): boolean {
+  // Browser fetch selalu membawa Origin + Sec-Fetch-Site. Form lintas situs tidak bisa
+  // mengirim Content-Type JSON tanpa preflight CORS, jadi kombinasi ini memblokir spam dasar.
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchSite && fetchSite !== "same-origin" && fetchSite !== "same-site" && fetchSite !== "none") {
+    return false;
   }
 
-  return cachedConfig;
+  const origin = request.headers.get("origin");
+  if (!origin) return true; // request same-origin lama / non-browser tanpa Origin
+  try {
+    return new URL(origin).host === request.headers.get("host");
+  } catch {
+    return false;
+  }
 }
 
-// ── Helpers ──
-
-function hashValue(value: string): string {
-  return createHash("sha256").update(value.trim().toLowerCase()).digest("hex");
+function cleanUserString(value: unknown, max = 200): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : undefined;
 }
-
-// ── POST handler ──
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { eventName, eventId, customData, userData } = body;
+    const contentLength = Number(request.headers.get("content-length") || 0);
+    if (contentLength > MAX_BODY_BYTES) return bad("Payload terlalu besar", 413);
 
-    if (!eventName || !eventId) {
-      return NextResponse.json({ error: "Missing eventName or eventId" }, { status: 400 });
+    if (!sameOrigin(request)) return bad("Origin tidak dikenal", 403);
+
+    const contentType = request.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("application/json")) {
+      return bad("Content-Type harus application/json", 415);
     }
 
-    const config = await getConfig();
-    if (!config) {
-      return NextResponse.json({ error: "Meta Pixel not configured" }, { status: 200 });
+    const clientIp = getClientIp(request);
+    if (!checkCapiRateLimit(clientIp)) return bad("Terlalu banyak event", 429);
+
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") return bad("Body tidak valid");
+
+    const eventName = cleanUserString(body.eventName, 64);
+    const eventId = cleanUserString(body.eventId, 200);
+
+    if (!eventName || !eventId) return bad("eventName/eventId wajib");
+    if (!EVENT_ID_PATTERN.test(eventId)) return bad("eventId tidak valid");
+    if (!CLIENT_CAPI_EVENTS.has(eventName)) {
+      // Termasuk Purchase: jangan izinkan publik mengirim Purchase.
+      return bad("Event tidak diizinkan", 403);
     }
 
-    // Build user_data with hashed values
-    const hashedUserData: Record<string, any> = {};
-    if (userData?.email) {
-      hashedUserData.em = [hashValue(userData.email)];
-    }
-    if (userData?.phone) {
-      // Normalize Indonesian phone: remove spaces/dashes, convert 08xx to 628xx
-      const normalized = userData.phone.replace(/[\s\-]/g, "").replace(/^0/, "62");
-      hashedUserData.ph = [hashValue(normalized)];
-    }
-    if (userData?.externalId) {
-      hashedUserData.external_id = [hashValue(userData.externalId)];
-    }
+    const rawUser = body.userData && typeof body.userData === "object" ? body.userData : {};
+    const cookies = getMetaCookies(request);
 
-    // Build CAPI payload
-    const payload = {
-      data: [
-        {
-          event_name: eventName,
-          event_time: Math.floor(Date.now() / 1000),
-          event_id: eventId,
-          user_data: hashedUserData,
-          custom_data: customData || {},
-          action_source: "website",
-        },
-      ],
-    };
+    // fbp/fbc dari body (dibaca browser) → fallback cookie request. fbc bisa dibentuk dari fbclid.
+    const fbp = cleanUserString(body.fbp, 200) || cookies.fbp;
+    const fbc = cleanUserString(body.fbc, 400) || cookies.fbc || buildFbc(cleanUserString(body.fbclid, 500));
 
-    // Send to Meta Conversions API
-    const url = `https://graph.facebook.com/v19.0/${config.pixelId}/events?access_token=${config.accessToken}`;
-    const bodyToSend: Record<string, any> = { ...payload };
-    if (config.testEventCode) {
-      bodyToSend.test_event_code = config.testEventCode;
-    }
+    const eventSourceUrl =
+      cleanUserString(body.eventSourceUrl, 1000) ||
+      cleanUserString(request.headers.get("referer"), 1000);
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(bodyToSend),
+    const result = await sendMetaCapiEvent({
+      eventName,
+      eventId,
+      eventSourceUrl,
+      userData: {
+        email: cleanUserString(rawUser.email, 320),
+        phone: cleanUserString(rawUser.phone, 40),
+        name: cleanUserString(rawUser.name, 120),
+        city: cleanUserString(rawUser.city, 120),
+        externalId: cleanUserString(rawUser.externalId, 200),
+        fbp,
+        fbc,
+        clientIp,
+        clientUserAgent: cleanUserString(request.headers.get("user-agent"), 1000),
+      },
+      customData: body.customData,
     });
 
-    const result = await response.json();
-
-    if (!response.ok) {
-      console.error("[Meta CAPI] Error:", result);
-      return NextResponse.json({ error: "CAPI request failed", details: result }, { status: 200 });
-    }
-
-    return NextResponse.json({ success: true, events_received: result.events_received });
+    // Gagal kirim ke Meta bukan error untuk client (fire-and-forget).
+    return NextResponse.json({ ok: result.ok, skipped: result.skipped === true });
   } catch (error) {
-    console.error("[Meta CAPI] Unexpected error:", error);
-    return NextResponse.json({ error: "Internal error" }, { status: 200 });
+    // Jangan log body/payload — bisa berisi data pribadi.
+    console.warn("[Meta CAPI] request gagal:", error instanceof Error ? error.message : "unknown");
+    return NextResponse.json({ ok: false }, { status: 200 });
   }
 }

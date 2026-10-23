@@ -99,16 +99,58 @@ export function flushMetaPixelQueue() {
   }
 }
 
+// ── Browser identifiers (fbp / fbc) ──
+
+function readCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  if (!match) return undefined;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
+/**
+ * `_fbp`/`_fbc` dibaca di browser lalu ikut dikirim ke server. Kalau `_fbc` belum ada tapi URL
+ * membawa `fbclid`, bentuk sesuai format resmi Meta (`fb.<subdomain>.<ms>.<fbclid>`) dan simpan
+ * sebagai cookie supaya request order berikutnya juga membawanya.
+ */
+export function getMetaBrowserIds(): { fbp?: string; fbc?: string } {
+  if (typeof document === "undefined") return {};
+
+  const fbp = readCookie("_fbp");
+  let fbc = readCookie("_fbc");
+
+  if (!fbc && typeof window !== "undefined") {
+    const fbclid = new URLSearchParams(window.location.search).get("fbclid");
+    if (fbclid) {
+      fbc = `fb.1.${Date.now()}.${fbclid}`;
+      try {
+        const secure = window.location.protocol === "https:" ? "; Secure" : "";
+        document.cookie = `_fbc=${encodeURIComponent(fbc)}; path=/; max-age=7776000; SameSite=Lax${secure}`;
+      } catch {
+        // cookie diblokir → nilai tetap dikirim lewat body
+      }
+    }
+  }
+
+  return { fbp, fbc };
+}
+
 // ── CAPI Sender ──
 
 export async function sendCAPIEvent(
   eventName: string,
   eventId: string,
   customData: Record<string, any>,
-  userData?: { email?: string; phone?: string; externalId?: string }
+  userData?: { email?: string; phone?: string; name?: string; city?: string; externalId?: string }
 ): Promise<void> {
   // Access token CAPI hanya ada di server (/api/meta-events) — jangan pernah butuh di browser.
   if (!_config || !_config.enabled) return;
+
+  const ids = getMetaBrowserIds();
 
   try {
     await fetch("/api/meta-events", {
@@ -119,6 +161,9 @@ export async function sendCAPIEvent(
         eventId,
         customData,
         userData,
+        fbp: ids.fbp,
+        fbc: ids.fbc,
+        eventSourceUrl: typeof window !== "undefined" ? window.location.href : undefined,
       }),
       keepalive: true,
     });

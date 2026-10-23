@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 import { motion } from "framer-motion";
 import { ShieldCheck, Copy, Check, Clock, MessageCircle, ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { trackPurchaseOnce, trackLead, sendCAPIEvent } from "@/lib/meta-pixel";
+import { trackPurchaseOnce, trackLead } from "@/lib/meta-pixel";
 import { isPaketItem, itemNameSuffix } from "@/lib/item-label";
 import { normalizeMethodType, paymentMethodLabel, type PaymentMethodRow } from "@/lib/payment-methods";
 import { useResolvedPaymentMethod } from "@/lib/use-payment-methods";
@@ -79,8 +79,10 @@ function CheckoutSuccessContent() {
         supabase.from("store_settings").select("whatsapp, store_name, tagline").eq("id", 1).single(),
       ]);
       if (orderRes.data) setOrder(orderRes.data as unknown as OrderData);
-      // Meta Pixel: Purchase — hanya sekali per pesanan (aman saat halaman di-refresh).
+      // Meta Pixel: Purchase (browser) — hanya sekali per pesanan, aman saat halaman di-refresh.
       // Nilai = subtotal produk saja, ongkir TIDAK dihitung.
+      // CAPI Purchase dikirim server-side (/api/orders) dengan event_id = nomor pesanan,
+      // jadi browser tidak perlu mengirim CAPI lagi (menghindari dobel).
       if (orderRes.data) {
         const orderData = orderRes.data as any;
         const items: NonNullable<OrderData["order_items"]> = orderData.order_items || [];
@@ -91,29 +93,14 @@ function CheckoutSuccessContent() {
         }));
         const contentIds = Array.from(new Set(contents.map((item) => item.id)));
         const numItems = contents.reduce((sum, item) => sum + item.quantity, 0);
-        const purchaseValue = Number(orderData.subtotal) || 0;
 
-        const purchase = trackPurchaseOnce({
+        trackPurchaseOnce({
           orderId: orderData.order_number,
-          value: purchaseValue,
+          value: Number(orderData.subtotal) || 0,
           contentIds,
           contents,
           numItems,
         });
-        if (purchase.isNew) {
-          sendCAPIEvent("Purchase", purchase.eventId, {
-            value: purchaseValue,
-            currency: "IDR",
-            content_ids: contentIds,
-            contents,
-            content_type: "product",
-            num_items: numItems,
-            order_id: orderData.order_number,
-          }, {
-            phone: orderData.customer_whatsapp,
-            externalId: orderData.order_number,
-          });
-        }
       }
       if (paymentRes.data) setPaymentMethods(paymentRes.data);
       if (settingsRes.data) setStoreSettings((prev) => ({ ...prev, ...settingsRes.data }));

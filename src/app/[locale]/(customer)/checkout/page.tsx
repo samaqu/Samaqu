@@ -9,7 +9,7 @@ import { useCart } from "@/lib/cart-context";
 import { supabase } from "@/lib/supabase";
 import { getWhatsAppLink } from "@/lib/store-settings";
 import { localPhone } from "@/lib/whatsapp";
-import { trackInitiateCheckout, sendCAPIEvent } from "@/lib/meta-pixel";
+import { trackInitiateCheckout, sendCAPIEvent, getMetaBrowserIds } from "@/lib/meta-pixel";
 import { isPaketItem, isPaketSize, variantName } from "@/lib/item-label";
 import { PaymentIcon } from "@/lib/payment-icons";
 import { fetchActivePaymentMethods, isOnlinePaymentMethod, normalizeMethodType, paymentMethodLabel, type PaymentMethodRow } from "@/lib/payment-methods";
@@ -409,9 +409,13 @@ function CheckoutContent() {
   useEffect(() => {
     if (isCartMode && items.length > 0) {
       const contentIds = items.map(i => i.id);
-      const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-      const { eventId } = trackInitiateCheckout(total, items.length, contentIds);
-      sendCAPIEvent("InitiateCheckout", eventId, { value: total, currency: "IDR", content_ids: contentIds, num_items: items.length });
+      const numItems = items.reduce((sum, item) => sum + item.qty, 0);
+      const total = items.reduce((sum, item) => {
+        const unitPrice = (item.create_your_price_enabled && item.customer_price) ? item.customer_price : item.price;
+        return sum + unitPrice * item.qty;
+      }, 0);
+      const { eventId } = trackInitiateCheckout(total, numItems, contentIds);
+      sendCAPIEvent("InitiateCheckout", eventId, { value: total, currency: "IDR", content_ids: contentIds, num_items: numItems });
     } else if (!isCartMode && product) {
       const { eventId } = trackInitiateCheckout(product.price * qty, qty, [product.id]);
       sendCAPIEvent("InitiateCheckout", eventId, { value: product.price * qty, currency: "IDR", content_ids: [product.id], num_items: qty });
@@ -641,6 +645,11 @@ function CheckoutContent() {
         discount,
         voucherCode: promoApplied ? voucherCode : null,
         voucherId: promoApplied ? voucherId : null,
+        // Meta CAPI: identifier browser (fbp/fbc) + URL halaman, dipakai server saat Purchase.
+        meta: {
+          ...getMetaBrowserIds(),
+          eventSourceUrl: typeof window !== "undefined" ? window.location.href : undefined,
+        },
         items: isCartMode
           ? items.map((item) => ({
               productId: item.id,

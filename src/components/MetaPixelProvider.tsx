@@ -6,6 +6,7 @@ import Script from "next/script";
 import { supabase } from "@/lib/supabase";
 import {
   flushMetaPixelQueue,
+  getMetaBrowserIds,
   setMetaPixelConfig,
   trackPageView,
   type MetaPixelConfig,
@@ -106,6 +107,10 @@ export default function MetaPixelProvider({ children }: { children: React.ReactN
 
   useEffect(() => {
     loadConfig();
+
+    // Simpan `_fbc` dari parameter fbclid sejak landing page, supaya checkout/Open Order
+    // berikutnya tetap membawa click id walau URL-nya sudah berganti.
+    getMetaBrowserIds();
 
     const handleFocus = () => loadConfig();
     window.addEventListener("focus", handleFocus);

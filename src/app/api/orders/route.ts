@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { buildFbc, getClientIp, getMetaCookies, sendMetaPurchaseEvent } from "@/lib/meta-capi";
 import { isPaymentMethodId, legacyPaymentType } from "@/lib/payment-methods";
 import {
   notifyAdminNewOrder,
@@ -42,6 +43,19 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { customer, shipping, items } = body;
+
+    // Meta CAPI: identifier browser dikirim dari klien (fbp/fbc), fallback ke cookie request.
+    const metaBody = body?.meta && typeof body.meta === "object" ? body.meta : {};
+    const metaCookies = getMetaCookies(request);
+    const metaFbp = typeof metaBody.fbp === "string" ? metaBody.fbp : metaCookies.fbp;
+    const metaFbc =
+      typeof metaBody.fbc === "string"
+        ? metaBody.fbc
+        : metaCookies.fbc || buildFbc(typeof metaBody.fbclid === "string" ? metaBody.fbclid : undefined);
+    const metaEventSourceUrl =
+      typeof metaBody.eventSourceUrl === "string" ? metaBody.eventSourceUrl : request.headers.get("referer");
+    const metaClientIp = getClientIp(request);
+    const metaUserAgent = request.headers.get("user-agent") || undefined;
 
     console.log("[ORDERS] === NEW ORDER REQUEST ===");
     console.log("[ORDERS] Customer:", { name: customer?.name, whatsapp: customer?.whatsapp?.slice(0, 6) + "***" });
@@ -483,6 +497,39 @@ export async function POST(request: NextRequest) {
         notes: shipping.notes || null,
       }),
     ]);
+
+    // Meta CAPI: Purchase dikirim SEKALI di server setelah order + item tersimpan.
+    // `after` = jalan setelah response terkirim, jadi tidak menahan/menggagalkan checkout.
+    // event_id = nomor pesanan (sama dengan eventID Purchase di browser Pixel).
+    after(async () => {
+      try {
+        await sendMetaPurchaseEvent({
+          orderNumber,
+          // Sesuai ketentuan: subtotal produk saja, ongkir & diskon tidak ikut.
+          value: subtotal,
+          contents: validatedItems.map((item) => ({
+            id: item.productId,
+            quantity: item.quantity || 1,
+            item_price: item.price,
+          })),
+          eventSourceUrl: metaEventSourceUrl,
+          user: {
+            name: customer.name,
+            email: customer.email,
+            phone: customer.whatsapp,
+            city: shipping.city,
+            externalId: linkedCustomerId,
+          },
+          fbp: metaFbp,
+          fbc: metaFbc,
+          clientIp: metaClientIp,
+          clientUserAgent: metaUserAgent,
+        });
+      } catch (error) {
+        // CAPI tidak boleh mengganggu order.
+        console.warn("[Meta CAPI] Purchase dilewati:", error instanceof Error ? error.message : "unknown");
+      }
+    });
 
     return NextResponse.json({
       success: true,

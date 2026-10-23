@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { buildFbc, getClientIp, getMetaCookies, sendMetaPurchaseEvent } from "@/lib/meta-capi";
 import { OPEN_ORDER_ADDON, resolveAddonWeight } from "@/lib/open-order-config";
 import { readOpenOrderWindow } from "@/lib/open-order-settings";
 import { resolveOpenOrderState } from "@/lib/open-order-window";
@@ -139,6 +140,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const rawCustomer = body.customer ?? {};
     const rawItems: OpenOrderItemInput[] = Array.isArray(body.items) ? body.items : [];
+
+    // Meta CAPI: identifier browser dari klien, fallback ke cookie request.
+    const metaBody = body?.meta && typeof body.meta === "object" ? body.meta : {};
+    const metaCookies = getMetaCookies(request);
+    const metaFbp = typeof metaBody.fbp === "string" ? metaBody.fbp : metaCookies.fbp;
+    const metaFbc =
+      typeof metaBody.fbc === "string"
+        ? metaBody.fbc
+        : metaCookies.fbc || buildFbc(typeof metaBody.fbclid === "string" ? metaBody.fbclid : undefined);
+    const metaEventSourceUrl =
+      typeof metaBody.eventSourceUrl === "string" ? metaBody.eventSourceUrl : request.headers.get("referer");
+    const metaClientIp = getClientIp(request);
+    const metaUserAgent = request.headers.get("user-agent") || undefined;
 
     // ── Gerbang jendela Open Order ──
     // Tombol "Tambah ke Pesanan" di wizard dimatikan kalau periode belum dibuka, tapi itu hanya
@@ -611,6 +625,37 @@ export async function POST(request: NextRequest) {
         source: "Open Order (Create Your Price)",
       }),
     ]);
+
+    // Meta CAPI: Purchase sekali di server setelah order + item tersimpan.
+    // event_id = nomor pesanan, sama dengan eventID Purchase di browser Pixel.
+    after(async () => {
+      try {
+        await sendMetaPurchaseEvent({
+          orderNumber,
+          // Ketentuan: subtotal produk saja — ongkir tidak dihitung.
+          value: subtotal,
+          contents: validatedItems.map((item) => ({
+            id: item.productId,
+            quantity: item.quantity || 1,
+            item_price: item.price,
+          })),
+          eventSourceUrl: metaEventSourceUrl,
+          user: {
+            name,
+            email: authData?.user?.email ?? null,
+            phone: whatsapp,
+            city,
+            externalId: customerId,
+          },
+          fbp: metaFbp,
+          fbc: metaFbc,
+          clientIp: metaClientIp,
+          clientUserAgent: metaUserAgent,
+        });
+      } catch (error) {
+        console.warn("[Meta CAPI] Purchase dilewati:", error instanceof Error ? error.message : "unknown");
+      }
+    });
 
     return NextResponse.json({ success: true, orderNumber, total, productTotal: subtotal + addonTotal, awbNo: null, paymentUrl });
   } catch (error) {

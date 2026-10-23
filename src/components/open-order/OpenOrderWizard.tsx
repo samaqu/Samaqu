@@ -39,7 +39,7 @@ import { getCurrentCustomer } from "@/lib/customer-auth";
 import { localPhone } from "@/lib/whatsapp";
 import { fetchActivePaymentMethods, isOnlinePaymentMethod, type PaymentMethodRow } from "@/lib/payment-methods";
 import { startOnlinePayment } from "@/lib/mayar-client";
-import { sendCAPIEvent, trackAddToCart, trackPurchaseOnce } from "@/lib/meta-pixel";
+import { getMetaBrowserIds, trackAddToCart, trackPurchaseOnce } from "@/lib/meta-pixel";
 import { supabase } from "@/lib/supabase";
 import StepAuth, { type AuthAccount } from "./StepAuth";
 import StepCart from "./StepCart";
@@ -531,6 +531,11 @@ export default function OpenOrderWizard({
           },
           extraCover,
           paymentMethod,
+          // Meta CAPI: identifier browser (fbp/fbc) + URL halaman, dipakai server saat Purchase.
+          meta: {
+            ...getMetaBrowserIds(),
+            eventSourceUrl: typeof window !== "undefined" ? window.location.href : undefined,
+          },
           shipping: shipping ? { method: `J&T - ${shipping.service}`, cost: shipping.cost } : null,
           items: lines.map((line) => ({
             productId: line.productId,
@@ -551,8 +556,9 @@ export default function OpenOrderWizard({
       setResult({ orderNumber: data.orderNumber, total: data.total });
       setStep(6);
 
-      // Meta Pixel: Purchase — hanya setelah server benar-benar menyimpan pesanan.
-      // Nilai = semua item produk (termasuk add-on Cover & Hanger), TANPA ongkir.
+      // Meta Pixel: Purchase browser — hanya setelah server benar-benar menyimpan pesanan.
+      // Value = subtotal produk saja (tanpa ongkir). CAPI Purchase dikirim server-side
+      // (/api/open-order) dengan event_id yang sama, jadi tidak ada CAPI dobel dari browser.
       const contents = lines.map((line) => ({
         id: line.productId,
         quantity: line.quantity,
@@ -560,29 +566,13 @@ export default function OpenOrderWizard({
       }));
       const contentIds = Array.from(new Set(contents.map((item) => item.id)));
       const numItems = contents.reduce((sum, item) => sum + item.quantity, 0);
-      const productTotal =
-        Number(data.productTotal) || subtotal + (extraCover ? OPEN_ORDER_ADDON.price : 0);
-      const purchase = trackPurchaseOnce({
+      trackPurchaseOnce({
         orderId: String(data.orderNumber),
-        value: productTotal,
+        value: subtotal,
         contentIds,
         contents,
         numItems,
       });
-      if (purchase.isNew) {
-        sendCAPIEvent("Purchase", purchase.eventId, {
-          value: productTotal,
-          currency: "IDR",
-          content_ids: contentIds,
-          contents,
-          content_type: "product",
-          num_items: numItems,
-          order_id: String(data.orderNumber),
-        }, {
-          phone: customer.whatsapp,
-          externalId: String(data.orderNumber),
-        });
-      }
       // Pembayaran online (Mayar): link bayar dibuat server saat pesanan dibuat, jadi customer
       // langsung diarahkan ke halaman Mayar. Gagal → tetap di halaman sukses; link bayar juga bisa
       // dibuka dari detail pesanan.
