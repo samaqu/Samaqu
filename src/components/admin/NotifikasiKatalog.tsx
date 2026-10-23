@@ -12,7 +12,8 @@ import { supabase } from "@/lib/supabase";
  * tab per template, chip variabel yang bisa diklik, warning, dan live preview.
  *
  * Template mentah memakai penanda `{nama}`, `{nomor}`, `{resi}`, dst. `{nama}` SUDAH berisi
- * sapaan "Ka <nama>", jadi template menulis "Halo {nama}" — bukan "Halo Ka {nama}".
+ * sapaan lengkap ("Ka Agus", atau "Ust. Irsan" kalau namanya diawali gelar), jadi template
+ * menulis "Halo {nama}" — bukan "Halo Ka {nama}".
  */
 
 type Item = {

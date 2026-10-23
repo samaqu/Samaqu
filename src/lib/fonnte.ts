@@ -16,13 +16,15 @@
  * menggagalkan checkout, pembayaran, pembatalan, atau pembaruan tracking — semua fungsi di
  * sini menelan error-nya sendiri dan mengembalikan `false` kalau benar-benar tidak terkirim.
  *
- * Semua template pesan ke customer memakai sapaan "Ka" dan TANPA emoji.
+ * Semua template pesan ke customer memakai sapaan "Ka <nama depan>" (atau gelar pelanggan
+ * kalau namanya diawali gelar, mis. "Ust. Irsan" — lihat `greeting.ts`) dan TANPA emoji.
  */
 
 import { getSupabaseAdmin } from "./supabase-admin";
 import { SITE_URL } from "./site-config";
 import { formatWhatsAppProductLine } from "./item-label";
 import { buildNotifikasi } from "./notifikasi-template";
+import { greetingName } from "./greeting";
 
 const FONNTE_ENDPOINT = "https://api.fonnte.com/send";
 const REQUEST_TIMEOUT_MS = 8000;
@@ -214,24 +216,6 @@ export async function sendFonnteMessage(
     console.error("[FONNTE] Error saat mengirim pesan:", error);
     return false;
   }
-}
-
-/**
- * Nama panggilan untuk sapaan pesan customer: "Ka <nama depan>".
- *
- * - Nama yang sudah diawali "Ka"/"Kak"/"Kakak" (tanpa memperhatikan huruf besar/kecil) dipakai
- *   apa adanya, supaya tidak muncul "Ka Kak Lea".
- * - Nama kosong → "Ka" (jadi pesannya "Halo Ka,").
- * - Penanda template ({nama}) dikembalikan apa adanya: nilai aslinya SUDAH berisi "Ka <nama>",
- *   jadi template tidak boleh menambah "Ka" lagi.
- */
-export function greetingName(name?: string | null): string {
-  const full = String(name ?? "").trim();
-  if (!full) return "Ka";
-  if (/^\{[a-zA-Z0-9_]+\}$/.test(full)) return full;
-  const firstName = full.split(/\s+/)[0];
-  if (/^ka(kak)?$/i.test(firstName)) return full;
-  return `Ka ${firstName}`;
 }
 
 function rupiah(value: number): string {

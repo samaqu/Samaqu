@@ -9,6 +9,8 @@
  * Modul ini murni (tanpa React/browser) supaya bisa diuji langsung dengan Node.
  */
 
+import { greetingName } from "./greeting";
+
 /** Nomor apa pun → format `wa.me` (62…, tanpa "+"). Nomor tak dikenal dibiarkan apa adanya. */
 export function waNumber(raw?: string | null): string {
   const digits = (raw || "").replace(/[^0-9]/g, "");
@@ -49,14 +51,14 @@ const SENYUM = "\u{1F60A}";
 
 /**
  * Teks pesan standar SAMAQU untuk menagih pembayaran — dipakai tombol
- * "Hubungi via WhatsApp" di detail pesanan untuk **semua** pesanan; hanya nama
- * panggilan pelanggan (kata pertama dari nama) dan nomor pesanan yang berubah.
+ * "Hubungi via WhatsApp" di detail pesanan untuk **semua** pesanan; hanya sapaan
+ * pelanggan (lihat `greetingName`) dan nomor pesanan yang berubah.
  */
 export function pesanPembayaran(nama?: string | null, noPesanan?: string | null): string {
-  const panggilan = (nama || "").trim().split(/\s+/)[0] || "Kakak";
+  const panggilan = greetingName(nama, "Kak");
   const no = (noPesanan || "").trim();
   const nomor = no ? ` (No. Pesanan: ${no})` : "";
-  return `Halo Kak ${panggilan} ${SENYUM}
+  return `Halo ${panggilan} ${SENYUM}
 
 Pesanan Kakak di SAMAQU${nomor} sudah masuk, nih! Tinggal selangkah lagi supaya pesanan bisa segera kami proses.
 
