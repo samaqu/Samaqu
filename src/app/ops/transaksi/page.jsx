@@ -16,7 +16,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { base44 } from "@/lib/ops-api";
-import { SALE_STATUSES, orderRevenue } from "@/lib/transaksi";
+import { SALE_STATUSES, orderRevenue, saleCount } from "@/lib/transaksi";
 import { ORDER_STAGE_TABS, matchesStage, orderStage } from "@/lib/order-flow";
 import DateFilter, { formatTanggalID } from "@/components/ops/leads/DateFilter";
 import ConfirmDeleteModal from "@/components/ops/ConfirmDeleteModal";
@@ -211,10 +211,17 @@ export default function Transaksi({ variant = "ops" }) {
   // KPI dihitung dari SELURUH data bulan (bukan hasil filter) — sama seperti mockup.
   // Omset tetap memakai aturan `SALE_STATUSES` (bukan sekadar "bukan batal") supaya angkanya
   // sama dengan menu lain, bukan angka karangan.
+  //
+  // Jumlah TRANSAKSI memakai aturan bersama `saleCount()` (diproses/dikirim/selesai) — sama angka
+  // dengan kartu "Total Transaksi" di dashboard ops dan "N transaksi" di Laporan Keuangan. Dulu
+  // kartu ini menghitung SEMUA baris bulan itu, termasuk yang belum bayar & dibatalkan, jadi
+  // angkanya beda sendiri dari layar lain. Jumlah semua pesanan masuk tetap ditampilkan sebagai
+  // keterangan (`ordersIn`), bukan sebagai angka besar.
   const panelKpis = useMemo(() => {
     const sold = orders.filter((order) => SALE_STATUSES.includes(order.status));
     return {
-      total: orders.length,
+      total: saleCount(orders),
+      ordersIn: orders.length,
       revenue: sold.reduce((sum, order) => sum + orderRevenue(order), 0),
       unpaid: orders.filter((order) => orderStage(order) === "belum_bayar").length,
       toProcess: orders.filter((order) => orderStage(order) === "belum_dipacking" || orderStage(order) === "sudah_dipacking").length,
@@ -305,7 +312,7 @@ export default function Transaksi({ variant = "ops" }) {
           <div className="card k">
             <small>Total transaksi</small>
             <b><AnimatedNumber value={isLoading ? 0 : panelKpis.total} /></b>
-            <i>{coverageLabel}</i>
+            <i>{isLoading ? coverageLabel : `${coverageLabel} · dari ${panelKpis.ordersIn} pesanan masuk`}</i>
           </div>
           <div className="card k">
             <small>Omset bulan ini</small>

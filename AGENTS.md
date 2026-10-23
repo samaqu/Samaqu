@@ -1383,6 +1383,13 @@ empat file: `src/app/ops/ongkir-jnt/page.tsx` (route tipis) → `src/components/
   (diproses/dikirim/selesai)"** dari `saleCount(orders)`: angka besarnya tetap jumlah semua pesanan
   masuk (`Pesanan` di dashboard admin, `Pesanan masuk` di panel admin), sedangkan angka keterangan
   yang wajib sama dengan laporan. Jangan menghitung ulang filter status di layar — pakai `saleCount`.
+  **Menu Transaksi** (`/panel-admin/transaksi` dan `/ops/transaksi`, satu komponen
+  `src/app/ops/transaksi/page.jsx`) sempat beda sendiri: kartu **"Total transaksi"** di sana memakai
+  `orders.length`, jadi menampilkan SEMUA baris bulan itu (mis. 143 = 126 diakui + 5 belum bayar +
+  12 batal) sementara dashboard ops & laporan berbunyi 126. Sekarang **angka besarnya
+  `saleCount(orders)`** dan keterangannya *"<bulan> · dari N pesanan masuk"* (`panelKpis.ordersIn`),
+  sehingga angkanya sama dengan laporan dan jumlah pesanan masuk tetap terlihat. Tab tahap di
+  bawahnya tetap menghitung semua baris — tab itu filter daftar, bukan angka transaksi.
 - **Basis tanggal omzet di Laporan Keuangan saat ini = `orders.created_at`** (bulan WIB, hanya
   `SALE_STATUSES`), sedangkan beban ongkir di halaman ini memakai tanggal pengiriman. Dua basis itu
   memang beda dan sudah dilabeli di UI — jangan disamakan tanpa mengubah Laporan juga.
