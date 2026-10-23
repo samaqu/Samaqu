@@ -10,7 +10,7 @@ import {
   trackingRow,
   trackingSummary,
 } from "@/lib/jnt/track-status";
-import { shippingStatusOf, SHIPPING_STATUS_LABEL } from "@/lib/order-flow";
+import { orderStatusKey, shippingStatusOf, SHIPPING_STATUS_LABEL } from "@/lib/order-flow";
 import { jntServiceCodeFromShippingMethod } from "@/lib/jnt/layanan";
 import { useSafeTranslations } from "@/lib/safe-i18n";
 import { PaymentMethodValue } from "@/components/admin/PaymentMethodsManager";
@@ -207,8 +207,9 @@ export default function OrderDetailContent({
     shipping_method?: string;
   }) => void;
 }) {
-  const sc = strukStatus(order.status);
-  const steps = strukSteps(order);
+  const effectiveStatus = orderStatusKey(order);
+  const sc = strukStatus(effectiveStatus);
+  const steps = strukSteps({ ...order, status: effectiveStatus });
   const items = order.order_items || [];
   const resi = order.awb_no || "";
   // Resi yang sudah di-void tidak boleh ditawari cetak label/batalkan lagi. Sumbernya kolom

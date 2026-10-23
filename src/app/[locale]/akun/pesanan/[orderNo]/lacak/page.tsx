@@ -6,6 +6,7 @@ import { getCustomerOrders } from "@/lib/customer-auth";
 import { useAkunCustomer } from "@/components/akun/AkunContext";
 import { useSafeLocale, useSafeTranslations } from "@/lib/safe-i18n";
 import { strukStatus } from "@/lib/akun-format";
+import { orderStatusKey } from "@/lib/order-flow";
 import type { TrackHistoryItem } from "@/lib/jnt/types";
 import { formatTrackingTime, sortHistoryDesc, trackingRow, trackingSummary } from "@/lib/jnt/track-status";
 import { STRUK_CSS, StrukHeader, StrukTitle } from "@/components/akun/StrukShell";
@@ -17,6 +18,8 @@ interface Order {
   updated_at?: string;
   awb_no?: string | null;
   shipping_method?: string | null;
+  shipping_status?: string | null;
+  tracking_status_code?: number | null;
 }
 
 interface TrackDetail {
@@ -99,7 +102,7 @@ export default function LacakPage() {
   // Riwayat terbaru di atas — diurut dari waktu asli J&T.
   const updates = useMemo(() => sortHistoryDesc(payload?.history), [payload]);
   const summary = useMemo(() => trackingSummary(payload?.history), [payload]);
-  const sc = order ? strukStatus(order.status) : null;
+  const sc = order ? strukStatus(orderStatusKey(order)) : null;
   const awb = order?.awb_no || payload?.awb;
 
   async function salin() {

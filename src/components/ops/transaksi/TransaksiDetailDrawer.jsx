@@ -451,7 +451,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${status?.badge || ""}`}>
                   {status?.icon ? <status.icon size={12} /> : null}
-                  {order.status_label}
+                  {ORDER_STAGE_LABEL[orderStage(order)]}
                 </span>
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${source?.badge || ""}`}>
                   {source?.icon ? <source.icon size={14} /> : null}

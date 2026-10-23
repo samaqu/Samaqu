@@ -12,6 +12,7 @@ import CustomerOrderDrawer from "@/components/akun/CustomerOrderDrawer";
 import DashboardProductSection from "@/components/akun/DashboardProductSection";
 
 import { statusInfo, rupiah, tglID } from "@/lib/akun-format";
+import { orderStatusKey } from "@/lib/order-flow";
 
 interface OrderItem {
   product_id?: string | null;
@@ -28,6 +29,9 @@ interface Order {
   total: number;
   status: string;
   created_at: string;
+  awb_no?: string | null;
+  shipping_status?: string | null;
+  tracking_status_code?: number | null;
   order_items: OrderItem[];
 }
 interface Cust {
@@ -89,7 +93,10 @@ export default function DashboardAkunPage() {
 
   const firstName = (cust?.name || "Pelanggan").split(" ")[0];
   const initials = (cust?.name || "U").split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-  const activeOrders = orders.filter((o) => o.status === "pending" || o.status === "diproses" || o.status === "dikirim").length;
+  const activeOrders = orders.filter((o) => {
+    const key = orderStatusKey(o);
+    return key === "pending" || key === "diproses" || key === "dikirim";
+  }).length;
   const totalSpend = orders.reduce((sum, o) => sum + (o.total || 0), 0);
   const recentOrders = orders.slice(0, 5);
 
@@ -206,7 +213,7 @@ export default function DashboardAkunPage() {
                       <tbody>
                         {recentOrders.map((order) => {
                           const item = order.order_items?.[0];
-                          const sc = statusInfo(order.status);
+                          const sc = statusInfo(orderStatusKey(order));
                           return (
                             <tr
                               key={order.id}
@@ -290,7 +297,7 @@ export default function DashboardAkunPage() {
                         </div>
                         <div className="mt-3 flex items-center justify-between gap-3">
                           <span className="text-[13.5px] font-black" style={{ color: "#000000" }}>Rp{order.total.toLocaleString("id-ID")}</span>
-                          <span className={statusInfo(order.status).pill}>{statusInfo(order.status).label}</span>
+                          <span className={statusInfo(orderStatusKey(order)).pill}>{statusInfo(orderStatusKey(order)).label}</span>
                         </div>
                       </button>
                     ))}

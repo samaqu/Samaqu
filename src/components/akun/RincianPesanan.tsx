@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSafeLocale, useSafeTranslations } from "@/lib/safe-i18n";
 import { strukStatus, strukSteps, tglJamID, rupiah } from "@/lib/akun-format";
+import { orderStatusKey } from "@/lib/order-flow";
 import { isPaketItem, itemVariantLabel } from "@/lib/item-label";
 import {
   formatWeightExact,
@@ -44,6 +45,8 @@ export interface RincianOrder {
   cancelled_at?: string | null;
   updated_at?: string;
   awb_no?: string | null;
+  shipping_status?: string | null;
+  tracking_status_code?: number | null;
   payment_method?: string | null;
   shipping_method?: string | null;
   /** Berat kirim pesanan (gram) — kolom `orders.weight`. */
@@ -256,7 +259,7 @@ export default function RincianPesanan({ order }: { order: RincianOrder }) {
   /** Jam pembatalan lokal, dipakai sampai halaman dimuat ulang dari server. */
   const [cancelTime, setCancelTime] = useState("");
 
-  const status = cancelled ? "dibatalkan" : order.status;
+  const status = cancelled ? "dibatalkan" : orderStatusKey(order);
   const sc = strukStatus(status);
   // Pesanan lama menyimpan `updated_at` = `created_at` (lihat `waktuBatal`), jadi pembatalan yang
   // baru terjadi dari halaman ini diberi jam sendiri — `cancelled_at` (jam akurat) sekaligus

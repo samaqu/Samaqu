@@ -9,6 +9,7 @@
  */
 import { useEffect, useState } from "react";
 import { statusLabel, SALE_STATUSES } from "@/lib/transaksi";
+import { orderStatusKey } from "@/lib/order-flow";
 import { opsGet } from "../panel-api";
 import { useWibGreeting, useWibToday, wibDateOffset, dailyIndexForDate } from "../wib-date";
 import styles from "../panel.module.css";
@@ -76,6 +77,8 @@ type TxRow = {
   customer_name?: string;
   qty_total?: number;
   awb_no?: string | null;
+  shipping_status?: string | null;
+  tracking_status_code?: number | null;
   item_summary?: string;
   items?: TxItem[];
 };
@@ -368,7 +371,9 @@ export default function PanelAdminHome() {
                   </div>
                   <div className={styles.listVal}>
                     {rupiah(o.total)}
-                    <small style={{ color: STATUS_TONE[o.status] ?? "var(--mut)" }}>{statusLabel(o.status)}</small>
+                    <small style={{ color: STATUS_TONE[orderStatusKey(o)] ?? "var(--mut)" }}>
+                      {statusLabel(orderStatusKey(o))}
+                    </small>
                   </div>
                 </div>
               ))}

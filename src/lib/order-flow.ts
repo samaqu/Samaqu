@@ -18,28 +18,96 @@
 
 export type OrderStage = "belum_bayar" | "belum_dipacking" | "sudah_dipacking" | "dikirim" | "selesai" | "dibatalkan";
 
-/** Field minimum untuk menentukan tahap: status pesanan + ada/tidaknya resi. */
+/** Field minimum untuk menentukan tahap: status pesanan + bukti pengiriman. */
 export interface StageSource {
   status: string;
   /** Nomor resi J&T — pembeda "Belum di Packing" (belum dibuat) vs "Menunggu Pickup". */
   awb_no?: string | null;
+  /** `menunggu_pickup` | `dikirim` | `selesai` — bukti paket benar-benar berjalan. */
+  shipping_status?: string | null;
+  /** Kode pemindaian J&T terakhir; 200 = benar-benar diterima penerima. */
+  tracking_status_code?: number | null;
 }
 
+/**
+ * Kode J&T yang BUKAN bukti paket bergerak (sama dengan `JNT_NON_SHIPPING_CODES` di
+ * `src/lib/jnt/track-status.ts`). Disalin agar modul ini tetap murni tanpa impor server.
+ */
+const NON_MOVING_CODES = new Set([101, 151, 162, 163]);
+
+function hasMovingScan(order: StageSource): boolean {
+  const code = order.tracking_status_code;
+  return typeof code === "number" && !NON_MOVING_CODES.has(code);
+}
+
+/**
+ * Tahap efektif. `orders.status` tidak dipercaya mentah-mentah: pesanan bisa tertulis
+ * `selesai` padahal tracking J&T baru sampai gateway (data lama/bug). Bila ada bukti
+ * pengiriman yang belum tuntas, tahap diturunkan ke posisi paket yang sebenarnya.
+ */
 export function orderStage(order: StageSource): OrderStage {
   switch (order.status) {
     case "pending":
       return "belum_bayar";
+    case "dibatalkan":
+      return "dibatalkan";
+    case "selesai":
+      return settledStage(order);
+    case "dikirim": {
+      // Resi terbit tapi belum ada pemindaian kurir → masih menunggu pickup.
+      if (order.shipping_status === "menunggu_pickup" && !hasMovingScan(order)) {
+        return order.awb_no ? "sudah_dipacking" : "belum_dipacking";
+      }
+      return "dikirim";
+    }
+    default:
+      // `diproses` (sudah dibayar, belum diserahkan ke kurir) dan status tak dikenal. Resi yang
+      // sudah terbit berarti paket selesai dipacking dan menunggu dijemput kurir — itulah
+      // "Menunggu Pickup"; tanpa resi berarti masih "Belum di Packing".
+      return order.awb_no ? "sudah_dipacking" : "belum_dipacking";
+  }
+}
+
+/** Apakah status `selesai` didukung bukti pengiriman? Kalau tidak, turunkan ke tahap nyata. */
+function settledStage(order: StageSource): OrderStage {
+  switch (order.shipping_status) {
+    case "selesai":
+      return "selesai";
+    case "dikirim":
+      return "dikirim";
+    case "menunggu_pickup":
+      return order.awb_no ? "sudah_dipacking" : "belum_dipacking";
+    default:
+      break;
+  }
+
+  const code = order.tracking_status_code;
+  if (typeof code === "number") {
+    if (code === 200) return "selesai";
+    if (NON_MOVING_CODES.has(code)) return order.awb_no ? "sudah_dipacking" : "belum_dipacking";
+    return "dikirim";
+  }
+
+  // Tidak ada bukti pengiriman sama sekali (pesanan manual/impor lama) → percayai status simpanan.
+  return "selesai";
+}
+
+/** Status pesanan kanonik untuk pill/label — dipakai SEMUA dashboard. */
+export type OrderStatusKey = "pending" | "diproses" | "dikirim" | "selesai" | "dibatalkan";
+
+export function orderStatusKey(order: StageSource): OrderStatusKey {
+  switch (orderStage(order)) {
+    case "belum_bayar":
+      return "pending";
+    case "belum_dipacking":
+    case "sudah_dipacking":
+      return "diproses";
     case "dikirim":
       return "dikirim";
     case "selesai":
       return "selesai";
     case "dibatalkan":
       return "dibatalkan";
-    default:
-      // `diproses` (sudah dibayar, belum diserahkan ke kurir) dan status tak dikenal. Resi yang
-      // sudah terbit berarti paket selesai dipacking dan menunggu dijemput kurir — itulah
-      // "Menunggu Pickup"; tanpa resi berarti masih "Belum di Packing".
-      return order.awb_no ? "sudah_dipacking" : "belum_dipacking";
   }
 }
 

@@ -268,7 +268,7 @@ export async function GET(req: NextRequest) {
   let query = admin
     .from("orders")
     .select(
-      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, awb_no, jnt_order_id, shipping_status, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel",
+      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -379,6 +379,7 @@ export async function GET(req: NextRequest) {
       awb_no: order.awb_no || "",
       jnt_order_id: order.jnt_order_id || "",
       shipping_status: order.shipping_status || "",
+      tracking_status_code: typeof order.tracking_status_code === "number" ? order.tracking_status_code : null,
       // Pesanan website hanya dipantau dari sini (sumbernya read-only); yang boleh
       // diubah/dibatalkan dari menu ini cuma transaksi yang dicatat manual.
       can_edit: key !== "website" && status !== "dibatalkan",

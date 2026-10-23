@@ -11,6 +11,7 @@ import { useSafeLocale } from "@/lib/safe-i18n";
 import { AkunHeader } from "@/components/akun/AkunShell";
 import CustomerOrderDrawer from "@/components/akun/CustomerOrderDrawer";
 import { statusInfo, tglID, rupiah } from "@/lib/akun-format";
+import { orderStatusKey } from "@/lib/order-flow";
 
 interface OrderItem {
   product_id?: string | null;
@@ -28,6 +29,8 @@ interface Order {
   status: string;
   created_at: string;
   awb_no?: string | null;
+  shipping_status?: string | null;
+  tracking_status_code?: number | null;
   order_items: OrderItem[];
 }
 
@@ -83,7 +86,7 @@ export default function PesananPage() {
     if (tab === "semua") return orders;
     // Tiap tab = satu status pesanan; "pending" punya tabnya sendiri ("Belum Bayar"), jadi
     // "Diproses" tidak lagi ikut menampung pesanan yang belum dibayar.
-    return orders.filter((o) => o.status === tab);
+    return orders.filter((o) => orderStatusKey(o) === tab);
   }, [orders, tab]);
 
   return (
@@ -138,7 +141,7 @@ export default function PesananPage() {
               <tbody>
                 {filtered.map((o) => {
                   const item = o.order_items?.[0];
-                  const sc = statusInfo(o.status);
+                  const sc = statusInfo(orderStatusKey(o));
                   return (
                     <tr
                       key={o.id}
