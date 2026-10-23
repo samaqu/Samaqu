@@ -9,7 +9,7 @@ import { getProducts } from "@/lib/db";
 import { resolveItemPhotos, type OrderPhotoLookup } from "@/lib/order-photo";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { useSafeLocale } from "@/lib/safe-i18n";
-import { sourceLabel } from "@/lib/transaksi";
+import { orderSourceLabel } from "@/lib/transaksi";
 import OrderDetailPanel from "@/components/ops/transaksi/OrderDetailPanel";
 import "@/app/panel-admin/panel-transaksi.css";
 import "@/app/panel-admin/panel-mono.css";
@@ -132,7 +132,7 @@ export default function DetailPesananPage() {
           <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                {sourceLabel(order.source)}
+                {orderSourceLabel(order)}
               </p>
               <h1 className="mt-0.5 text-lg font-extrabold text-slate-900">Detail Pesanan</h1>
               <p className="mt-0.5 font-mono text-xs font-semibold text-slate-500">{order.order_number}</p>

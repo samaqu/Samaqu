@@ -79,7 +79,7 @@ export default function Transaksi({ variant = "ops" }) {
     const query = search.toLowerCase();
     const queryPhone = phoneKey(search);
     return orders.filter((order) => {
-      if (sourceFilter !== "all" && order.source !== sourceFilter) return false;
+      if (sourceFilter !== "all" && (order.source_key || order.source) !== sourceFilter) return false;
       // Saring per TAHAP (order-flow, sama seperti halaman Pesanan admin).
       if (!matchesStage(order, stageFilter)) return false;
       if (selectedDate && order.date_wib !== selectedDate) return false;
@@ -95,7 +95,7 @@ export default function Transaksi({ variant = "ops" }) {
   }, [orders, search, sourceFilter, stageFilter, selectedDate]);
 
   // Opsi filter diambil dari data yang benar-benar ada di bulan itu.
-  const sourceOptions = useMemo(() => [...new Set(orders.map((o) => o.source))], [orders]);
+  const sourceOptions = useMemo(() => [...new Set(orders.map((o) => o.source_key || o.source))], [orders]);
 
   const markedDates = useMemo(() => [...new Set(orders.map((o) => o.date_wib).filter(Boolean))], [orders]);
 
@@ -472,7 +472,7 @@ export default function Transaksi({ variant = "ops" }) {
                       <td className="mono" style={{ textAlign: "right" }} data-label="Total">
                         Rp {formatRupiah(order.total)}
                         <small style={{ textAlign: "right" }}>
-                          {SOURCE_STYLES[order.source]?.label || order.source_label}
+                          {SOURCE_STYLES[order.source_key]?.label || order.source_label}
                         </small>
                       </td>
                       <td data-label="No. Resi">

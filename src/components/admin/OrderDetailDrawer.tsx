@@ -24,7 +24,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import OrderDetailContent, { AdminDetailOrder } from "@/components/admin/OrderDetailContent";
 import { useBodyScrollLock } from "@/lib/use-scroll-lock";
-import { sourceLabel } from "@/lib/transaksi";
+import { orderSourceLabel } from "@/lib/transaksi";
 
 export default function OrderDetailDrawer({
   order,
@@ -85,7 +85,7 @@ export default function OrderDetailDrawer({
           >
             <header className="odr-head">
               <div className="odr-head-txt">
-                <p className="odr-source">{sourceLabel(order.source)}</p>
+                <p className="odr-source">{orderSourceLabel(order)}</p>
                 <h2 className="odr-title">Detail Pesanan</h2>
               </div>
               <button onClick={onClose} className="odr-x" aria-label="Tutup">

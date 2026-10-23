@@ -27,7 +27,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { statusLabel, sourceLabel } from "@/lib/transaksi";
+import { statusLabel, orderSourceLabel } from "@/lib/transaksi";
 import GlassCard from "@/components/ops/GlassCard";
 
 /**
@@ -1113,7 +1113,7 @@ function TableBody({
                         {statusLabel(row.status)}
                       </Badge>
                     </td>
-                    <td className="hidden px-3 py-3 text-xs text-slate-500 lg:table-cell">{sourceLabel(row.source)}</td>
+                    <td className="hidden px-3 py-3 text-xs text-slate-500 lg:table-cell">{orderSourceLabel(row)}</td>
                   </>
                 ) : tab === "returns" ? (
                   <>

@@ -18,7 +18,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { stockStatus } from "@/lib/ops-auth";
 import { resolveStock } from "@/lib/ops-stock";
 import { rankTopProducts, isSaleOrder } from "@/lib/top-products";
-import { SALE_STATUSES, STATUS_LABEL as ORDER_STATUS_LABEL, statusLabel, sourceLabel, itemSummary } from "@/lib/transaksi";
+import { SALE_STATUSES, STATUS_LABEL as ORDER_STATUS_LABEL, statusLabel, orderSourceLabel, itemSummary } from "@/lib/transaksi";
 import {
   ORDER_STAGE_LABEL,
   orderStage,
@@ -417,7 +417,7 @@ async function cariTransaksi(args: Record<string, unknown>): Promise<AdminToolRe
 
   const lines = rows.map((o) => {
     const ship = shippingLine(o);
-    return `- ${o.order_number} · ${wibDate(o.created_at)} · ${String(o.customer_name || "-")} (${maskContact(o.customer_whatsapp)}) · ${rupiah(Number(o.total) || 0)} · ${statusLabel(o.status)} · ${sourceLabel(o.source)} · ${ship.courier}${ship.resi && ship.resi !== "Tanpa resi" ? ` (${ship.resi})` : ""}${ship.status ? ` · ${ship.status}` : ""}`;
+    return `- ${o.order_number} · ${wibDate(o.created_at)} · ${String(o.customer_name || "-")} (${maskContact(o.customer_whatsapp)}) · ${rupiah(Number(o.total) || 0)} · ${statusLabel(o.status)} · ${orderSourceLabel(o)} · ${ship.courier}${ship.resi && ship.resi !== "Tanpa resi" ? ` (${ship.resi})` : ""}${ship.status ? ` · ${ship.status}` : ""}`;
   });
 
   return {
@@ -449,7 +449,7 @@ async function statusPesananResi(args: Record<string, unknown>): Promise<AdminTo
   const items = Array.isArray(order.order_items) ? order.order_items : [];
 
   const lines = [
-    `Pesanan ${order.order_number} (${wibDate(order.created_at)}, sumber ${sourceLabel(order.source)})`,
+    `Pesanan ${order.order_number} (${wibDate(order.created_at)}, sumber ${orderSourceLabel(order)})`,
     `- Pelanggan: ${String(order.customer_name || "-")}`,
     `- Tahap pesanan: ${ORDER_STAGE_LABEL[orderStage(order)]} (status tersimpan: ${statusLabel(order.status)})`,
     `- Nilai: ${rupiah(Number(order.total) || 0)}`,

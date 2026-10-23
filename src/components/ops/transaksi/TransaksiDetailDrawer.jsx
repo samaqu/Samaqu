@@ -27,7 +27,7 @@ import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
 export default function TransaksiDetailDrawer({ open, order, variant = "ops", onClose, onEdit, onCancel, onDelete, onResiCreated }) {
   const isPanel = variant === "panel";
   const status = order ? STATUS_STYLES[order.status] : null;
-  const source = order ? SOURCE_STYLES[order.source] : null;
+  const source = order ? SOURCE_STYLES[order.source_key || order.source] : null;
 
   // Nama metode pembayaran: `orders.payment_method` bisa berupa id ke tabel `payment_methods`
   // (pesanan baru) atau string lama ('bank'/'qris'/'cod'/'cash'). Hook ini yang menerjemahkannya.

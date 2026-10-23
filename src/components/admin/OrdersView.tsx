@@ -18,7 +18,7 @@ import {
   orderStage,
   type OrderStageFilter,
 } from "@/lib/order-flow";
-import { SALE_STATUSES } from "@/lib/transaksi";
+import { ORDER_SOURCE_LABEL, SALE_STATUSES, orderSourceKey, orderSourceLabel } from "@/lib/transaksi";
 import StageIcon from "@/components/ops/transaksi/StageIcon";
 import AnimatedNumber from "@/components/AnimatedNumber";
 import "@/app/ops/ops-transaksi.css";
@@ -37,6 +37,8 @@ export interface AdminOrderRow {
   status: string;
   total: number;
   created_at: string;
+  /** Sumber mentah dari database; label selalu lewat helper `orderSource*`. */
+  source?: string | null;
   order_items?: {
     product_name: string;
     color?: string | null;
@@ -108,7 +110,7 @@ export default function OrdersView({
   onPrevMonth?: () => void;
   onNextMonth?: () => void;
 }) {
-  const [orderSource, setOrderSource] = useState<"all" | "website" | "open">("all");
+  const [orderSource, setOrderSource] = useState<string>("all");
   const [orderFilter, setOrderFilter] = useState<OrderStageFilter>("semua");
   const [orderSearch, setOrderSearch] = useState("");
 
@@ -118,11 +120,13 @@ export default function OrdersView({
     () =>
       orders.filter((o) => {
         if (orderSource === "all") return true;
-        const open = o.order_number.startsWith("CYO-");
-        return orderSource === "open" ? open : !open;
+        return orderSourceKey(o) === orderSource;
       }),
     [orders, orderSource],
   );
+
+  // Opsi filter memakai sumber yang sudah dipetakan helper, bukan tebakan awalan.
+  const sourceOptions = useMemo(() => [...new Set(orders.map((o) => orderSourceKey(o)))], [orders]);
 
   const orderQuery = orderSearch.trim().toLowerCase();
   const searchedOrders = useMemo(() => {
@@ -169,7 +173,7 @@ export default function OrdersView({
   );
 
   const sourceLabelText =
-    orderSource === "open" ? "Open Order" : orderSource === "website" ? "Pesanan Website" : "Semua sumber";
+    orderSource === "all" ? "Semua sumber" : ORDER_SOURCE_LABEL[orderSource] || orderSource;
   const filtersActive = Boolean(orderQuery) || orderFilter !== "semua" || orderSource !== "all";
   const resetFilters = () => {
     setOrderSearch("");
@@ -178,11 +182,9 @@ export default function OrdersView({
   };
   const ordersEmptyText = orderQuery
     ? "Tidak ada pesanan yang cocok dengan pencarian"
-    : orderSource === "open"
-      ? "Belum ada pesanan Open Order"
-      : orderSource === "website"
-        ? "Tidak ada pesanan Website"
-        : "Tidak ada pesanan";
+    : orderSource === "all"
+      ? "Tidak ada pesanan"
+      : `Tidak ada pesanan ${ORDER_SOURCE_LABEL[orderSource] || orderSource}`;
 
   return (
     <div className="ops-tx">
@@ -260,12 +262,15 @@ export default function OrdersView({
           ) : null}
           <select
             value={orderSource}
-            onChange={(event) => setOrderSource(event.target.value as "all" | "website" | "open")}
+            onChange={(event) => setOrderSource(event.target.value)}
             aria-label="Sumber pesanan"
           >
             <option value="all">Semua sumber</option>
-            <option value="website">Pesanan Website</option>
-            <option value="open">Open Order</option>
+            {sourceOptions.map((source) => (
+              <option key={source} value={source}>
+                {ORDER_SOURCE_LABEL[source] || source}
+              </option>
+            ))}
           </select>
           {filtersActive ? (
             <button type="button" className="btn-sec" onClick={resetFilters}>
@@ -313,7 +318,7 @@ export default function OrdersView({
                 const firstItem = o.order_items?.[0];
                 const extraItems = Math.max(0, (o.order_items?.length || 0) - 1);
                 const variantText = itemVariant(firstItem);
-                const sourceLabel = o.order_number.startsWith("CYO-") ? "Open Order" : "Website";
+                const sourceLabel = orderSourceLabel(o);
                 return (
                   <tr key={o.id} onClick={() => onSelect(o)}>
                     <td data-label="No. Pesanan">

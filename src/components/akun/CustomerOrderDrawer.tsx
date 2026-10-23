@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import OrderDetailPanel from "@/components/ops/transaksi/OrderDetailPanel";
 import { formatTrackingTime, sortHistoryDesc, trackingRow, trackingSummary } from "@/lib/jnt/track-status";
-import { sourceLabel } from "@/lib/transaksi";
+import { orderSourceLabel } from "@/lib/transaksi";
 
 type CustomerOrder = Record<string, any>;
 
@@ -120,7 +120,7 @@ export default function CustomerOrderDrawer({
         <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
-              {sourceLabel(order.source)}
+              {orderSourceLabel(order)}
             </p>
             <h2 className="mt-0.5 text-lg font-extrabold text-slate-900">Detail Pesanan</h2>
             <p className="mt-0.5 font-mono text-xs font-semibold text-slate-500">{order.order_number}</p>

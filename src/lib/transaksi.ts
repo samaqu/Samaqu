@@ -35,6 +35,39 @@ export function sourceLabel(value: unknown): string {
   return SOURCE_LABEL[sourceKey(value)] || "Website";
 }
 
+/**
+ * Sumber pesanan yang dipakai SEMUA halaman (Order Management, Admin Operasional,
+ * dan dashboard Ops). Aturannya satu:
+ *
+ * - awalan `CYO-` -> Open Order, apa pun isi kolom `source` (data lama menyimpan "website");
+ * - awalan `SMQ-` -> Website (checkout website tidak menulis kolom `source`);
+ * - selain itu -> nilai `source` yang dikenal (whatsapp, instagram, dst);
+ * - kalau kosong/tidak dikenal -> "Tidak diketahui", BUKAN diam-diam "Website".
+ */
+export const OPEN_ORDER_SOURCE_KEY = "open_order";
+export const UNKNOWN_SOURCE_KEY = "unknown";
+
+export const ORDER_SOURCE_LABEL: Record<string, string> = {
+  ...SOURCE_LABEL,
+  [OPEN_ORDER_SOURCE_KEY]: "Open Order",
+  [UNKNOWN_SOURCE_KEY]: "Tidak diketahui",
+};
+
+export function orderSourceKey(order?: { order_number?: string | null; source?: unknown } | null): string {
+  const number = String(order?.order_number ?? "").trim().toUpperCase();
+  if (number.startsWith("CYO-")) return OPEN_ORDER_SOURCE_KEY;
+
+  const raw = String(order?.source ?? "").trim().toLowerCase();
+  if (SOURCE_KEYS.includes(raw)) return raw;
+
+  if (number.startsWith("SMQ-")) return "website";
+  return UNKNOWN_SOURCE_KEY;
+}
+
+export function orderSourceLabel(order?: { order_number?: string | null; source?: unknown } | null): string {
+  return ORDER_SOURCE_LABEL[orderSourceKey(order)] || ORDER_SOURCE_LABEL[UNKNOWN_SOURCE_KEY];
+}
+
 /** Status pesanan → istilah yang dibaca admin di menu Transaksi. */
 export const STATUS_LABEL: Record<string, string> = {
   pending: "Belum Bayar",

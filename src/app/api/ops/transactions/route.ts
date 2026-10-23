@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
-import { sourceLabel } from "@/lib/transaksi";
+import { orderSourceLabel } from "@/lib/transaksi";
 
 /**
  * Transaksi (barang keluar) untuk dashboard internal.
@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
       price,
       total: qty * price,
       ongkir: 0,
-      platform: sourceLabel(o.source),
+      platform: orderSourceLabel(o),
       status: cancelled ? "return" : unpaid ? "pending" : "completed",
       payment_method: o.payment_method || null,
       is_free_gift: false,

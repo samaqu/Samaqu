@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
 import { cancelOrderCompletely, type CancelableOrder } from "@/lib/cancel-order";
-import { MANUAL_PRICE_MAX, MANUAL_PRICE_MIN, MANUAL_SOURCE_KEYS, hasManualPrice, itemSummary, manualPrice, sourceKey, sourceLabel, statusLabel } from "@/lib/transaksi";
+import { MANUAL_PRICE_MAX, MANUAL_PRICE_MIN, MANUAL_SOURCE_KEYS, hasManualPrice, itemSummary, manualPrice, orderSourceKey, orderSourceLabel, sourceKey, statusLabel } from "@/lib/transaksi";
 import { localPhone } from "@/lib/whatsapp";
 import { notifyCustomerInvoice } from "@/lib/fonnte";
 import { kotaFromShipping } from "@/lib/kota";
@@ -332,6 +332,7 @@ export async function GET(req: NextRequest) {
     const rows = byOrder.get(order.id) || [];
     const status = String(order.status || "");
     const key = sourceKey(order.source);
+    const resolvedKey = orderSourceKey(order);
     return {
       id: order.id,
       order_number: order.order_number,
@@ -341,7 +342,8 @@ export async function GET(req: NextRequest) {
       customer_name: order.customer_name || "-",
       customer_whatsapp: order.customer_whatsapp || "",
       source: key,
-      source_label: sourceLabel(key),
+      source_key: resolvedKey,
+      source_label: orderSourceLabel(order),
       status,
       status_label: statusLabel(status),
       subtotal: Number(order.subtotal) || 0,
