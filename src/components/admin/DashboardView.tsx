@@ -1,30 +1,35 @@
 "use client";
 
 /**
- * Panel dashboard admin — wireframe-accurate "Sales Analytics View"
- * (needmcp wireframe:sales-analytics-view).
+ * Panel dashboard admin — ringkasan penjualan bulan terpilih (wireframe "Sales Analytics View").
  *
- * Tata letak mengikuti wireframe persis: judul + subjudul, 4 kartu metrik,
- * bar chart (col-span-2) + donut (col-span-1), lalu grid "Produk Terlaris" 4 kolom.
+ * Tata letaknya: judul periode → 4 kartu metrik → grafik pendapatan bulanan (garis naik-turun) +
+ * donut status → Produk Terlaris.
  *
- * SEMUA angka dihitung dari data asli (orders / products) yang di-pass dari caller —
- * tidak ada angka, persentase, atau chart palsu.
+ * SEMUA angka dihitung dari data asli yang di-pass caller, tidak ada angka/contoh palsu:
+ *  - `orders`      = pesanan BULAN terpilih (`/api/ops/orders?from&to`) → kartu metrik + donut;
+ *  - `chartOrders` = pesanan JENDELA 6 BULAN (bulan terpilih + 5 sebelumnya) → garis grafik
+ *    "Pendapatan Bulanan" + pembanding "vs bulan lalu" di kartu.
+ *
+ * Aturan angka dipakai bersama layar lain supaya tidak beda antar dashboard — jangan hitung ulang
+ * di komponen ini:
+ *  - transaksi sah   = `saleCount()` (`SALE_STATUSES`: diproses/dikirim/selesai);
+ *  - omset           = `orderRevenue()` (harga produk saja: `total − ongkir`);
+ *  - tahap pesanan   = `orderStage()` (`src/lib/order-flow.ts`, sama dengan tab panel Order Management);
+ *  - bulan periode   = modul `src/lib/month-period.ts` (semua batas bulan WIB).
  */
 
-import { SALE_STATUSES, SALE_COUNT_NOTE, saleCount, orderRevenue } from "@/lib/transaksi";
+import { orderStage, ORDER_STAGE_LABEL } from "@/lib/order-flow";
+import { monthKeyWIB, monthShift, monthShortID } from "@/lib/month-period";
+import { SALE_COUNT_NOTE, SALE_STATUSES, orderRevenue, saleCount } from "@/lib/transaksi";
+import MonthlyTrendChart, { type MonthlyTrendPoint } from "@/components/admin/MonthlyTrendChart";
 
 const money = (n: number) => "Rp " + Math.round(n).toLocaleString("id-ID");
 
 /** Aturan bersama "sudah dibayar" — lihat SALE_STATUSES (src/lib/transaksi.ts). */
 const isPaidOrder = (status?: string | null) => SALE_STATUSES.includes(String(status || "").toLowerCase());
 
-const shortMoney = (n: number) =>
-  n >= 1_000_000_000 ? "Rp " + (n / 1_000_000_000).toFixed(1).replace(".", ",") + " M"
-  : n >= 1_000_000 ? "Rp " + (n / 1_000_000).toFixed(1).replace(".", ",") + " jt"
-  : n >= 1_000 ? "Rp " + Math.round(n / 1_000) + " rb"
-  : "Rp " + n;
-
-/** Warna irisan donut — persis palet wireframe (#1c1c1c, #5f5f5d, #f59e0b, #22c55e). */
+/** Warna irisan donut — palet wireframe (#1c1c1c, #5f5f5d, #f59e0b, #22c55e). */
 const SLICE_COLORS: Record<string, string> = {
   selesai: "#1c1c1c",
   diproses: "#5f5f5d",
@@ -40,9 +45,10 @@ export interface DashboardOrder {
   /** Ongkir yang dibayar customer — dikurangkan dari `total` supaya angkanya harga PRODUK saja. */
   shipping_cost?: number;
   created_at: string;
-}
-export interface DashboardProduct {
-  category?: string | null;
+  /** Bukti pengiriman, dipakai `orderStage()` untuk kartu "Belum di Packing". */
+  awb_no?: string | null;
+  shipping_status?: string | null;
+  tracking_status_code?: number | null;
 }
 export interface TopProduct {
   /** Nama produk lengkap (baris atas pil). */
@@ -54,85 +60,122 @@ export interface TopProduct {
   revenue: number;
 }
 
+interface Metric {
+  label: string;
+  value: string;
+  /** Keterangan SATU BARIS (dipotong kalau layar sempit) — bagian dipisah " · ". */
+  caption: string;
+  /** Penjelasan lengkap saat kursor diarahkan ke kartu. */
+  detail: string;
+  /** Perubahan vs bulan sebelumnya (%), `null` kalau bulan lalu tidak ada data pembanding. */
+  delta?: number | null;
+  /** Nama bulan pembanding di chip tren, mis. "Sep". */
+  deltaLabel?: string;
+  /** Nilai bulan lalu (tooltip chip tren). */
+  deltaTitle?: string;
+}
+
+/** Chip tren naik/turun vs bulan sebelumnya — hijau naik, merah turun. */
+function TrendChip({ delta, label, title }: { delta: number; label: string; title?: string }) {
+  const up = delta >= 0;
+  const pct = Math.abs(delta).toFixed(1).replace(".", ",");
+  return (
+    <span
+      title={title}
+      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-black whitespace-nowrap shrink-0"
+      style={{ background: up ? "#ecfdf5" : "#fef2f2", color: up ? "#047857" : "#dc2626" }}
+    >
+      <svg
+        width="10"
+        height="10"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
+        {up ? <path d="M6 14l6-6 6 6" /> : <path d="M6 10l6 6 6-6" />}
+      </svg>
+      {pct}%
+      <span className="font-bold" style={{ opacity: 0.75 }}>vs {label}</span>
+    </span>
+  );
+}
+
 export default function DashboardView({
   revenue,
   orders,
   chartOrders,
-  products,
   topProducts,
   loading = false,
+  periodValue,
   periodLabel,
   onPrevMonth,
   onNextMonth,
   onThisMonth,
 }: {
   /** Total pendapatan periode terpilih — dihitung caller dengan aturan bersama `SALE_STATUSES`
-   *  (hanya pesanan yang sudah dibayar: diproses/dikirim/selesai). */
+   *  (hanya pesanan yang sudah dibayar: diproses/dikirim/selesai) dan `orderRevenue()`. */
   revenue: number;
   /** Pesanan PERIODE TERPILIH — dipakai kartu metrik, donut status, dan Produk Terlaris. */
   orders: DashboardOrder[];
-  /** Sumber deret 6 bulan grafik "Pendapatan Bulanan" (default: `orders`). */
+  /** Pesanan JENDELA 6 BULAN sampai bulan terpilih (bulan terpilih + 5 sebelumnya) — sumber
+   *  garis grafik "Pendapatan Bulanan" dan pembanding tren. Default: `orders`. */
   chartOrders?: DashboardOrder[];
-  products: DashboardProduct[];
   topProducts: TopProduct[];
   loading?: boolean;
+  /** Bulan terpilih "YYYY-MM" (WIB). */
+  periodValue: string;
   /** Label periode terpilih, mis. "Oktober 2026". */
   periodLabel: string;
   onPrevMonth: () => void;
   onNextMonth: () => void;
   onThisMonth: () => void;
 }) {
-  /* ── metrik ── */
+  const chartSource = chartOrders ?? orders;
+
+  /* ── metrik periode terpilih ── */
   const orderCount = orders.length;
   const pendingOrders = orders.filter((o) => o.status === "pending").length;
-  /* Pesanan yang dihitung sebagai pendapatan: SATU aturan bersama `SALE_STATUSES`
-     (src/lib/transaksi.ts) — sama dengan menu Transaksi/Database Kota/Pelanggan dan dashboard ops.
-     Dipakai untuk rata-rata supaya pembaginya sejalan dengan `revenue` (dulu dibagi SEMUA pesanan,
-     termasuk yang belum bayar & batal, jadi rata-ratanya kelihatan lebih kecil). */
-  const paidOrders = orders.filter((o) => isPaidOrder(o.status));
-  const avgOrder = paidOrders.length ? revenue / paidOrders.length : 0;
+  const cancelledOrders = orders.filter((o) => o.status === "dibatalkan").length;
+  /* Transaksi sah: SATU aturan bersama `saleCount()` (diproses/dikirim/selesai) — sama dengan
+     menu Transaksi, Laporan Keuangan, dan panel Order Management. Inilah angka yang dipakai
+     sebagai pembagi rata-rata, jadi rata-rata sejalan dengan `revenue`. */
+  const saleOrders = saleCount(orders);
+  const avgOrder = saleOrders ? revenue / saleOrders : 0;
+  /* Pesanan lunas yang resinya belum dibuat — tahap `belum_dipacking` (order-flow), angka yang
+     sama dengan tab "Belum di Packing" di panel Order Management. */
+  const toPackOrders = orders.filter((o) => orderStage(o) === "belum_dipacking").length;
 
-  const categoryCount: Record<string, number> = {};
-  products.forEach((p) => {
-    const c = (p.category || "").trim();
-    if (c) categoryCount[c] = (categoryCount[c] || 0) + 1;
-  });
-  const topCategory = Object.entries(categoryCount).sort((a, b) => b[1] - a[1])[0];
+  /* ── bulan sebelum periode terpilih, untuk tren naik/turun ── */
+  const prevKey = monthShift(periodValue, -1);
+  const prevLabel = monthShortID(prevKey);
+  const prevOrders = chartSource.filter((o) => monthKeyWIB(o.created_at) === prevKey);
+  const prevRevenue = prevOrders.filter((o) => isPaidOrder(o.status)).reduce((sum, o) => sum + orderRevenue(o), 0);
+  const prevSales = saleCount(prevOrders);
+  const prevAvg = prevSales ? prevRevenue / prevSales : 0;
+  /* Bulan lalu tanpa data → tidak ada persen: chip tren disembunyikan (bukan dibagi nol/dikarang). */
+  const delta = (current: number, previous: number) => (previous > 0 ? ((current - previous) / previous) * 100 : null);
+  const prevDetail = (text: string) => `Bulan sebelumnya (${prevLabel}): ${text}`;
 
-  /* ── deret pendapatan bulanan (jendela 6 bulan sampai bulan pesanan terbaru) ── */
-  const chartSource = chartOrders ?? orders;
-  const monthly = (() => {
-    if (chartSource.length === 0) return [] as { label: string; revenue: number; orders: number }[];
-    const stamps = chartSource.map((o) => new Date(o.created_at).getTime());
-    const latest = new Date(Math.max(...stamps));
-    const LABELS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+  /* ── deret 6 bulan berakhir di bulan terpilih (garis grafik "naik-turun") ── */
+  const monthly: MonthlyTrendPoint[] = (() => {
     const keys: string[] = [];
+    for (let i = 5; i >= 0; i--) keys.push(monthShift(periodValue, -i));
     const rev: Record<string, number> = {};
-    const cnt: Record<string, number> = {};
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(latest.getFullYear(), latest.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      keys.push(key);
-      rev[key] = 0;
-      cnt[key] = 0;
-    }
+    const count: Record<string, number> = {};
+    keys.forEach((k) => { rev[k] = 0; count[k] = 0; });
     for (const o of chartSource) {
-      const d = new Date(o.created_at);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      if (key in rev) {
-        cnt[key] += 1;
-        if (isPaidOrder(o.status)) rev[key] += orderRevenue(o);
-      }
+      const key = monthKeyWIB(o.created_at);
+      if (!(key in rev)) continue;
+      count[key] += 1;
+      if (isPaidOrder(o.status)) rev[key] += orderRevenue(o);
     }
-    return keys.map((k) => ({
-      label: LABELS[parseInt(k.split("-")[1], 10) - 1],
-      revenue: rev[k],
-      orders: cnt[k],
-    }));
+    return keys.map((k) => ({ label: monthShortID(k), revenue: rev[k], orders: count[k] }));
   })();
-
-  const maxRev = Math.max(1, ...monthly.map((m) => m.revenue));
-  const peakIdx = monthly.reduce((best, m, i, arr) => (m.revenue > arr[best].revenue ? i : best), 0);
+  const revenueDelta = delta(revenue, prevRevenue);
 
   /* ── irisan donut: pesanan per status (data asli) ── */
   const statusMap: Record<string, number> = {};
@@ -157,24 +200,44 @@ export default function DashboardView({
     return arc;
   });
 
-  const metrics: { label: string; value: string; pill: string; note?: string }[] = [
+  /* ── 4 kartu metrik — keterangannya SATU BARIS supaya kartu sejajar & rapi ── */
+  const metrics: Metric[] = [
     {
       label: "Pendapatan",
       value: money(revenue),
-      pill: `${paidOrders.length} pesanan`,
-      note: "Hanya harga produk (tanpa ongkir)",
+      caption: `${saleOrders} transaksi · tanpa ongkir`,
+      detail: `${money(revenue)} dari ${saleOrders} transaksi diakui · hanya harga produk (ongkir tidak dihitung)`,
+      delta: revenueDelta,
+      deltaLabel: prevLabel,
+      deltaTitle: prevDetail(money(prevRevenue)),
     },
     {
-      label: "Pesanan",
+      label: "Pesanan Masuk",
       value: String(orderCount),
-      pill: `${pendingOrders} menunggu`,
-      note: `${saleCount(orders)} ${SALE_COUNT_NOTE}`,
+      // Keterangan sengaja pendek ("126 transaksi diakui"): kartu ini juga sempit di layar 4 kolom,
+      // jadi kalimat panjang akan terpotong. Rincian lengkapnya ada di tooltip kartu + donut "Per Status".
+      caption: `${saleOrders} ${SALE_COUNT_NOTE}`,
+      detail:
+        `${orderCount} pesanan masuk bulan ${periodLabel}: ${saleOrders} diakui sebagai transaksi ` +
+        `(diproses/dikirim/selesai), ${pendingOrders} belum bayar, ${cancelledOrders} dibatalkan`,
+      delta: delta(orderCount, prevOrders.length),
+      deltaLabel: prevLabel,
+      deltaTitle: prevDetail(`${prevOrders.length} pesanan masuk`),
     },
-    { label: "Rata-rata Pesanan", value: avgOrder ? money(avgOrder) : "—", pill: "per pesanan" },
     {
-      label: "Kategori Teratas",
-      value: topCategory ? topCategory[0] : "—",
-      pill: topCategory ? `${topCategory[1]} produk` : "belum ada produk",
+      label: "Rata-rata Pesanan",
+      value: avgOrder ? money(avgOrder) : "—",
+      caption: `per ${SALE_COUNT_NOTE}`,
+      detail: `${money(revenue)} ÷ ${saleOrders} transaksi diakui bulan ${periodLabel}`,
+      delta: delta(avgOrder, prevAvg),
+      deltaLabel: prevLabel,
+      deltaTitle: prevDetail(money(prevAvg)),
+    },
+    {
+      label: ORDER_STAGE_LABEL.belum_dipacking,
+      value: String(toPackOrders),
+      caption: "lunas · resi belum dibuat",
+      detail: `${toPackOrders} pesanan sudah lunas tapi belum dibuatkan resi J&T (tahap sama dengan tab "${ORDER_STAGE_LABEL.belum_dipacking}" di Order Management)`,
     },
   ];
 
@@ -184,7 +247,9 @@ export default function DashboardView({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="font-extrabold text-sm" style={{ color: "var(--fg)" }}>Ringkasan Periode</h2>
-          <p className="text-[11px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--fg3)" }}>{periodLabel}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--fg3)" }}>
+            {periodLabel} · dibanding {prevLabel}
+          </p>
         </div>
         <div className="flex items-center gap-1 rounded-xl p-1" style={{ background: "var(--card)", border: "1px solid var(--bd)" }}>
           <button
@@ -220,83 +285,73 @@ export default function DashboardView({
       {/* ── 4 kartu metrik ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-5">
         {metrics.map((m) => (
-          <div key={m.label} className="p-5" style={{ background: "var(--card)", border: "1px solid var(--bd)", borderRadius: "var(--rad3)" }}>
-            <span className="text-xs font-bold" style={{ color: "var(--fg3)" }}>{m.label}</span>
-            {/* Ukuran font fluid supaya nominal panjang (mis. "Rp 19.383.000") tidak
-                pernah terpotong di layar sempit / zoom tinggi. */}
+          <div
+            key={m.label}
+            title={m.detail}
+            className="p-5 flex flex-col gap-3 transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.07)]"
+            style={{ background: "var(--card)", border: "1px solid var(--bd)", borderRadius: "var(--rad3)" }}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wide truncate" style={{ color: "var(--fg3)" }}>
+                {m.label}
+              </span>
+              {m.delta != null ? (
+                <TrendChip delta={m.delta} label={m.deltaLabel || prevLabel} title={m.deltaTitle} />
+              ) : null}
+            </div>
+            {/* Ukuran font fluid supaya nominal panjang (mis. "Rp 48.331.123") tidak pernah
+                terpotong di layar sempit / zoom tinggi. */}
             <div
-              className="font-extrabold mt-2 leading-tight whitespace-nowrap text-[clamp(1.15rem,1.7vw,1.6rem)]"
+              className="font-extrabold leading-none whitespace-nowrap text-[clamp(1.25rem,1.8vw,1.75rem)]"
               style={{ color: "var(--fg)" }}
             >
               {m.value}
             </div>
-            <span className="text-[11px] font-bold inline-block mt-2 px-2 py-0.5 rounded-full" style={{ background: "var(--sub)", color: "var(--fg3)" }}>{m.pill}</span>
-            {m.note ? (
-              <p className="text-[11px] font-semibold mt-2" style={{ color: "var(--fg3)" }}>{m.note}</p>
-            ) : null}
+            {/* Keterangan satu baris (permintaan pemilik: "tulisan keterangan di card bikin sejajar 1 baris") */}
+            <p className="text-[11px] font-semibold truncate" style={{ color: "var(--fg3)" }}>
+              {m.caption}
+            </p>
           </div>
         ))}
       </div>
 
-      {/* ── bar chart (col-span-2) + donut (col-span-1) ── */}
+      {/* ── grafik pendapatan bulanan (garis naik-turun) + donut status ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6">
         <div className="lg:col-span-2 p-6" style={{ background: "var(--card)", border: "1px solid var(--bd)", borderRadius: "var(--rad3)" }}>
-          <h3 className="font-extrabold text-sm" style={{ color: "var(--fg)" }}>
-            Pendapatan Bulanan <span className="font-bold" style={{ color: "var(--fg3)" }}>· hanya harga produk (tanpa ongkir)</span>
-          </h3>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="font-extrabold text-sm" style={{ color: "var(--fg)" }}>Pendapatan Bulanan</h3>
+              <p className="text-[11px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--fg3)" }}>
+                6 bulan terakhir · hanya harga produk (tanpa ongkir)
+              </p>
+            </div>
+            {!loading && revenueDelta != null ? (
+              <TrendChip
+                delta={revenueDelta}
+                label={prevLabel}
+                title={prevDetail(`${money(prevRevenue)} · ${money(revenue)} bulan ${periodLabel}`)}
+              />
+            ) : null}
+          </div>
           {loading ? (
             <p className="text-xs font-bold mt-4" style={{ color: "var(--fg3)" }}>Memuat…</p>
-          ) : monthly.length === 0 ? (
-            <p className="text-xs font-bold mt-4" style={{ color: "var(--fg3)" }}>Belum ada data penjualan</p>
           ) : (
-            <div className="flex gap-3 h-56 lg:h-64 mt-4">
-              <div className="flex flex-col justify-between text-[10px] font-bold pb-5 text-right" style={{ color: "var(--fg3)" }}>
-                <span>{shortMoney(maxRev)}</span>
-                <span>{shortMoney(maxRev / 2)}</span>
-                <span>Rp 0</span>
-              </div>
-              <div className="flex-1 flex flex-col min-w-0">
-                <div className="flex-1 flex items-end gap-2" style={{ borderBottom: "1px solid var(--bd)" }}>
-                  {monthly.map((m, i) => (
-                    <div key={m.label} className="flex-1 h-full flex flex-col items-center justify-end group min-w-0">
-                      <span className="mb-1 text-[10px] font-extrabold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap" style={{ color: "var(--fg)" }}>
-                        {m.revenue > 0 ? shortMoney(m.revenue) : "Rp 0"}
-                      </span>
-                      <div
-                        className="w-full transition-all"
-                        title={`${m.label}: ${money(m.revenue)} · ${m.orders} pesanan`}
-                        style={{
-                          height: `${(m.revenue / maxRev) * 100}%`,
-                          minHeight: m.revenue > 0 ? 6 : 2,
-                          background: i === peakIdx && m.revenue > 0 ? "var(--fg)" : "rgba(28,28,28,0.1)",
-                          border: "1.5px solid var(--fg)",
-                          borderRadius: 8,
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div className="flex gap-2 mt-2">
-                  {monthly.map((m) => (
-                    <span key={m.label} className="flex-1 text-center text-[10px] font-bold min-w-0" style={{ color: m.revenue > 0 ? "var(--fg2)" : "var(--fg3)" }}>
-                      {m.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <MonthlyTrendChart data={monthly} />
           )}
         </div>
 
         <div className="p-6" style={{ background: "var(--card)", border: "1px solid var(--bd)", borderRadius: "var(--rad3)" }}>
           <h3 className="font-extrabold text-sm" style={{ color: "var(--fg)" }}>Per Status</h3>
+          <p className="text-[11px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--fg3)" }}>
+            {periodLabel} · semua pesanan masuk
+          </p>
           {loading ? (
             <p className="text-xs font-bold mt-4" style={{ color: "var(--fg3)" }}>Memuat…</p>
           ) : sliceTotal === 0 ? (
             <p className="text-xs font-bold mt-4" style={{ color: "var(--fg3)" }}>Belum ada pesanan</p>
           ) : (
             <>
-              <div className="relative h-44 lg:h-56 w-full flex items-center justify-center">
+              <div className="relative h-44 lg:h-52 w-full flex items-center justify-center">
                 <svg viewBox="0 0 140 140" className="h-full w-auto max-w-full">
                   {arcs.map((a) => (
                     <circle
@@ -313,7 +368,7 @@ export default function DashboardView({
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <span className="text-xl font-extrabold leading-none" style={{ color: "var(--fg)" }}>{sliceTotal}</span>
-                  <span className="text-[10px] font-bold mt-1" style={{ color: "var(--fg3)" }}>pesanan</span>
+                  <span className="text-[10px] font-bold mt-1" style={{ color: "var(--fg3)" }}>pesanan masuk</span>
                 </div>
               </div>
               <ul className="mt-3 space-y-1.5">
@@ -322,6 +377,9 @@ export default function DashboardView({
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: sliceColor(s.label, i) }} />
                     <span className="font-bold capitalize flex-1 truncate" style={{ color: "var(--fg2)" }}>{s.label}</span>
                     <span className="font-extrabold" style={{ color: "var(--fg)" }}>{s.value}</span>
+                    <span className="font-semibold w-8 text-right" style={{ color: "var(--fg3)" }}>
+                      {Math.round((s.value / sliceTotal) * 100)}%
+                    </span>
                   </li>
                 ))}
               </ul>

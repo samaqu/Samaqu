@@ -1372,7 +1372,10 @@ empat file: `src/app/ops/ongkir-jnt/page.tsx` (route tipis) → `src/components/
   (`src/app/panel-admin/(panel)/page.tsx`) memakai keterangan kecil **"Hanya harga produk (tanpa
   ongkir)"** (`note` di `metrics`/`MetricCard`, gaya `.stNote` di `panel.module.css`); grafik
   "Pendapatan Bulanan" yang dulu menjumlah `o.total` kini ikut `orderRevenue()` (`DashboardOrder`
-  membawa `shipping_cost`). Margin ongkir = (2) − (1) net, **hanya dari resi yang cocok ke pesanan**;
+  membawa `shipping_cost`). **Revisi 2026-10-23 (sore)**: di dashboard admin keterangan itu
+  dipendekkan jadi bagian dari caption satu baris **"126 transaksi · tanpa ongkir"** dan basis
+  lengkapnya pindah ke subjudul grafik + tooltip kartu — lihat bagian "Kartu dashboard admin"
+  di bawah; panel-admin belum ikut diubah. Margin ongkir = (2) − (1) net, **hanya dari resi yang cocok ke pesanan**;
   omzet produk tidak pernah ikut ke angka margin. PPN invoice punya baris sendiri (menunggu
   keputusan akuntan) dan belum digabung ke biaya ongkir.
 - **Jumlah transaksi = `saleCount()` + `SALE_COUNT_NOTE`** (`src/lib/transaksi.ts`, 2026-10-23).
@@ -1404,6 +1407,66 @@ empat file: `src/app/ops/ongkir-jnt/page.tsx` (route tipis) → `src/components/
   **"Omset bulan ini"** di panel yang sama juga ikut `orderRevenue()` (dulu menjumlah `o.total`, jadi
   masih memuat ongkir: 51.634.621 vs 48.331.123 pada 2026-10). Tab tahap + filter "Belum di packing"
   tetap menghitung semua baris — itu filter daftar, bukan angka transaksi.
+
+## Kartu dashboard admin: 126 vs 143, keterangan satu baris, tren, grafik garis (2026-10-23)
+
+Pemilik bertanya "transaksi yang benar berapa, 126 apa 143" sambil meminta keterangan kartu **satu
+baris**, grafik **naik-turun**, desain lebih modern, dan kartu "Kategori Teratas" diganti. Semua
+angka dijawab dari data nyata, tanpa mengubah aturan hitung mana pun.
+
+**Jawaban angkanya (Oktober 2026, dicek langsung lewat REST `orders`):** 143 = SEMUA pesanan masuk
+bulan itu (belum bayar 5 + diproses 13 + dikirim 14 + selesai 99 + dibatalkan 12); **126** = yang
+diakui sebagai transaksi (`saleCount`, `SALE_STATUSES`), jadi 143 − 126 = 17 (5 belum bayar +
+12 batal). Keduanya benar, beda pertanyaan — dan itu sekarang terbaca di UI: kartu berl label
+**"Pesanan Masuk"** bernilai 143 dengan keterangan **"126 transaksi diakui"** (tooltip kartunya
+menyebut rincian 126/5/12), sedangkan kartu `Pendapatan` berketerangan "126 transaksi · tanpa
+ongkir" dan donut `Per Status` memecah 143 per status. Jangan "menyamakan" 143 dan 126: angkanya
+memang beda per definisi.
+
+- **Keterangan kartu satu baris** (permintaan pemilik: "tulisan keterangan di card bikin sejajar
+  1 baris"): kartu metrik di `src/components/admin/DashboardView.tsx` sekarang label (uppercase) +
+  chip tren di baris atas, nilai besar, lalu caption `.truncate` (satu baris, dipotong `…` kalau
+  tidak muat). **Caption wajib pendek** — di `xl` kartu hanya ~205 px, jadi kalimat panjang
+  terpotong; caption terpanjang sekarang "126 transaksi · tanpa ongkir" (28 karakter). Rincian
+  panjang ditaruh di `title` kartu (tooltip), bukan di caption. Kalau menambah kartu/keterangan
+  baru, ukur lagi di 4 kolom sebelum menyerahkannya.
+- **Chip tren naik/turun** = pembanding bulan sebelumnya (`+615,8% vs Sep` hijau, `-26,1% vs Sep`
+  merah). Bulan lalu tanpa data (prev = 0) → chip **disembunyikan**, bukan dibagi nol/dikarang.
+  Nilai pembanding dihitung dari jendela grafik 6 bulan (`chartOrders`), bukan query tambahan.
+- **Kartu "Kategori Teratas" diganti "Belum di Packing"** (jumlah pesanan lunas yang resinya belum
+  dibuat) memakai **`orderStage()`** dari `src/lib/order-flow.ts` — jadi angkanya selalu sama dengan
+  tab "Belum di Packing" di panel Order Management. Prop `products` di `DashboardView` (dulu hanya
+  untuk kategori teratas) sudah dihapus dari komponen **dan** pemanggilnya.
+- **Grafik "Pendapatan Bulanan" jadi garis/area naik-turun** (`src/components/admin/MonthlyTrendChart.tsx`,
+  SVG inline tanpa dependency baru): kurva halus yang tetap melewati tiap titik, area gradasi,
+  titik per bulan, label bulan, nilai titik tertinggi (atau titik yang disorot mouse), sumbu Y
+  ringkas (`20jt`/`800rb`). Judulnya diberi subjudul "6 bulan terakhir · hanya harga produk (tanpa
+  ongkir)" + chip tren.
+- **Datanya sekarang 6 bulan ASLI.** Dulu `chartOrders={orders}` = 50 pesanan terbaru, jadi bulan
+  lama tampak Rp 0. Sekarang `src/app/admin/page.tsx` mengambil **jendela 6 bulan** (bulan terpilih
+  + 5 sebelumnya, `monthRangeWIB` + `monthShift`, `/api/ops/orders?from&to&limit=1000`) bersama
+  query bulan terpilih lewat satu `Promise.all`, lalu mengirimnya sebagai prop `chartOrders`;
+  `DashboardView` mengelompokkannya per bulan WIB (`monthKeyWIB`) untuk 6 titik yang berakhir di
+  bulan terpilih. Prop baru: **`periodValue`** ("YYYY-MM", dasar label & jendela grafik).
+- **Satu sumber bulan WIB**: modul baru **`src/lib/month-period.ts`** (`currentMonthWIB`, `monthShift`,
+  `monthLabelID`, `monthShortID`, `monthKeyWIB`, `monthRangeWIB`). `src/app/admin/page.tsx` tidak
+  lagi menyimpan `currentMonthValue`/`monthLabelParts`/`monthRangeUTC`/regex pergeseran bulan —
+  semuanya memanggil modul itu, supaya rentang query, label periode, label grafik, dan chip tren
+  tidak bisa berbeda. Dashboard ops masih punya perhitungannya sendiri (belum diubah).
+- **Donut `Per Status`** tetap seperti sebelumnya (irisan per status + total di tengah), hanya
+  keterangannya ditambah "semua pesanan masuk" dan **persen** per baris legenda.
+- **Verifikasi (2026-10-23, sesi admin diputar ulang via preview)**: `npx tsc --noEmit` bersih;
+  `curl /admin` & `/id/admin` = 200; di `/admin` kartu berbunyi Pendapatan Rp 48.331.123
+  (+615,8% vs Sep) · Pesanan Masuk 143 / "126 transaksi diakui" · Rata-rata Rp 383.580 (−26,1% vs
+  Sep) · Belum di Packing 10 — semuanya sama dengan hitungan REST; caption **satu baris dan tidak
+  terpotong** di tablet 867 px, mobile 375 px, dan desktop 4 kolom (205 px), tanpa scroll samping di
+  ketiganya; grafik menampilkan 6 label bulan Mei–Okt (nilai puncak Rp 48.331.123) dan sorot mouse
+  pada titik Mei mengubah label nilainya jadi Rp 0; donut 143 (selesai 99 · 69%, diproses 13 · 9%,
+  dikirim 14 · 10%, pending 5 · 3%, dibatalkan 12 · 8%); klik `<` → September 2026
+  (Rp 6.752.000 / 16 pesanan masuk / 13 transaksi diakui) lalu `>` kembali ke Oktober; 0 error
+  console. **Belum diuji**: tampilan tanpa sesi admin, dan chip tren untuk bulan yang bulan
+  sebelumnya kosong (Agustus) — logikanya `previous > 0` (chip disembunyikan), belum dilihat di
+  browser.
 - **Basis tanggal omzet di Laporan Keuangan saat ini = `orders.created_at`** (bulan WIB, hanya
   `SALE_STATUSES`), sedangkan beban ongkir di halaman ini memakai tanggal pengiriman. Dua basis itu
   memang beda dan sudah dilabeli di UI — jangan disamakan tanpa mengubah Laporan juga.
