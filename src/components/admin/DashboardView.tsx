@@ -52,7 +52,7 @@ export interface DashboardOrder {
   /** Ongkir yang dibayar customer — dikurangkan dari `total` supaya angkanya harga PRODUK saja. */
   shipping_cost?: number;
   created_at: string;
-  /** Bukti pengiriman, dipakai `orderStage()` untuk kartu "Belum di Packing". */
+  /** Bukti pengiriman, dipakai `orderStage()` untuk tahap pesanan (Belum di Packing vs Menunggu Pickup). */
   awb_no?: string | null;
   shipping_status?: string | null;
   tracking_status_code?: number | null;
@@ -157,9 +157,9 @@ export default function DashboardView({
      sebagai pembagi rata-rata, jadi rata-rata sejalan dengan `revenue`. */
   const saleOrders = saleCount(orders);
   const avgOrder = saleOrders ? revenue / saleOrders : 0;
-  /* Pesanan lunas yang resinya belum dibuat — tahap `belum_dipacking` (order-flow), angka yang
-     sama dengan tab "Belum di Packing" di panel Order Management. */
-  const toPackOrders = orders.filter((o) => orderStage(o) === "belum_dipacking").length;
+  /* Pesanan BELUM DIBAYAR — tahap `belum_bayar` (order-flow), angka yang sama dengan tab
+     "Belum Bayar" di panel Order Management dan irisan `pending` di donut "Per Status". */
+  const unpaidOrders = orders.filter((o) => orderStage(o) === "belum_bayar").length;
 
   /* ── bulan sebelum periode terpilih, untuk tren naik/turun ── */
   const prevKey = monthShift(periodValue, -1);
@@ -248,10 +248,10 @@ export default function DashboardView({
       deltaTitle: prevDetail(money(prevAvg)),
     },
     {
-      label: ORDER_STAGE_LABEL.belum_dipacking,
-      value: String(toPackOrders),
-      caption: "lunas · resi belum dibuat",
-      detail: `${toPackOrders} pesanan sudah lunas tapi belum dibuatkan resi J&T (tahap sama dengan tab "${ORDER_STAGE_LABEL.belum_dipacking}" di Order Management)`,
+      label: ORDER_STAGE_LABEL.belum_bayar,
+      value: String(unpaidOrders),
+      caption: "menunggu pembayaran",
+      detail: `${unpaidOrders} pesanan belum dibayar bulan ${periodLabel} (tahap sama dengan tab "${ORDER_STAGE_LABEL.belum_bayar}" di Order Management)`,
     },
   ];
 

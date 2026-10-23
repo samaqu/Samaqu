@@ -1439,6 +1439,16 @@ lihat butir terakhir di bagian ini.
   dibuat) memakai **`orderStage()`** dari `src/lib/order-flow.ts` — jadi angkanya selalu sama dengan
   tab "Belum di Packing" di panel Order Management. Prop `products` di `DashboardView` (dulu hanya
   untuk kategori teratas) sudah dihapus dari komponen **dan** pemanggilnya.
+  **Kartu keempat diganti lagi 2026-10-24** (pemilik: "Belum di Packing card ini harusnya buat Blm
+  bayar bro lebih enak"): isinya sekarang **"Belum Bayar"** — nilai `orderStage(o) === "belum_bayar"`
+  (`ORDER_STAGE_LABEL.belum_bayar`), jadi selalu sama dengan tab "Belum Bayar" di panel Order
+  Management dan irisan `pending` di donut `Per Status` (Oktober 2026: **6**), caption satu baris
+  **"menunggu pembayaran"**, rincian di tooltip kartu. `toPackOrders` dihapus dari komponen; status
+  "Belum di Packing"/"Menunggu Pickup" tetap terbaca di tab & filter cepat panel Order Management
+  serta menu Transaksi ops — jangan menambahkannya kembali sebagai kartu dashboard tanpa permintaan
+  baru. Verifikasi (2026-10-24, sesi admin diputar ulang): `/admin` menampilkan kartu **BELUM BAYAR
+  6 / "menunggu pembayaran"** (cocok dengan donut `pending` 6), kartu "Belum di Packing" tidak ada
+  lagi, caption keempat kartu tidak terpotong, 0 error console.
 - **Grafik "Pendapatan Bulanan" jadi garis/area naik-turun** (`src/components/admin/MonthlyTrendChart.tsx`,
   SVG inline tanpa dependency baru): kurva halus yang tetap melewati tiap titik, area gradasi,
   titik per bulan, label bulan, nilai titik tertinggi (atau titik yang disorot mouse), sumbu Y
