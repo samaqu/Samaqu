@@ -8,7 +8,7 @@
  * Omset mengikuti aturan bersama `SALE_STATUSES` (diproses/dikirim/selesai) seperti dashboard lain.
  */
 import { useEffect, useState } from "react";
-import { statusLabel, SALE_STATUSES } from "@/lib/transaksi";
+import { statusLabel, SALE_STATUSES, orderRevenue } from "@/lib/transaksi";
 import { orderStatusKey } from "@/lib/order-flow";
 import { opsGet } from "../panel-api";
 import { useWibGreeting, useWibToday, wibDateOffset, dailyIndexForDate } from "../wib-date";
@@ -74,6 +74,7 @@ type TxRow = {
   time_wib?: string;
   status: string;
   total: number;
+  shipping_cost?: number;
   customer_name?: string;
   qty_total?: number;
   awb_no?: string | null;
@@ -223,8 +224,8 @@ export default function PanelAdminHome() {
 
   const todayOrders = orders.filter((o) => o.date_wib === today);
   const yestOrders = orders.filter((o) => o.date_wib === yesterday);
-  const omsetToday = todayOrders.filter((o) => isSale(o.status)).reduce((a, o) => a + (Number(o.total) || 0), 0);
-  const omsetYest = yestOrders.filter((o) => isSale(o.status)).reduce((a, o) => a + (Number(o.total) || 0), 0);
+  const omsetToday = todayOrders.filter((o) => isSale(o.status)).reduce((a, o) => a + orderRevenue(o), 0);
+  const omsetYest = yestOrders.filter((o) => isSale(o.status)).reduce((a, o) => a + orderRevenue(o), 0);
   const deltaOmset = omsetYest > 0 ? Math.round(((omsetToday - omsetYest) / omsetYest) * 100) : omsetToday > 0 ? 100 : 0;
   const deltaMasuk =
     yestOrders.length > 0 ? Math.round(((todayOrders.length - yestOrders.length) / yestOrders.length) * 100) : todayOrders.length > 0 ? 100 : 0;

@@ -87,6 +87,21 @@ export function statusLabel(status: unknown): string {
  */
 export const SALE_STATUSES: string[] = ["diproses", "dikirim", "selesai"];
 
+/**
+ * Omset satu pesanan = HARGA PRODUK saja (total − ongkir).
+ *
+ * Ongkir yang dibayar customer bukan pendapatan toko: itu uang titipan untuk jasa kirim, dan
+ * biaya J&T-nya sendiri sudah dibukukan sebagai pengurang di menu Ongkir J&T (lapisan "omzet
+ * produk" di sana memakai rumus yang sama). Kalau ongkir ikut dihitung, omset terbaca lebih
+ * besar dari penjualan sebenarnya.
+ *
+ * Rumusnya `total - ongkir` (bukan kolom `subtotal`) supaya diskon voucher tetap terpotong dan
+ * nilainya persis sama dengan jumlah `order_items.price × quantity`.
+ */
+export function orderRevenue(order?: { total?: unknown; shipping_cost?: unknown } | null): number {
+  return Math.max(0, (Number(order?.total) || 0) - (Number(order?.shipping_cost) || 0));
+}
+
 /** Ringkasan produk satu baris daftar, mis. `Jiharkah B-01 x2 +1 lainnya`. */
 export function itemSummary(
   items: { series?: string | null; kain?: string | null; product_name?: string | null; quantity?: number | null }[],

@@ -1359,7 +1359,14 @@ empat file: `src/app/ops/ongkir-jnt/page.tsx` (route tipis) → `src/components/
 - **Tiga lapis angka sengaja tidak digabung**: (1) tagihan J&T — basis tanggal pengiriman;
   (2) ongkir yang dibayar customer (`orders.shipping_cost`); (3) omzet produk (`total − shipping_cost`)
   — keduanya basis **`orders.created_at` (WIB) + `SALE_STATUSES`**, sama seperti `/api/ops/laporan`
-  dan Produk Terlaris. Margin ongkir = (2) − (1) net, **hanya dari resi yang cocok ke pesanan**;
+  dan Produk Terlaris. Sejak 2026-10-23 rumus lapisan (3) dipusatkan di
+  **`orderRevenue(order)`** (`src/lib/transaksi.ts`) dan **semua kartu omset/penjualan** memakainya —
+  Laporan (`Omzet Bruto` + ringkasan metode pembayaran + tren), Dashboard ops (`Omzet Bruto`,
+  tren harian, AOV, laba, margin), menu Transaksi (`Omset bulan ini`), Database Kota
+  (`Total Omset`, rata-rata per pesanan), panel-admin (`Omset hari ini`), dashboard admin
+  (`dashRevenue`), dan tool AI `ringkas_operasional`. Jangan menjumlahkan `orders.total` langsung
+  lagi di kartu omset: nilainya masih memuat ongkir. Query-nya harus ikut menarik `shipping_cost`
+  (route kota, dashboard ops, laporan, admin-tools). Margin ongkir = (2) − (1) net, **hanya dari resi yang cocok ke pesanan**;
   omzet produk tidak pernah ikut ke angka margin. PPN invoice punya baris sendiri (menunggu
   keputusan akuntan) dan belum digabung ke biaya ongkir.
 - **Basis tanggal omzet di Laporan Keuangan saat ini = `orders.created_at`** (bulan WIB, hanya

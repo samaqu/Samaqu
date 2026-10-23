@@ -16,7 +16,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { base44 } from "@/lib/ops-api";
-import { SALE_STATUSES } from "@/lib/transaksi";
+import { SALE_STATUSES, orderRevenue } from "@/lib/transaksi";
 import { ORDER_STAGE_TABS, matchesStage, orderStage } from "@/lib/order-flow";
 import DateFilter, { formatTanggalID } from "@/components/ops/leads/DateFilter";
 import ConfirmDeleteModal from "@/components/ops/ConfirmDeleteModal";
@@ -215,7 +215,7 @@ export default function Transaksi({ variant = "ops" }) {
     const sold = orders.filter((order) => SALE_STATUSES.includes(order.status));
     return {
       total: orders.length,
-      revenue: sold.reduce((sum, order) => sum + (order.total || 0), 0),
+      revenue: sold.reduce((sum, order) => sum + orderRevenue(order), 0),
       unpaid: orders.filter((order) => orderStage(order) === "belum_bayar").length,
       toProcess: orders.filter((order) => orderStage(order) === "belum_dipacking" || orderStage(order) === "sudah_dipacking").length,
     };

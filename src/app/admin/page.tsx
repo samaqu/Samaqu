@@ -22,7 +22,7 @@ import NotifikasiKatalog from "@/components/admin/NotifikasiKatalog";
 import OrdersView from "@/components/admin/OrdersView";
 import DashboardView from "@/components/admin/DashboardView";
 import { rankTopProducts } from "@/lib/top-products";
-import { SALE_STATUSES } from "@/lib/transaksi";
+import { SALE_STATUSES, orderRevenue } from "@/lib/transaksi";
 import ProductsCatalog from "@/components/admin/ProductsCatalog";
 import ProductDetailDrawer from "@/components/admin/ProductDetailDrawer";
 import LiveChatView from "@/components/admin/LiveChatView";
@@ -278,7 +278,7 @@ function AdminPageInner() {
    *  hanya pesanan yang sudah dibayar (`diproses`/`dikirim`/`selesai`). Dulu filternya
    *  "bukan pending", jadi pesanan `dibatalkan` ikut dihitung sebagai pendapatan. */
   const dashRevenue = useMemo(
-    () => dashOrders.filter((o) => SALE_STATUSES.includes(String(o.status || "").toLowerCase())).reduce((sum, o) => sum + o.total, 0),
+    () => dashOrders.filter((o) => SALE_STATUSES.includes(String(o.status || "").toLowerCase())).reduce((sum, o) => sum + orderRevenue(o), 0),
     [dashOrders]
   );
 

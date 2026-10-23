@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
 import { BIZ_OFFSET_MS } from "@/lib/ops-followup";
-import { SALE_STATUSES } from "@/lib/transaksi";
+import { SALE_STATUSES, orderRevenue } from "@/lib/transaksi";
 import { paymentChannelLabel } from "@/lib/payment-channel";
 
 /**
  * Laporan keuangan owner.
  *
  * Aturan angka:
- *  - Omzet Bruto  = orders.total untuk SALE_STATUSES (diproses/dikirim/selesai)
+ *  - Omzet Bruto  = orderRevenue(orders) = total − ongkir (harga PRODUK saja), SALE_STATUSES
+ *                   (diproses/dikirim/selesai). Ongkir yang dibayar customer TIDAK dihitung
+ *                   sebagai pendapatan — biaya kirimnya dibukukan terpisah (menu Ongkir J&T).
  *  - Retur        = refund_amount dari returns type=return yang refund_settled_at-nya
  *                   jatuh di periode (retur selesai != refund selesai)
  *  - Penyesuaian  = price_difference_total Tukar Size yang price_difference_status=settled
@@ -159,7 +161,7 @@ function buildPaymentBreakdown(
     const key = isTransferBank ? "transfer-bank" : `${raw}|${channel}`;
     const entry = groups.get(key) || { key, label, count: 0, amount: 0 };
     entry.count += 1;
-    entry.amount += Number(order.total) || 0;
+    entry.amount += orderRevenue(order);
     groups.set(key, entry);
   }
 
@@ -184,7 +186,7 @@ async function loadPeriod(
   const [ordersRes, returnsCreatedRes, refundsRes, exchangesRes] = await Promise.all([
     admin
       .from("orders")
-      .select("id, order_number, customer_name, customer_whatsapp, created_at, total, status, source, payment_method, payment_provider, payment_channel")
+      .select("id, order_number, customer_name, customer_whatsapp, created_at, total, shipping_cost, status, source, payment_method, payment_provider, payment_channel")
       .gte("created_at", startIso)
       .lt("created_at", endIso)
       .order("created_at", { ascending: false })
@@ -304,7 +306,7 @@ async function loadPeriod(
     (row) => !["dibatalkan", "ditolak"].includes(String(row.status || "")),
   );
 
-  const gross = sumBy(validOrders, (o) => Number(o.total) || 0);
+  const gross = sumBy(validOrders, orderRevenue);
   const hpp = validOrders.reduce((sum, order) => sum + (hppByOrder.get(String(order.id)) || 0), 0);
   const refundTotal = sumBy(settledRefunds, (row) => Number(row.refund_amount) || 0);
   const exchangeTotal = sumBy(settledExchanges, (row) => Number(row.price_difference_total) || 0);
@@ -450,7 +452,7 @@ function buildTrend(
     const bucket = bucketForDate(wibKeyOf(order.created_at));
     if (!bucket) continue;
     const row = map.get(bucket.key)!;
-    row.gross += Number(order.total) || 0;
+    row.gross += orderRevenue(order);
     row.hpp += orderHpp.get(String(order.id)) || 0;
   }
   for (const refund of refunds) {

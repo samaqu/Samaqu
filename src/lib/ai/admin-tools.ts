@@ -18,7 +18,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { stockStatus } from "@/lib/ops-auth";
 import { resolveStock } from "@/lib/ops-stock";
 import { rankTopProducts, isSaleOrder } from "@/lib/top-products";
-import { SALE_STATUSES, STATUS_LABEL as ORDER_STATUS_LABEL, statusLabel, orderSourceLabel, itemSummary } from "@/lib/transaksi";
+import { SALE_STATUSES, STATUS_LABEL as ORDER_STATUS_LABEL, statusLabel, orderSourceLabel, itemSummary, orderRevenue } from "@/lib/transaksi";
 import {
   ORDER_STAGE_LABEL,
   orderStage,
@@ -283,7 +283,7 @@ async function ringkasOperasional(args: Record<string, unknown>): Promise<AdminT
 
   const [ordersRes, variantsRes, productsRes, leadTotal, leadBaru, leadHariIni, leadTerlambat, leadUnscheduled, todayTasks] =
     await Promise.all([
-      admin.from("orders").select("id, status, total, created_at").gte("created_at", periode.startIso).lt("created_at", periode.endIso),
+      admin.from("orders").select("id, status, total, shipping_cost, created_at").gte("created_at", periode.startIso).lt("created_at", periode.endIso),
       admin.from("product_variants").select("product_id, stock, base_product_id"),
       admin.from("products").select("id, product_type, name, category, series"),
       countLeads((q) => q),
@@ -307,9 +307,9 @@ async function ringkasOperasional(args: Record<string, unknown>): Promise<AdminT
     return { text: "Gagal mengambil data pesanan. Coba lagi." };
   }
 
-  const orders = (ordersRes.data || []) as Array<{ id: string; status: string; total: number | null; created_at: string }>;
+  const orders = (ordersRes.data || []) as Array<{ id: string; status: string; total: number | null; shipping_cost: number | null; created_at: string }>;
   const valid = orders.filter((o) => SALE_STATUSES.includes(String(o.status || "").toLowerCase()));
-  const omset = valid.reduce((s, o) => s + (Number(o.total) || 0), 0);
+  const omset = valid.reduce((s, o) => s + orderRevenue(o), 0);
 
   // Sebaran per tahap (memakai aturan tahap yang sama dengan daftar Transaksi).
   const perTahap = new Map<string, number>();
