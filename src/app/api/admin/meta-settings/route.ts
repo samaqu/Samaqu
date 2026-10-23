@@ -5,9 +5,10 @@ import { clearMetaCapiConfigCache } from "@/lib/meta-capi";
 /**
  * Pengaturan Meta Pixel untuk dashboard admin.
  *
- * Pixel ID / status / test event code tidak rahasia (dipakai base code di browser), tetapi
- * ACCESS TOKEN CAPI disimpan di tabel `meta_settings` yang tanpa policy RLS — nilainya tidak
- * pernah dikirim balik ke browser, hanya status `hasToken`.
+ * Pixel ID / status / test event code tidak rahasia (dipakai base code di browser), sedangkan
+ * ACCESS TOKEN CAPI disimpan di tabel `meta_settings` yang tanpa policy RLS. Token hanya
+ * dikirim balik ke browser lewat route ini setelah sesi admin terverifikasi, supaya form edit
+ * bisa menampilkan nilai yang tersimpan.
  */
 
 async function isAdmin(req: NextRequest): Promise<boolean> {
@@ -59,6 +60,7 @@ export async function GET(req: NextRequest) {
     enabled: settings?.meta_pixel_enabled === true,
     testEventCode: settings?.meta_test_event_code || "",
     hasToken,
+    accessToken: secret?.access_token || "",
   });
 }
 

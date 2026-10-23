@@ -586,6 +586,7 @@ function MetaPixelSection() {
   const [testEventCode, setTestEventCode] = useState("");
   const [enabled, setEnabled] = useState(false);
   const [original, setOriginal] = useState({ pixelId: "", testEventCode: "", enabled: false });
+  const [originalToken, setOriginalToken] = useState("");
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -594,8 +595,8 @@ function MetaPixelSection() {
   const [tableReady, setTableReady] = useState(true);
   const toast = useToast();
 
-  // Lewat API admin — access token CAPI disimpan di `meta_settings` (service-role only) dan
-  // tidak pernah dikirim balik ke browser.
+  // Lewat API admin — access token CAPI disimpan di `meta_settings` (service-role only).
+  // Route hanya mengembalikan token ke sesi admin yang terverifikasi.
   async function authHeaders() {
     const { data: { session } } = await supabase.auth.getSession();
     return { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token || ""}` };
@@ -610,6 +611,8 @@ function MetaPixelSection() {
         setPixelId(json.pixelId || "");
         setEnabled(json.enabled === true);
         setTestEventCode(json.testEventCode || "");
+        setAccessToken(json.accessToken || "");
+        setOriginalToken(json.accessToken || "");
         setHasToken(json.hasToken === true);
         setTableReady(json.tableReady !== false);
         setOriginal({
@@ -645,12 +648,12 @@ function MetaPixelSection() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Gagal menyimpan pengaturan Meta Pixel");
 
-      if (accessToken.trim()) {
-        setHasToken(true);
-        setAccessToken("");
-        setShowToken(false);
-        setTableReady(true);
-      }
+      const savedToken = accessToken.trim() || originalToken;
+      setAccessToken(savedToken);
+      setOriginalToken(savedToken);
+      setHasToken(!!savedToken);
+      setShowToken(false);
+      setTableReady(true);
       setOriginal({ pixelId: pixelId.trim(), testEventCode: testEventCode.trim(), enabled });
       setEditing(false);
       toast.showToast("success", "Pengaturan Meta Pixel disimpan");
@@ -665,14 +668,14 @@ function MetaPixelSection() {
     setPixelId(original.pixelId);
     setTestEventCode(original.testEventCode);
     setEnabled(original.enabled);
-    setAccessToken("");
+    setAccessToken(originalToken);
     setShowToken(false);
     setEditing(false);
   }
 
   if (loading) return <div className="card p-6 max-w-2xl"><Loader2 size={20} className="animate-spin" style={{ color: "var(--gold)" }} /></div>;
 
-  const dirty = pixelId !== original.pixelId || testEventCode !== original.testEventCode || enabled !== original.enabled || !!accessToken.trim();
+  const dirty = pixelId !== original.pixelId || testEventCode !== original.testEventCode || enabled !== original.enabled || accessToken !== originalToken;
 
   return (
     <SettingsCard
@@ -725,7 +728,7 @@ function MetaPixelSection() {
             </button>
           </div>
           <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
-            {hasToken ? "Token tersimpan (tidak pernah dikirim ke browser)." : "Belum ada token tersimpan."} Digunakan untuk Conversions API (CAPI). Buat di Meta Business Suite → System Users.
+            {hasToken ? "Token tersimpan. Nilai hanya ditampilkan di sesi admin." : "Belum ada token tersimpan."} Kosongkan field untuk mempertahankan token lama. Digunakan untuk Conversions API (CAPI). Buat di Meta Business Suite → System Users.
           </p>
           {!tableReady && (
             <p className="text-[11px] mt-1" style={{ color: "#b45309" }}>
