@@ -1366,7 +1366,13 @@ empat file: `src/app/ops/ongkir-jnt/page.tsx` (route tipis) → `src/components/
   (`Total Omset`, rata-rata per pesanan), panel-admin (`Omset hari ini`), dashboard admin
   (`dashRevenue`), dan tool AI `ringkas_operasional`. Jangan menjumlahkan `orders.total` langsung
   lagi di kartu omset: nilainya masih memuat ongkir. Query-nya harus ikut menarik `shipping_cost`
-  (route kota, dashboard ops, laporan, admin-tools). Margin ongkir = (2) − (1) net, **hanya dari resi yang cocok ke pesanan**;
+  (route kota, dashboard ops, laporan, admin-tools). Basis itu juga **dilabeli di UI** (2026-10-23):
+  kartu `Pendapatan` + judul grafik `Pendapatan Bulanan` di dashboard admin
+  (`src/components/admin/DashboardView.tsx`) dan kartu `Omset hari ini` di panel-admin
+  (`src/app/panel-admin/(panel)/page.tsx`) memakai keterangan kecil **"Hanya harga produk (tanpa
+  ongkir)"** (`note` di `metrics`/`MetricCard`, gaya `.stNote` di `panel.module.css`); grafik
+  "Pendapatan Bulanan" yang dulu menjumlah `o.total` kini ikut `orderRevenue()` (`DashboardOrder`
+  membawa `shipping_cost`). Margin ongkir = (2) − (1) net, **hanya dari resi yang cocok ke pesanan**;
   omzet produk tidak pernah ikut ke angka margin. PPN invoice punya baris sendiri (menunggu
   keputusan akuntan) dan belum digabung ke biaya ongkir.
 - **Basis tanggal omzet di Laporan Keuangan saat ini = `orders.created_at`** (bulan WIB, hanya

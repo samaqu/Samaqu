@@ -11,7 +11,7 @@
  * tidak ada angka, persentase, atau chart palsu.
  */
 
-import { SALE_STATUSES } from "@/lib/transaksi";
+import { SALE_STATUSES, orderRevenue } from "@/lib/transaksi";
 
 const money = (n: number) => "Rp " + Math.round(n).toLocaleString("id-ID");
 
@@ -37,6 +37,8 @@ const SLICE_FALLBACK = ["#1c1c1c", "#5f5f5d", "#f59e0b", "#22c55e", "#9a9a98"];
 export interface DashboardOrder {
   status: string;
   total: number;
+  /** Ongkir yang dibayar customer — dikurangkan dari `total` supaya angkanya harga PRODUK saja. */
+  shipping_cost?: number;
   created_at: string;
 }
 export interface DashboardProduct {
@@ -119,7 +121,7 @@ export default function DashboardView({
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       if (key in rev) {
         cnt[key] += 1;
-        if (isPaidOrder(o.status)) rev[key] += o.total;
+        if (isPaidOrder(o.status)) rev[key] += orderRevenue(o);
       }
     }
     return keys.map((k) => ({
@@ -155,8 +157,13 @@ export default function DashboardView({
     return arc;
   });
 
-  const metrics = [
-    { label: "Pendapatan", value: money(revenue), pill: `${paidOrders.length} pesanan` },
+  const metrics: { label: string; value: string; pill: string; note?: string }[] = [
+    {
+      label: "Pendapatan",
+      value: money(revenue),
+      pill: `${paidOrders.length} pesanan`,
+      note: "Hanya harga produk (tanpa ongkir)",
+    },
     { label: "Pesanan", value: String(orderCount), pill: `${pendingOrders} menunggu` },
     { label: "Rata-rata Pesanan", value: avgOrder ? money(avgOrder) : "—", pill: "per pesanan" },
     {
@@ -219,6 +226,9 @@ export default function DashboardView({
               {m.value}
             </div>
             <span className="text-[11px] font-bold inline-block mt-2 px-2 py-0.5 rounded-full" style={{ background: "var(--sub)", color: "var(--fg3)" }}>{m.pill}</span>
+            {m.note ? (
+              <p className="text-[11px] font-semibold mt-2" style={{ color: "var(--fg3)" }}>{m.note}</p>
+            ) : null}
           </div>
         ))}
       </div>
@@ -226,7 +236,9 @@ export default function DashboardView({
       {/* ── bar chart (col-span-2) + donut (col-span-1) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6">
         <div className="lg:col-span-2 p-6" style={{ background: "var(--card)", border: "1px solid var(--bd)", borderRadius: "var(--rad3)" }}>
-          <h3 className="font-extrabold text-sm" style={{ color: "var(--fg)" }}>Pendapatan Bulanan</h3>
+          <h3 className="font-extrabold text-sm" style={{ color: "var(--fg)" }}>
+            Pendapatan Bulanan <span className="font-bold" style={{ color: "var(--fg3)" }}>· hanya harga produk (tanpa ongkir)</span>
+          </h3>
           {loading ? (
             <p className="text-xs font-bold mt-4" style={{ color: "var(--fg3)" }}>Memuat…</p>
           ) : monthly.length === 0 ? (

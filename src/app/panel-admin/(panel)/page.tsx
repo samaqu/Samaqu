@@ -104,6 +104,8 @@ type MetricCard = {
   valueColor?: string;
   /** Tooltip untuk memperjelas arti angka. */
   hint?: string;
+  /** Keterangan kecil di bawah angka — dipakai untuk basis hitung (mis. omzet tanpa ongkir). */
+  note?: string;
 };
 
 function Heart() {
@@ -245,6 +247,7 @@ export default function PanelAdminHome() {
       label: "Omset hari ini",
       value: rupiah(omsetToday),
       caption: "Dari kemarin",
+      note: "Hanya harga produk (tanpa ongkir)",
       delta: `${deltaOmset >= 0 ? "↗" : "↘"} ${Math.abs(deltaOmset)}%`,
       down: deltaOmset < 0,
       icon: "bag",
@@ -311,6 +314,7 @@ export default function PanelAdminHome() {
             <div className={styles.stValue} style={m.valueColor ? { color: m.valueColor } : undefined}>
               {loading ? "—" : m.value}
             </div>
+            {m.note ? <div className={styles.stNote}>{m.note}</div> : null}
             <div className={styles.stFoot}>
               {m.delta ? (
                 <span

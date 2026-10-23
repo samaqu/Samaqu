@@ -304,6 +304,13 @@ svg.heart { width: 14px; height: 14px; fill: #e46a92; stroke: none; color: #e46a
   font-size: clamp(1.05rem, 1.5vw, 1.75rem);
   color: var(--plum);
 }
+/* Keterangan basis hitung di bawah angka (mis. "hanya harga produk"), di atas caption/delta. */
+.stNote {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mut);
+}
 .stFoot {
   display: flex;
   align-items: center;
