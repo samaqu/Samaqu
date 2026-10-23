@@ -259,7 +259,7 @@ export default function PanelAdminHome() {
       label: "Pesanan masuk",
       value: String(todayOrders.length),
       caption: "Hari ini",
-      note: `Termasuk belum bayar/batal · ${transaksiToday} ${SALE_COUNT_NOTE}`,
+      note: `${transaksiToday} ${SALE_COUNT_NOTE}`,
       delta: `${deltaMasuk >= 0 ? "↗" : "↘"} ${Math.abs(deltaMasuk)}%`,
       down: deltaMasuk < 0,
       icon: "basket",

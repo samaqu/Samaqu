@@ -312,7 +312,10 @@ export default function Transaksi({ variant = "ops" }) {
           <div className="card k">
             <small>Total transaksi</small>
             <b><AnimatedNumber value={isLoading ? 0 : panelKpis.total} /></b>
-            <i>{isLoading ? coverageLabel : `${coverageLabel} · dari ${panelKpis.ordersIn} pesanan masuk`}</i>
+            {/* Keterangan kartu: HANYA pesanan periode yang dipilih (bulan, atau satu tanggal
+                kalau filter tanggal aktif) — dulu periodenya di depan ("Oktober 2026 · dari 143
+                pesanan masuk"), jadi angka 143 terbaca seperti total sepanjang waktu. */}
+            <i>{isLoading ? coverageLabel : `dari ${panelKpis.ordersIn} pesanan masuk ${coverageLabel}`}</i>
           </div>
           <div className="card k">
             <small>Omset bulan ini</small>

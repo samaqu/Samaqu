@@ -186,8 +186,18 @@ export default function OrdersView({
 
   const sourceLabelText =
     orderSource === "all" ? "Semua sumber" : ORDER_SOURCE_LABEL[orderSource] || orderSource;
-  /** Keterangan kartu "Total transaksi" — bentuknya sama dengan menu Transaksi ops. */
+  /** Label periode (mis. "Oktober 2026") — dipakai saat kartu masih memuat. */
   const periodCaption = periodLabel || sourceLabelText;
+  /**
+   * Keterangan kartu "Total transaksi": HANYA pesanan periode yang sedang dipilih, mis.
+   * "dari 143 pesanan masuk bulan Oktober 2026" — jadi angka 143 tidak terbaca sebagai total
+   * sepanjang waktu. Dulu bunyinya "Oktober 2026 · dari 143 pesanan masuk" (periode di depan,
+   * "dari" di tengah) dan pemilik menanyakan 143 itu pesanan bulan mana. Bentuknya sama dengan
+   * menu Transaksi ops.
+   */
+  const ordersNote = periodLabel
+    ? `dari ${kpis.ordersIn} pesanan masuk bulan ${periodLabel}`
+    : `dari ${kpis.ordersIn} pesanan masuk`;
   const filtersActive = Boolean(orderQuery) || orderFilter !== "semua" || orderSource !== "all";
   const resetFilters = () => {
     setOrderSearch("");
@@ -206,7 +216,7 @@ export default function OrdersView({
         <div className="card k">
           <small>Total transaksi</small>
           <b><AnimatedNumber value={loading ? 0 : kpis.total} /></b>
-          <i>{loading ? periodCaption : `${periodCaption} · dari ${kpis.ordersIn} pesanan masuk`}</i>
+          <i>{loading ? periodCaption : ordersNote}</i>
         </div>
         <div className="card k">
           <small>Omset bulan ini</small>

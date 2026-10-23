@@ -168,7 +168,7 @@ export default function DashboardView({
       label: "Pesanan",
       value: String(orderCount),
       pill: `${pendingOrders} menunggu`,
-      note: `Termasuk belum bayar/batal · ${saleCount(orders)} ${SALE_COUNT_NOTE}`,
+      note: `${saleCount(orders)} ${SALE_COUNT_NOTE}`,
     },
     { label: "Rata-rata Pesanan", value: avgOrder ? money(avgOrder) : "—", pill: "per pesanan" },
     {

@@ -99,8 +99,12 @@ export function saleCount(orders: { status?: string | null }[] | null | undefine
   return (orders || []).filter((o) => SALE_STATUSES.includes(String(o?.status || "").toLowerCase())).length;
 }
 
-/** Kalimat basis "jumlah transaksi" — teks yang SAMA di dashboard admin, panel admin, ops, dan laporan. */
-export const SALE_COUNT_NOTE = "transaksi diakui (diproses/dikirim/selesai)";
+/**
+ * Kalimat basis "jumlah transaksi" — teks yang SAMA di dashboard admin, panel admin, ops, dan laporan.
+ * Dipendekkan atas permintaan pemilik ("keterangan card jangan terlalu panjang"): status mana yang
+ * dihitung tetap dijelaskan sekali di komentar `SALE_STATUSES` di atas, bukan di setiap kartu.
+ */
+export const SALE_COUNT_NOTE = "transaksi diakui";
 
 /**
  * Omset satu pesanan = HARGA PRODUK saja (total − ongkir).

@@ -1379,22 +1379,28 @@ empat file: `src/app/ops/ongkir-jnt/page.tsx` (route tipis) → `src/components/
   Kartu "Total Transaksi" (dashboard ops) dan "N transaksi" (Laporan Keuangan) memang sudah memakai
   `SALE_STATUSES`, tapi dashboard admin & panel admin cuma menampilkan jumlah SEMUA pesanan masuk —
   itulah yang membuat angka "jumlah transaksi" beda antar layar. Sekarang kartu pesanan di kedua
-  dashboard membawa keterangan kecil **"Termasuk belum bayar/batal · N transaksi diakui
-  (diproses/dikirim/selesai)"** dari `saleCount(orders)`: angka besarnya tetap jumlah semua pesanan
+  dashboard membawa keterangan kecil **"N transaksi diakui"** dari `saleCount(orders)` —
+  keterangannya **dipendekkan 2026-10-23** (pemilik: "keterangan card di dashboard update broo biar
+  ga terlalu panjang bikin informatif"): dulu *"Termasuk belum bayar/batal · N transaksi diakui
+  (diproses/dikirim/selesai)"*, sekarang `SALE_COUNT_NOTE` = "transaksi diakui" saja
+  (`src/lib/transaksi.ts`; status yang dihitung tetap `SALE_STATUSES`): angka besarnya tetap jumlah semua pesanan
   masuk (`Pesanan` di dashboard admin, `Pesanan masuk` di panel admin), sedangkan angka keterangan
   yang wajib sama dengan laporan. Jangan menghitung ulang filter status di layar — pakai `saleCount`.
   **Menu Transaksi** (`/panel-admin/transaksi` dan `/ops/transaksi`, satu komponen
   `src/app/ops/transaksi/page.jsx`) sempat beda sendiri: kartu **"Total transaksi"** di sana memakai
   `orders.length`, jadi menampilkan SEMUA baris bulan itu (mis. 143 = 126 diakui + 5 belum bayar +
   12 batal) sementara dashboard ops & laporan berbunyi 126. Sekarang **angka besarnya
-  `saleCount(orders)`** dan keterangannya *"<bulan> · dari N pesanan masuk"* (`panelKpis.ordersIn`),
-  sehingga angkanya sama dengan laporan dan jumlah pesanan masuk tetap terlihat. Tab tahap di
+  `saleCount(orders)`** dan keterangannya *"dari N pesanan masuk <bulan>"* (`panelKpis.ordersIn`) —
+  **urutan periode dipindah ke belakang 2026-10-23** karena bentuk lama *"Oktober 2026 · dari 143
+  pesanan masuk"* membuat pemilik bertanya 143 itu pesanan bulan mana — sehingga angkanya sama
+  dengan laporan dan jumlah pesanan masuk (periode terpilih) tetap terlihat. Tab tahap di
   bawahnya tetap menghitung semua baris — tab itu filter daftar, bukan angka transaksi.
   **Panel Order Management dashboard admin** (`src/components/admin/OrdersView.tsx`, 2026-10-23) ikut
   disamakan: kartu **"Total transaksi"** di sana dulu memakai `orders.length`, jadi menampilkan SEMUA
   baris periode itu (143 = 126 diakui + 5 belum bayar + 12 batal, angka yang terlihat di layar admin),
   padahal layar lain berbunyi 126. Sekarang angka besarnya `saleCount(orders)` dan keterangannya
-  *"<bulan> · dari N pesanan masuk"* (`kpis.ordersIn`) — satu bentuk dengan menu Transaksi. Kartu
+  *"dari N pesanan masuk bulan <periode terpilih>"* (`kpis.ordersIn`) — satu bentuk dengan menu
+  Transaksi, dan **hanya** pesanan periode itu (bukan total sepanjang waktu). Kartu
   **"Omset bulan ini"** di panel yang sama juga ikut `orderRevenue()` (dulu menjumlah `o.total`, jadi
   masih memuat ongkir: 51.634.621 vs 48.331.123 pada 2026-10). Tab tahap + filter "Belum di packing"
   tetap menghitung semua baris — itu filter daftar, bukan angka transaksi.
