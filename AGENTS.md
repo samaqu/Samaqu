@@ -1375,6 +1375,14 @@ empat file: `src/app/ops/ongkir-jnt/page.tsx` (route tipis) → `src/components/
   membawa `shipping_cost`). Margin ongkir = (2) − (1) net, **hanya dari resi yang cocok ke pesanan**;
   omzet produk tidak pernah ikut ke angka margin. PPN invoice punya baris sendiri (menunggu
   keputusan akuntan) dan belum digabung ke biaya ongkir.
+- **Jumlah transaksi = `saleCount()` + `SALE_COUNT_NOTE`** (`src/lib/transaksi.ts`, 2026-10-23).
+  Kartu "Total Transaksi" (dashboard ops) dan "N transaksi" (Laporan Keuangan) memang sudah memakai
+  `SALE_STATUSES`, tapi dashboard admin & panel admin cuma menampilkan jumlah SEMUA pesanan masuk —
+  itulah yang membuat angka "jumlah transaksi" beda antar layar. Sekarang kartu pesanan di kedua
+  dashboard membawa keterangan kecil **"Termasuk belum bayar/batal · N transaksi diakui
+  (diproses/dikirim/selesai)"** dari `saleCount(orders)`: angka besarnya tetap jumlah semua pesanan
+  masuk (`Pesanan` di dashboard admin, `Pesanan masuk` di panel admin), sedangkan angka keterangan
+  yang wajib sama dengan laporan. Jangan menghitung ulang filter status di layar — pakai `saleCount`.
 - **Basis tanggal omzet di Laporan Keuangan saat ini = `orders.created_at`** (bulan WIB, hanya
   `SALE_STATUSES`), sedangkan beban ongkir di halaman ini memakai tanggal pengiriman. Dua basis itu
   memang beda dan sudah dilabeli di UI — jangan disamakan tanpa mengubah Laporan juga.

@@ -11,7 +11,7 @@
  * tidak ada angka, persentase, atau chart palsu.
  */
 
-import { SALE_STATUSES, orderRevenue } from "@/lib/transaksi";
+import { SALE_STATUSES, SALE_COUNT_NOTE, saleCount, orderRevenue } from "@/lib/transaksi";
 
 const money = (n: number) => "Rp " + Math.round(n).toLocaleString("id-ID");
 
@@ -164,7 +164,12 @@ export default function DashboardView({
       pill: `${paidOrders.length} pesanan`,
       note: "Hanya harga produk (tanpa ongkir)",
     },
-    { label: "Pesanan", value: String(orderCount), pill: `${pendingOrders} menunggu` },
+    {
+      label: "Pesanan",
+      value: String(orderCount),
+      pill: `${pendingOrders} menunggu`,
+      note: `Termasuk belum bayar/batal · ${saleCount(orders)} ${SALE_COUNT_NOTE}`,
+    },
     { label: "Rata-rata Pesanan", value: avgOrder ? money(avgOrder) : "—", pill: "per pesanan" },
     {
       label: "Kategori Teratas",

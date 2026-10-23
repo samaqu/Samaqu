@@ -8,7 +8,7 @@
  * Omset mengikuti aturan bersama `SALE_STATUSES` (diproses/dikirim/selesai) seperti dashboard lain.
  */
 import { useEffect, useState } from "react";
-import { statusLabel, SALE_STATUSES, orderRevenue } from "@/lib/transaksi";
+import { statusLabel, SALE_STATUSES, SALE_COUNT_NOTE, saleCount, orderRevenue } from "@/lib/transaksi";
 import { orderStatusKey } from "@/lib/order-flow";
 import { opsGet } from "../panel-api";
 import { useWibGreeting, useWibToday, wibDateOffset, dailyIndexForDate } from "../wib-date";
@@ -229,6 +229,8 @@ export default function PanelAdminHome() {
   const omsetToday = todayOrders.filter((o) => isSale(o.status)).reduce((a, o) => a + orderRevenue(o), 0);
   const omsetYest = yestOrders.filter((o) => isSale(o.status)).reduce((a, o) => a + orderRevenue(o), 0);
   const deltaOmset = omsetYest > 0 ? Math.round(((omsetToday - omsetYest) / omsetYest) * 100) : omsetToday > 0 ? 100 : 0;
+  /** Jumlah TRANSAKSI hari ini — aturan bersama `SALE_STATUSES`, angka yang SAMA dengan laporan. */
+  const transaksiToday = saleCount(todayOrders);
   const deltaMasuk =
     yestOrders.length > 0 ? Math.round(((todayOrders.length - yestOrders.length) / yestOrders.length) * 100) : todayOrders.length > 0 ? 100 : 0;
 
@@ -257,6 +259,7 @@ export default function PanelAdminHome() {
       label: "Pesanan masuk",
       value: String(todayOrders.length),
       caption: "Hari ini",
+      note: `Termasuk belum bayar/batal · ${transaksiToday} ${SALE_COUNT_NOTE}`,
       delta: `${deltaMasuk >= 0 ? "↗" : "↘"} ${Math.abs(deltaMasuk)}%`,
       down: deltaMasuk < 0,
       icon: "basket",

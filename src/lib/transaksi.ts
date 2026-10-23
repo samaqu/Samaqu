@@ -88,6 +88,21 @@ export function statusLabel(status: unknown): string {
 export const SALE_STATUSES: string[] = ["diproses", "dikirim", "selesai"];
 
 /**
+ * Jumlah TRANSAKSI (pesanan sah) dari sekumpulan pesanan — satu aturan bersama `SALE_STATUSES`.
+ *
+ * Angkanya sama persis dengan kartu "Total Transaksi" di dashboard ops dan "N transaksi" di
+ * Laporan Keuangan. Dashboard admin & panel admin menampilkan angka ini sebagai keterangan di
+ * kartu pesanannya, supaya "jumlah transaksi" tidak pernah beda antar layar; kartu pesanannya
+ * sendiri tetap menghitung SEMUA pesanan masuk (termasuk yang belum bayar/dibatalkan).
+ */
+export function saleCount(orders: { status?: string | null }[] | null | undefined): number {
+  return (orders || []).filter((o) => SALE_STATUSES.includes(String(o?.status || "").toLowerCase())).length;
+}
+
+/** Kalimat basis "jumlah transaksi" — teks yang SAMA di dashboard admin, panel admin, ops, dan laporan. */
+export const SALE_COUNT_NOTE = "transaksi diakui (diproses/dikirim/selesai)";
+
+/**
  * Omset satu pesanan = HARGA PRODUK saja (total − ongkir).
  *
  * Ongkir yang dibayar customer bukan pendapatan toko: itu uang titipan untuk jasa kirim, dan
