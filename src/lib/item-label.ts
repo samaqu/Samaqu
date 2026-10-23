@@ -273,3 +273,22 @@ export function formatWhatsAppProductLine(item?: WhatsAppProductItem | null): st
 export function formatProductLabel(item?: WhatsAppProductItem | null): string {
   return formatWhatsAppProductLine(item).replace(/\s+x\d+$/, "");
 }
+
+/**
+ * Nama item untuk label pengiriman (AWB).
+ *
+ * Nama produk Open Order sudah memuat series, mis. "Thobe Grey Indigo — Jiharkah",
+ * sementara kolom `series` juga berisi "Jiharkah". Jangan ditempel lagi kalau teksnya
+ * sudah ada, supaya label tidak menulis "Jiharkah Jiharkah".
+ */
+export function labelItemName(item?: {
+  product_name?: string | null;
+  name?: string | null;
+  series?: string | null;
+} | null): string {
+  const name = String(item?.product_name ?? item?.name ?? "").trim();
+  const series = String(item?.series ?? "").trim();
+  if (!series) return name;
+  if (!name) return series;
+  return name.toLowerCase().includes(series.toLowerCase()) ? name : `${name} ${series}`;
+}

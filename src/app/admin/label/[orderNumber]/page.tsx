@@ -7,6 +7,7 @@ import { maskPhoneLast4 } from "@/lib/mask-phone";
 import { fetchPaymentMethodById, isPaymentMethodId, legacyPaymentType, normalizeMethodType } from "@/lib/payment-methods";
 import { sumWeightGramsBySize, productWeightMapFromRows, variantWeightMapFromRows } from "@/lib/shipping-weight";
 import { jntServiceCodeFromShippingMethod } from "@/lib/jnt/layanan";
+import { labelItemName } from "@/lib/item-label";
 
 interface OrderData {
   order_number: string;
@@ -352,7 +353,7 @@ export default function LabelPage() {
                   <span style={{ fontSize: "9px", fontWeight: "800", lineHeight: "1.2", minWidth: "3.2mm" }}>{i + 1}.</span>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontSize: "10px", fontWeight: "800", lineHeight: "1.2", wordBreak: "break-word" }}>
-                      {it.product_name}{it.series ? ` ${it.series}` : ""}
+                      {labelItemName(it)}
                     </div>
                     <div style={{ fontSize: "8px", fontWeight: "600", color: "#222", lineHeight: "1.25", marginTop: "0.3mm", wordBreak: "break-word" }}>
                       {meta}
@@ -456,7 +457,7 @@ export default function LabelPage() {
                 <span style={{ fontSize: "8px", fontWeight: "800", lineHeight: "1.15", minWidth: "2.4mm" }}>{i + 1}.</span>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: "8px", fontWeight: "800", lineHeight: "1.15", wordBreak: "break-word" }}>
-                    {it.product_name}{it.series ? ` ${it.series}` : ""}
+                    {labelItemName(it)}
                   </div>
                   <div style={{ fontSize: "6.5px", fontWeight: "600", color: "#222", lineHeight: "1.15", marginTop: "0.15mm", wordBreak: "break-word" }}>
                     {meta}
