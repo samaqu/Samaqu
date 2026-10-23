@@ -1341,3 +1341,71 @@ semua"); `prevUnits: 0` → label "Baru", tanpa persen. Katalog dibaca **sekali*
 
 Kartu Produk Terlaris di `/ops/dashboard` dan dashboard admin masih memakai `src/lib/top-products.ts`
 (per varian) — sengaja tidak diubah.
+
+## Ongkir J&T — cross-check tagihan J&T (menu Ops → Keuangan, 2026-10-23)
+
+Menu baru **Ongkir J&T** (`/ops/ongkir-jnt`, sidebar grup Keuangan di `OpsShell`'s `MENU_GROUPS`)
+untuk mencocokkan tagihan bulanan J&T dengan ongkir yang dibayar customer. Halaman dirakit dari
+empat file: `src/app/ops/ongkir-jnt/page.tsx` (route tipis) → `src/components/ops/OngkirJntView.tsx`
+(pemilih bulan + kartu ringkasan) + `JntInvoiceForm.tsx` (angka invoice) + `JntUploadCard.tsx`
+(upload Excel) + `JntItemsTable.tsx` (tabel per resi).
+
+**Aturan uang (jangan diubah tanpa membahas ulang dengan pemilik):**
+
+- **Diskon J&T = pengurang biaya, bukan pendapatan.** Biaya yang dibukukan selalu `net_cost`
+  (bruto − diskon). Efek diskon sudah otomatis masuk margin dihitung dari net; kalau dihitung dari
+  bruto, laba terbaca lebih kecil dari yang sebenarnya.
+- **Beban masuk ke bulan TANGGAL PENGIRIMAN** (`jnt_invoice_items.delivery_date`), bukan bulan bayar.
+- **Tiga lapis angka sengaja tidak digabung**: (1) tagihan J&T — basis tanggal pengiriman;
+  (2) ongkir yang dibayar customer (`orders.shipping_cost`); (3) omzet produk (`total − shipping_cost`)
+  — keduanya basis **`orders.created_at` (WIB) + `SALE_STATUSES`**, sama seperti `/api/ops/laporan`
+  dan Produk Terlaris. Margin ongkir = (2) − (1) net, **hanya dari resi yang cocok ke pesanan**;
+  omzet produk tidak pernah ikut ke angka margin. PPN invoice punya baris sendiri (menunggu
+  keputusan akuntan) dan belum digabung ke biaya ongkir.
+- **Basis tanggal omzet di Laporan Keuangan saat ini = `orders.created_at`** (bulan WIB, hanya
+  `SALE_STATUSES`), sedangkan beban ongkir di halaman ini memakai tanggal pengiriman. Dua basis itu
+  memang beda dan sudah dilabeli di UI — jangan disamakan tanpa mengubah Laporan juga.
+
+**Data.** `supabase/migrations/20261023_jnt_invoices.sql` membuat `jnt_invoices` (header bulanan,
+satu baris per `period` 'YYYY-MM'), `jnt_invoice_items` (baris per resi, **`awb_no` UNIQUE** = kunci
+idempoten; `net_cost`, `has_discount`, `order_number`, `shipping_cost`), index, RLS aktif **tanpa
+policy** (data keuangan: hanya service role), plus view **`jnt_ongkir_expense`** (beban net per
+bulan) yang adalah SATU sumber untuk Pengeluaran & Laporan Keuangan nanti — jangan catat beban
+ongkir J&T sebagai pengeluaran manual supaya tidak terhitung dua kali. **Dijalankan manual** di SQL
+Editor Supabase (sandbox tidak punya jalur DDL, sama seperti `jnt-settings.sql`).
+
+**API** (`isOpsAdmin`): `GET /api/ops/ongkir-jnt?period=YYYY-MM` (header + rincian + ringkasan),
+`POST` yang sama untuk menyimpan header invoice, dan `POST /api/ops/ongkir-jnt/upload` (multipart
+`file` + `period`). Logika berat ada di dua modul: `src/lib/xlsx-lite.ts` (pembaca .xlsx
+**tanpa dependency** — zip via `node:zlib` + parser XML; `package-lock.json` proyek ini pernah drift
+dan `npm ci` gagal, jadi jangan tambah library hanya demi ini) dan `src/lib/jnt-invoice.ts` (peta
+header→item, `toNumber`/`toIsoDate`, ringkasan — modul murni, bisa diuji lewat Node), plus
+`src/lib/jnt-invoice-db.ts` (query + pencocokan `orders.awb_no`). Kolom dicari lewat NAMA header,
+bukan posisi, jadi urutan kolom ekspor J&T boleh berubah — tapi header wajib memuat
+`No. Waybill` + `Biaya Kirim`, kalau tidak request dibalas 400 dengan pesan yang menyebut "Resi Saya".
+
+**Idempotensi & pratinjau.** Bulan tagihan setiap baris diambil dari tanggal pengirimannya (satu
+file boleh memuat dua bulan; invoice baris dibuat otomatis per bulan). Upload ulang file yang sama →
+`new: 0`, `existing: 125`, `failed: 0`, tidak ada baris ganda. Kalau tabelnya belum ada, upload
+**tidak** mati: route membalas `tableReady:false` + `saved:false` berisi hasil BACA file (jumlah
+resi per bulan, baris gagal, total) dan UI menampilkannya sebagai **pratinjau** dengan peringatan
+jelas — tidak ada satu baris pun yang ditulis.
+
+**Verifikasi (2026-10-23).** Pembaca + peta diuji langsung lewat Node terhadap dua ekspor asli
+"Resi Saya" milik pemilik: file 50 resi → 50 item, bruto Rp1.654.500, diskon Rp397.875, net
+Rp1.256.625; file 125 resi → 125 item, bruto Rp3.207.000, diskon Rp786.000, net Rp2.421.000 (sama
+dengan hitungan manual di luar app). Berkas uji bersisi rusak (resi kosong, tanggal tak dikenal,
+biaya bukan angka, resi dobel) → 3 item + 4 baris gagal dengan alasannya; header salah → ditolak.
+`tsc --noEmit` bersih; `/ops/ongkir-jnt` = 200 (gerbang login ops); `/api/ops/ongkir-jnt` dan
+`/upload` tanpa sesi = 401. **BELUM terbukti end-to-end** (dan tidak bisa dari sandbox): simpan
+header invoice, tulis baris upload, idempotensi di database, pencocokan `orders.awb_no`, dan angka
+margin — semuanya butuh (a) migration dijalankan lebih dulu dan (b) sesi admin ops di browser
+preview (putaran sesi yang tersedia bukan sesi admin, jadi `/ops/*` selalu menampilkan login).
+Jangan tandai butir-butir itu "verified" sebelum keduanya ada.
+
+**Pertanyaan terbuka untuk J&T.** Ekspor kedua (125 resi) memuat **2 resi bertanda "Tanpa Diskon"**
+(`JO0329572178` Rp47.000 dan `JO0329677967` Rp16.000) sedangkan baris lain dapat diskon 25%; kalau
+keduanya seharusnya dapat diskon, ada potensi kelebihan bayar ±Rp15.750. Selain itu, invoice periode
+yang ditagih belum tentu sama dengan file yang diunggah — filter tanggal portal J&T harus dicek
+lewat angka "Total X" sebelum menekan Ekspor, dan `outsidePeriod` di balasan upload menandai baris
+yang tanggalnya di luar bulan terpilih.

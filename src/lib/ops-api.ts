@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import type { JntInvoiceHeader, JntInvoiceResponse, JntUploadResult } from "@/lib/jnt-invoice";
 
 /**
  * Shim data-layer untuk dashboard internal (/ops).
@@ -52,6 +53,8 @@ const ALAMAT_TEBAK = "/api/ops/alamat-tebak";
 const KOTA = "/api/ops/kota";
 /** Cek ongkir J&T: berat dihitung di server, tarifnya dari /api/shipping/jnt-cost (checkout). */
 const ONGKIR = "/api/ops/ongkir";
+/** Menu Keuangan → Ongkir J&T: tagihan bulanan J&T vs ongkir yang dibayar customer. */
+const ONGKIR_JNT = "/api/ops/ongkir-jnt";
 /** Pra-cek pembuatan resi (baca data pesanan + kode area J&T; tidak memanggil J&T). */
 const RESI_CHECK = "/api/ops/resi-check";
 /**
@@ -350,6 +353,32 @@ export const base44 = {
     Ongkir: {
       async check(body: { city: string; kecamatan: string; items: unknown[] }) {
         return call<{ data: any[]; weight_grams: number; city: string; kecamatan: string }>("POST", ONGKIR, body);
+      },
+    },
+
+    /** Tagihan bulanan J&T (menu Keuangan → Ongkir J&T). */
+    OngkirJnt: {
+      get(period: string) {
+        return call<JntInvoiceResponse>("GET", `${ONGKIR_JNT}?period=${encodeURIComponent(period)}`);
+      },
+      /** Simpan angka invoice J&T: bruto, diskon, PPN, total bayar, jatuh tempo, status. */
+      async simpan(body: Record<string, unknown>) {
+        const json = await call<{ invoice: JntInvoiceHeader }>("POST", ONGKIR_JNT, body);
+        return json.invoice;
+      },
+      /** Upload ekspor "Resi Saya" J&T — idempoten per nomor resi. */
+      async upload(file: File, period: string) {
+        const form = new FormData();
+        form.append("file", file);
+        form.append("period", period);
+        const res = await fetch(`${ONGKIR_JNT}/upload`, {
+          method: "POST",
+          headers: await authHeaders(),
+          body: form,
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok) throw new Error((json as any)?.error || `Upload gagal (${res.status})`);
+        return json as JntUploadResult;
       },
     },
 
