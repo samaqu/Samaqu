@@ -1,4 +1,4 @@
-﻿# AGENTS.md â€” running this repo in the Base44 sandbox
+# AGENTS.md â€” running this repo in the Base44 sandbox
 
 Notes that are not obvious from the manifests.
 
@@ -189,7 +189,7 @@ Switching a warna or series chip swaps the gallery and resets it to the first ph
 ukuran terpilih tidak ada di varian baru, otomatis pindah ke ukuran pertama yang tersedia.
 
 Submissions POST to **`/api/open-order`** (`src/app/api/open-order/route.ts`; the `[locale]/api`
-copy is the dead duplicate â€” the live API is the one under `src/app/api/`). The route re-reads
+duplicate was removed on 23 October 2026 - the live API is the one under `src/app/api/`)
 `products` (+ `jenis_kain`) dan `product_variants` with the admin client, rebuilds the offering via
 `buildOpenOrderProducts()` and re-validates product/color/series/size/quantity and the price floor
 against it (client prices are never trusted), lalu **memotong stok** dulu (lihat bagian stok di
@@ -964,7 +964,7 @@ pembayaran diverifikasi.
   route checkout). Modul itu juga menentukan COD (`payment_methods.method_type`, atau nilai lama
   `'cod'`) dan berat kirim (`orders.weight`; kalau kosong dijumlah dari `products.weight` per
   `order_items`, fallback 1200 g/item â€” pesanan Open Order menyimpan `weight: null`).
-  Salinan mati `src/app/[locale]/api/**` sengaja tidak diubah.
+  Salinan mati `src/app/[locale]/api/**` sudah dihapus 23 Oktober 2026.
 - **Aksi admin**: `PATCH /api/admin/orders` dengan `action: "createJnt"` â†’ guard (404 pesanan tidak
   ada, 400 sudah punya `awb_no`, 400 kalau `dibatalkan`), panggil J&T, lalu simpan `awb_no` +
   `jnt_order_id` **dan ubah status ke `diproses`**. Tombol **"Atur Pesanan"** (kelas `od-a-primary`,
