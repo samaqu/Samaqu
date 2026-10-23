@@ -1317,3 +1317,27 @@ tanpa dampak perilaku, tidak perlu menambah catatan.
   arsitektur, atau fitur). Tautan internal pakai `[[Nama Dokumen]]`.
 - **Jangan `git commit`/`push` hanya untuk dokumentasi** kecuali diminta secara terpisah; vault
   berada di luar repo ini.
+
+## Produk Terlaris di halaman Laporan ops (per produk induk)
+
+`src/app/ops/laporan/page.tsx` merender **`src/components/ops/BestSellerSection.tsx`** (self-fetching,
+punya pemilih bulan sendiri) yang memanggil **`GET /api/ops/best-sellers?month=YYYY-MM`**
+(guard `isOpsAdmin`). Angka lama (`buildTopProducts` di `/api/ops/laporan`, top 5 per
+`product_id || nama`) sudah **dihapus**: `order_items.product_id` menunjuk ke baris katalog
+(satu kombinasi produk × series) dan `product_name` ikut menyimpan "(Kain …) Size … (Include/Tanpa
+Cover & Hanger)", jadi satu produk pecah jadi beberapa baris dan totalnya cuma jumlah top 5.
+
+Satu modul agregasi: **`src/lib/best-sellers.ts`**
+- produk induk = `products.category::products.name` (fallback: nama dibersihkan dari kain/size/cover);
+- unit & omzet dari SEMUA item pesanan sah `SALE_STATUSES` (bukan top-N), jadi `totals.units` harus
+  sama dengan jumlah `quantity` mentah di periode itu — itu cara termudah memeriksanya;
+- breakdown per ukuran dan per kain/opsi disimpan untuk baris yang di-expand.
+
+Batas periode **WIB** (`jakartaMonthBounds`/`jakartaDayBounds`). Pembanding apple-to-apple: bulan
+berjalan → rentang tanggal yang sama bulan sebelumnya (1–23 Okt vs 1–23 Sep), bulan selesai → bulan
+penuh vs bulan penuh; agregasi & filter memakai fungsi yang sama untuk kedua periode. Produk yang
+hanya laku di periode pembanding ikut dikirim dengan `units: 0` (tampil sebagai turun di "Lihat
+semua"); `prevUnits: 0` → label "Baru", tanpa persen. Katalog dibaca **sekali** untuk kedua periode.
+
+Kartu Produk Terlaris di `/ops/dashboard` dan dashboard admin masih memakai `src/lib/top-products.ts`
+(per varian) — sengaja tidak diubah.

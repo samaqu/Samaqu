@@ -6,7 +6,6 @@ import Link from "next/link";
 import * as LucideIcons from "lucide-react";
 import {
   AlertTriangle,
-  ArrowUpRight,
   CheckCircle,
   ChevronLeft,
   ChevronRight,
@@ -17,11 +16,8 @@ import {
 } from "lucide-react";
 import {
   CartesianGrid,
-  Cell,
   Line,
   LineChart,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip as ChartTooltip,
   XAxis,
@@ -29,6 +25,7 @@ import {
 } from "recharts";
 import { statusLabel, orderSourceLabel } from "@/lib/transaksi";
 import GlassCard from "@/components/ops/GlassCard";
+import BestSellerSection from "@/components/ops/BestSellerSection";
 
 /**
  * Sebagian ikon lucide ada di runtime tapi belum masuk definisi tipe versi ini —
@@ -101,16 +98,6 @@ type PaymentBreakdownRow = {
   share: number;
 };
 
-/** Produk terlaris (unit terjual) pada periode laporan. */
-type TopProductRow = {
-  key: string;
-  name: string;
-  units: number;
-  revenue: number;
-  /** Porsi unit terhadap total top 5 (0–100). */
-  share: number;
-};
-
 type ReportData = {
   period: Period;
   summary: Summary;
@@ -125,7 +112,6 @@ type ReportData = {
   deltas: { gross: number | null; net: number | null; profit: number | null };
   trend: { type: "day" | "week" | "month"; points: TrendPoint[] };
   payments: PaymentBreakdownRow[];
-  topProducts: { totalUnits: number; rows: TopProductRow[] };
   tables: {
     sales: any[];
     returns: any[];
@@ -146,9 +132,6 @@ const nfmt = (v: number | null | undefined) =>
 
 /** Urutan warna bar metode pembayaran — semakin gelap, semakin besar porsinya. */
 const PAYMENT_BAR = ["bg-slate-900", "bg-slate-700", "bg-slate-500", "bg-slate-400", "bg-slate-300"];
-
-/** Warna donut produk terlaris — senada dengan aksen laporan (slate/blue). */
-const PRODUCT_COLORS = ["#0F172A", "#334155", "#64748B", "#94A3B8", "#CBD5E1"];
 
 const rp = (v: number | null | undefined) => `Rp ${nfmt(v)}`;
 
@@ -324,8 +307,6 @@ export default function LaporanKeuanganPage() {
 
   const s = data.summary;
   const payments = data.payments || [];
-  const topProducts = data.topProducts || { totalUnits: 0, rows: [] };
-  const topRows = topProducts.rows || [];
   const profitPositive = (s.profit ?? 0) >= 0;
   const pendingEmpty = s.refundsPendingCount === 0 && s.exchangePendingCount === 0;
   const profitBadge =
@@ -709,79 +690,8 @@ export default function LaporanKeuanganPage() {
         ) : null}
       </section>
 
-      {/* PRODUK TERLARIS */}
-      <section className="rounded-3xl border border-[#E5E7EB] bg-white p-5 shadow-sm md:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#F3F4F6] text-slate-700">
-                <ArrowUpRight size={18} strokeWidth={1.9} />
-              </span>
-              <div>
-                <h2 className="text-lg font-black tracking-tight text-[#374151]">Produk Terlaris</h2>
-                <p className="text-xs font-medium text-slate-500">
-                  5 produk dengan unit terjual terbanyak.
-                </p>
-              </div>
-            </div>
-            <span className="rounded-full bg-[#F9FAFB] px-3 py-1.5 text-[11px] font-bold text-slate-500">
-              {nfmt(topProducts.totalUnits)} unit
-            </span>
-          </div>
-
-          {topRows.length === 0 ? (
-            <div className="mt-5 grid place-items-center rounded-2xl bg-[#F9FAFB] px-4 py-8 text-center">
-              <p className="text-sm font-bold text-slate-700">Belum ada penjualan di periode ini</p>
-              <p className="mt-1 text-xs text-slate-500">Coba rentang tanggal lain.</p>
-            </div>
-          ) : (
-            <div className="mt-4 grid gap-5 sm:grid-cols-[170px_1fr] sm:items-center">
-              <div className="relative mx-auto h-[170px] w-[170px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={topRows}
-                      dataKey="units"
-                      nameKey="name"
-                      innerRadius={58}
-                      outerRadius={80}
-                      paddingAngle={2}
-                      stroke="none"
-                      isAnimationActive={false}
-                    >
-                      {topRows.map((row, index) => (
-                        <Cell key={row.key} fill={PRODUCT_COLORS[index % PRODUCT_COLORS.length]} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="pointer-events-none absolute inset-0 grid place-items-center">
-                  <div className="text-center">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Terjual</p>
-                    <p className="text-2xl font-black tabular-nums text-[#374151]">{nfmt(topProducts.totalUnits)}</p>
-                    <p className="text-[10px] font-semibold text-slate-400">unit</p>
-                  </div>
-                </div>
-              </div>
-
-              <ul className="space-y-2.5">
-                {topRows.map((row, index) => (
-                  <li key={row.key} className="flex items-center gap-2.5">
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: PRODUCT_COLORS[index % PRODUCT_COLORS.length] }}
-                    />
-                    <span className="min-w-0 flex-1 text-sm font-semibold leading-snug text-[#374151]" title={row.name}>
-                      {row.name}
-                    </span>
-                    <span className="shrink-0 whitespace-nowrap text-[11px] font-bold text-slate-500 tabular-nums">
-                      {nfmt(row.units)} unit · {row.share.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-      </section>
+      {/* PRODUK TERLARIS — periode sendiri + pembanding bulan lalu */}
+      <BestSellerSection />
 
       {/* METODE PEMBAYARAN */}
       <section className="rounded-3xl border border-[#E5E7EB] bg-white p-5 shadow-sm md:p-6">

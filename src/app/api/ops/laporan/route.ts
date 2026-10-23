@@ -159,40 +159,6 @@ function buildPaymentBreakdown(
     .sort((a, b) => b.amount - a.amount);
 }
 
-/**
- * Top 5 produk terlaris (berdasarkan unit terjual) pada pesanan sah.
- * Porsi donut dihitung dari total unit top 5, jadi angka yang tampil selalu 100%.
- */
-function buildTopProducts(validOrders: OrderRow[], orderItems: any[]) {
-  const validIds = new Set(validOrders.map((order) => String(order.id)));
-  const groups = new Map<string, { key: string; name: string; units: number; revenue: number }>();
-
-  for (const item of orderItems) {
-    if (!validIds.has(String(item.order_id || ""))) continue;
-    const name = String(item.product_name || item.series || item.kain || "Tanpa nama").trim();
-    const key = String(item.product_id || name);
-    const units = Number(item.quantity ?? item.qty) || 0;
-    const price = Number(item.price) || 0;
-    const entry = groups.get(key) || { key, name, units: 0, revenue: 0 };
-    entry.units += units;
-    entry.revenue += price * units;
-    groups.set(key, entry);
-  }
-
-  const top = [...groups.values()]
-    .sort((a, b) => b.units - a.units || b.revenue - a.revenue)
-    .slice(0, 5);
-  const totalUnits = top.reduce((sum, row) => sum + row.units, 0);
-
-  return {
-    totalUnits,
-    rows: top.map((row) => ({
-      ...row,
-      share: totalUnits > 0 ? Math.round((row.units / totalUnits) * 1000) / 10 : 0,
-    })),
-  };
-}
-
 async function loadPeriod(
   admin: ReturnType<typeof getSupabaseAdmin>,
   from: string,
@@ -551,7 +517,6 @@ export async function GET(req: NextRequest) {
       if (pm.id) methodById.set(String(pm.id), label);
     }
     const payments = buildPaymentBreakdown(current.validOrders, methodById, bankMethodIds);
-    const topProducts = buildTopProducts(current.validOrders, current.orderItems);
 
     const trend = buildTrend(
       from,
@@ -625,7 +590,6 @@ export async function GET(req: NextRequest) {
       },
       trend,
       payments,
-      topProducts,
       tables: {
         sales: salesRows,
         returns: returnTable,
