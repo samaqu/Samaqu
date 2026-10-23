@@ -27,6 +27,7 @@ begin
     'product_series',
     'jenis_kain',
     'payment_methods',
+    'qris_ewallet_methods',
     'vouchers',
     'voucher_usages',
     'bio_links',
