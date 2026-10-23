@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useSafeLocale, useSafeTranslations } from "@/lib/safe-i18n";
 import { strukStatus, strukSteps, tglJamID, rupiah } from "@/lib/akun-format";
 import { orderStatusKey } from "@/lib/order-flow";
+import CopyButton from "@/components/ui/CopyButton";
 import { isPaketItem, itemVariantLabel } from "@/lib/item-label";
 import {
   formatWeightExact,
@@ -395,7 +396,11 @@ export default function RincianPesanan({ order }: { order: RincianOrder }) {
           </span>
           <div>
             <b>{sc.label}</b>
-            <small>#{order.order_number} • {tglJamID(order.created_at)}</small>
+            <small style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              #{order.order_number}
+              <CopyButton value={order.order_number} label="nomor pesanan" />
+              • {tglJamID(order.created_at)}
+            </small>
           </div>
         </section>
 
@@ -403,9 +408,10 @@ export default function RincianPesanan({ order }: { order: RincianOrder }) {
           <div className="rp-sec">
             <span className="rp-h">Info Pengiriman</span>
             <div className="rp-line" style={{ marginTop: 8 }}>
-              <span className="rp-sub">
+              <span className="rp-sub" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                 {order.shipping_method || "Pengiriman"}
                 {resi ? `: ${resi}` : ""}
+                {resi ? <CopyButton value={resi} label="nomor resi" /> : null}
               </span>
             </div>
             {order.weight && order.weight > 0 ? (
@@ -523,7 +529,13 @@ export default function RincianPesanan({ order }: { order: RincianOrder }) {
                 <div className="rp-row"><span>Berat</span><span className="rp-mono">{formatWeightExact(order.weight)}</span></div>
               ) : null}
               {resi ? (
-                <div className="rp-row"><span>Nomor Resi</span><span>{resi}</span></div>
+                <div className="rp-row">
+                  <span>Nomor Resi</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    {resi}
+                    <CopyButton value={resi} label="nomor resi" />
+                  </span>
+                </div>
               ) : null}
             </div>
           </details>

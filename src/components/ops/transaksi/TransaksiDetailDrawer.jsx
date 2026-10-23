@@ -14,6 +14,7 @@ import { Ban, CreditCard, MapPin, Pencil, Receipt, ShoppingBag, Trash2, Truck, X
 import { NEUTRAL_ITEM_PHOTO } from "@/lib/order-photo";
 import { isPaketItem, variantName } from "@/lib/item-label";
 import { ORDER_STAGE_LABEL, orderStage } from "@/lib/order-flow";
+import CopyButton from "@/components/ui/CopyButton";
 import { usePaymentMethodName } from "@/lib/use-payment-methods";
 import { paymentChannelLabel } from "@/lib/payment-channel";
 import { supabase } from "@/lib/supabase";
@@ -322,7 +323,10 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                 <div className="sec2">
                   <div className="kv">
                     <span>No. Pesanan</span>
-                    <b>{order.order_number}</b>
+                    <b style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      {order.order_number}
+                      <CopyButton value={order.order_number} label="nomor pesanan" />
+                    </b>
                   </div>
                   <div className="kv">
                     <span>Waktu Pemesanan</span>
@@ -435,7 +439,10 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                 </div>
                 <div>
                   <h3 className="font-heading font-bold text-slate-900 dark:text-white">Detail Transaksi</h3>
-                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400">{order.order_number}</p>
+                  <p className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400">
+                    {order.order_number}
+                    <CopyButton value={order.order_number} label="nomor pesanan" />
+                  </p>
                 </div>
               </div>
               <button

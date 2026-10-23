@@ -12,6 +12,7 @@ import { CreditCard, MapPin, ShoppingBag, Truck } from "lucide-react";
 import { NEUTRAL_ITEM_PHOTO } from "@/lib/order-photo";
 import { isPaketItem, variantName } from "@/lib/item-label";
 import { ORDER_STAGE_LABEL, SHIPPING_STATUS_LABEL, orderStage } from "@/lib/order-flow";
+import CopyButton from "@/components/ui/CopyButton";
 import { usePaymentMethodName } from "@/lib/use-payment-methods";
 import { paymentChannelLabel } from "@/lib/payment-channel";
 import { formatWeightExact } from "@/lib/shipping-weight";
@@ -126,7 +127,10 @@ export default function OrderDetailPanel({
           <>
             <div className="kv">
               <span>Nomor Resi</span>
-              <b>{awb || "-"}</b>
+              <b style={{ display: "inline-flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
+                {awb || "-"}
+                <CopyButton value={awb} label="nomor resi" />
+              </b>
             </div>
             {latestTracking ? (
               <div className="kv" style={{ alignItems: "flex-start" }}>
@@ -251,7 +255,10 @@ export default function OrderDetailPanel({
       <div className="sec2">
         <div className="kv">
           <span>No. Pesanan</span>
-          <b>{order.order_number}</b>
+          <b style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {order.order_number}
+            <CopyButton value={order.order_number} label="nomor pesanan" />
+          </b>
         </div>
         <div className="kv">
           <span>Waktu Pemesanan</span>
