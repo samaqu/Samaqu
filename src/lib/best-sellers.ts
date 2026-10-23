@@ -1,26 +1,20 @@
 /**
  * Agregasi "Produk Terlaris" untuk halaman Laporan ops.
  *
- * Identitas produk (product key) = produk + SERIES + KAIN.
- * Hanya Size dan keterangan Cover & Hanger yang dibuang dari kunci, karena dua hal itu
- * memang varian dari produk yang sama. Series dan kain/kode kain BEDA = baris berbeda:
+ * Identitas diambil dari RELASI MASTER, bukan dari parsing nama item:
+ *  - `order_items.product_id` → `products.id`. Katalog menyimpan satu baris per
+ *    produk+series (`products.name` sama, `products.series` beda), jadi product_id
+ *    sudah mengidentifikasi kombinasi PRODUK + SERIES.
+ *  - Nama produk = `products.name`, series = `products.series`, kain = `jenis_kain.name`
+ *    (fallback `products.kain`). Ukuran & Cover/Hanger hanya jadi rincian, bukan kunci.
+ *  - Satu baris "Per Produk" menggabungkan semua series di bawah produk+kain yang sama.
  *
- *   "Thobe Superblack · Jiharkah · Kain B-01"
- *   "Thobe Superblack · Imalah · Kain B-01"
- *   "Thobe Superblack"            (produk lama, memang tanpa series)
- *
- * Sumber data, berurutan (tidak ada daftar series yang di-hardcode):
- *  1. field terstruktur di `order_items`: `series`, `kain`, `size`.
- *  2. baris katalog `products` lewat `product_id`: `name`, `series`, `jenis_kain.name`
- *     (dipakai juga untuk item lama yang kolom series/kain-nya kosong).
- *  3. parsing nama teks — FALLBACK terakhir, hanya pola size / "(Kain …)" / "… Series …" /
- *     "(Cover & Hanger)" yang dikenal.
- *
- * Kunci yang sama dipakai untuk periode sekarang DAN periode pembanding, jadi produk yang
- * sama selalu menghasilkan key yang sama di kedua periode.
+ * Parsing teks HANYA dipakai untuk item lama yang tidak punya relasi master valid.
+ * Item seperti itu ditandai `fallback` dan tidak pernah digabung ke baris master.
  */
 
 import { SALE_STATUSES } from "@/lib/transaksi";
+import { OPEN_ORDER_ADDON } from "@/lib/open-order-config";
 
 /** Baris `order_items` yang dipakai agregasi. */
 export interface BestSellerItem {
@@ -51,23 +45,51 @@ export interface BestSellerBreakdown {
   units: number;
 }
 
-export interface BestSellerProduct {
-  /** Kunci produk (stabil antar periode → dipakai untuk pembanding). */
+/** Rincian per series di dalam satu baris produk. */
+export interface BestSellerSeriesBreakdown extends BestSellerBreakdown {
   key: string;
-  /** Nama tampil: produk + series + warna + kode kain, tanpa size/cover. */
-  name: string;
-  units: number;
   revenue: number;
-  /** Unit per ukuran, terbanyak dulu. */
   sizes: BestSellerBreakdown[];
-  /** Unit per opsi Cover & Hanger, terbanyak dulu. */
-  covers: BestSellerBreakdown[];
 }
 
-export interface BestSellerTotals {
+interface BestSellerRowBase {
+  /** Kunci stabil antar periode. */
+  key: string;
+  /** Nama tampil baris pertama (produk, dengan "— Series" pada mode series). */
+  name: string;
+  /** Baris kedua kecil, mis. "Kain B-01". */
+  subname: string;
+  kain: string;
+  category: string;
   units: number;
   revenue: number;
-  rows: BestSellerProduct[];
+  sizes: BestSellerBreakdown[];
+  covers: BestSellerBreakdown[];
+  /** true = item lama tanpa relasi master; sengaja tidak digabung. */
+  fallback: boolean;
+}
+
+export interface BestSellerSeriesRow extends BestSellerRowBase {
+  series: string;
+}
+
+export interface BestSellerProductRow extends BestSellerRowBase {
+  seriesBreakdown: BestSellerSeriesBreakdown[];
+}
+
+export interface BestSellerModeTotals {
+  units: number;
+  revenue: number;
+  /** Jumlah baris unik dengan unit > 0 — mengikuti mode yang aktif. */
+  products: number;
+  /** Jumlah baris item fallback (bukan unit). */
+  fallbackItems: number;
+  fallbackUnits: number;
+}
+
+export interface BestSellerAggregate {
+  series: { rows: BestSellerSeriesRow[]; totals: BestSellerModeTotals };
+  product: { rows: BestSellerProductRow[]; totals: BestSellerModeTotals };
 }
 
 /** Pesanan yang dianggap penjualan sah — satu aturan dengan laporan & menu Transaksi. */
@@ -84,7 +106,8 @@ const SERIES_PHRASE_IN_NAME_RE = /\b([A-Za-z][\w'’.-]*)\s+series\b/i;
 const SERIES_DASH_IN_NAME_RE = /\s+[—–]\s+(.+)$/;
 
 const text = (value?: string | null) => String(value ?? "").trim();
-const stripKainWord = (value: string) => value.replace(/^\s*kain\s+/i, "").trim().toUpperCase();
+const stripKainWord = (value: string) => value.replace(/^\s*kain\s+/i, "").trim();
+const normalizeKeyPart = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
 
 /** "Size M" / "XS" → "M" / "XS"; kalau kolomnya kosong, dibaca dari nama item. */
 export function normalizeSize(raw?: string | null, fallbackName?: string | null): string {
@@ -102,7 +125,7 @@ export function normalizeCoverOption(rawName?: string | null): string {
   return word === "tanpa" || word === "without" ? "Tanpa Cover" : "Include Cover";
 }
 
-/** Series dari teks nama — hanya dipakai kalau field & katalog sama-sama kosong. */
+/** Series dari teks nama — hanya dipakai kalau item tidak punya relasi master. */
 function seriesFromName(rawName?: string | null): string {
   const name = String(rawName || "");
   const phrase = name.match(SERIES_PHRASE_IN_NAME_RE);
@@ -137,92 +160,182 @@ export function cleanProductName(raw?: string | null): string {
 function catalogKain(row?: BestSellerCatalogRow): string {
   if (!row) return "";
   const relation = Array.isArray(row.jenis_kain) ? row.jenis_kain[0] : row.jenis_kain;
-  const fromRelation = text(relation?.name);
-  if (fromRelation) return stripKainWord(fromRelation);
+  const fromRelation = stripKainWord(text(relation?.name));
+  if (fromRelation) return fromRelation;
   if (typeof row.kain === "string" && row.kain.trim()) return stripKainWord(row.kain);
   return "";
 }
 
-/**
- * Nama baris ranking: produk + series + warna + kode kain.
- * Series disisipkan setelah kata pertama, mengikuti pola nama katalog lama:
- *   ("Thobe Broken White", "Jiharkah", "B-01") → "Thobe Jiharkah Series Broken White · Kain B-01"
- */
-export function composeProductName(base: string, series?: string | null, kain?: string | null): string {
-  let label = text(base) || "(tanpa nama)";
-  const seriesValue = text(series);
-  if (seriesValue && !new RegExp(`\\b${seriesValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(label)) {
-    const [first, ...rest] = label.split(/\s+/);
-    label = rest.length ? `${first} ${seriesValue} Series ${rest.join(" ")}` : `${first} ${seriesValue} Series`;
-  }
-  const kainValue = text(kain);
-  return kainValue ? `${label} · Kain ${kainValue}` : label;
+const productKeyOf = (category: string, name: string, kain: string) =>
+  ["p", category, name, kain].map(normalizeKeyPart).join("::");
+
+const seriesDisplayName = (name: string, series: string) =>
+  series ? `${name} — ${series}` : name;
+
+const subnameOf = (kain: string) => (kain ? `Kain ${kain}` : "");
+
+interface Acc {
+  units: number;
+  revenue: number;
+  sizes: Map<string, number>;
+  covers: Map<string, number>;
 }
 
-const normalizeKeyPart = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
+interface SeriesAcc extends Acc {
+  key: string;
+  name: string;
+  subname: string;
+  series: string;
+  kain: string;
+  category: string;
+  fallback: boolean;
+}
+
+interface ProductAcc extends Acc {
+  key: string;
+  name: string;
+  subname: string;
+  kain: string;
+  category: string;
+  fallback: boolean;
+  series: Map<string, { label: string; units: number; revenue: number; sizes: Map<string, number> }>;
+}
+
+const bump = (map: Map<string, number>, label: string, qty: number) =>
+  map.set(label, (map.get(label) || 0) + qty);
+
+const toBreakdown = (map: Map<string, number>): BestSellerBreakdown[] =>
+  [...map.entries()]
+    .map(([label, units]) => ({ label, units }))
+    .sort((a, b) => b.units - a.units || a.label.localeCompare(b.label));
 
 /**
- * Hitung unit, omzet, dan rincian varian per produk (produk × series × kain).
+ * Hitung unit, omzet, dan rincian varian untuk kedua mode sekaligus.
  * Input `items` HARUS sudah difilter ke pesanan sah (lihat `isValidSaleOrder`).
  */
 export function aggregateBestSellers(
   items: BestSellerItem[],
   catalog: BestSellerCatalogRow[] = [],
-): BestSellerTotals {
+): BestSellerAggregate {
   const catalogById = new Map<string, BestSellerCatalogRow>();
   for (const row of catalog) {
     if (row?.id) catalogById.set(String(row.id), row);
   }
 
-  type Acc = {
-    key: string;
-    name: string;
-    units: number;
-    revenue: number;
-    sizes: Map<string, number>;
-    covers: Map<string, number>;
-  };
-  const groups = new Map<string, Acc>();
+  const seriesGroups = new Map<string, SeriesAcc>();
+  const productGroups = new Map<string, ProductAcc>();
+  let fallbackItems = 0;
+  let fallbackUnits = 0;
 
   for (const item of items) {
-    const rawName = text(item.product_name);
-    const catalogRow = catalogById.get(text(item.product_id)) || undefined;
-
-    // Identitas produk: field terstruktur → katalog → teks (fallback).
-    const series = text(item.series) || text(catalogRow?.series) || seriesFromName(rawName);
-    const kain = stripKainWord(text(item.kain)) || catalogKain(catalogRow) || kainFromName(rawName);
-    const base = text(catalogRow?.name) || cleanProductName(rawName) || "(tanpa nama)";
-    const category = text(catalogRow?.category);
-
-    const name = composeProductName(base, series, kain);
-    const key = [category, base, series, kain].map(normalizeKeyPart).join("::");
-
     const qty = Number(item.quantity ?? item.qty) || 0;
     if (qty <= 0) continue;
-    const price = Number(item.price) > 0 ? Number(item.price) : Number(item.customer_price) || 0;
 
+    const rawName = text(item.product_name);
+    const price = Number(item.price) > 0 ? Number(item.price) : Number(item.customer_price) || 0;
     const sizeLabel = normalizeSize(item.size, rawName) || "Tanpa ukuran";
     const coverLabel = normalizeCoverOption(rawName) || "Standar";
 
-    const entry =
-      groups.get(key) ||
-      ({ key, name, units: 0, revenue: 0, sizes: new Map(), covers: new Map() } as Acc);
-    entry.units += qty;
-    entry.revenue += price * qty;
-    entry.sizes.set(sizeLabel, (entry.sizes.get(sizeLabel) || 0) + qty);
-    entry.covers.set(coverLabel, (entry.covers.get(coverLabel) || 0) + qty);
-    groups.set(key, entry);
+    const productId = text(item.product_id);
+    const master = productId ? catalogById.get(productId) : undefined;
+
+    let seriesKey: string;
+    let productKey: string;
+    let name: string;
+    let seriesName: string;
+    let kain: string;
+    let category: string;
+    let fallback: boolean;
+
+    if (master) {
+      name = text(master.name) || cleanProductName(rawName) || "(tanpa nama)";
+      seriesName = text(master.series);
+      kain = catalogKain(master);
+      category = text(master.category);
+      seriesKey = `s:${productId}`;
+      productKey = productKeyOf(category, name, kain);
+      fallback = false;
+    } else if (productId === OPEN_ORDER_ADDON.id) {
+      name = rawName || OPEN_ORDER_ADDON.name;
+      seriesName = "";
+      kain = "";
+      category = "Add-on";
+      seriesKey = `s:${OPEN_ORDER_ADDON.id}`;
+      productKey = `p:${OPEN_ORDER_ADDON.id}`;
+      fallback = false;
+    } else {
+      name = cleanProductName(rawName) || rawName || "(tanpa nama)";
+      seriesName = text(item.series) || seriesFromName(rawName);
+      kain = stripKainWord(text(item.kain)) || kainFromName(rawName);
+      category = "";
+      seriesKey = `s:f:${normalizeKeyPart([name, seriesName, kain].join("|"))}`;
+      productKey = `p:f:${normalizeKeyPart([name, kain].join("|"))}`;
+      fallback = true;
+      fallbackItems += 1;
+      fallbackUnits += qty;
+    }
+
+    const seriesEntry =
+      seriesGroups.get(seriesKey) ||
+      ({
+        key: seriesKey,
+        name: seriesDisplayName(name, seriesName),
+        subname: subnameOf(kain),
+        series: seriesName,
+        kain,
+        category,
+        fallback,
+        units: 0,
+        revenue: 0,
+        sizes: new Map(),
+        covers: new Map(),
+      } as SeriesAcc);
+    seriesEntry.units += qty;
+    seriesEntry.revenue += price * qty;
+    bump(seriesEntry.sizes, sizeLabel, qty);
+    bump(seriesEntry.covers, coverLabel, qty);
+    seriesGroups.set(seriesKey, seriesEntry);
+
+    const productEntry =
+      productGroups.get(productKey) ||
+      ({
+        key: productKey,
+        name,
+        subname: subnameOf(kain),
+        kain,
+        category,
+        fallback,
+        units: 0,
+        revenue: 0,
+        sizes: new Map(),
+        covers: new Map(),
+        series: new Map(),
+      } as ProductAcc);
+    productEntry.units += qty;
+    productEntry.revenue += price * qty;
+    bump(productEntry.sizes, sizeLabel, qty);
+    bump(productEntry.covers, coverLabel, qty);
+
+    const seriesLabel = seriesName || "Tanpa series";
+    const seriesBreakdown =
+      productEntry.series.get(seriesKey) ||
+      { label: seriesLabel, units: 0, revenue: 0, sizes: new Map<string, number>() };
+    seriesBreakdown.units += qty;
+    seriesBreakdown.revenue += price * qty;
+    bump(seriesBreakdown.sizes, sizeLabel, qty);
+    productEntry.series.set(seriesKey, seriesBreakdown);
+    productGroups.set(productKey, productEntry);
   }
 
-  const toBreakdown = (map: Map<string, number>): BestSellerBreakdown[] =>
-    [...map.entries()]
-      .map(([label, units]) => ({ label, units }))
-      .sort((a, b) => b.units - a.units || a.label.localeCompare(b.label));
-
-  const rows = [...groups.values()]
+  const seriesRows: BestSellerSeriesRow[] = [...seriesGroups.values()]
     .map((entry) => ({
       key: entry.key,
       name: entry.name,
+      subname: entry.subname,
+      series: entry.series,
+      kain: entry.kain,
+      category: entry.category,
+      fallback: entry.fallback,
       units: entry.units,
       revenue: entry.revenue,
       sizes: toBreakdown(entry.sizes),
@@ -230,9 +343,40 @@ export function aggregateBestSellers(
     }))
     .sort((a, b) => b.units - a.units || b.revenue - a.revenue || a.name.localeCompare(b.name));
 
-  return {
+  const productRows: BestSellerProductRow[] = [...productGroups.values()]
+    .map((entry) => ({
+      key: entry.key,
+      name: entry.name,
+      subname: entry.subname,
+      kain: entry.kain,
+      category: entry.category,
+      fallback: entry.fallback,
+      units: entry.units,
+      revenue: entry.revenue,
+      sizes: toBreakdown(entry.sizes),
+      covers: toBreakdown(entry.covers),
+      seriesBreakdown: [...entry.series.entries()]
+        .map(([key, value]) => ({
+          key,
+          label: value.label,
+          units: value.units,
+          revenue: value.revenue,
+          sizes: toBreakdown(value.sizes),
+        }))
+        .sort((a, b) => b.units - a.units || a.label.localeCompare(b.label)),
+    }))
+    .sort((a, b) => b.units - a.units || b.revenue - a.revenue || a.name.localeCompare(b.name));
+
+  const totalsOf = (rows: { units: number; revenue: number }[]): BestSellerModeTotals => ({
     units: rows.reduce((sum, row) => sum + row.units, 0),
     revenue: rows.reduce((sum, row) => sum + row.revenue, 0),
-    rows,
+    products: rows.filter((row) => row.units > 0).length,
+    fallbackItems,
+    fallbackUnits,
+  });
+
+  return {
+    series: { rows: seriesRows, totals: totalsOf(seriesRows) },
+    product: { rows: productRows, totals: totalsOf(productRows) },
   };
 }

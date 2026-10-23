@@ -5,12 +5,21 @@ import { BIZ_OFFSET_MS, jakartaDayBounds, jakartaMonthBounds } from "@/lib/ops-f
 import {
   aggregateBestSellers,
   isValidSaleOrder,
+  type BestSellerBreakdown,
   type BestSellerCatalogRow,
   type BestSellerItem,
+  type BestSellerModeTotals,
+  type BestSellerProductRow,
+  type BestSellerSeriesBreakdown,
+  type BestSellerSeriesRow,
 } from "@/lib/best-sellers";
 
 /**
- * Produk Terlaris per PRODUK INDUK untuk halaman Laporan ops.
+ * Produk Terlaris untuk halaman Laporan ops — dua mode dari satu sumber data:
+ * `series` (produk + series, default) dan `product` (semua series digabung).
+ *
+ * Identitas diambil dari relasi master `order_items.product_id → products.id`
+ * (satu baris katalog = satu produk+series), bukan dari parsing nama item.
  *
  * - Periode: satu BULAN (`?month=YYYY-MM`, default bulan WIB sekarang), batasnya WIB.
  * - Pembanding apple-to-apple:
@@ -110,6 +119,71 @@ async function loadCatalog(admin: Admin, items: BestSellerItem[]): Promise<BestS
   return catalog;
 }
 
+type MergeableRow = {
+  key: string;
+  name: string;
+  units: number;
+  revenue: number;
+  sizes: BestSellerBreakdown[];
+  covers: BestSellerBreakdown[];
+  seriesBreakdown?: BestSellerSeriesBreakdown[];
+};
+
+/**
+ * Gabungkan periode sekarang & pembanding memakai kunci mode yang sama.
+ * Baris yang hanya muncul di periode pembanding tetap ditampilkan (unit 0).
+ */
+function mergeMode<T extends MergeableRow>(
+  current: T[],
+  previous: T[],
+  currentTotals: BestSellerModeTotals,
+  previousTotals: BestSellerModeTotals,
+  zeroRow: (row: T) => T,
+) {
+  const previousByKey = new Map(previous.map((row) => [row.key, row]));
+  const currentKeys = new Set<string>();
+
+  const rows = current.map((row) => {
+    currentKeys.add(row.key);
+    const prevUnits = previousByKey.get(row.key)?.units ?? 0;
+    return {
+      ...row,
+      prevUnits,
+      deltaUnits: row.units - prevUnits,
+      deltaPct: changePct(row.units, prevUnits),
+      isNew: prevUnits === 0 && row.units > 0,
+      share: currentTotals.units > 0 ? Math.round((row.units / currentTotals.units) * 1000) / 10 : 0,
+    };
+  });
+
+  for (const row of previous) {
+    if (currentKeys.has(row.key)) continue;
+    rows.push({
+      ...zeroRow(row),
+      prevUnits: row.units,
+      deltaUnits: -row.units,
+      deltaPct: changePct(0, row.units),
+      isNew: false,
+      share: 0,
+    });
+  }
+
+  rows.sort((a, b) => b.units - a.units || b.revenue - a.revenue || a.name.localeCompare(b.name));
+  const top = rows.find((row) => row.units > 0) || null;
+
+  return {
+    rows,
+    totals: {
+      ...currentTotals,
+      products: rows.filter((row) => row.units > 0).length,
+      unitsPrev: previousTotals.units,
+      deltaUnits: currentTotals.units - previousTotals.units,
+      deltaPct: changePct(currentTotals.units, previousTotals.units),
+      top: top ? { name: top.name, units: top.units } : null,
+    },
+  };
+}
+
 export async function GET(req: NextRequest) {
   if (!(await isOpsAdmin(req))) return unauthorized();
   const admin = getSupabaseAdmin();
@@ -142,42 +216,22 @@ export async function GET(req: NextRequest) {
     const currentAgg = aggregateBestSellers(currentSales.items, catalog);
     const previousAgg = aggregateBestSellers(previousSales.items, catalog);
 
-    const previousByKey = new Map(previousAgg.rows.map((row) => [row.key, row]));
-    const currentKeys = new Set<string>();
+    const seriesMode = mergeMode<BestSellerSeriesRow>(
+      currentAgg.series.rows,
+      previousAgg.series.rows,
+      currentAgg.series.totals,
+      previousAgg.series.totals,
+      (row) => ({ ...row, units: 0, revenue: 0, sizes: [], covers: [] }),
+    );
+    const productMode = mergeMode<BestSellerProductRow>(
+      currentAgg.product.rows,
+      previousAgg.product.rows,
+      currentAgg.product.totals,
+      previousAgg.product.totals,
+      (row) => ({ ...row, units: 0, revenue: 0, sizes: [], covers: [], seriesBreakdown: [] }),
+    );
 
-    const rows = currentAgg.rows.map((row) => {
-      currentKeys.add(row.key);
-      const prevUnits = previousByKey.get(row.key)?.units ?? 0;
-      return {
-        ...row,
-        prevUnits,
-        deltaUnits: row.units - prevUnits,
-        deltaPct: changePct(row.units, prevUnits),
-        isNew: prevUnits === 0 && row.units > 0,
-        share: currentAgg.units > 0 ? Math.round((row.units / currentAgg.units) * 1000) / 10 : 0,
-      };
-    });
-
-    // Produk yang hanya terjual di periode pembanding tetap ikut (unit 0) → terlihat sebagai penurunan.
-    for (const row of previousAgg.rows) {
-      if (currentKeys.has(row.key)) continue;
-      rows.push({
-        ...row,
-        units: 0,
-        revenue: 0,
-        sizes: [],
-        covers: [],
-        prevUnits: row.units,
-        deltaUnits: -row.units,
-        deltaPct: changePct(0, row.units),
-        isNew: false,
-        share: 0,
-      });
-    }
-
-    rows.sort((a, b) => b.units - a.units || b.revenue - a.revenue || a.name.localeCompare(b.name));
-
-    const top = rows.find((row) => row.units > 0) || null;
+    const orderCounts = { validOrders: currentSales.validOrders, orders: currentSales.orders };
     const currentLastKey = wibKey(new Date(Date.parse(currentEnd) - 1).toISOString());
     const previousLastKey = wibKey(new Date(Date.parse(previousEnd) - 1).toISOString());
 
@@ -198,20 +252,12 @@ export async function GET(req: NextRequest) {
         to: previousEnd,
         rangeLabel: rangeLong(wibKey(previous.startIso), previousLastKey),
         shortLabel: rangeShort(wibKey(previous.startIso), previousLastKey),
-        hasData: previousAgg.units > 0,
+        hasData: previousAgg.series.totals.units > 0,
       },
-      totals: {
-        units: currentAgg.units,
-        revenue: currentAgg.revenue,
-        products: rows.filter((row) => row.units > 0).length,
-        validOrders: currentSales.validOrders,
-        orders: currentSales.orders,
-        top: top ? { name: top.name, units: top.units } : null,
-        unitsPrev: previousAgg.units,
-        deltaUnits: currentAgg.units - previousAgg.units,
-        deltaPct: changePct(currentAgg.units, previousAgg.units),
+      modes: {
+        series: { ...seriesMode, totals: { ...seriesMode.totals, ...orderCounts } },
+        product: { ...productMode, totals: { ...productMode.totals, ...orderCounts } },
       },
-      rows,
     });
   } catch (error) {
     console.error("[OPS] best-sellers GET:", error);

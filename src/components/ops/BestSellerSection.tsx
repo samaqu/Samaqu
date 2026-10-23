@@ -14,10 +14,14 @@ import { ArrowDown, ArrowUpRight, ChevronDown, Loader2, RefreshCw } from "lucide
  */
 
 type Breakdown = { label: string; units: number };
+type SeriesBreakdown = Breakdown & { key: string; revenue: number; sizes: Breakdown[] };
 
 type BestSellerRow = {
   key: string;
   name: string;
+  subname: string;
+  series?: string;
+  kain?: string;
   units: number;
   revenue: number;
   share: number;
@@ -28,7 +32,25 @@ type BestSellerRow = {
   isNew: boolean;
   sizes: Breakdown[];
   covers: Breakdown[];
+  fallback: boolean;
+  seriesBreakdown?: SeriesBreakdown[];
 };
+
+type ModeTotals = {
+  units: number;
+  revenue: number;
+  products: number;
+  validOrders: number;
+  orders: number;
+  top: { name: string; units: number } | null;
+  unitsPrev: number;
+  deltaUnits: number;
+  deltaPct: number | null;
+  fallbackItems: number;
+  fallbackUnits: number;
+};
+
+type ModeData = { rows: BestSellerRow[]; totals: ModeTotals };
 
 type BestSellerData = {
   period: { month: string; label: string; isPartial: boolean; rangeLabel: string; shortLabel: string };
@@ -39,18 +61,7 @@ type BestSellerData = {
     shortLabel: string;
     hasData: boolean;
   };
-  totals: {
-    units: number;
-    revenue: number;
-    products: number;
-    validOrders: number;
-    orders: number;
-    top: { name: string; units: number } | null;
-    unitsPrev: number;
-    deltaUnits: number;
-    deltaPct: number | null;
-  };
-  rows: BestSellerRow[];
+  modes: { series: ModeData; product: ModeData };
 };
 
 const nfmt = (value: number | null | undefined) =>
@@ -159,6 +170,7 @@ export default function BestSellerSection() {
   const thisMonth = currentMonthKey();
   const [month, setMonth] = useState(thisMonth);
   const [sortMode, setSortMode] = useState<"units" | "revenue">("units");
+  const [groupMode, setGroupMode] = useState<"series" | "product">("series");
   const [compareOn, setCompareOn] = useState(true);
   const [showAll, setShowAll] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -174,7 +186,8 @@ export default function BestSellerSection() {
     [thisMonth],
   );
 
-  const rows = data?.rows || [];
+  const modeData = data?.modes?.[groupMode];
+  const rows = modeData?.rows || [];
   const sorted = useMemo(() => {
     const copy = [...rows];
     if (sortMode === "revenue") copy.sort((a, b) => b.revenue - a.revenue || b.units - a.units);
@@ -183,7 +196,7 @@ export default function BestSellerSection() {
 
   const visible = showAll ? sorted : sorted.slice(0, 10);
   const maxUnits = Math.max(1, ...visible.map((row) => (sortMode === "revenue" ? row.revenue : row.units)));
-  const totals = data?.totals;
+  const totals = modeData?.totals;
   const comparison = data?.comparison;
   const compareVisible = compareOn && !!comparison?.hasData;
 
@@ -197,7 +210,7 @@ export default function BestSellerSection() {
           <div>
             <h2 className="text-lg font-black tracking-tight text-[#374151]">Produk Terlaris</h2>
             <p className="text-xs font-medium text-slate-500">
-              Peringkat per produk, series, dan kain — size &amp; cover digabung — pada{" "}
+              Peringkat produk terlaris — dikelompokkan dari data master, ukuran &amp; cover jadi rincian — pada{" "}
               {data?.period.label || monthLabel(month)}.
             </p>
           </div>
@@ -260,6 +273,24 @@ export default function BestSellerSection() {
               onClick={() => setSortMode(item.key)}
               className={`rounded-full px-3 py-1 text-[11px] font-bold transition-colors ${
                 sortMode === item.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1 rounded-full bg-[#F3F4F6] p-1">
+          {[
+            { key: "series" as const, label: "Per Series" },
+            { key: "product" as const, label: "Per Produk" },
+          ].map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setGroupMode(item.key)}
+              className={`rounded-full px-3 py-1 text-[11px] font-bold transition-colors ${
+                groupMode === item.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}
             >
               {item.label}
@@ -418,8 +449,18 @@ export default function BestSellerSection() {
                             <span className="truncate text-sm font-bold text-[#374151]" title={row.name}>
                               {row.name}
                             </span>
+                            {row.fallback ? (
+                              <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700">
+                                Fallback
+                              </span>
+                            ) : null}
                             {compareVisible && (row.isNew || row.prevUnits === 0) ? <DeltaChip row={row} /> : null}
                           </span>
+                          {row.subname ? (
+                            <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-400">
+                              {row.subname}
+                            </span>
+                          ) : null}
                           <span className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[11px] font-semibold text-slate-500 sm:hidden">
                             <span className="tabular-nums">{nfmt(row.units)} unit</span>
                             <span className="tabular-nums">{rp(row.revenue)}</span>
@@ -466,8 +507,45 @@ export default function BestSellerSection() {
 
                     {isOpen ? (
                       <div className="mb-3 grid gap-2 pl-9 sm:grid-cols-2">
-                        <BreakdownColumn title="Per ukuran" items={row.sizes} accent="#475569" />
-                        <BreakdownColumn title="Per cover & hanger" items={row.covers} accent="#94A3B8" />
+                        {groupMode === "product" && row.seriesBreakdown && row.seriesBreakdown.length > 0 ? (
+                          <>
+                            <div className="rounded-2xl bg-[#F9FAFB] p-3 sm:col-span-2">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Per series</p>
+                              <ul className="mt-2 space-y-2">
+                                {row.seriesBreakdown.map((item) => (
+                                  <li key={item.key} className="rounded-xl bg-white px-3 py-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="truncate text-[11px] font-bold text-slate-700" title={item.label}>
+                                        {item.label}
+                                      </span>
+                                      <span className="shrink-0 text-[11px] font-bold tabular-nums text-slate-600">
+                                        {nfmt(item.units)} unit · {rp(item.revenue)}
+                                      </span>
+                                    </div>
+                                    {item.sizes.length > 0 ? (
+                                      <div className="mt-1.5 flex flex-wrap gap-1">
+                                        {item.sizes.map((size) => (
+                                          <span
+                                            key={size.label}
+                                            className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[10px] font-semibold text-slate-600"
+                                          >
+                                            {size.label} · {nfmt(size.units)}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                            <BreakdownColumn title="Per cover & hanger" items={row.covers} accent="#94A3B8" />
+                          </>
+                        ) : (
+                          <>
+                            <BreakdownColumn title="Per ukuran" items={row.sizes} accent="#475569" />
+                            <BreakdownColumn title="Per cover & hanger" items={row.covers} accent="#94A3B8" />
+                          </>
+                        )}
                         {compareVisible ? (
                           <div className="sm:col-span-2">
                             <p className="text-[11px] font-semibold text-slate-500">
@@ -492,7 +570,9 @@ export default function BestSellerSection() {
                 onClick={() => setShowAll((value) => !value)}
                 className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#E5E7EB] px-3 py-2 text-xs font-bold text-slate-600 hover:bg-[#F9FAFB]"
               >
-                {showAll ? "Tampilkan lebih sedikit" : `Lihat semua (${sorted.length} produk)`}
+                {showAll
+                  ? "Tampilkan lebih sedikit"
+                  : `Lihat semua (${sorted.length} ${groupMode === "product" ? "produk" : "baris"})`}
                 <ChevronDown size={14} className={showAll ? "rotate-180 transition-transform" : "transition-transform"} />
               </button>
             ) : null}
@@ -505,6 +585,13 @@ export default function BestSellerSection() {
             ) : compareOn && comparison ? (
               <p className="mt-3 text-[11px] font-semibold text-slate-400">
                 Belum ada data pembanding untuk {comparison.label}.
+              </p>
+            ) : null}
+
+            {totals?.fallbackItems ? (
+              <p className="mt-2 text-[11px] font-semibold text-amber-700">
+                {nfmt(totals.fallbackItems)} item lama tanpa relasi master ditampilkan terpisah (
+                {nfmt(totals.fallbackUnits)} unit).
               </p>
             ) : null}
           </div>
