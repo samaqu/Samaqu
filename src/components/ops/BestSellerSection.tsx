@@ -27,7 +27,7 @@ type BestSellerRow = {
   deltaPct: number | null;
   isNew: boolean;
   sizes: Breakdown[];
-  variants: Breakdown[];
+  covers: Breakdown[];
 };
 
 type BestSellerData = {
@@ -197,7 +197,8 @@ export default function BestSellerSection() {
           <div>
             <h2 className="text-lg font-black tracking-tight text-[#374151]">Produk Terlaris</h2>
             <p className="text-xs font-medium text-slate-500">
-              Peringkat produk induk (semua varian digabung) pada {data?.period.label || monthLabel(month)}.
+              Peringkat per produk, series, dan kain — size &amp; cover digabung — pada{" "}
+              {data?.period.label || monthLabel(month)}.
             </p>
           </div>
         </div>
@@ -361,7 +362,7 @@ export default function BestSellerSection() {
                   </p>
                   <p className="text-[11px] font-semibold text-slate-500">
                     {totals?.deltaPct === null
-                      ? `tanpa data ${comparison?.shortLabel}`
+                      ? `${nfmt(totals?.unitsPrev || 0)} unit di ${comparison?.shortLabel}`
                       : `${(totals?.deltaPct || 0) > 0 ? "+" : "−"}${pct(Math.abs(totals?.deltaPct || 0))}`}
                   </p>
                 </>
@@ -466,7 +467,7 @@ export default function BestSellerSection() {
                     {isOpen ? (
                       <div className="mb-3 grid gap-2 pl-9 sm:grid-cols-2">
                         <BreakdownColumn title="Per ukuran" items={row.sizes} accent="#475569" />
-                        <BreakdownColumn title="Per kain / opsi" items={row.variants} accent="#94A3B8" />
+                        <BreakdownColumn title="Per cover & hanger" items={row.covers} accent="#94A3B8" />
                         {compareVisible ? (
                           <div className="sm:col-span-2">
                             <p className="text-[11px] font-semibold text-slate-500">

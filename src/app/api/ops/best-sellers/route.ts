@@ -24,6 +24,13 @@ import {
  */
 
 const DAY_MS = 86_400_000;
+/**
+ * Basis pembanding terlalu kecil → persen menyesatkan (+100% dari 1 unit).
+ * Di bawah ambang ini UI hanya menampilkan selisih unit.
+ */
+const MIN_PCT_BASE = 5;
+const changePct = (current: number, previous: number) =>
+  previous >= MIN_PCT_BASE ? Math.round(((current - previous) / previous) * 1000) / 10 : null;
 const BULAN_SINGKAT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 const CHUNK = 120;
 
@@ -93,7 +100,10 @@ async function loadCatalog(admin: Admin, items: BestSellerItem[]): Promise<BestS
   const catalog: BestSellerCatalogRow[] = [];
   for (let i = 0; i < ids.length; i += CHUNK) {
     const chunk = ids.slice(i, i + CHUNK);
-    const { data, error } = await admin.from("products").select("id, name, category").in("id", chunk);
+    const { data, error } = await admin
+      .from("products")
+      .select("id, name, category, series, kain, jenis_kain(name)")
+      .in("id", chunk);
     if (error) throw new Error(error.message);
     catalog.push(...((data || []) as BestSellerCatalogRow[]));
   }
@@ -142,7 +152,7 @@ export async function GET(req: NextRequest) {
         ...row,
         prevUnits,
         deltaUnits: row.units - prevUnits,
-        deltaPct: prevUnits > 0 ? Math.round(((row.units - prevUnits) / prevUnits) * 1000) / 10 : null,
+        deltaPct: changePct(row.units, prevUnits),
         isNew: prevUnits === 0 && row.units > 0,
         share: currentAgg.units > 0 ? Math.round((row.units / currentAgg.units) * 1000) / 10 : 0,
       };
@@ -156,10 +166,10 @@ export async function GET(req: NextRequest) {
         units: 0,
         revenue: 0,
         sizes: [],
-        variants: [],
+        covers: [],
         prevUnits: row.units,
         deltaUnits: -row.units,
-        deltaPct: -100,
+        deltaPct: changePct(0, row.units),
         isNew: false,
         share: 0,
       });
@@ -199,10 +209,7 @@ export async function GET(req: NextRequest) {
         top: top ? { name: top.name, units: top.units } : null,
         unitsPrev: previousAgg.units,
         deltaUnits: currentAgg.units - previousAgg.units,
-        deltaPct:
-          previousAgg.units > 0
-            ? Math.round(((currentAgg.units - previousAgg.units) / previousAgg.units) * 1000) / 10
-            : null,
+        deltaPct: changePct(currentAgg.units, previousAgg.units),
       },
       rows,
     });
