@@ -18,7 +18,7 @@ import {
   orderStage,
   type OrderStageFilter,
 } from "@/lib/order-flow";
-import { ORDER_SOURCE_LABEL, SALE_STATUSES, orderSourceKey, orderSourceLabel } from "@/lib/transaksi";
+import { ORDER_SOURCE_LABEL, SALE_STATUSES, orderRevenue, orderSourceKey, orderSourceLabel, saleCount } from "@/lib/transaksi";
 import StageIcon from "@/components/ops/transaksi/StageIcon";
 import AnimatedNumber from "@/components/AnimatedNumber";
 import "@/app/ops/ops-transaksi.css";
@@ -36,6 +36,8 @@ export interface AdminOrderRow {
   shipping_status?: string | null;
   status: string;
   total: number;
+  /** Ongkir yang dibayar customer — diambil dari `order.total` oleh `orderRevenue()`. */
+  shipping_cost?: number | null;
   created_at: string;
   /** Sumber mentah dari database; label selalu lewat helper `orderSource*`. */
   source?: string | null;
@@ -147,11 +149,21 @@ export default function OrdersView({
     [searchedOrders, orderFilter],
   );
 
+  // KPI dihitung dari SELURUH pesanan periode itu (bukan hasil filter) — sama seperti menu Transaksi.
+  //
+  // Jumlah TRANSAKSI memakai aturan bersama `saleCount()` (diproses/dikirim/selesai): angka yang sama
+  // dengan menu Transaksi, dashboard ops, dan "N transaksi" di Laporan Keuangan. Dulu kartu ini
+  // menghitung SEMUA baris periode itu (termasuk belum bayar & dibatalkan), jadi angkanya beda
+  // sendiri dari layar lain. Jumlah semua pesanan masuk tetap tampil sebagai keterangan (`ordersIn`).
+  //
+  // Omset memakai `orderRevenue()` (harga PRODUK saja = total − ongkir) supaya sama dengan kartu
+  // "Omset bulan ini" di menu Transaksi & Laporan — `orders.total` masih memuat ongkir.
   const kpis = useMemo(() => {
     const sold = orders.filter((o) => (SALE_STATUSES as readonly string[]).includes(o.status));
     return {
-      total: orders.length,
-      revenue: sold.reduce((sum, o) => sum + (Number(o.total) || 0), 0),
+      total: saleCount(orders),
+      ordersIn: orders.length,
+      revenue: sold.reduce((sum, o) => sum + orderRevenue(o), 0),
       unpaid: orders.filter((o) => orderStage(o) === "belum_bayar").length,
       toProcess: orders.filter((o) => {
         const stage = orderStage(o);
@@ -174,6 +186,8 @@ export default function OrdersView({
 
   const sourceLabelText =
     orderSource === "all" ? "Semua sumber" : ORDER_SOURCE_LABEL[orderSource] || orderSource;
+  /** Keterangan kartu "Total transaksi" — bentuknya sama dengan menu Transaksi ops. */
+  const periodCaption = periodLabel || sourceLabelText;
   const filtersActive = Boolean(orderQuery) || orderFilter !== "semua" || orderSource !== "all";
   const resetFilters = () => {
     setOrderSearch("");
@@ -192,7 +206,7 @@ export default function OrdersView({
         <div className="card k">
           <small>Total transaksi</small>
           <b><AnimatedNumber value={loading ? 0 : kpis.total} /></b>
-          <i>{periodLabel || sourceLabelText}</i>
+          <i>{loading ? periodCaption : `${periodCaption} · dari ${kpis.ordersIn} pesanan masuk`}</i>
         </div>
         <div className="card k">
           <small>Omset bulan ini</small>

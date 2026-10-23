@@ -1390,6 +1390,14 @@ empat file: `src/app/ops/ongkir-jnt/page.tsx` (route tipis) → `src/components/
   `saleCount(orders)`** dan keterangannya *"<bulan> · dari N pesanan masuk"* (`panelKpis.ordersIn`),
   sehingga angkanya sama dengan laporan dan jumlah pesanan masuk tetap terlihat. Tab tahap di
   bawahnya tetap menghitung semua baris — tab itu filter daftar, bukan angka transaksi.
+  **Panel Order Management dashboard admin** (`src/components/admin/OrdersView.tsx`, 2026-10-23) ikut
+  disamakan: kartu **"Total transaksi"** di sana dulu memakai `orders.length`, jadi menampilkan SEMUA
+  baris periode itu (143 = 126 diakui + 5 belum bayar + 12 batal, angka yang terlihat di layar admin),
+  padahal layar lain berbunyi 126. Sekarang angka besarnya `saleCount(orders)` dan keterangannya
+  *"<bulan> · dari N pesanan masuk"* (`kpis.ordersIn`) — satu bentuk dengan menu Transaksi. Kartu
+  **"Omset bulan ini"** di panel yang sama juga ikut `orderRevenue()` (dulu menjumlah `o.total`, jadi
+  masih memuat ongkir: 51.634.621 vs 48.331.123 pada 2026-10). Tab tahap + filter "Belum di packing"
+  tetap menghitung semua baris — itu filter daftar, bukan angka transaksi.
 - **Basis tanggal omzet di Laporan Keuangan saat ini = `orders.created_at`** (bulan WIB, hanya
   `SALE_STATUSES`), sedangkan beban ongkir di halaman ini memakai tanggal pengiriman. Dua basis itu
   memang beda dan sudah dilabeli di UI — jangan disamakan tanpa mengubah Laporan juga.
