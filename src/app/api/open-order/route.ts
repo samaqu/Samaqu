@@ -612,7 +612,7 @@ export async function POST(request: NextRequest) {
       }),
     ]);
 
-    return NextResponse.json({ success: true, orderNumber, total, awbNo: null, paymentUrl });
+    return NextResponse.json({ success: true, orderNumber, total, productTotal: subtotal + addonTotal, awbNo: null, paymentUrl });
   } catch (error) {
     console.error("[OPEN-ORDER] Failed:", error);
     return NextResponse.json({ error: "Terjadi kesalahan server" }, { status: 500 });

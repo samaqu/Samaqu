@@ -35,6 +35,22 @@ async function getConfig(): Promise<CachedConfig | null> {
       cacheTimestamp = now;
       return cachedConfig;
     }
+
+    // Fallback: Pixel ID dari environment (NEXT_PUBLIC_META_PIXEL_ID / META_PIXEL_ID) —
+    // dipakai kalau dashboard belum menyimpan Pixel ID. Access token tetap wajib ada.
+    const envPixelId = (process.env.META_PIXEL_ID || process.env.NEXT_PUBLIC_META_PIXEL_ID || "").trim();
+    const dbPixelId = (data?.meta_pixel_id || "").trim();
+    const pixelId = dbPixelId || envPixelId;
+    const enabled = dbPixelId ? Boolean(data?.meta_pixel_enabled) : Boolean(envPixelId);
+    if (pixelId && enabled && data?.meta_access_token) {
+      cachedConfig = {
+        pixelId,
+        accessToken: data.meta_access_token,
+        testEventCode: data.meta_test_event_code || undefined,
+      };
+      cacheTimestamp = now;
+      return cachedConfig;
+    }
   } catch {
     // Return cached if available
   }

@@ -39,6 +39,7 @@ import { getCurrentCustomer } from "@/lib/customer-auth";
 import { localPhone } from "@/lib/whatsapp";
 import { fetchActivePaymentMethods, isOnlinePaymentMethod, type PaymentMethodRow } from "@/lib/payment-methods";
 import { startOnlinePayment } from "@/lib/mayar-client";
+import { sendCAPIEvent, trackAddToCart, trackPurchaseOnce } from "@/lib/meta-pixel";
 import { supabase } from "@/lib/supabase";
 import StepAuth, { type AuthAccount } from "./StepAuth";
 import StepCart from "./StepCart";
@@ -394,6 +395,15 @@ export default function OpenOrderWizard({
     setNextKey((key) => key + 1);
     setDraft(null);
     setStep(3);
+
+    // Meta Pixel: AddToCart — setelah baris benar-benar masuk keranjang wizard.
+    trackAddToCart({
+      id: line.productId,
+      name: findOpenOrderProduct(products, line.productId)?.name || "Open Order",
+      price: line.price,
+      quantity: line.quantity,
+      contents: [{ id: line.productId, quantity: line.quantity, item_price: line.price }],
+    });
   }
 
   function updateQuantity(key: number, quantity: number) {
@@ -540,6 +550,39 @@ export default function OpenOrderWizard({
       }
       setResult({ orderNumber: data.orderNumber, total: data.total });
       setStep(6);
+
+      // Meta Pixel: Purchase — hanya setelah server benar-benar menyimpan pesanan.
+      // Nilai = semua item produk (termasuk add-on Cover & Hanger), TANPA ongkir.
+      const contents = lines.map((line) => ({
+        id: line.productId,
+        quantity: line.quantity,
+        item_price: line.price,
+      }));
+      const contentIds = Array.from(new Set(contents.map((item) => item.id)));
+      const numItems = contents.reduce((sum, item) => sum + item.quantity, 0);
+      const productTotal =
+        Number(data.productTotal) || subtotal + (extraCover ? OPEN_ORDER_ADDON.price : 0);
+      const purchase = trackPurchaseOnce({
+        orderId: String(data.orderNumber),
+        value: productTotal,
+        contentIds,
+        contents,
+        numItems,
+      });
+      if (purchase.isNew) {
+        sendCAPIEvent("Purchase", purchase.eventId, {
+          value: productTotal,
+          currency: "IDR",
+          content_ids: contentIds,
+          contents,
+          content_type: "product",
+          num_items: numItems,
+          order_id: String(data.orderNumber),
+        }, {
+          phone: customer.whatsapp,
+          externalId: String(data.orderNumber),
+        });
+      }
       // Pembayaran online (Mayar): link bayar dibuat server saat pesanan dibuat, jadi customer
       // langsung diarahkan ke halaman Mayar. Gagal → tetap di halaman sukses; link bayar juga bisa
       // dibuka dari detail pesanan.

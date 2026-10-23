@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 import { motion } from "framer-motion";
 import { ShieldCheck, Copy, Check, Clock, MessageCircle, ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { trackPurchase, trackLead, sendCAPIEvent } from "@/lib/meta-pixel";
+import { trackPurchaseOnce, trackLead, sendCAPIEvent } from "@/lib/meta-pixel";
 import { isPaketItem, itemNameSuffix } from "@/lib/item-label";
 import { normalizeMethodType, paymentMethodLabel, type PaymentMethodRow } from "@/lib/payment-methods";
 import { useResolvedPaymentMethod } from "@/lib/use-payment-methods";
@@ -25,7 +25,7 @@ interface OrderData {
   shipping_method: string;
   payment_method: string;
   created_at: string;
-  order_items: { product_name: string; color: string; size: string; quantity: number; price: number }[];
+  order_items: { product_id?: string | null; product_name: string; color: string; size: string; quantity: number; price: number }[];
 }
 
 function CheckoutSuccessContent() {
@@ -70,7 +70,7 @@ function CheckoutSuccessContent() {
             .catch(() => ({ data: null }))
         : supabase
             .from("orders")
-            .select("*, order_items(product_name, color, size, quantity, price)")
+            .select("*, order_items(product_id, product_name, color, size, quantity, price)")
             .eq("order_number", orderId)
             .single();
       const [orderRes, paymentRes, settingsRes] = await Promise.all([
@@ -79,23 +79,41 @@ function CheckoutSuccessContent() {
         supabase.from("store_settings").select("whatsapp, store_name, tagline").eq("id", 1).single(),
       ]);
       if (orderRes.data) setOrder(orderRes.data as unknown as OrderData);
-      // Meta Pixel: Purchase
+      // Meta Pixel: Purchase — hanya sekali per pesanan (aman saat halaman di-refresh).
+      // Nilai = subtotal produk saja, ongkir TIDAK dihitung.
       if (orderRes.data) {
         const orderData = orderRes.data as any;
-        const contentIds = (orderData.order_items || []).map((_: any, i: number) => `item-${i}`);
-        const numItems = (orderData.order_items || []).length;
-        const { eventId } = trackPurchase(orderData.total, orderData.order_number, contentIds, numItems);
-        sendCAPIEvent("Purchase", eventId, {
-          value: orderData.total,
-          currency: "IDR",
-          content_ids: contentIds,
-          content_type: "product",
-          num_items: numItems,
-          order_id: orderData.order_number,
-        }, {
-          phone: orderData.customer_whatsapp,
-          externalId: orderData.order_number,
+        const items: NonNullable<OrderData["order_items"]> = orderData.order_items || [];
+        const contents = items.map((item, i) => ({
+          id: String(item.product_id || item.product_name || `item-${i}`),
+          quantity: Number(item.quantity) || 1,
+          item_price: Number(item.price) || 0,
+        }));
+        const contentIds = Array.from(new Set(contents.map((item) => item.id)));
+        const numItems = contents.reduce((sum, item) => sum + item.quantity, 0);
+        const purchaseValue = Number(orderData.subtotal) || 0;
+
+        const purchase = trackPurchaseOnce({
+          orderId: orderData.order_number,
+          value: purchaseValue,
+          contentIds,
+          contents,
+          numItems,
         });
+        if (purchase.isNew) {
+          sendCAPIEvent("Purchase", purchase.eventId, {
+            value: purchaseValue,
+            currency: "IDR",
+            content_ids: contentIds,
+            contents,
+            content_type: "product",
+            num_items: numItems,
+            order_id: orderData.order_number,
+          }, {
+            phone: orderData.customer_whatsapp,
+            externalId: orderData.order_number,
+          });
+        }
       }
       if (paymentRes.data) setPaymentMethods(paymentRes.data);
       if (settingsRes.data) setStoreSettings((prev) => ({ ...prev, ...settingsRes.data }));

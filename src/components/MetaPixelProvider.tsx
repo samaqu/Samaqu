@@ -4,7 +4,12 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback } f
 import { usePathname } from "next/navigation";
 import Script from "next/script";
 import { supabase } from "@/lib/supabase";
-import { setMetaPixelConfig, trackPageView, type MetaPixelConfig } from "@/lib/meta-pixel";
+import {
+  flushMetaPixelQueue,
+  setMetaPixelConfig,
+  trackPageView,
+  type MetaPixelConfig,
+} from "@/lib/meta-pixel";
 
 // ── Context ──
 
@@ -17,6 +22,24 @@ const MetaPixelContext = createContext<MetaPixelContextValue>({ config: null, is
 
 export function useMetaPixel() {
   return useContext(MetaPixelContext);
+}
+
+/* ── Pixel ID dari environment ──
+   `NEXT_PUBLIC_META_PIXEL_ID` dipakai kalau dashboard admin belum menyimpan Pixel ID.
+   Nilai dari store_settings tetap MENANG supaya admin bisa mengganti / mematikan pixel
+   tanpa redeploy. ID wajib numerik — jangan pernah menyisipkan nilai bebas ke base code. */
+const ENV_PIXEL_ID = (process.env.NEXT_PUBLIC_META_PIXEL_ID || "").trim();
+const PIXEL_ID_PATTERN = /^\d{8,20}$/;
+
+function validPixelId(value: string | null | undefined): string {
+  const id = (value || "").trim();
+  return PIXEL_ID_PATTERN.test(id) ? id : "";
+}
+
+// Test event code hanya boleh alfanumerik — nilainya masuk ke inline script.
+function validTestEventCode(value: string | null | undefined): string {
+  const code = (value || "").trim();
+  return /^[A-Za-z0-9]{1,32}$/.test(code) ? code : "";
 }
 
 // ── Config cache (module-level, 5 min TTL) ──
@@ -32,23 +55,33 @@ async function fetchConfig(): Promise<MetaPixelConfig | null> {
   try {
     const { data } = await supabase
       .from("store_settings")
-      .select("meta_pixel_id, meta_access_token, meta_pixel_enabled, meta_test_event_code")
+      .select("meta_pixel_id, meta_pixel_enabled, meta_test_event_code")
       .eq("id", 1)
-      .single();
+      .maybeSingle();
 
-    if (data?.meta_pixel_id && data?.meta_pixel_enabled) {
+    const dbPixelId = validPixelId(data?.meta_pixel_id);
+    const envPixelId = validPixelId(ENV_PIXEL_ID);
+
+    if (dbPixelId) {
+      // Ada Pixel ID di dashboard → status aktif/nonaktif admin yang menentukan.
       cachedConfig = {
-        pixelId: data.meta_pixel_id,
-        enabled: true,
-        accessToken: data.meta_access_token || undefined,
-        testEventCode: data.meta_test_event_code || undefined,
+        pixelId: dbPixelId,
+        enabled: Boolean(data?.meta_pixel_enabled),
+        testEventCode: validTestEventCode(data?.meta_test_event_code) || undefined,
       };
+    } else if (envPixelId) {
+      // Belum diatur di dashboard → pakai environment variable.
+      cachedConfig = { pixelId: envPixelId, enabled: true };
     } else {
       cachedConfig = null;
     }
     cacheTimestamp = now;
   } catch {
-    // Keep cached config on error
+    // Gagal baca settings: tetap pakai env kalau ada, kalau tidak biarkan cache lama.
+    const envPixelId = validPixelId(ENV_PIXEL_ID);
+    if (!cachedConfig && envPixelId) {
+      cachedConfig = { pixelId: envPixelId, enabled: true };
+    }
   }
 
   return cachedConfig;
@@ -58,15 +91,17 @@ async function fetchConfig(): Promise<MetaPixelConfig | null> {
 
 export default function MetaPixelProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<MetaPixelConfig | null>(null);
-  const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [scriptReady, setScriptReady] = useState(false);
   const pathname = usePathname();
-  const initialPageViewFired = useRef(false);
+  const lastTrackedPath = useRef<string | null>(null);
 
   // Fetch config on mount + on window focus (for pixel ID changes)
   const loadConfig = useCallback(async () => {
     const cfg = await fetchConfig();
     setConfig(cfg);
     setMetaPixelConfig(cfg);
+    // Event yang terjadi sebelum config siap ikut dikirim begitu pixel siap.
+    flushMetaPixelQueue();
   }, []);
 
   useEffect(() => {
@@ -77,30 +112,30 @@ export default function MetaPixelProvider({ children }: { children: React.ReactN
     return () => window.removeEventListener("focus", handleFocus);
   }, [loadConfig]);
 
-  // Fire initial PageView after script loads
-  useEffect(() => {
-    if (scriptLoaded && config?.enabled && !initialPageViewFired.current) {
-      initialPageViewFired.current = true;
-      trackPageView();
-    }
-  }, [scriptLoaded, config]);
+  const handleScriptReady = useCallback(() => {
+    setScriptReady(true);
+    flushMetaPixelQueue();
+  }, []);
 
-  // Track PageView on route change (SPA navigation)
-  const prevPathname = useRef(pathname);
+  /* PageView sekali per pathname — termasuk halaman pertama dan setiap perpindahan route SPA.
+     `lastTrackedPath` memastikan tidak ada PageView dobel saat config/script baru siap
+     (dulu efek "initial" + efek "route change" bisa menembak dua kali untuk halaman yang sama). */
   useEffect(() => {
-    if (scriptLoaded && config?.enabled && pathname !== prevPathname.current) {
-      prevPathname.current = pathname;
-      trackPageView();
-    }
-  }, [pathname, scriptLoaded, config]);
+    if (!scriptReady || !config?.enabled) return;
+    if (lastTrackedPath.current === pathname) return;
+    lastTrackedPath.current = pathname;
+    trackPageView();
+  }, [pathname, scriptReady, config]);
 
   return (
-    <MetaPixelContext.Provider value={{ config, isReady: scriptLoaded && !!config?.enabled }}>
-      {/* Meta Pixel base code */}
+    <MetaPixelContext.Provider value={{ config, isReady: scriptReady && !!config?.enabled }}>
+      {/* Meta Pixel base code — satu kali di layout global */}
       {config?.enabled && config.pixelId && (
         <Script
           id="meta-pixel"
           strategy="afterInteractive"
+          onReady={handleScriptReady}
+          onLoad={handleScriptReady}
           dangerouslySetInnerHTML={{
             __html: `
               !function(f,b,e,v,n,t,s)
@@ -115,7 +150,6 @@ export default function MetaPixelProvider({ children }: { children: React.ReactN
               ${config.testEventCode ? `fbq('set', 'agent', '${config.testEventCode}');` : ""}
             `,
           }}
-          onLoad={() => setScriptLoaded(true)}
         />
       )}
       {children}

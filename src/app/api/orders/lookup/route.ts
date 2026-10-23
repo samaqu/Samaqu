@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await getSupabaseAdmin()
     .from("orders")
-    .select("*, order_items(product_name, color, size, quantity, price)")
+    .select("*, order_items(product_id, product_name, color, size, quantity, price)")
     .eq("order_number", orderNumber)
     .maybeSingle();
 

@@ -296,13 +296,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     });
   }, [id, searchParams]);
 
-  // Meta Pixel: ViewContent
+  // Meta Pixel: ViewContent — sekali per produk yang benar-benar dibuka
+  const viewContentTracked = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (product) {
+    if (product && !viewContentTracked.current.has(product.id)) {
+      viewContentTracked.current.add(product.id);
       trackViewContent({
         id: product.id,
         name: product.name,
-        price: product.price,
+        price: product.create_your_price_enabled ? (product.minimum_price ?? product.price) : product.price,
         category: product.category,
       });
     }
@@ -525,12 +527,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         : undefined,
     );
 
-    // Meta Pixel: AddToCart
+    // Meta Pixel: AddToCart — harga yang benar-benar masuk keranjang (termasuk Create Your Price)
+    const trackedUnitPrice = isCYP ? finalCYPPrice : currentPrice;
     trackAddToCart({
       id: displayId,
       name: product.name,
-      price: isCYP ? minimumPrice : currentPrice,
+      price: trackedUnitPrice,
       quantity: qty,
+      contents: [{ id: displayId, quantity: qty, item_price: trackedUnitPrice }],
     });
   }
 
