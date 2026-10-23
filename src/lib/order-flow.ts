@@ -110,12 +110,17 @@ export interface ShippingSource {
   status?: string;
   shipping_status?: string | null;
   awb_no?: string | null;
+  /** `voided` = resi sudah dibatalkan di J&T (kolom `orders.jnt_void_status`). */
+  jnt_void_status?: string | null;
 }
 
 export function shippingStatusOf(order: ShippingSource): ShippingStatus | null {
   // Pesanan dibatalkan → jangan tampilkan progres pengiriman. Kalau tidak, pesanan batal masih
   // memperlihatkan "Menunggu Pickup" (resi yang sudah di-void) — tidak konsisten dengan status batal.
   if (order.status === "dibatalkan") return null;
+  // Resi sudah di-void tapi pesanan belum dibatalkan (void dilakukan di dashboard J&T): tidak ada
+  // paket yang berjalan, jadi status pengirimannya juga tidak boleh ditampilkan.
+  if (order.jnt_void_status === "voided") return null;
   if (order.shipping_status === "menunggu_pickup" || order.shipping_status === "dikirim" || order.shipping_status === "selesai") {
     return order.shipping_status;
   }

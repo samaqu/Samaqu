@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TrackHistoryItem, TrackResponse } from "./types";
-import { isDelivered, isShipped, orderRank, shippingRank } from "./track-status";
+import { isDelivered, isShipped, isVoided, orderRank, shippingRank } from "./track-status";
 import { notifyCustomerOrderDelivered, notifyCustomerOrderShipped } from "../fonnte";
 import { claimOrderNotification, recordShippedNotifyStatus, sendOnce } from "../order-notify";
 import { syncCommissionStatus } from "../affiliate/commission";
@@ -28,6 +28,8 @@ export interface SyncOrder {
   customer_whatsapp?: string | null;
   /** Penanda notifikasi "dikirim" sudah dikirim (kolom `orders.shipped_notified_at`). */
   shipped_notified_at?: string | null;
+  /** `voided` = resi sudah dibatalkan di J&T (kolom `orders.jnt_void_status`). */
+  jnt_void_status?: string | null;
 }
 
 export interface TrackOutcome {
@@ -136,6 +138,14 @@ export async function applyTrackingToOrder(
     snapshot.tracking_status_text = latest.status ?? null;
     snapshot.tracking_city = latest.city_name ?? null;
     snapshot.tracking_updated_at = new Date().toISOString();
+  }
+
+  // 2b) Resi yang di-void LANGSUNG di dashboard J&T (bukan lewat panel kita) hanya terlihat dari
+  // riwayatnya (kode 162/163). Tandai supaya label resi mati tidak tercetak lagi dan status
+  // pengirimannya tidak ditampilkan. Hanya penanda — status pesanan tidak disentuh di sini.
+  if (!order.jnt_void_status && isVoided(track.data)) {
+    snapshot.jnt_void_status = "voided";
+    snapshot.jnt_voided_at = new Date().toISOString();
   }
 
   // 3) API gagal / riwayat kosong → JANGAN ubah status pesanan.

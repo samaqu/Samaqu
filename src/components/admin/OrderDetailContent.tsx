@@ -81,6 +81,8 @@ export interface AdminDetailOrder {
   weight?: number | null;
   /** Status pengiriman terpisah dari status pesanan (menunggu_pickup | dikirim | selesai). */
   shipping_status?: string | null;
+  /** `voided` = resi sudah dibatalkan di J&T (kolom `orders.jnt_void_status`). */
+  jnt_void_status?: string | null;
   source?: string | null;
   tracking_status_text?: string | null;
   /** Kode pemindaian terakhir — dipakai mendeteksi status tertunda (badge "Tertunda"). */
@@ -209,6 +211,10 @@ export default function OrderDetailContent({
   const steps = strukSteps(order);
   const items = order.order_items || [];
   const resi = order.awb_no || "";
+  // Resi yang sudah di-void tidak boleh ditawari cetak label/batalkan lagi. Sumbernya kolom
+  // `jnt_void_status`; pesanan `dibatalkan` yang dibuat sebelum kolom itu ada tetap tertangkap
+  // lewat statusnya (semua jalur pembatalan memang mem-void resi lebih dulu).
+  const resiVoided = !!resi && (order.jnt_void_status === "voided" || order.status === "dibatalkan");
   const wa = waNumber(order.customer_whatsapp);
   // Pesan chat sudah terisi (satu teks standar untuk semua pesanan) supaya admin tinggal
   // kirim — teksnya di `pesanPembayaran`, hanya nama panggilan pelanggan dan nomor
@@ -536,16 +542,24 @@ export default function OrderDetailContent({
     </button>
   ) : null;
 
-  const cancelJntAction = resi && order.status !== "dibatalkan" && onCancelJnt ? (
+  const cancelJntAction = resi && !resiVoided && onCancelJnt ? (
     <button type="button" className="od-a od-a-danger" onClick={onCancelJnt}>
       Batalkan J&amp;T
     </button>
   ) : null;
 
-  const labelAction = resi ? (
+  // Label resi yang sudah di-void tidak ditawari lagi: kalau tercetak, label mati itu bisa
+  // ditempel ke paket. Nomor resinya tetap disimpan (jejak audit) dan tetap terlihat di atas.
+  const labelAction = resi && !resiVoided ? (
     <a href={`/admin/label/${order.order_number}`} target="_blank" rel="noopener noreferrer" className="od-a">
       Cetak Label
     </a>
+  ) : null;
+
+  const voidNote = resiVoided ? (
+    <p className="od-hint">
+      Resi {resi} sudah dibatalkan di J&amp;T, jadi labelnya tidak bisa dicetak lagi.
+    </p>
   ) : null;
 
   const deleteAction = (
@@ -687,6 +701,8 @@ export default function OrderDetailContent({
                   )}
                 </div>
               ) : null}
+
+              {voidNote}
 
               <div className="od-acts">
                 {/* Paket sudah dikirim → hanya dua aksi utama (Lacak Paket + Hubungi via

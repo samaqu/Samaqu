@@ -27,6 +27,20 @@ export const JNT_NON_SHIPPING_CODES: ReadonlySet<number> = new Set([101, 151, 16
 /** Kode "Manifes" — resi baru dibuat, bukan pergerakan paket. */
 export const JNT_MANIFEST_CODE = 101;
 
+/** Kode tracking J&T yang berarti resinya sudah dibatalkan (di-void). */
+export const JNT_VOID_CODES: ReadonlySet<number> = new Set([162, 163]);
+
+/**
+ * Riwayat menunjukkan resi sudah di-void di J&T. Dipakai menandai `orders.jnt_void_status` supaya
+ * label resi mati tidak tercetak lagi — termasuk void yang dilakukan langsung di dashboard J&T,
+ * yang tidak lewat aplikasi ini.
+ */
+export function isVoided(data: { history?: TrackHistoryItem[] | null } | null | undefined): boolean {
+  return !!data?.history?.some(
+    (h) => typeof h?.status_code === "number" && JNT_VOID_CODES.has(h.status_code),
+  );
+}
+
 /**
  * Paket dianggap **sudah dikirim** (diserahkan ke J&T / dipindai kurir) bila J&T memuat minimal
  * satu entri riwayat yang BUKAN artefak pembuatan resi (lihat `JNT_NON_SHIPPING_CODES`).

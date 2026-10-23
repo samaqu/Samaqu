@@ -122,15 +122,39 @@ export async function cancelOrderCompletely(
   // dijalankan manual di SQL Editor Supabase. Selama SQL itu belum dijalankan, update diulang
   // tanpa kolom tersebut supaya pembatalan tetap jalan — jam batalnya jatuh ke `updated_at`.
   const cancelledAt = new Date().toISOString();
-  const statusUpdate = { status: "dibatalkan", updated_at: cancelledAt };
-  let { error } = await supabase
-    .from("orders")
-    .update({ ...statusUpdate, cancelled_at: cancelledAt })
-    .eq("id", order.id);
+  // Penanda void hanya ditulis kalau resi benar-benar di-void (`cancelId` ada). `awb_no` sengaja
+  // TIDAK dikosongkan: nomornya tetap jejak audit, dan yang membedakan resi mati dari resi aktif
+  // adalah kolom ini (dipakai guard label di /admin/label/<no-pesanan>).
+  type CancelUpdate = {
+    status: string;
+    updated_at: string;
+    cancelled_at?: string;
+    jnt_void_status?: string;
+    jnt_voided_at?: string;
+  };
+  const payload: CancelUpdate = {
+    status: "dibatalkan",
+    updated_at: cancelledAt,
+    cancelled_at: cancelledAt,
+    ...(cancelId ? { jnt_void_status: "voided", jnt_voided_at: cancelledAt } : {}),
+  };
 
-  if (error?.message?.includes("cancelled_at")) {
-    console.warn("[CANCEL] orders.cancelled_at belum ada (SQL-nya belum dijalankan), menulis tanpa kolom itu:", error.message);
-    ({ error } = await supabase.from("orders").update(statusUpdate).eq("id", order.id));
+  let { error } = await supabase.from("orders").update(payload).eq("id", order.id);
+
+  // Kolom-kolom baru datang dari SQL yang dijalankan manual di Supabase. Selama belum ada,
+  // PostgREST menolak SELURUH update — buang kolom yang disebut pesannya lalu ulangi, supaya
+  // pembatalan tetap jalan dan hanya penandanya yang belum tersimpan.
+  while (error) {
+    const missing = (["jnt_void_status", "jnt_voided_at", "cancelled_at"] as const).find((k) =>
+      error!.message.includes(k)
+    );
+    if (!missing) break;
+    console.warn(
+      `[CANCEL] orders.${missing} belum ada (SQL-nya belum dijalankan), mengulang tanpa kolom itu:`,
+      error.message
+    );
+    delete payload[missing];
+    ({ error } = await supabase.from("orders").update(payload).eq("id", order.id));
   }
 
   if (error) {

@@ -24,6 +24,8 @@ interface OrderData {
   weight: number | null;
   awb_no: string | null;
   status: string;
+  /** `voided` = resi sudah dibatalkan di J&T (kolom `orders.jnt_void_status`). */
+  jnt_void_status?: string | null;
   created_at: string;
   order_items?: { product_id?: string; product_name: string; color: string; size: string; series?: string | null; kain?: string | null; quantity: number; price: number }[];
 }
@@ -133,6 +135,14 @@ export default function LabelPage() {
 
       if (fetchErr || !data) {
         setError(res.status === 401 ? "Login admin dulu untuk membuka label resi." : "Label tidak ditemukan");
+        setLoading(false);
+        return;
+      }
+
+      // Resi yang sudah di-void tidak boleh dicetak: label mati yang ditempel ke paket bisa
+      // menyangkut di sortir J&T. Nomor resinya tetap tersimpan sebagai jejak audit.
+      if (data.status === "dibatalkan" || data.jnt_void_status === "voided") {
+        setError("Resi pesanan ini sudah dibatalkan di J&T, jadi labelnya tidak bisa dicetak lagi.");
         setLoading(false);
         return;
       }

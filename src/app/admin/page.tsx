@@ -67,6 +67,8 @@ interface Order {
   created_at: string;
   /** Jam pembatalan yang akurat (kolom `orders.cancelled_at`), dibaca `waktuBatal`. */
   cancelled_at?: string | null;
+  /** `voided` = resi sudah dibatalkan di J&T (kolom `orders.jnt_void_status`). */
+  jnt_void_status?: string | null;
   /** Jam perubahan terakhir; cadangan jam pembatalan kalau `cancelled_at` masih kosong. */
   updated_at?: string;
   order_items?: { product_id?: string | null; product_name: string; color: string; size: string; series?: string | null; kain?: string | null; quantity: number; price: number; customer_price: number | null; minimum_price: number | null; product_image?: string | null }[];
@@ -663,10 +665,13 @@ function AdminPageInner() {
           toast.showToast("error", data.error || "Gagal membatalkan J&T");
           return;
         }
+        // `jnt_void_status` ikut ditimpa supaya tombol Cetak Label langsung hilang di drawer
+        // tanpa perlu memuat ulang (server menulis nilai yang sama — lihat cancel-order.ts).
         const cancelledAt = new Date().toISOString();
-        setOrders((prev) => prev.map((o) => o.order_number === order.order_number ? { ...o, status: "dibatalkan", cancelled_at: cancelledAt, updated_at: cancelledAt } : o));
-        setDashOrders((prev) => prev.map((o) => o.order_number === order.order_number ? { ...o, status: "dibatalkan", cancelled_at: cancelledAt, updated_at: cancelledAt } : o));
-        setSelectedOrder((prev) => prev && prev.order_number === order.order_number ? { ...prev, status: "dibatalkan", cancelled_at: cancelledAt, updated_at: cancelledAt } : prev);
+        const patch = { status: "dibatalkan", cancelled_at: cancelledAt, updated_at: cancelledAt, jnt_void_status: "voided" };
+        setOrders((prev) => prev.map((o) => o.order_number === order.order_number ? { ...o, ...patch } : o));
+        setDashOrders((prev) => prev.map((o) => o.order_number === order.order_number ? { ...o, ...patch } : o));
+        setSelectedOrder((prev) => prev && prev.order_number === order.order_number ? { ...prev, ...patch } : prev);
         toast.showToast("success", "Berhasil membatalkan pesanan di J&T");
       } catch (err) {
         console.error("Cancel J&T error:", err);

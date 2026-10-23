@@ -75,6 +75,8 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
 
   const awb = createdAwb || order?.awb_no || "";
   const cancelled = order?.status === "dibatalkan";
+  /** Resi sudah di-void di J&T (`orders.jnt_void_status`) — labelnya tidak boleh dicetak lagi. */
+  const voided = cancelled || order?.jnt_void_status === "voided";
   /** Baris kecil di bawah status: lokasi + waktu scan terakhir dari J&T. */
   const trackingMeta = latestTracking
     ? [latestTracking.location, formatTrackingTime(latestTracking.dateTime)].filter(Boolean).join(" · ")
@@ -84,9 +86,9 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
   // dipanggil dari luar lewat ref, supaya dialog pilih ukuran tetap satu sumber di sini.
   useImperativeHandle(ref, () => ({
     print: () => {
-      if (awb && !cancelled) setPrintSize(labelSize);
+      if (awb && !voided) setPrintSize(labelSize);
     },
-  }), [awb, cancelled, labelSize]);
+  }), [awb, voided, labelSize]);
 
   if (!order) return null;
 
@@ -351,7 +353,7 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
             </p>
           ) : null}
 
-          {!cancelled && !hidePrintButton ? (
+          {!voided && !hidePrintButton ? (
             /* Satu tombol saja (alurnya sama dengan "Buat Resi" / "Atur Pesanan"): klik → popup
                → pilih ukuran label → halaman label dibuka di tab baru. */
             <button
