@@ -1394,9 +1394,11 @@ empat file: `src/app/ops/ongkir-jnt/page.tsx` (route tipis) → `src/components/
   keterangannya **dipendekkan 2026-10-23** (pemilik: "keterangan card di dashboard update broo biar
   ga terlalu panjang bikin informatif"): dulu *"Termasuk belum bayar/batal · N transaksi diakui
   (diproses/dikirim/selesai)"*, sekarang `SALE_COUNT_NOTE` = "transaksi diakui" saja
-  (`src/lib/transaksi.ts`; status yang dihitung tetap `SALE_STATUSES`): angka besarnya tetap jumlah semua pesanan
-  masuk (`Pesanan` di dashboard admin, `Pesanan masuk` di panel admin), sedangkan angka keterangan
-  yang wajib sama dengan laporan. Jangan menghitung ulang filter status di layar — pakai `saleCount`.
+  (`src/lib/transaksi.ts`; status yang dihitung tetap `SALE_STATUSES`). Dulu angka besar kartunya =
+  jumlah SEMUA pesanan masuk dan `saleCount` hanya jadi keterangan kecil; **sejak 2026-10-24** kartu
+  "Pesanan Masuk" (dashboard admin) dan "Pesanan masuk" (beranda panel-admin) memakai `saleCount()`
+  sebagai NILAI besarnya dengan keterangan "dari N pesanan masuk \<periode\>" (N = semua pesanan
+  periode itu). Jangan menghitung ulang filter status di layar — pakai `saleCount`.
   **Menu Transaksi** (`/panel-admin/transaksi` dan `/ops/transaksi`, satu komponen
   `src/app/ops/transaksi/page.jsx`) sempat beda sendiri: kartu **"Total transaksi"** di sana memakai
   `orders.length`, jadi menampilkan SEMUA baris bulan itu (mis. 143 = 126 diakui + 5 belum bayar +
@@ -1565,8 +1567,8 @@ lihat butir terakhir di bagian ini.
   Rata-rata Rp 383.580 / "per transaksi diakui" · Belum di Packing 10; donut tetap **132**
   (selesai 99 · 75%, diproses 13 · 10%, dikirim 14 · 11%, pending 6 · 5%) = 126 + 6; klik `<` →
   September kartu **13** (0 belum bayar, 3 batal) dan donut 13; caption keempat kartu **tidak
-  terpotong** di 4 kolom desktop maupun 375 px; 0 error console. **Belum diuji**: kartu "Pesanan
-  masuk" di panel-admin (sengaja belum diubah — masih menghitung semua pesanan hari itu) dan angka
+  terpotong** di 4 kolom desktop maupun 375 px; 0 error console. Kartu "Pesanan masuk" di panel-admin
+  **sudah disamakan 2026-10-24** (lihat "Keterangan kartu Transaksi"). **Belum diuji**: angka
   mentah REST (`/api/ops/orders` membalas 401 untuk sesi preview, jadi kecocokan 132 − 6 = 126
   dibuktikan dari donut di halaman yang sama, bukan dari query terpisah).
 - **Verifikasi (2026-10-23, sesi admin diputar ulang via preview)**: `npx tsc --noEmit` bersih;
@@ -1662,6 +1664,31 @@ padanan di layar lain. Jadi keempat keterangan mockup sekarang terbaca di panel 
 menu Transaksi; jumlah SEMUA pesanan periode itu (mis. 145) hanya muncul di keterangan, **bukan**
 sebagai nilai kartu (`saleCount` tetap nilai besarnya). `npx tsc --noEmit` bersih; tampilan belum
 diperiksa ulang di browser (pemilik minta tidak diverifikasi lama).
+
+**Beranda panel admin disamakan 2026-10-24** (permintaan pemilik: *"samakan semua teks caption KPI
+di Panel-Admin agar seragam dengan Admin dan Ops"*, lalu jawabannya *"dari 145 pesanan masuk
+Oktober 2026 yg ini loh"* + pilihan **"Ikut Admin persis"**): kartu **"Pesanan masuk"** di
+`src/app/panel-admin/(panel)/page.tsx` sekarang **persis** kartu *Pesanan Masuk* dashboard admin —
+nilai besarnya `saleCount(todayOrders)` (transaksi diakui) dan keterangannya **"dari N pesanan
+masuk hari ini"** (N = SEMUA pesanan hari itu); catatan kecil "N transaksi diakui" dihapus (angkanya
+sudah jadi nilai besar) dan rinciannya pindah ke tooltip kartu (`hint`), sedangkan chip tren
+membandingkan himpunan yang sama (`saleCount` hari ini vs kemarin) seperti di admin. Karena itu
+`SALE_COUNT_NOTE` tidak lagi diimpor di file itu. Tiga kartu lain sengaja **tidak** diubah — tidak
+punya padanan di Admin/Ops: `Omset hari ini` (keterangan "Dari kemarin" = pembanding harian),
+`Perlu dikirim`/"Menunggu resi", dan `Varian menipis`/"Sisa stok 1–5 unit". Caption kartunya kini
+~30 karakter sementara `.stFoot` dulu `white-space: nowrap` → `panel.module.css` membuat baris kaki
+kartu **membungkus** (`flex-wrap: wrap`, `nowrap` dilepas) seperti caption kartu menu Transaksi yang
+juga panjang; tanpa itu keterangannya meluber keluar kartu di layar 4 kolom.
+Verifikasi (2026-10-24, sesi admin diputar ulang, `/panel-admin` dimuat lewat iframe same-origin —
+`navigate()` memang tidak bekerja untuk route ini): kartu "Pesanan masuk" bernilai **0**
+berketerangan **"dari 2 pesanan masuk hari ini"** (hari itu 2 pesanan, keduanya belum diakui → 0,
+jadi angkanya memang lebih kecil dari N seperti di admin), catatan kecil "transaksi diakui" hilang,
+tooltip berbunyi "0 dari 2 pesanan masuk hari ini (diproses/dikirim/selesai · belum bayar &
+dibatalkan tidak dihitung)", chip tren "↘ 100%"; tidak ada kartu statistik yang meluber (tepi kanan
+foot 313 ≤ tepi kartu 334 di client 360 px) pada 1280 px, 1050 px, maupun 375 px; `npx tsc --noEmit`
+bersih; 0 error console. **Catatan pre-existing**: di 375 px Beranda masih punya geser samping
+±48 px dari baris daftar "Pesanan terbaru"/"Stok menipis" (`.listVal` `white-space: nowrap`), bukan
+dari kartu KPI — tidak diperbaiki karena di luar permintaan.
 
 **Pindah menu tanpa loading.**
 

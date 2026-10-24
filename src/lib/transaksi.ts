@@ -93,8 +93,9 @@ export const SALE_STATUSES: string[] = ["diproses", "dikirim", "selesai"];
  * Angkanya sama persis dengan kartu "Total Transaksi" di dashboard ops dan "N transaksi" di
  * Laporan Keuangan, dan sejak 2026-10-24 juga jadi NILAI kartu "Pesanan Masuk" di dashboard admin
  * (permintaan pemilik: "belum bayar juga jangan dihitung") — pesanan yang belum dibayar/batal
- * memang bukan pesanan masuk. Kartu "Pesanan masuk" di panel admin masih menghitung semua pesanan
- * hari itu dengan angka ini sebagai keterangannya.
+ * memang bukan pesanan masuk. Kartu "Pesanan masuk" di beranda panel admin ikut aturan yang sama
+ * (permintaan pemilik 2026-10-24: "ikut Admin persis"): nilainya angka ini, keterangannya
+ * "dari N pesanan masuk <periode>" — N = SEMUA pesanan periode itu, bukan hanya yang diakui.
  */
 export function saleCount(orders: { status?: string | null }[] | null | undefined): number {
   return (orders || []).filter((o) => SALE_STATUSES.includes(String(o?.status || "").toLowerCase())).length;

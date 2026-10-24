@@ -8,7 +8,7 @@
  * Omset mengikuti aturan bersama `SALE_STATUSES` (diproses/dikirim/selesai) seperti dashboard lain.
  */
 import { useEffect, useState } from "react";
-import { statusLabel, SALE_STATUSES, SALE_COUNT_NOTE, saleCount, orderRevenue } from "@/lib/transaksi";
+import { statusLabel, SALE_STATUSES, saleCount, orderRevenue } from "@/lib/transaksi";
 import { orderStatusKey } from "@/lib/order-flow";
 import { opsGet } from "../panel-api";
 import { useWibGreeting, useWibToday, wibDateOffset, dailyIndexForDate } from "../wib-date";
@@ -242,8 +242,11 @@ export default function PanelAdminHome() {
   const deltaOmset = omsetYest > 0 ? Math.round(((omsetToday - omsetYest) / omsetYest) * 100) : omsetToday > 0 ? 100 : 0;
   /** Jumlah TRANSAKSI hari ini — aturan bersama `SALE_STATUSES`, angka yang SAMA dengan laporan. */
   const transaksiToday = saleCount(todayOrders);
+  const transaksiYest = saleCount(yestOrders);
+  /** Tren kartu "Pesanan masuk" membandingkan himpunan yang SAMA dengan angka besarnya (transaksi
+   *  diakui), persis seperti chip tren kartu "Pesanan Masuk" di dashboard admin. */
   const deltaMasuk =
-    yestOrders.length > 0 ? Math.round(((todayOrders.length - yestOrders.length) / yestOrders.length) * 100) : todayOrders.length > 0 ? 100 : 0;
+    transaksiYest > 0 ? Math.round(((transaksiToday - transaksiYest) / transaksiYest) * 100) : transaksiToday > 0 ? 100 : 0;
 
   const perluDikirim = orders.filter((o) => o.status === "diproses" && !o.awb_no).length;
   const lowStock = variants.filter((v) => {
@@ -267,14 +270,18 @@ export default function PanelAdminHome() {
       iconColor: "var(--panel-metric-revenue, currentColor)",
     },
     {
+      // Kartu ini mengikuti kartu "Pesanan Masuk" di dashboard admin persis (permintaan pemilik
+      // 2026-10-24: "ikut Admin persis") — angka besarnya transaksi diakui (`saleCount`), dan
+      // keterangannya menyebut SEMUA pesanan masuk hari itu. Dulu angkanya semua pesanan hari itu
+      // dengan keterangan "Hari ini" + catatan kecil "N transaksi diakui".
       label: "Pesanan masuk",
-      value: String(todayOrders.length),
-      caption: "Hari ini",
-      note: `${transaksiToday} ${SALE_COUNT_NOTE}`,
+      value: String(transaksiToday),
+      caption: `dari ${todayOrders.length} pesanan masuk hari ini`,
       delta: `${deltaMasuk >= 0 ? "↗" : "↘"} ${Math.abs(deltaMasuk)}%`,
       down: deltaMasuk < 0,
       icon: "basket",
       iconColor: "var(--panel-metric-orders, currentColor)",
+      hint: `${transaksiToday} dari ${todayOrders.length} pesanan masuk hari ini (diproses/dikirim/selesai · belum bayar & dibatalkan tidak dihitung)`,
     },
     {
       label: "Perlu dikirim",

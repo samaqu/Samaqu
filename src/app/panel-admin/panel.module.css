@@ -311,15 +311,19 @@ svg.heart { width: 14px; height: 14px; fill: #e46a92; stroke: none; color: #e46a
   font-weight: 600;
   color: var(--mut);
 }
+/* Baris kaki kartu: chip tren + caption. Caption mengikuti kalimat mockup dashboard ops
+   (mis. "dari 14 pesanan masuk hari ini"), jadi barisnya dibiarkan MEMBUNGKUS seperti caption
+   kartu menu Transaksi — `white-space: nowrap` dulu membuat caption panjang meluber keluar kartu
+   di layar 4 kolom. Chip tren tetap utuh karena barisnya wrap, bukan mengecilkan chip. */
 .stFoot {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: auto;
   padding-top: 6px;
   font-size: 12px;
   color: var(--mut);
-  white-space: nowrap;
 }
 .delta { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
 .ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; flex: none; }
