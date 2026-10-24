@@ -686,7 +686,12 @@ function AdminPageInner() {
         setOrders((prev) => prev.map((o) => o.order_number === order.order_number ? { ...o, ...patch } : o));
         setDashOrders((prev) => prev.map((o) => o.order_number === order.order_number ? { ...o, ...patch } : o));
         setSelectedOrder((prev) => prev && prev.order_number === order.order_number ? { ...prev, ...patch } : prev);
-        toast.showToast("success", "Berhasil membatalkan pesanan di J&T");
+        toast.showToast(
+          "success",
+          data.packagingWarning
+            ? "Pesanan dibatalkan. Retur kemasan gagal dicatat; cek menu Produksi."
+            : "Berhasil membatalkan pesanan di J&T"
+        );
       } catch (err) {
         console.error("Cancel J&T error:", err);
         toast.showToast("error", "Gagal membatalkan J&T, coba lagi");

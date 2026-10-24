@@ -28,7 +28,7 @@ export interface CancelableOrder {
 }
 
 export type CancelOrderResult =
-  | { success: true; voidedJnt: boolean }
+  | { success: true; voidedJnt: boolean; packagingWarning?: boolean }
   | { success: false; stage: "jnt" | "status"; message: string };
 
 /**
@@ -115,6 +115,7 @@ export async function cancelOrderCompletely(
 
   // Packaging hanya dikembalikan kalau pesanan belum dikirim. Setelah dikirim,
   // kemasan dianggap sudah terpakai dan tidak ada retur otomatis.
+  let packagingWarning = false;
   if (order.status !== "dikirim" && order.status !== "selesai") {
     try {
       await supabase.rpc("production_return_order_packaging", {
@@ -123,6 +124,7 @@ export async function cancelOrderCompletely(
         p_actor: "cancel-order",
       });
     } catch (e) {
+      packagingWarning = true;
       console.error("[CANCEL] Gagal retur packaging:", order.order_number, e);
     }
   }
@@ -206,5 +208,5 @@ export async function cancelOrderCompletely(
     ]);
   }
 
-  return { success: true, voidedJnt: !!cancelId };
+  return { success: true, voidedJnt: !!cancelId, packagingWarning };
 }

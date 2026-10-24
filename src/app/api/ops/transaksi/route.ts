@@ -660,7 +660,11 @@ export async function PATCH(req: NextRequest) {
         "Dibatalkan dari menu Transaksi",
       );
       if (!result.success) return bad(result.message);
-      return NextResponse.json({ order_number: order.order_number, cancelled: true });
+      return NextResponse.json({
+        order_number: order.order_number,
+        cancelled: true,
+        packagingWarning: Boolean(result.packagingWarning),
+      });
     }
 
     if (action !== "update") return bad("Aksi tidak dikenal");

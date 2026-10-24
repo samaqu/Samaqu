@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("[ORDER-CANCEL] Cancelled by customer:", orderNumber);
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, packagingWarning: Boolean(result.packagingWarning) });
   } catch (error) {
     console.error("[ORDER-CANCEL] Failed:", error);
     return NextResponse.json({ error: "Terjadi kesalahan server" }, { status: 500 });

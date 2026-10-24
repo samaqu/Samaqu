@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { computeOrderPackaging } from "@/lib/produksi-order-hpp";
+import { isCoverHangerKategori } from "@/lib/item-label";
+
+async function orderHasCoverProduct(admin: ReturnType<typeof getSupabaseAdmin>, orderId: string) {
+  const { data: lines } = await admin
+    .from("order_items")
+    .select("product_id")
+    .eq("order_id", orderId);
+  const ids = Array.from(new Set((lines || []).map((row: any) => String(row.product_id || "")).filter(Boolean)));
+  if (ids.length === 0) return false;
+  const { data: products } = await admin
+    .from("products")
+    .select("category")
+    .in("id", ids);
+  return (products || []).some((row: any) => isCoverHangerKategori(row.category));
+}
 
 /**
  * Paket kemasan default/resmi untuk satu pesanan.
@@ -32,6 +47,7 @@ export async function GET(
     .maybeSingle();
 
   if (header?.packaged_at && !header?.returned_at) {
+    const coverProductInOrder = await orderHasCoverProduct(admin, order.id);
     const { data: savedItems } = await admin
       .from("production_order_packaging_items")
       .select("component_id, component_code, component_name, unit_use, qty, unit_price, total")
@@ -41,6 +57,7 @@ export async function GET(
       already_packaged: true,
       use_cover_hanger: Boolean(header.use_cover_hanger),
       has_cover_hanger: false,
+      cover_product_in_order: coverProductInOrder,
       packaging_warning: Boolean(header.packaging_warning),
       items: (savedItems || []).map((row: any) => ({
         component_id: row.component_id,
@@ -62,6 +79,7 @@ export async function GET(
     already_packaged: false,
     use_cover_hanger: computed.use_cover_hanger,
     has_cover_hanger: computed.has_cover_hanger,
+    cover_product_in_order: computed.cover_product_in_order,
     packaging_warning: false,
     items: computed.items.map((item) => ({
       component_id: item.component_id,

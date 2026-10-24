@@ -122,7 +122,11 @@ export async function PATCH(request: NextRequest) {
           : NextResponse.json({ error: "J&T dibatalkan tapi gagal update status" }, { status: 500 });
       }
 
-      return NextResponse.json({ success: true, message: "Berhasil membatalkan pesanan di J&T" });
+      return NextResponse.json({
+        success: true,
+        message: "Berhasil membatalkan pesanan di J&T",
+        packagingWarning: Boolean(result.packagingWarning),
+      });
     }
 
     // ── "Atur Pesanan": buat resi J&T setelah pembayaran diverifikasi ──
@@ -156,11 +160,8 @@ export async function PATCH(request: NextRequest) {
       try {
         packResult = await packOrderForResi(supabaseAdmin, order.id, packaging, actor);
       } catch (packError) {
-        console.error("[ADMIN] packaging gagal:", identifier, packError);
-        return NextResponse.json(
-          { error: `Gagal mencatat paket kemasan: ${packError instanceof Error ? packError.message : "unknown"}` },
-          { status: 400 },
-        );
+        console.error("[ADMIN] packaging gagal, resi tetap lanjut:", identifier, packError);
+        packResult = { packed: false, warning: true };
       }
 
       const result = await createJntOrderForOrder({
@@ -183,11 +184,15 @@ export async function PATCH(request: NextRequest) {
 
       if (!result.success || !result.awbNo) {
         if (packResult.packed) {
-          await supabaseAdmin.rpc("production_return_order_packaging", {
-            p_order_id: order.id,
-            p_reason: "Resi J&T gagal dibuat",
-            p_actor: actor,
-          });
+          try {
+            await supabaseAdmin.rpc("production_return_order_packaging", {
+              p_order_id: order.id,
+              p_reason: "Resi J&T gagal dibuat",
+              p_actor: actor,
+            });
+          } catch (returnError) {
+            console.error("[ADMIN] retur kemasan saat resi gagal:", identifier, returnError);
+          }
         }
         console.error("[ADMIN] J&T order create failed:", identifier, result.error);
         return NextResponse.json({ error: `Gagal membuat resi J&T: ${result.error}` }, { status: 400 });
@@ -214,11 +219,15 @@ export async function PATCH(request: NextRequest) {
 
       if (updateError) {
         if (packResult.packed) {
-          await supabaseAdmin.rpc("production_return_order_packaging", {
-            p_order_id: order.id,
-            p_reason: "Gagal menyimpan resi J&T",
-            p_actor: actor,
-          });
+          try {
+            await supabaseAdmin.rpc("production_return_order_packaging", {
+              p_order_id: order.id,
+              p_reason: "Gagal menyimpan resi J&T",
+              p_actor: actor,
+            });
+          } catch (returnError) {
+            console.error("[ADMIN] retur kemasan saat simpan resi gagal:", identifier, returnError);
+          }
         }
         console.error("[ADMIN] Failed to save J&T AWB:", updateError);
         return NextResponse.json({ error: "Resi J&T terbit tapi gagal disimpan. Coba lagi." }, { status: 500 });
@@ -293,11 +302,8 @@ export async function PATCH(request: NextRequest) {
       try {
         packResult = await packOrderForResi(supabaseAdmin, order.id, packaging, actor);
       } catch (packError) {
-        console.error("[ADMIN] packaging manual gagal:", identifier, packError);
-        return NextResponse.json(
-          { error: `Gagal mencatat paket kemasan: ${packError instanceof Error ? packError.message : "unknown"}` },
-          { status: 400 },
-        );
+        console.error("[ADMIN] packaging manual gagal, resi tetap lanjut:", identifier, packError);
+        packResult = { packed: false, warning: true };
       }
 
       const { error: updateError } = await supabaseAdmin
@@ -313,11 +319,15 @@ export async function PATCH(request: NextRequest) {
 
       if (updateError) {
         if (packResult.packed) {
-          await supabaseAdmin.rpc("production_return_order_packaging", {
-            p_order_id: order.id,
-            p_reason: "Gagal menyimpan resi manual",
-            p_actor: actor,
-          });
+          try {
+            await supabaseAdmin.rpc("production_return_order_packaging", {
+              p_order_id: order.id,
+              p_reason: "Gagal menyimpan resi manual",
+              p_actor: actor,
+            });
+          } catch (returnError) {
+            console.error("[ADMIN] retur kemasan saat simpan resi manual gagal:", identifier, returnError);
+          }
         }
         console.error("[ADMIN] Gagal simpan resi manual HBO:", identifier, updateError);
         return NextResponse.json({ error: "Gagal menyimpan nomor resi. Coba lagi." }, { status: 500 });

@@ -5,6 +5,7 @@ import {
   type ScheduleTargetInput,
 } from "@/lib/produksi-jadwal";
 import { loadRecipeMap, loadScheduleComponents } from "@/lib/produksi-jadwal-server";
+import { isCoverHangerKategori } from "@/lib/item-label";
 
 const norm = (value: unknown) => String(value ?? "").trim().toLowerCase();
 const round2 = (value: number) => Math.round((Number(value) || 0) * 100) / 100;
@@ -176,6 +177,7 @@ export async function computeOrderPackaging(
   items: PackagingLine[];
   has_cover_hanger: boolean;
   use_cover_hanger: boolean;
+  cover_product_in_order: boolean;
 }> {
   const { data: itemRows } = await admin
     .from("order_items")
@@ -192,7 +194,9 @@ export async function computeOrderPackaging(
     }))
     .filter((row) => row.product_id && row.size && row.quantity > 0);
 
-  if (items.length === 0) return { items: [], has_cover_hanger: false, use_cover_hanger: false };
+  if (items.length === 0) {
+    return { items: [], has_cover_hanger: false, use_cover_hanger: false, cover_product_in_order: false };
+  }
 
   const productIds = Array.from(new Set(items.map((item) => item.product_id)));
   const [{ data: products }, components] = await Promise.all([
@@ -207,6 +211,9 @@ export async function computeOrderPackaging(
 
   const packaging = new Map<string, PackagingLine>();
   let hasCover = false;
+  const coverProductInOrder = items.some((item) =>
+    isCoverHangerKategori(productById.get(item.product_id)?.category),
+  );
 
   for (const item of items) {
     const product = productById.get(item.product_id);
@@ -260,13 +267,17 @@ export async function computeOrderPackaging(
     }
   }
 
-  const useCover = useCoverOverride == null ? hasCover : Boolean(useCoverOverride);
+  // Kalau pesanan sudah memuat produk Cover & Hanger, tambahan Cover/Hanger
+  // untuk produk lain default mati supaya stok/HPP tidak dobel.
+  const useCover =
+    useCoverOverride == null ? hasCover && !coverProductInOrder : Boolean(useCoverOverride);
   return {
     items: Array.from(packaging.values()).filter(
       (row) => includeAllCover || row.kind !== "cover_hanger" || useCover,
     ),
     has_cover_hanger: hasCover,
     use_cover_hanger: useCover,
+    cover_product_in_order: coverProductInOrder,
   };
 }
 

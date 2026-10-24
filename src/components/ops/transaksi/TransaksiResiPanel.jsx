@@ -311,6 +311,12 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
         ) : null}
       </div>
 
+      {packagingPreview?.cover_product_in_order ? (
+        <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+          Pesanan sudah memuat produk Cover &amp; Hanger. Tambahan Cover &amp; Hanger untuk produk lain dimatikan agar stok dan HPP tidak dobel.
+        </p>
+      ) : null}
+
       {packagingLoading ? (
         <p className="mt-2 text-[11px] font-semibold text-slate-400">Memuat paket kemasan…</p>
       ) : !packagingPreview ? (
@@ -442,7 +448,7 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
     <>
       {packagingWarning ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-200">
-          Stok komponen kemasan ada yang minus. Cek stok di menu Produksi.
+          Kemasan belum tercatat sempurna (stok minus atau gagal simpan). Resi tetap dibuat. Cek menu Produksi.
         </div>
       ) : null}
 

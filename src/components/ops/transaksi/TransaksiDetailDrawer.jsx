@@ -717,7 +717,7 @@ function PackagingWarning({ warning }) {
 function HppBlock({ order }) {
   if (!order?.hpp_visible) return null;
   const hpp = order.hpp;
-  const sourceLabel = { aktual: "aktual", standar: "standar", none: "belum ada" };
+  const sourceLabel = { aktual: "aktual", standar: "standar", none: "belum ada HPP" };
 
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-800 p-3.5">
@@ -731,7 +731,7 @@ function HppBlock({ order }) {
       </div>
 
       {!hpp ? (
-        <p className="mt-2 text-xs font-semibold text-slate-400">Belum ada HPP (transaksi lama).</p>
+        <p className="mt-2 text-xs font-semibold text-slate-400">Belum ada HPP (transaksi lama atau snapshot gagal).</p>
       ) : (
         <>
           <div className="mt-2 space-y-1.5">
