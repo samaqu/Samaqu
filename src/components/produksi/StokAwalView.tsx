@@ -7,7 +7,6 @@ import { produksiFetch } from "@/lib/produksi-api";
 import { useProduksiAccess } from "./useAccess";
 import {
   AccessGate,
-  Badge,
   Drawer,
   EmptyState,
   ErrorBox,
@@ -220,44 +219,96 @@ export default function StokAwalView() {
         </div>
 
         <div className={`${cardClass} overflow-hidden`}>
-          <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-bold text-slate-900 dark:text-white">Riwayat stok awal</p>
+            <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 tabular-nums">
+              {items.length} baris · Rp {formatRupiah(historyValue)}
+            </p>
           </div>
           <div>
             <table className="w-full border-collapse table-fixed">
               <colgroup>
+                <col className="w-[12%]" />
+                <col className="w-[34%]" />
                 <col className="w-[13%]" />
-                <col className="w-[25%]" />
-                <col className="w-[16%]" />
                 <col className="w-[14%]" />
-                <col className="w-[14%]" />
-                <col className="w-[18%]" />
+                <col className="w-[15%]" />
+                <col className="w-[12%]" />
               </colgroup>
               <thead>
                 <tr className="bg-[#1e3a5f]">
-                  {["Tanggal", "Komponen", "Jumlah", "Harga satuan", "Nilai", "Catatan"].map((h) => (
-                    <th key={h} className="px-2 py-2.5 text-left text-[11px] font-bold text-white uppercase tracking-wide leading-tight">{h}</th>
+                  {[
+                    { label: "Tanggal", align: "text-left" },
+                    { label: "Komponen", align: "text-left" },
+                    { label: "Jumlah", align: "text-right" },
+                    { label: "Harga satuan", align: "text-right" },
+                    { label: "Nilai", align: "text-right" },
+                    { label: "Catatan", align: "text-left" },
+                  ].map((head) => (
+                    <th
+                      key={head.label}
+                      className={`px-2.5 py-2.5 ${head.align} text-[10px] font-bold text-white uppercase tracking-wider leading-tight`}
+                    >
+                      {head.label}
+                    </th>
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
                 {loading ? (
                   <tr><td colSpan={6}><Spinner /></td></tr>
                 ) : items.length === 0 ? (
                   <tr><td colSpan={6}><EmptyState title="Belum ada stok awal" description="Isi formulir di atas untuk mencatat stok awal pertama." /></td></tr>
                 ) : (
                   items.map((row, index) => (
-                    <tr key={row.id} className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-blue-50/30 dark:bg-[#1a1d28]"} border-b border-gray-100 dark:border-slate-800/50`}>
-                      <td className="px-2 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatDate(row.movement_date)}</td>
-                      <td className="px-2 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug break-words">{row.component_code} · {row.component_name}</td>
-                      <td className="px-2 py-2.5 whitespace-nowrap"><Badge tone="green">+{formatQty(row.qty)} {row.unit_use}</Badge></td>
-                      <td className="px-2 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(row.unit_price)}</td>
-                      <td className="px-2 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">Rp {formatRupiah(row.value)}</td>
-                      <td className="px-2 py-2.5 text-[10px] text-slate-500 dark:text-slate-400 leading-snug break-words">{row.notes || "—"}</td>
+                    <tr
+                      key={row.id}
+                      className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-slate-50/60 dark:bg-[#1a1d28]"} hover:bg-blue-50/50 dark:hover:bg-slate-800/60 transition-colors`}
+                    >
+                      <td className="px-2.5 py-2.5 align-middle text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap tabular-nums">
+                        {formatDate(row.movement_date)}
+                      </td>
+                      <td className="px-2.5 py-2.5 align-middle min-w-0">
+                        <span className="block text-[10px] font-mono font-semibold tracking-wide text-slate-400 dark:text-slate-500 truncate">
+                          {row.component_code}
+                        </span>
+                        <span className="block text-xs font-bold text-slate-900 dark:text-white truncate" title={row.component_name}>
+                          {row.component_name}
+                        </span>
+                      </td>
+                      <td className="px-2.5 py-2.5 align-middle text-right whitespace-nowrap tabular-nums">
+                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">+{formatQty(row.qty)}</span>
+                        <span className="ml-1 text-[10px] font-semibold text-slate-400">{row.unit_use}</span>
+                      </td>
+                      <td className="px-2.5 py-2.5 align-middle text-right whitespace-nowrap tabular-nums">
+                        <span className="text-[10px] text-slate-400">Rp</span>{" "}
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{formatRupiah(row.unit_price)}</span>
+                      </td>
+                      <td className="px-2.5 py-2.5 align-middle text-right whitespace-nowrap tabular-nums">
+                        <span className="text-xs font-black text-slate-900 dark:text-white">Rp {formatRupiah(row.value)}</span>
+                      </td>
+                      <td className="px-2.5 py-2.5 align-middle min-w-0">
+                        <span className="block truncate text-[10px] text-slate-400 dark:text-slate-500" title={row.notes || ""}>
+                          {row.notes || "—"}
+                        </span>
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
+              {!loading && items.length > 0 ? (
+                <tfoot>
+                  <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
+                    <td colSpan={4} className="px-2.5 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Total {items.length} baris
+                    </td>
+                    <td className="px-2.5 py-2.5 text-right text-xs font-black text-slate-900 dark:text-white whitespace-nowrap tabular-nums">
+                      Rp {formatRupiah(historyValue)}
+                    </td>
+                    <td />
+                  </tr>
+                </tfoot>
+              ) : null}
             </table>
           </div>
         </div>
