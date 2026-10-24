@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -24,13 +24,18 @@ import {
 import * as LucideIcons from "lucide-react";
 const WalletIcon: any = (LucideIcons as any).WalletMinimal ?? (LucideIcons as any).Wallet;
 const IconPhoneCall: any = (LucideIcons as any).PhoneCall ?? (LucideIcons as any).Phone;
+const IconBoxes: any = (LucideIcons as any).Boxes ?? Package;
+const IconBookOpen: any = (LucideIcons as any).BookOpen ?? FileText;
+const IconPackagePlus: any = (LucideIcons as any).PackagePlus ?? Package;
+const IconClipboardCheck: any = (LucideIcons as any).ClipboardCheck ?? FileText;
 import { supabase } from "@/lib/supabase";
 import { Toaster } from "@/components/ops/ui/toaster";
 import OpsFooter from "@/components/ops/OpsFooter";
 
 type MenuItem = { title: string; href: string; icon: any; soon?: boolean };
+type MenuGroup = { label: string; items: MenuItem[] };
 
-const MENU_GROUPS: { label: string; items: MenuItem[] }[] = [
+const BASE_MENU_GROUPS: MenuGroup[] = [
   { label: "Utama", items: [{ title: "Dashboard", href: "/ops", icon: LayoutDashboard }] },
   {
     label: "Penjualan",
@@ -84,17 +89,19 @@ function SidebarContent({
   pathname,
   onNavigate,
   stripOps,
+  groups,
 }: {
   pathname: string;
   onNavigate?: () => void;
   stripOps?: boolean;
+  groups: MenuGroup[];
 }) {
   const router = useRouter();
   // Prefetch halaman begitu kursor menyentuh menu → klik jadi instan.
   const prefetch = (href: string) => { try { router.prefetch(href); } catch { /* diabaikan */ } };
   return (
     <div className="flex-1 px-3 py-3 space-y-3 no-scrollbar overflow-y-auto">
-      {MENU_GROUPS.map((group, idx) => (
+      {groups.map((group, idx) => (
         <div key={idx}>
           <h4 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 px-3">
             {group.label}
@@ -151,10 +158,64 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [onOpsHost, setOnOpsHost] = useState(false);
+  /** Akses menu Produksi (Owner/Leader) — ditentukan server, bukan disimpan di browser. */
+  const [prodAccess, setProdAccess] = useState<{ allowed: boolean; role: "owner" | "leader" | "other" }>({
+    allowed: false,
+    role: "other",
+  });
 
   useEffect(() => {
     setOnOpsHost(window.location.hostname === "office.samaqu.id");
   }, []);
+
+  useEffect(() => {
+    if (!authorized) {
+      setProdAccess({ allowed: false, role: "other" });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) return;
+      try {
+        const res = await fetch("/api/ops/production/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json().catch(() => null);
+        if (cancelled) return;
+        if (res.ok && json?.allowed) {
+          setProdAccess({ allowed: true, role: json.role === "owner" ? "owner" : "leader" });
+        } else {
+          setProdAccess({ allowed: false, role: "other" });
+        }
+      } catch {
+        if (!cancelled) setProdAccess({ allowed: false, role: "other" });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [authorized]);
+
+  const menuGroups = useMemo<MenuGroup[]>(() => {
+    if (!prodAccess.allowed) return BASE_MENU_GROUPS;
+
+    const productionItems: MenuItem[] = [
+      { title: "Komponen & Bahan", href: "/ops/produksi/komponen", icon: IconBoxes },
+      { title: "Pembelian Bahan", href: "/ops/produksi/pembelian", icon: ShoppingBag },
+      { title: "Buku Stok", href: "/ops/produksi/buku-stok", icon: IconBookOpen },
+      { title: "Stok Awal", href: "/ops/produksi/stok-awal", icon: IconPackagePlus },
+      { title: "Stok Opname", href: "/ops/produksi/opname", icon: IconClipboardCheck },
+    ];
+
+    // Leader hanya melihat stok & status; semua menu berisi harga disembunyikan.
+    const visible = prodAccess.role === "owner"
+      ? productionItems
+      : productionItems.filter((item) => ["/ops/produksi/komponen", "/ops/produksi/buku-stok"].includes(item.href));
+
+    const groups = [...BASE_MENU_GROUPS];
+    groups.splice(3, 0, { label: "Produksi", items: visible });
+    return groups;
+  }, [prodAccess]);
 
   useEffect(() => {
     let cancelled = false;
@@ -267,7 +328,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
             <img src="/logo.svg" alt="SAMAQU" className="h-8 w-auto object-contain" />
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center">Internal</p>
           </div>
-          <SidebarContent pathname={pathname} stripOps={onOpsHost} />
+          <SidebarContent pathname={pathname} stripOps={onOpsHost} groups={menuGroups} />
           <div className="p-3 border-t border-slate-200 dark:border-slate-800 shrink-0">
             <button
               onClick={handleLogout}
@@ -292,7 +353,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
                   <X size={18} className="text-slate-500" />
                 </button>
               </div>
-              <SidebarContent pathname={pathname} stripOps={onOpsHost} onNavigate={() => setDrawer(false)} />
+              <SidebarContent pathname={pathname} stripOps={onOpsHost} groups={menuGroups} onNavigate={() => setDrawer(false)} />
               <div className="p-3 border-t border-slate-200 dark:border-slate-800">
                 <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100">
                   <LogOut size={17} /> Keluar
