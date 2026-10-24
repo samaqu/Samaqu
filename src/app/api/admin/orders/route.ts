@@ -264,6 +264,15 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: "Pesanan sudah dibatalkan, resi tidak bisa disimpan." }, { status: 400 });
       }
 
+      // Paket sudah diterima → resi bersifat final. Jangan izinkan ganti/input resi manual,
+      // supaya pesanan selesai tidak berubah jadi "HBO" karena salah klik.
+      if (order.status === "selesai" || order.shipping_status === "selesai") {
+        return NextResponse.json(
+          { error: "Pesanan sudah selesai. Nomor resi tidak bisa diubah lagi." },
+          { status: 400 }
+        );
+      }
+
       const resi = String(awbNo || "").trim();
       if (!resi) {
         return NextResponse.json({ error: "Nomor resi wajib diisi." }, { status: 400 });

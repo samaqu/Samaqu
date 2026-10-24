@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Ban, Pencil, Truck, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { waNumber } from "@/lib/whatsapp";
 import { formatTrackingTime, sortHistoryDesc, trackingRow, trackingSummary } from "@/lib/jnt/track-status";
 import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
 import OrderDetailPanel from "@/components/ops/transaksi/OrderDetailPanel";
@@ -25,6 +26,10 @@ export default function OpsOrderDetailDrawer({ open, order, onClose, onEdit, onC
   const trackRows = trackOpen ? historyRows : [];
   const trackSummary = trackOpen ? trackingSummary(track.history) : null;
   const canPrint = Boolean(awb) && order?.status !== "dibatalkan";
+  // Khusus pesanan Selesai: "Cetak Resi" di footer diganti "Hubungi Customer" (tanpa pesan).
+  const isSelesai = order?.status === "selesai" || order?.shipping_status === "selesai";
+  const customerWa = waNumber(order?.customer_whatsapp || "");
+  const canHubungiCustomer = /^628[1-9][0-9]{6,10}$/.test(customerWa);
 
   useEffect(() => {
     if (!open) {
@@ -191,7 +196,7 @@ export default function OpsOrderDetailDrawer({ open, order, onClose, onEdit, onC
               />
             </div>
 
-            {(order.can_edit || order.can_cancel || canPrint) && (
+            {(order.can_edit || order.can_cancel || canPrint || isSelesai) && (
               <div className="flex shrink-0 gap-2 border-t border-slate-200 px-5 py-3.5 dark:border-slate-800">
                 {order.can_edit ? (
                   <button
@@ -201,7 +206,20 @@ export default function OpsOrderDetailDrawer({ open, order, onClose, onEdit, onC
                     <Pencil size={16} /> Ubah
                   </button>
                 ) : null}
-                {canPrint ? (
+                {isSelesai ? (
+                  <button
+                    type="button"
+                    disabled={!canHubungiCustomer}
+                    onClick={() => {
+                      if (canHubungiCustomer) {
+                        window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
+                      }
+                    }}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-slate-200 px-4 py-2.5 font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    Hubungi Customer
+                  </button>
+                ) : canPrint ? (
                   <button
                     onClick={() => resiPanelRef.current?.print()}
                     className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-slate-200 px-4 py-2.5 font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"

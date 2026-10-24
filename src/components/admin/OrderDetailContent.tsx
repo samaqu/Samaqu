@@ -423,6 +423,8 @@ export default function OrderDetailContent({
   // "Sudah jalan" termasuk paket yang sudah SAMPAI (`selesai`): pesanan yang sudah diterima
   // tidak boleh lagi menampilkan tombol pembatalan/cetak label/hapus.
   const shipped = SHIPPED_STATES.includes(shippingStatusOf(order) || "") || SHIPPED_STATES.includes(order.status);
+  /** Paket sudah diterima: resi final, form input/ubah resi HBO tidak boleh muncul lagi. */
+  const delivered = order.status === "selesai" || shippingStatusOf(order) === "selesai";
 
   // ── Resi HBO ── dibuat admin langsung di J&T VIP (di luar sistem), jadi nomor resinya
   // diinput manual di sini. Alur statusnya sama dengan resi EZ/ECO: resi tersimpan → menunggu
@@ -536,6 +538,26 @@ export default function OrderDetailContent({
     </a>
   ) : null;
 
+  // Khusus pesanan Selesai: tombol "Cetak Resi" di bawah modal diganti "Hubungi Customer".
+  // Tanpa teks pesan bawaan; nomor dinormalkan ke 62... dan tombol nonaktif bila tidak valid.
+  const customerWa = waNumber(order.customer_whatsapp);
+  const canHubungiCustomer = /^628[1-9][0-9]{6,10}$/.test(customerWa);
+  const hubungiCustomerAction = (
+    <button
+      type="button"
+      className="od-a"
+      disabled={!canHubungiCustomer}
+      style={!canHubungiCustomer ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+      onClick={() => {
+        if (canHubungiCustomer) {
+          window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
+        }
+      }}
+    >
+      Hubungi Customer
+    </button>
+  );
+
   const lacakAction = resi ? (
     <button type="button" className={`od-a${showTrack ? " is-on" : ""}`} onClick={() => openTrack()}>
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7h11v9H3z" /><path d="M14 10h4l3 3v3h-7z" /><circle cx="7" cy="18" r="1.5" /><circle cx="17.5" cy="18" r="1.5" /></svg>
@@ -630,7 +652,7 @@ export default function OrderDetailContent({
               ) : null}
 
               {/* Resi HBO — pesanan dibuat admin di J&T VIP, resinya diinput manual di sini. */}
-              {order.status !== "dibatalkan" && (isHbo || manualFormOpen) ? (
+              {order.status !== "dibatalkan" && !delivered && (isHbo || manualFormOpen) ? (
                 <div className="od-manual">
                   <p className="od-title">Resi J&amp;T HBO</p>
                   <p className="od-hint">Pesanan HBO dibuat manual di J&amp;T VIP, masukkan nomor resi di sini.</p>
@@ -713,7 +735,7 @@ export default function OrderDetailContent({
                 {order.status === "selesai" ? (
                   // Pesanan sudah selesai (diterima): cukup SATU aksi — hubungi pelanggan.
                   // Riwayat pengiriman tetap tampil di bawah (dibuka otomatis untuk kasus ini).
-                  <>{whatsappAction}</>
+                  <>{hubungiCustomerAction}</>
                 ) : shipped ? (
                   <>
                     {lacakAction}

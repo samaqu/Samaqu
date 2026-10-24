@@ -19,6 +19,7 @@ import { usePaymentMethodName } from "@/lib/use-payment-methods";
 import { paymentChannelLabel } from "@/lib/payment-channel";
 import { supabase } from "@/lib/supabase";
 import { formatWeightExact } from "@/lib/shipping-weight";
+import { waNumber } from "@/lib/whatsapp";
 import { formatTrackingTime, sortHistoryDesc, trackingRow, trackingSummary } from "@/lib/jnt/track-status";
 import { jntServiceTag } from "@/lib/jnt/layanan";
 import JntBadge from "@/components/JntBadge";
@@ -163,6 +164,11 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
     // Tombol "Cetak Resi" ikut pindah ke footer, jadi footer juga harus tampil walau
     // pesanan tidak punya aksi lain (mis. pesanan website yang sudah dikirim).
     const canPrint = Boolean(awb) && order.status !== "dibatalkan";
+    // Khusus pesanan Selesai: tombol "Cetak Resi" di footer diganti "Hubungi Customer".
+    // Nomor dinormalkan ke 62... dan tombol nonaktif kalau nomor kosong/tidak valid.
+    const isSelesai = order.status === "selesai" || order.shipping_status === "selesai";
+    const customerWa = waNumber(order.customer_whatsapp || "");
+    const canHubungiCustomer = /^628[1-9][0-9]{6,10}$/.test(customerWa);
 
     return (
       <AnimatePresence>
@@ -343,7 +349,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                 </div>
               </div>
 
-              {order.can_edit || order.can_cancel || canDelete || canPrint ? (
+              {order.can_edit || order.can_cancel || canDelete || canPrint || isSelesai ? (
                 <div className="df">
                   {canDelete ? (
                     <button type="button" className="b-danger" onClick={() => onDelete?.(order)}>
@@ -355,7 +361,20 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                       Ubah
                     </button>
                   ) : null}
-                  {canPrint ? (
+                  {isSelesai ? (
+                    <button
+                      type="button"
+                      className="b2"
+                      disabled={!canHubungiCustomer}
+                      onClick={() => {
+                        if (canHubungiCustomer) {
+                          window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
+                        }
+                      }}
+                    >
+                      Hubungi Customer
+                    </button>
+                  ) : canPrint ? (
                     <button type="button" className="b2" onClick={() => resiPanelRef.current?.print()}>
                       Cetak Resi
                     </button>

@@ -100,7 +100,9 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
   const shippingStatus = createdAwb ? "menunggu_pickup" : order.shipping_status || "";
   /** Layanan tersimpan — HBO = pesanan dibuat manual di J&T VIP, resinya diinput admin. */
   const isHbo = jntServiceCodeFromShippingMethod(order.shipping_method) === "HBO";
-  const manualFormOpen = manualOpen || (isHbo && !awb);
+  /** Pesanan sudah diterima: resi final, opsi ganti/input resi manual ditutup. */
+  const resiFinal = cancelled || order.status === "selesai" || shippingStatus === "selesai";
+  const manualFormOpen = !resiFinal && (manualOpen || (isHbo && !awb));
   const bisaTandaiDikirim =
     !!awb &&
     !cancelled &&
@@ -487,7 +489,7 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
 
           {/* Resi HBO: dibuat manual di J&T VIP — admin bisa mengedit nomornya dan menandai
               paket sudah dikirim (notifikasi menyusul lewat jalur yang sama dengan EZ/ECO). */}
-          {!cancelled ? (
+          {!resiFinal ? (
             manualOpen ? (
               manualForm
             ) : (
