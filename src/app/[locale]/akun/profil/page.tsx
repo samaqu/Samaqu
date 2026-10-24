@@ -19,6 +19,17 @@ const PENGATURAN = [
     icon: <path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11ZM12 10a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />,
   },
   {
+    href: "/akun/ubah-password",
+    title: "Ubah Password",
+    sub: "Ganti password dengan verifikasi OTP WhatsApp",
+    icon: (
+      <>
+        <rect x="4" y="10" width="16" height="10" rx="2" />
+        <path d="M8 10V8a4 4 0 0 1 8 0v2" />
+      </>
+    ),
+  },
+  {
     href: "/akun/panduan-ukuran",
     title: "Panduan Ukuran",
     sub: "Tabel ukuran biar tidak salah pilih size",
