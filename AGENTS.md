@@ -1651,6 +1651,18 @@ Keterangan itu **selalu tampil** — tidak lagi bergantian dengan label periode/
 tetap `saleCount` — **jangan** kembalikan `orders.length` sebagai nilai kartu; jumlah semua pesanan
 periode itu hanya muncul di keterangan.
 
+**Kartu dashboard admin (panel Dashboard) ikut disamakan 2026-10-24** (permintaan pemilik:
+*"keterangan yg di panel admin samain kaya yg lain di menu transaksi sama dashboard"*) — keterangan
+empat kartu `src/components/admin/DashboardView.tsx`: `Pendapatan` → **"Tidak termasuk dibatalkan"**,
+`Pesanan Masuk` → **"dari N pesanan masuk <periode>"** (N = `orders.length` periode itu; kalimat dan
+angkanya sama persis dengan kartu `Total transaksi` di menu Transaksi, karena keduanya menerima
+`dashOrders` yang sama), `Belum Bayar` → **"Perlu follow-up"**. Kartu `Rata-rata Pesanan` **tetap**
+"Rata-rata nilai pesanan" — sama seperti kartu `Perlu diproses` di menu Transaksi, tidak punya
+padanan di layar lain. Jadi keempat keterangan mockup sekarang terbaca di panel Dashboard **dan**
+menu Transaksi; jumlah SEMUA pesanan periode itu (mis. 145) hanya muncul di keterangan, **bukan**
+sebagai nilai kartu (`saleCount` tetap nilai besarnya). `npx tsc --noEmit` bersih; tampilan belum
+diperiksa ulang di browser (pemilik minta tidak diverifikasi lama).
+
 **Pindah menu tanpa loading.**
 
 - **Dashboard admin** (`src/app/admin/page.tsx`): panel yang sudah pernah dibuka tetap **terpasang**

@@ -231,10 +231,11 @@ export default function DashboardView({
       label: "Pendapatan",
       num: revenue,
       format: money,
-      // Keterangan kartu ini menyebut jumlah transaksinya sendiri (permintaan pemilik 2026-10-24:
-      // "Pendapatan" → "126 transaksi berhasil"); basis "tanpa ongkir" pindah ke tooltip +
-      // subjudul grafik supaya caption tetap satu baris.
-      caption: `${saleOrders} transaksi berhasil`,
+      // Keterangan kartu disamakan dengan menu Transaksi / kartu mockup ops (permintaan pemilik
+      // 2026-10-24: "keterangan yg di panel admin samain kaya yg lain di menu transaksi sama
+      // dashboard") — kartu omset berbunyi "Tidak termasuk dibatalkan" di SEMUA layar. Rincian
+      // "tanpa ongkir" tetap di tooltip kartu + subjudul grafik, jadi caption tetap satu baris.
+      caption: "Tidak termasuk dibatalkan",
       detail: `${money(revenue)} dari ${saleOrders} transaksi diakui · hanya harga produk (ongkir tidak dihitung)`,
       delta: revenueDelta,
       deltaLabel: prevLabel,
@@ -244,9 +245,10 @@ export default function DashboardView({
       label: "Pesanan Masuk",
       num: saleOrders,
       format: count,
-      // Keterangan sengaja pendek: kartu ini sempit di layar 4 kolom, jadi kalimat panjang akan
-      // terpotong. Rincian lengkapnya ada di tooltip kartu + donut "Per Status".
-      caption: "Di luar batal & belum bayar",
+      // Keterangan SAMA PERSIS dengan kartu "Total transaksi" di menu Transaksi (angka besarnya
+      // juga sama: `saleCount`), jadi kedua layar menyebut jumlah pesanan periode itu dengan
+      // kalimat yang identik. Rincian lengkapnya ada di tooltip kartu + donut "Per Status".
+      caption: `dari ${orders.length} pesanan masuk ${periodLabel}`,
       detail:
         `${saleOrders} pesanan masuk bulan ${periodLabel} (sudah dibayar: diproses/dikirim/selesai) ` +
         `· ${pendingOrders} belum bayar dan ${cancelledOrders} dibatalkan tidak dihitung`,
@@ -269,7 +271,7 @@ export default function DashboardView({
       label: ORDER_STAGE_LABEL.belum_bayar,
       num: unpaidOrders,
       format: count,
-      caption: "menunggu pembayaran",
+      caption: "Perlu follow-up",
       detail: `${unpaidOrders} pesanan belum dibayar bulan ${periodLabel} (tahap sama dengan tab "${ORDER_STAGE_LABEL.belum_bayar}" di Order Management)`,
     },
   ];
