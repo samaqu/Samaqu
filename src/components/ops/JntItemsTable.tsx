@@ -97,19 +97,24 @@ export default function JntItemsTable({ items }: { items: JntInvoiceItem[] }) {
         ))}
       </div>
 
-      <div className="mt-4 overflow-x-auto">
-        <table className="min-w-[1000px] w-full border-collapse text-sm">
+      {/* Di bawah xl tabel (10 kolom) masih lebih lebar dari layar → beri tahu bisa digeser. */}
+      <p className="mt-3 text-[11px] text-slate-400 xl:hidden">
+        Geser tabel ke samping untuk melihat kolom lainnya →
+      </p>
+
+      <div className="mt-2 overflow-x-auto xl:mt-4">
+        <table className="w-full min-w-[760px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              <th className="py-2 pr-3">No. Resi</th>
-              <th className="py-2 pr-3">Tanggal Kirim</th>
-              <th className="py-2 pr-3">Tujuan</th>
-              <th className="py-2 pr-3">Layanan</th>
-              <th className="py-2 pr-3 text-right">Berat</th>
-              <th className="py-2 pr-3 text-right">Biaya Kirim</th>
-              <th className="py-2 pr-3 text-right">Diskon</th>
-              <th className="py-2 pr-3 text-right">Net (dibukukan)</th>
-              <th className="py-2 pr-3 text-right">Ongkir Customer</th>
+              <th className="py-2 pr-2">No. Resi</th>
+              <th className="py-2 pr-2">Tgl Kirim</th>
+              <th className="py-2 pr-2">Tujuan</th>
+              <th className="py-2 pr-2">Layanan</th>
+              <th className="py-2 pr-2 text-right">Berat</th>
+              <th className="py-2 pr-2 text-right">Biaya Kirim</th>
+              <th className="py-2 pr-2 text-right">Diskon</th>
+              <th className="py-2 pr-2 text-right">Net Dibukukan</th>
+              <th className="py-2 pr-2 text-right">Ongkir Customer</th>
               <th className="py-2 text-right">Selisih</th>
             </tr>
           </thead>
@@ -118,7 +123,7 @@ export default function JntItemsTable({ items }: { items: JntInvoiceItem[] }) {
               const selisih = item.order_number ? Number(item.shipping_cost || 0) - Number(item.net_cost || 0) : null;
               return (
                 <tr key={normalizeAwb(item.awb_no)} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70">
-                  <td className="py-2 pr-3 whitespace-nowrap font-mono text-xs text-slate-800">
+                  <td className="py-2 pr-2 whitespace-nowrap font-mono text-xs text-slate-800">
                     {item.awb_no}
                     {!item.has_discount && (
                       <motion.span
@@ -130,19 +135,19 @@ export default function JntItemsTable({ items }: { items: JntInvoiceItem[] }) {
                       </motion.span>
                     )}
                   </td>
-                  <td className="py-2 pr-3 whitespace-nowrap text-xs text-slate-600">{formatTanggalPendek(item.delivery_date)}</td>
-                  <td className="py-2 pr-3 text-xs text-slate-700">
-                    <span className="block max-w-[190px] truncate" title={`${item.district || ""} ${item.city || ""}`.trim()}>
+                  <td className="py-2 pr-2 whitespace-nowrap text-xs text-slate-600">{formatTanggalPendek(item.delivery_date)}</td>
+                  <td className="py-2 pr-2 text-xs text-slate-700">
+                    <span className="block max-w-[150px] truncate" title={`${item.district || ""} ${item.city || ""}`.trim()}>
                       {item.district ? `${item.district}, ` : ""}
                       {item.city || "—"}
                     </span>
                   </td>
-                  <td className="py-2 pr-3 text-xs text-slate-500">{item.service || "—"}</td>
-                  <td className="py-2 pr-3 text-right text-xs text-slate-600">{formatKg(item.weight)}</td>
-                  <td className="py-2 pr-3 text-right text-xs text-slate-500">{formatRp(item.gross_cost)}</td>
-                  <td className="py-2 pr-3 text-right text-xs text-slate-500">{item.discount ? `− ${formatRp(item.discount)}` : "—"}</td>
-                  <td className="py-2 pr-3 text-right text-xs font-bold text-slate-900">{formatRp(item.net_cost)}</td>
-                  <td className="py-2 pr-3 text-right text-xs text-slate-700">
+                  <td className="py-2 pr-2 text-xs text-slate-500">{item.service || "—"}</td>
+                  <td className="py-2 pr-2 text-right text-xs text-slate-600">{formatKg(item.weight)}</td>
+                  <td className="py-2 pr-2 text-right text-xs text-slate-500">{formatRp(item.gross_cost)}</td>
+                  <td className="py-2 pr-2 text-right text-xs text-slate-500">{item.discount ? `− ${formatRp(item.discount)}` : "—"}</td>
+                  <td className="py-2 pr-2 text-right text-xs font-bold text-slate-900">{formatRp(item.net_cost)}</td>
+                  <td className="py-2 pr-2 text-right text-xs text-slate-700">
                     {item.order_number ? (
                       <>
                         {formatRp(item.shipping_cost)}

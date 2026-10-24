@@ -1605,6 +1605,17 @@ header→item, `toNumber`/`toIsoDate`, ringkasan — modul murni, bisa diuji lew
 bukan posisi, jadi urutan kolom ekspor J&T boleh berubah — tapi header wajib memuat
 `No. Waybill` + `Biaya Kirim`, kalau tidak request dibalas 400 dengan pesan yang menyebut "Resi Saya".
 
+**Tabel per resi harus muat tanpa geser.** `JntItemsTable.tsx` sempat memakai `min-w-[1000px]`,
+sehingga di desktop 1280 px — kolom konten hanya **911 px** setelah sidebar 248 px + `lg:p-8` —
+kolom terakhir **Selisih terpotong** walau pembungkusnya `overflow-x-auto` (pemilik melihatnya
+sebagai "tabelnya kepotong"). Sekarang `w-full min-w-[760px]`, padding sel `pr-2`, dua header
+dipendekkan (`Tgl Kirim`, `Net Dibukukan`), dan kolom Tujuan dipotong `max-w-[150px]`: lebar alami
+tabel **853 px**, jadi muat penuh (0 px geser) mulai lebar viewport ~1200 px ke atas dan tidak ada
+scroll samping di halaman. Di bawah itu 10 kolom memang tidak bisa dipadatkan lagi → tabel tetap
+bisa digeser mendatar (petunjuk "Geser tabel ke samping…", `xl:hidden`). **Jangan** menaikkan
+`min-width`-nya lagi atau menghapus pembungkus `overflow-x-auto` tanpa mengukur ulang di 1280 px
+(uji: 1280 → 0 px geser, 1024 → 198 px, 375 → 567 px).
+
 **Idempotensi & pratinjau.** Bulan tagihan setiap baris diambil dari tanggal pengirimannya (satu
 file boleh memuat dua bulan; invoice baris dibuat otomatis per bulan). Upload ulang file yang sama →
 `new: 0`, `existing: 125`, `failed: 0`, tidak ada baris ganda. Kalau tabelnya belum ada, upload
