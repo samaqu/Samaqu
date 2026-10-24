@@ -100,13 +100,23 @@ export default function StockMovementsPanel({ direction }: { direction: "in" | "
 
       <div className="bg-white dark:bg-[#1a1d28] rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[820px]">
+          <table className="w-full border-collapse table-fixed min-w-[900px]">
+            <colgroup>
+              <col style={{ width: "13%" }} />
+              <col style={{ width: "17%" }} />
+              <col style={{ width: "11%" }} />
+              <col style={{ width: "7%" }} />
+              <col style={{ width: "9%" }} />
+              <col style={{ width: "10%" }} />
+              <col style={{ width: "25%" }} />
+              <col style={{ width: "8%" }} />
+            </colgroup>
             <thead>
-              <tr className="bg-[#1e3a5f]">
+              <tr className="bg-[#f8fafc] dark:bg-slate-800/60 border-b border-[#e2e8f0] dark:border-slate-700">
                 {["Tanggal", "Produk", "Kain/Warna", "Ukuran", "Perubahan", "Stok", "Keterangan", "Oleh"].map((head) => (
                   <th
                     key={head}
-                    className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wide text-white whitespace-nowrap"
+                    className="px-3.5 py-3 text-left font-inter text-[11px] font-bold uppercase tracking-[.06em] text-slate-500 dark:text-slate-300 whitespace-nowrap"
                   >
                     {head}
                   </th>
@@ -129,22 +139,22 @@ export default function StockMovementsPanel({ direction }: { direction: "in" | "
                   </td>
                 </tr>
               ) : (
-                rows.map((m, index) => (
+                rows.map((m) => (
                   <tr
                     key={m.id}
-                    className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-blue-50/30 dark:bg-[#1a1d28]"} border-b border-gray-100 dark:border-slate-800/50`}
+                    className="hover:bg-[#eff6ff] dark:hover:bg-slate-800/70 border-b border-[#e2e8f0] dark:border-slate-800/60 transition-colors"
                   >
-                    <td className="px-3 py-2 text-[13px] text-gray-600 dark:text-slate-300 whitespace-nowrap">
+                    <td className="px-3.5 py-2.5 font-inter text-[13px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap">
                       {new Date(m.created_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
                     </td>
-                    <td className="px-3 py-2 text-[13px] font-semibold text-gray-900 dark:text-white">{m.product_name}</td>
-                    <td className="px-3 py-2 text-[13px] text-gray-600 dark:text-slate-300 whitespace-nowrap">
+                    <td className="px-3.5 py-2.5 font-inter text-[13px] font-semibold leading-snug text-gray-900 dark:text-white break-words">{m.product_name}</td>
+                    <td className="px-3.5 py-2.5 font-inter text-[12px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap">
                       {m.color && m.color !== "default" ? m.color : "-"}
                     </td>
-                    <td className="px-3 py-2 text-[13px] text-center font-semibold text-gray-700 dark:text-slate-200">{m.size || "-"}</td>
-                    <td className="px-3 py-2">
+                    <td className="px-3.5 py-2.5 text-center font-inter text-[12px] font-semibold text-gray-700 dark:text-slate-200">{m.size || "-"}</td>
+                    <td className="px-3.5 py-2.5">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[12px] font-bold ${
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-bold ${
                           m.direction === "in"
                             ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400"
                             : "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-400"
@@ -153,18 +163,18 @@ export default function StockMovementsPanel({ direction }: { direction: "in" | "
                         {m.direction === "in" ? "+" : "-"}{m.qty}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-[12px] text-gray-600 dark:text-slate-300 whitespace-nowrap tabular-nums">
+                    <td className="px-3.5 py-2.5 font-inter text-[12px] text-gray-600 dark:text-slate-300 whitespace-nowrap tabular-nums">
                       {m.before_stock ?? "-"} → {m.after_stock ?? "-"}
                     </td>
-                    <td className="px-3 py-2 text-[12px] text-gray-600 dark:text-slate-300">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 text-[10px] font-bold">
+                    <td className="px-3.5 py-2.5 font-inter text-[12px] leading-snug text-gray-600 dark:text-slate-300">
+                      <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
+                        <span className="shrink-0 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 text-[10px] font-bold">
                           {sourceLabel(m.source)}
                         </span>
-                        <span className="max-w-[360px] truncate" title={m.notes || undefined}>{m.notes || "-"}</span>
+                        <span className="truncate" title={m.notes || undefined}>{m.notes || "-"}</span>
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-[12px] text-gray-600 dark:text-slate-300 whitespace-nowrap">
+                    <td className="px-3.5 py-2.5 font-inter text-[12px] text-gray-600 dark:text-slate-300 whitespace-nowrap">
                       {m.actor_name || "-"}
                     </td>
                   </tr>
