@@ -1965,13 +1965,13 @@ export default function MasterProduk() {
                       <div className="overflow-x-auto">
                         <table className="w-full border-collapse table-fixed min-w-[900px]">
                           <colgroup>
-                            <col style={{ width: "11%" }} />
-                            <col style={{ width: "16%" }} />
-                            <col style={{ width: "21%" }} />
-                            <col style={{ width: "11%" }} />
+                            <col style={{ width: "10%" }} />
+                            <col style={{ width: "14%" }} />
+                            <col style={{ width: "24%" }} />
+                            <col style={{ width: "10%" }} />
                             <col style={{ width: "7%" }} />
                             <col style={{ width: "7%" }} />
-                            <col style={{ width: "21%" }} />
+                            <col style={{ width: "22%" }} />
                             <col style={{ width: "6%" }} />
                           </colgroup>
                           <thead>
@@ -2014,32 +2014,37 @@ export default function MasterProduk() {
                                 const product = products.find(p => p.id === si.product_id);
                                 return (
                                   <tr key={si.id} className="hover:bg-[#eff6ff] dark:hover:bg-slate-800/70 transition-colors border-b border-[#e2e8f0] dark:border-slate-800/60">
-                                    <td className="px-3.5 py-2.5 align-middle font-inter text-[13px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap">
+                                    <td className="px-3.5 py-2.5 align-top font-inter text-[13px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap">
                                       {format(new Date(si.date), 'dd MMM yyyy')}
                                     </td>
-                                    <td className="px-3.5 py-2.5 align-middle font-mono text-[12px] leading-snug font-semibold text-gray-700 dark:text-slate-200 break-words">
+                                    <td className="px-3.5 py-2.5 align-top font-mono text-[12px] leading-snug font-semibold text-gray-700 dark:text-slate-200 break-words">
                                       {displayVariantSku(variants, product, si.product_id, si.variant_color, si.variant_size, si.sku)}
                                     </td>
-                                    <td className="px-3.5 py-2.5 align-middle font-inter text-[13px] leading-snug font-semibold text-gray-900 dark:text-white break-words">
-                                      {si.product_name || product?.name || '-'}
+                                    <td className="px-3.5 py-2.5 align-top font-inter text-[13px] leading-snug font-semibold text-gray-900 dark:text-white break-words">
+                                      <span className="block">{product?.name || si.product_name || '-'}</span>
+                                      {(product?.series || si.series) ? (
+                                        <span className="block text-[11px] font-medium text-gray-500 dark:text-slate-400 mt-0.5">
+                                          {product?.series || si.series}
+                                        </span>
+                                      ) : null}
                                     </td>
-                                    <td className="px-3.5 py-2.5 text-center align-middle font-inter text-[12px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap">
+                                    <td className="px-3.5 py-2.5 text-center align-top font-inter text-[12px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap">
                                       {displayVariantColor(si.variant_color, product)}
                                     </td>
-                                    <td className="px-3.5 py-2.5 text-center align-middle font-inter text-[12px] font-semibold text-gray-700 dark:text-slate-200 whitespace-nowrap">
+                                    <td className="px-3.5 py-2.5 text-center align-top font-inter text-[12px] font-semibold text-gray-700 dark:text-slate-200 whitespace-nowrap">
                                       {si.variant_size || '-'}
                                     </td>
-                                    <td className="px-3.5 py-2.5 text-center align-middle">
+                                    <td className="px-3.5 py-2.5 text-center align-top">
                                       <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 text-[12px] font-bold">
                                         +{si.qty}
                                       </span>
                                     </td>
-                                    <td className="px-3.5 py-2.5 align-middle font-inter text-[12px] leading-snug text-gray-500 dark:text-slate-400">
+                                    <td className="px-3.5 py-2.5 align-top font-inter text-[12px] leading-snug text-gray-500 dark:text-slate-400">
                                       <span className="block max-w-[220px] truncate" title={si.notes || undefined}>
                                         {si.notes || '-'}
                                       </span>
                                     </td>
-                                    <td className="px-3.5 py-2.5 text-center align-middle">
+                                    <td className="px-3.5 py-2.5 text-center align-top">
                                       {['batal', 'tukar_size', 'return'].includes(si.source) ? (
                                         <span
                                           className="text-[11px] font-semibold text-gray-400 dark:text-slate-500"
@@ -2109,13 +2114,13 @@ export default function MasterProduk() {
                     <th className="w-[15%] px-3.5 py-3 text-left font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em] whitespace-nowrap">
                     Order ID
                     </th>
-                    <th className="w-[19%] px-3.5 py-3 text-left font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em]">
+                    <th className="w-[25%] px-3.5 py-3 text-left font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em]">
                     Produk
                     </th>
-                    <th className="w-[12%] px-3.5 py-3 text-center font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em] whitespace-nowrap">
+                    <th className="w-[10%] px-3.5 py-3 text-center font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em] whitespace-nowrap">
                     Warna
                     </th>
-                    <th className="w-[22%] px-3.5 py-3 text-left font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em] whitespace-nowrap">
+                    <th className="w-[18%] px-3.5 py-3 text-left font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em] whitespace-nowrap">
                     SKU
                     </th>
                     <th className="w-[7%] px-3.5 py-3 text-center font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em]">
@@ -2164,8 +2169,13 @@ export default function MasterProduk() {
                     )}
                     </div>
                     </td>
-                    <td className="px-3.5 py-2.5 align-top font-inter text-[13px] font-medium leading-snug text-gray-900 dark:text-white break-words">
-                    {t.product_name || product?.name || '-'}
+                    <td className="px-3.5 py-2.5 align-top font-inter text-[13px] font-semibold leading-snug text-gray-900 dark:text-white break-words">
+                    <span className="block">{product?.name || t.product_name || '-'}</span>
+                    {(t.series || product?.series) ? (
+                    <span className="block text-[11px] font-medium text-gray-500 dark:text-slate-400 mt-0.5">
+                    {t.series || product?.series}
+                    </span>
+                    ) : null}
                     </td>
                     <td className="px-3.5 py-2.5 text-center align-top font-inter text-[12px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap">
                     {displayVariantColor(t.variant_color, product)}
