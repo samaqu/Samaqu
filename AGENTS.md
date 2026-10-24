@@ -951,6 +951,14 @@ tanpa menyentuh status ataupun logika database sama sekali.
   tengah turn ia mencoba SPA nav dan gagal (`navigation_failed`, URL berubah tapi konten tetap).
   Jadi: **jalankan perintah shell dulu**, baru `preview_screenshot({path:'/admin'})`, lalu
   `preview_execute_code` tanpa shell/edit di antaranya.
+  **Cara yang lebih andal (2026-10-24, terbukti):** `preview_execute_code` cukup membuat
+  `<iframe src="/admin">` (same-origin, lebar 375/867/1280 px sebagai pengganti `setViewport`) lalu
+  membaca `frame.contentDocument` — halaman admin dimuat penuh di dalam iframe tanpa menyentuh URL
+  preview, jadi route admin **bisa** diperiksa: teks/lebar elemen (`scrollWidth` vs `clientWidth`
+  untuk mendeteksi teks terpotong), posisi baris (`getBoundingClientRect().top` untuk membuktikan
+  kartu sejajar), `documentElement.scrollWidth - clientWidth` untuk scroll samping, plus
+  `consoleLogs`. `navigate()` tetap gagal (`navigation_failed`) dan URL-nya tertinggal menunjuk
+  route admin — panggil `reload_preview` kalau halaman preview sendiri perlu bersih.
 
 ## "Atur Pesanan" â€” resi J&T diterbitkan admin (ala Shopee Seller Centre)
 
@@ -1432,6 +1440,13 @@ lihat butir terakhir di bagian ini.
   terpotong; caption terpanjang sekarang "126 transaksi · tanpa ongkir" (28 karakter). Rincian
   panjang ditaruh di `title` kartu (tooltip), bukan di caption. Kalau menambah kartu/keterangan
   baru, ukur lagi di 4 kolom sebelum menyerahkannya.
+  **Revisi 2026-10-24 (pemilik: "tulisan d card nya kepotong"):** chip tren tidak lagi duduk
+  sebaris dengan nama kartu di `xl`. Di 4 kolom (isi kartu ~190 px) nama kartu dulu kalah ruang
+  dari chip sehingga terpotong `…` (`RATA-RATA PESAN…`) — itu yang dikeluhkan. Nama kartu sekarang
+  **tanpa `truncate`** dan barisnya `flex-wrap`: chip turun ke baris kedua (rata kanan) di `xl`,
+  sedangkan pembungkusnya tetap `h-[18px]` di semua lebar supaya keempat kartu punya tinggi baris
+  header yang sama (41 px di `xl`, 18 px di tablet) dan nilai + caption-nya tetap sejajar.
+  Jangan mengembalikan `truncate` ke nama kartu atau menaruh chip sebaris lagi di 4 kolom.
 - **Chip tren naik/turun** = pembanding bulan sebelumnya (`+615,8% vs Sep` hijau, `-26,1% vs Sep`
   merah). Bulan lalu tanpa data (prev = 0) → chip **disembunyikan**, bukan dibagi nol/dikarang.
   Nilai pembanding dihitung dari jendela grafik 6 bulan (`chartOrders`), bukan query tambahan.

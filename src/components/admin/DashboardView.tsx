@@ -305,13 +305,18 @@ export default function DashboardView({
             className="p-5 flex flex-col gap-3 transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.07)]"
             style={{ background: "var(--card)", border: "1px solid var(--bd)", borderRadius: "var(--rad3)" }}
           >
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wide truncate" style={{ color: "var(--fg3)" }}>
+            {/* Nama kartu + chip tren. Di kartu 4 kolom (~190 px isi) chip tren tidak lagi
+                memotong nama kartu: chip turun ke baris kedua, dan tinggi baris chip dijaga
+                sama di semua kartu (termasuk yang tanpa chip) supaya isi kartu tetap sejajar. */}
+            <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--fg3)" }}>
                 {m.label}
               </span>
-              {m.delta != null ? (
-                <TrendChip delta={m.delta} label={m.deltaLabel || prevLabel} title={m.deltaTitle} />
-              ) : null}
+              <span className="shrink-0 h-[18px] flex items-center justify-end xl:w-full">
+                {m.delta != null ? (
+                  <TrendChip delta={m.delta} label={m.deltaLabel || prevLabel} title={m.deltaTitle} />
+                ) : null}
+              </span>
             </div>
             {/* Ukuran font fluid supaya nominal panjang (mis. "Rp 48.331.123") tidak pernah
                 terpotong di layar sempit / zoom tinggi. */}
