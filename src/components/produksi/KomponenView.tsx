@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, Loader2, Pencil, Plus, Search, X } from "lucide-react";
+import { ChevronRight, ClipboardList, Loader2, Pencil, Plus, Search, X } from "lucide-react";
 import {
   COMPONENT_CATEGORIES,
   COMPONENT_UNITS,
   STOCK_STATUS_LABEL,
   categoryLabel,
+  formatDate,
   formatQty,
   formatRupiah,
+  movementLabel,
   parseComponentPaste,
   stockStatus,
   type FabricType,
@@ -104,6 +106,26 @@ export default function KomponenView() {
   const [codeTouched, setCodeTouched] = useState(false);
 
   const [importOpen, setImportOpen] = useState(false);
+  const [detail, setDetail] = useState<ComponentRow | null>(null);
+  const [detailMovements, setDetailMovements] = useState<any[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  async function openDetail(row: ComponentRow) {
+    setDetail(row);
+    setDetailMovements([]);
+    setDetailLoading(true);
+    try {
+      const json = await produksiFetch<{ item: ComponentRow; movements: any[] }>(
+        `/api/ops/production/components/${row.id}`,
+      );
+      setDetail(json.item || row);
+      setDetailMovements((json.movements || []).slice(0, 6));
+    } catch {
+      /* tetap tampilkan data baris yang sudah ada */
+    } finally {
+      setDetailLoading(false);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -328,81 +350,117 @@ export default function KomponenView() {
         </div>
 
         <div className={`${cardClass} overflow-hidden`}>
-          <div className="overflow-x-auto">
-            <table className={`w-full border-collapse ${access.role === "owner" ? "min-w-[1100px]" : "min-w-[760px]"}`}>
-              <thead>
-                <tr className="bg-[#1e3a5f]">
-                  {[
-                    "Kode", "Nama", "Kategori", "Satuan", "Stok", "Min",
-                    ...(access.role === "owner" ? ["Harga Real", "Harga Aman", "Selisih", "Nilai Stok"] : []),
-                    "Status", "",
-                  ].map((h) => (
-                    <th key={h} className="px-3 py-3 text-left font-inter text-xs font-bold text-white uppercase tracking-wide border-r border-[#2d4a6f] last:border-r-0 whitespace-nowrap">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={12}><Spinner /></td></tr>
-                ) : items.length === 0 ? (
-                  <tr><td colSpan={12}><EmptyState title="Belum ada komponen" description="Tambahkan komponen pertama atau tempel data dari Excel." /></td></tr>
-                ) : (
-                  items.map((row, index) => {
-                    const statusKey = stockStatus(row.stock, row.min_stock);
-                    const gap = Number(row.price_gap) || 0;
-                    return (
-                      <tr
-                        key={row.id}
-                        className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-blue-50/30 dark:bg-[#1a1d28]"} border-b border-gray-100 dark:border-slate-800/50`}
-                      >
-                        <td className="px-3 py-2.5 text-xs font-black text-slate-900 dark:text-white whitespace-nowrap">{row.code}</td>
-                        <td className="px-3 py-2.5 text-sm font-bold text-slate-800 dark:text-slate-100">
-                          <Link href={`/ops/produksi/komponen/${row.id}`} className="hover:text-[#1e3a5f] dark:hover:text-blue-300">
-                            {row.name}
-                          </Link>
-                          {row.fabric_type_name ? (
-                            <span className="ml-2 text-[10px] font-bold text-slate-400">{row.fabric_type_name}</span>
-                          ) : null}
-                          {!row.is_active ? <span className="ml-2"><Badge tone="slate">Nonaktif</Badge></span> : null}
-                        </td>
-                        <td className="px-3 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">{categoryLabel(row.category)}</td>
-                        <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                          {row.unit_use}
-                          <span className="text-slate-400"> · 1 {row.unit_buy} = {formatQty(row.conversion)}</span>
-                        </td>
-                        <td className="px-3 py-2.5 text-sm font-bold text-slate-900 dark:text-white whitespace-nowrap">{formatQty(row.stock)} <span className="text-[11px] font-medium text-slate-400">{row.unit_use}</span></td>
-                        <td className="px-3 py-2.5 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatQty(row.min_stock)}</td>
-                        {access.role === "owner" ? (
-                          <>
-                            <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">Rp {formatRupiah(row.real_price)}</td>
-                            <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">Rp {formatRupiah(row.safe_price)}</td>
-                            <td className={`px-3 py-2.5 text-xs font-bold whitespace-nowrap ${gap < 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                              {gap < 0 ? "−" : "+"}Rp {formatRupiah(Math.abs(gap))}
-                            </td>
-                            <td className="px-3 py-2.5 text-sm font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">Rp {formatRupiah(row.stock_value)}</td>
-                          </>
-                        ) : null}
-                        <td className="px-3 py-2.5 whitespace-nowrap"><Badge tone={statusTone[statusKey]}>{STOCK_STATUS_LABEL[statusKey]}</Badge></td>
-                        <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                          {access.canWrite ? (
-                            <button
-                              type="button"
-                              onClick={() => openEdit(row)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700"
-                            >
-                              <Pencil size={12} /> Edit
-                            </button>
-                          ) : null}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-bold text-slate-900 dark:text-white">Daftar komponen</p>
+            <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 tabular-nums">
+              {items.length} komponen
+            </p>
           </div>
+          <table className="w-full border-collapse table-fixed">
+            <colgroup>
+              {access.role === "owner" ? (
+                <>
+                  <col className="w-[13%]" />
+                  <col className="w-[32%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[13%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[3%]" />
+                </>
+              ) : (
+                <>
+                  <col className="w-[16%]" />
+                  <col className="w-[50%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[3%]" />
+                </>
+              )}
+            </colgroup>
+            <thead>
+              <tr className="bg-[#1e3a5f]">
+                <th className="px-2.5 py-3 text-left text-[10px] font-bold text-white uppercase tracking-wider leading-tight border-r border-[#2d4a6f]">Kode</th>
+                <th className="px-2.5 py-3 text-left text-[10px] font-bold text-white uppercase tracking-wider leading-tight border-r border-[#2d4a6f]">Komponen</th>
+                <th className="px-2.5 py-3 text-right text-[10px] font-bold text-white uppercase tracking-wider leading-tight border-r border-[#2d4a6f]">Stok</th>
+                {access.role === "owner" ? (
+                  <>
+                    <th className="px-2.5 py-3 text-right text-[10px] font-bold text-white uppercase tracking-wider leading-tight border-r border-[#2d4a6f]">Harga Real</th>
+                    <th className="px-2.5 py-3 text-right text-[10px] font-bold text-white uppercase tracking-wider leading-tight border-r border-[#2d4a6f]">Harga Aman</th>
+                  </>
+                ) : null}
+                <th className="px-2.5 py-3 text-left text-[10px] font-bold text-white uppercase tracking-wider leading-tight">Status</th>
+                <th className="px-1 py-3 border-l border-[#2d4a6f]" aria-label="Detail" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+              {loading ? (
+                <tr><td colSpan={access.role === "owner" ? 7 : 5}><Spinner /></td></tr>
+              ) : items.length === 0 ? (
+                <tr><td colSpan={access.role === "owner" ? 7 : 5}><EmptyState title="Belum ada komponen" description="Tambahkan komponen pertama atau tempel data dari Excel." /></td></tr>
+              ) : (
+                items.map((row, index) => {
+                  const statusKey = stockStatus(row.stock, row.min_stock);
+                  const gap = Number(row.price_gap) || 0;
+                  return (
+                    <tr
+                      key={row.id}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Detail komponen ${row.name}`}
+                      onClick={() => openDetail(row)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openDetail(row);
+                        }
+                      }}
+                      className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-slate-50/60 dark:bg-[#1a1d28]"} hover:bg-blue-50/50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500`}
+                    >
+                      <td className="px-2.5 py-2.5 align-middle text-[11px] font-mono font-bold text-slate-600 dark:text-slate-300 truncate" title={row.code}>
+                        {row.code}
+                      </td>
+                      <td className="px-2.5 py-2.5 align-middle min-w-0">
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white truncate" title={row.name}>{row.name}</span>
+                          {!row.is_active ? <Badge tone="slate">Nonaktif</Badge> : null}
+                        </span>
+                        <span className="block text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                          {categoryLabel(row.category)}{row.fabric_type_name ? ` · ${row.fabric_type_name}` : ""}
+                        </span>
+                      </td>
+                      <td className="px-2.5 py-2.5 align-middle text-right whitespace-nowrap tabular-nums">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white">{formatQty(row.stock)}</span>
+                        <span className="ml-1 text-[10px] font-semibold text-slate-400">{row.unit_use}</span>
+                        <span className="block text-[10px] text-slate-400">min {formatQty(row.min_stock)}</span>
+                      </td>
+                      {access.role === "owner" ? (
+                        <>
+                          <td className="px-2.5 py-2.5 align-middle text-right whitespace-nowrap tabular-nums">
+                            <span className="text-[10px] text-slate-400">Rp</span>{" "}
+                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{formatRupiah(row.real_price)}</span>
+                          </td>
+                          <td className="px-2.5 py-2.5 align-middle text-right whitespace-nowrap tabular-nums">
+                            <span className="text-[10px] text-slate-400">Rp</span>{" "}
+                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{formatRupiah(row.safe_price)}</span>
+                            <span className={`block text-[10px] font-bold ${gap < 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                              {gap < 0 ? "−" : "+"}Rp {formatRupiah(Math.abs(gap))}
+                            </span>
+                          </td>
+                        </>
+                      ) : null}
+                      <td className="px-2.5 py-2.5 align-middle">
+                        <Badge tone={statusTone[statusKey]}>{STOCK_STATUS_LABEL[statusKey]}</Badge>
+                      </td>
+                      <td className="px-1 py-2.5 align-middle text-center text-slate-300 dark:text-slate-600">
+                        <ChevronRight size={15} />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
 
         {access.role === "leader" ? (
@@ -410,6 +468,134 @@ export default function KomponenView() {
             Harga dan nilai stok disembunyikan untuk role Leader.
           </p>
         ) : null}
+
+        <Drawer
+          open={Boolean(detail)}
+          onClose={() => setDetail(null)}
+          title="Detail Komponen"
+          subtitle={detail ? `${detail.code} · ${detail.name}` : ""}
+          footer={
+            detail ? (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Link href={`/ops/produksi/komponen/${detail.id}`} className={btnSecondary}>
+                  Buka riwayat lengkap
+                </Link>
+                <div className="flex items-center gap-2">
+                  {access.canWrite ? (
+                    <button
+                      className={btnSecondary}
+                      onClick={() => {
+                        const row = detail;
+                        setDetail(null);
+                        openEdit(row);
+                      }}
+                    >
+                      <Pencil size={15} /> Edit
+                    </button>
+                  ) : null}
+                  <button className={btnPrimary} onClick={() => setDetail(null)}>Tutup</button>
+                </div>
+              </div>
+            ) : null
+          }
+        >
+          {detail ? (
+            <div className="space-y-4">
+              <div className={`${cardClass} p-4 flex items-start justify-between gap-4`}>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={stockStatus(detail.stock, detail.min_stock) === "aman" ? "green" : stockStatus(detail.stock, detail.min_stock) === "menipis" ? "amber" : "red"}>
+                      {STOCK_STATUS_LABEL[stockStatus(detail.stock, detail.min_stock)]}
+                    </Badge>
+                    <Badge tone={detail.is_active ? "blue" : "slate"}>{detail.is_active ? "Aktif" : "Nonaktif"}</Badge>
+                  </div>
+                  <p className="mt-3 text-sm font-black text-slate-900 dark:text-white break-words">{detail.name}</p>
+                  <p className="text-[11px] text-slate-400">
+                    {categoryLabel(detail.category)}{detail.fabric_type_name ? ` · ${detail.fabric_type_name}` : ""}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Stok saat ini</p>
+                  <p className="mt-1 text-2xl font-black whitespace-nowrap tabular-nums text-slate-900 dark:text-white">
+                    {formatQty(detail.stock)}
+                    <span className="ml-1 text-xs font-semibold text-slate-400">{detail.unit_use}</span>
+                  </p>
+                  <p className="mt-1 text-[11px] text-slate-400">min {formatQty(detail.min_stock)} {detail.unit_use}</p>
+                </div>
+              </div>
+
+              {access.role === "owner" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <DetailField label="Harga Real" value={`Rp ${formatRupiah(detail.real_price)} / ${detail.unit_use}`} />
+                  <DetailField label="Harga Aman" value={`Rp ${formatRupiah(detail.safe_price)} / ${detail.unit_use}`} />
+                  <DetailField
+                    label="Selisih Aman − Real"
+                    value={`${Number(detail.price_gap) < 0 ? "−" : "+"}Rp ${formatRupiah(Math.abs(Number(detail.price_gap) || 0))}`}
+                    tone={Number(detail.price_gap) < 0 ? "danger" : "positive"}
+                  />
+                  <DetailField label="Nilai stok" value={`Rp ${formatRupiah(detail.stock_value)}`} />
+                </div>
+              ) : null}
+
+              <div className={`${cardClass} p-4 grid grid-cols-2 gap-x-4 gap-y-3`}>
+                <DetailField label="Satuan pakai" value={detail.unit_use} />
+                <DetailField label="Satuan beli" value={`${detail.unit_buy} · 1 = ${formatQty(detail.conversion)} ${detail.unit_use}`} />
+                <DetailField label="Supplier utama" value={detail.supplier || "—"} />
+                <DetailField label="Jenis kain" value={detail.fabric_type_name || "—"} />
+              </div>
+
+              {detail.notes ? (
+                <div className={`${cardClass} p-4`}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Catatan</p>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-200 break-words">{detail.notes}</p>
+                </div>
+              ) : null}
+
+              <div className={`${cardClass} overflow-hidden`}>
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">Pergerakan terakhir</p>
+                </div>
+                {detailLoading ? (
+                  <Spinner label="Memuat pergerakan…" />
+                ) : detailMovements.length === 0 ? (
+                  <p className="px-4 py-6 text-center text-xs text-slate-400">Belum ada pergerakan stok.</p>
+                ) : (
+                  <table className="w-full border-collapse table-fixed">
+                    <colgroup>
+                      <col className="w-[27%]" />
+                      <col className="w-[33%]" />
+                      <col className="w-[20%]" />
+                      <col className="w-[20%]" />
+                    </colgroup>
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/60">
+                        {["Tanggal", "Jenis", "Jumlah", "Saldo"].map((h, i) => (
+                          <th key={h} className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 ${i >= 2 ? "text-right" : "text-left"}`}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                      {detailMovements.map((movement) => (
+                        <tr key={movement.id}>
+                          <td className="px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDate(movement.movement_date)}</td>
+                          <td className="px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200 truncate">{movementLabel(movement.type)}</td>
+                          <td className={`px-3 py-2 text-right text-[11px] font-bold whitespace-nowrap tabular-nums ${movement.qty > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                            {movement.qty > 0 ? "+" : "−"}{formatQty(Math.abs(movement.qty))}
+                          </td>
+                          <td className="px-3 py-2 text-right text-[11px] font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap tabular-nums">
+                            {formatQty(movement.running_balance)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </Drawer>
 
         <Drawer
           open={editorOpen}
@@ -549,6 +735,29 @@ export default function KomponenView() {
         />
       </div>
     </AccessGate>
+  );
+}
+
+function DetailField({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  tone?: "default" | "positive" | "danger";
+}) {
+  const color =
+    tone === "positive"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : tone === "danger"
+        ? "text-red-600 dark:text-red-400"
+        : "text-slate-800 dark:text-slate-100";
+  return (
+    <div className="min-w-0 rounded-xl border border-gray-100 dark:border-slate-800 p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className={`mt-0.5 text-xs font-bold break-words tabular-nums ${color}`}>{value}</p>
+    </div>
   );
 }
 
