@@ -100,7 +100,7 @@ export default function StockMovementsPanel({ direction }: { direction: "in" | "
 
       <div className="bg-white dark:bg-[#1a1d28] rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse table-fixed min-w-[900px]">
+          <table className="w-full border-collapse table-fixed">
             <colgroup>
               <col style={{ width: "13%" }} />
               <col style={{ width: "17%" }} />

@@ -1963,7 +1963,7 @@ export default function MasterProduk() {
                     {/* Table - Google Sheet Style */}
                     <div className="bg-white dark:bg-[#1a1d28] rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 overflow-hidden transition-colors duration-300">
                       <div className="overflow-x-auto">
-                        <table className="w-full border-collapse table-fixed min-w-[900px]">
+                        <table className="w-full border-collapse table-fixed">
                           <colgroup>
                             <col style={{ width: "10%" }} />
                             <col style={{ width: "14%" }} />
@@ -2050,7 +2050,7 @@ export default function MasterProduk() {
                                           className="text-[11px] font-semibold text-gray-400 dark:text-slate-500"
                                           title="Baris otomatis dari retur/pembatalan — stok sudah diterapkan, tidak dihapus dari sini"
                                         >
-                                          {si.source === 'tukar_size' ? 'tukar size' : si.source === 'return' ? 'retur' : 'otomatis'}
+                                          {si.source === 'tukar_size' ? 'tukar size' : si.source === 'return' ? 'retur' : 'auto'}
                                         </span>
                                       ) : (
                                         <button
@@ -2105,7 +2105,7 @@ export default function MasterProduk() {
               {/* Table - Google Sheet Style */}
               <div className="bg-white dark:bg-[#1a1d28] rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 overflow-hidden transition-colors duration-300">
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse table-fixed min-w-[880px]">
+                  <table className="w-full border-collapse table-fixed">
                     <thead>
                     <tr className="bg-[#f8fafc] dark:bg-slate-800/60 border-b border-[#e2e8f0] dark:border-slate-700">
                     <th className="w-[10%] px-3.5 py-3 text-left font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em] whitespace-nowrap">
