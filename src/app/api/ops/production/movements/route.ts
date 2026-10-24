@@ -47,6 +47,19 @@ export async function GET(req: NextRequest) {
     : { data: [] as any[] };
   const componentById = new Map((components || []).map((c: any) => [c.id, c]));
 
+  // Nomor pembelian untuk baris referensi (drawer detail lebih mudah dibaca).
+  const purchaseIds = Array.from(
+    new Set(
+      (data || [])
+        .filter((row: any) => row.ref_type === "purchase" && row.ref_id)
+        .map((row: any) => row.ref_id),
+    ),
+  );
+  const { data: purchases } = purchaseIds.length
+    ? await admin.from("production_purchases").select("id, purchase_number").in("id", purchaseIds)
+    : { data: [] as any[] };
+  const purchaseNumberById = new Map((purchases || []).map((p: any) => [p.id, p.purchase_number]));
+
   const items = (data || []).map((row: any) => {
     const component = componentById.get(row.component_id) as any;
     return mapMovement(
@@ -55,6 +68,7 @@ export async function GET(req: NextRequest) {
         component_code: component?.code || "",
         component_name: component?.name || "",
         unit_use: component?.unit_use || "",
+        ref_label: row.ref_type === "purchase" ? purchaseNumberById.get(row.ref_id) || "" : "",
       },
       showPrices,
     );

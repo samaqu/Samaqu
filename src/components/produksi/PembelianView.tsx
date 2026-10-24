@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Trash2, X } from "lucide-react";
+import { ChevronRight, Loader2, Plus, Trash2, X } from "lucide-react";
 import { formatDate, formatQty, formatRupiah, todayInput } from "@/lib/produksi";
 import { produksiFetch } from "@/lib/produksi-api";
 import { useProduksiAccess } from "./useAccess";
 import {
   AccessGate,
+  Badge,
   Drawer,
   EmptyState,
   ErrorBox,
@@ -36,11 +37,15 @@ type PurchaseItem = {
   component_name: string;
   qty_buy: number;
   unit_buy: string;
+  unit_use?: string;
   price_buy: number;
+  conversion?: number;
   qty_use: number;
   line_value: number;
   allocated_cost: number;
   final_unit_price: number;
+  real_price_before?: number;
+  real_price_after?: number;
 };
 
 type Purchase = {
@@ -68,6 +73,8 @@ export default function PembelianView() {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [supplier, setSupplier] = useState("");
+
+  const [detail, setDetail] = useState<Purchase | null>(null);
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
@@ -243,58 +250,170 @@ export default function PembelianView() {
           )}
         </div>
 
-        {loading ? (
-          <div className={cardClass}><Spinner /></div>
-        ) : items.length === 0 ? (
-          <div className={cardClass}><EmptyState title="Belum ada pembelian" description="Catat pembelian pertama lewat tombol di atas." /></div>
-        ) : (
-          <div className="space-y-3">
-            {items.map((purchase) => (
-              <details key={purchase.id} className={`${cardClass} overflow-hidden`}>
-                <summary className="cursor-pointer list-none px-4 py-3 flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 dark:border-slate-800">
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                    <span className="text-sm font-black text-slate-900 dark:text-white">{purchase.purchase_number}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">{formatDate(purchase.purchase_date)}</span>
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{purchase.supplier || "Tanpa supplier"}</span>
-                    {purchase.notes ? <span className="text-[11px] text-slate-400">{purchase.notes}</span> : null}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-black text-slate-900 dark:text-white">Rp {formatRupiah(purchase.total_value)}</p>
-                    <p className="text-[11px] text-slate-400">
-                      Barang Rp {formatRupiah(purchase.items_value)} + ongkir Rp {formatRupiah(purchase.additional_cost)}
+        <div className={`${cardClass} overflow-hidden`}>
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-bold text-slate-900 dark:text-white">Riwayat pembelian</p>
+            <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 tabular-nums">
+              {loading ? "Memuat…" : `${items.length} pembelian`}
+            </p>
+          </div>
+          <table className="w-full border-collapse table-fixed">
+            <colgroup>
+              <col className="w-[12%]" />
+              <col className="w-[16%]" />
+              <col className="w-[25%]" />
+              <col className="w-[10%]" />
+              <col className="w-[32%]" />
+              <col className="w-[5%]" />
+            </colgroup>
+            <thead>
+              <tr className="bg-[#1e3a5f]">
+                {[
+                  { label: "Tanggal", align: "text-left" },
+                  { label: "No. Pembelian", align: "text-left" },
+                  { label: "Supplier", align: "text-left" },
+                  { label: "Item", align: "text-right" },
+                  { label: "Total", align: "text-right" },
+                ].map((head) => (
+                  <th key={head.label} className={`px-3 py-3 ${head.align} text-[11px] font-bold text-white uppercase tracking-wider leading-tight`}>
+                    {head.label}
+                  </th>
+                ))}
+                <th className="px-1 py-3" aria-label="Detail" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+              {loading ? (
+                <tr><td colSpan={6}><Spinner /></td></tr>
+              ) : items.length === 0 ? (
+                <tr><td colSpan={6}><EmptyState title="Belum ada pembelian" description="Catat pembelian pertama lewat tombol di atas." /></td></tr>
+              ) : (
+                items.map((purchase, index) => (
+                  <tr
+                    key={purchase.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Detail pembelian ${purchase.purchase_number}`}
+                    onClick={() => setDetail(purchase)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setDetail(purchase);
+                      }
+                    }}
+                    className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-slate-50/60 dark:bg-[#1a1d28]"} hover:bg-blue-50/50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500`}
+                  >
+                    <td className="px-3 py-3 align-middle text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap tabular-nums">
+                      {formatDate(purchase.purchase_date)}
+                    </td>
+                    <td className="px-3 py-3 align-middle text-[13px] font-black text-slate-900 dark:text-white whitespace-nowrap">
+                      {purchase.purchase_number}
+                    </td>
+                    <td className="px-3 py-3 align-middle text-xs font-semibold text-slate-700 dark:text-slate-200 truncate" title={purchase.supplier}>
+                      {purchase.supplier || "Tanpa supplier"}
+                    </td>
+                    <td className="px-3 py-3 align-middle text-right text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap tabular-nums">
+                      {purchase.items.length}
+                    </td>
+                    <td className="px-3 py-3 align-middle text-right whitespace-nowrap tabular-nums">
+                      <span className="text-[13px] font-black text-slate-900 dark:text-white">Rp {formatRupiah(purchase.total_value)}</span>
+                      <span className="block text-[11px] text-slate-400">
+                        Barang Rp {formatRupiah(purchase.items_value)} + ongkir Rp {formatRupiah(purchase.additional_cost)}
+                      </span>
+                    </td>
+                    <td className="px-1 py-3 align-middle text-center text-slate-300 dark:text-slate-600">
+                      <ChevronRight size={15} />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <Drawer
+          open={Boolean(detail)}
+          onClose={() => setDetail(null)}
+          wide
+          title="Detail Pembelian"
+          subtitle={detail ? `${detail.purchase_number} · ${formatDate(detail.purchase_date)}` : ""}
+          footer={
+            <div className="flex justify-end">
+              <button className={btnPrimary} onClick={() => setDetail(null)}>Tutup</button>
+            </div>
+          }
+        >
+          {detail ? (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/40 p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total pembelian</p>
+                    <p className="mt-1 text-3xl font-black text-slate-900 dark:text-white whitespace-nowrap tabular-nums">
+                      Rp {formatRupiah(detail.total_value)}
+                    </p>
+                    <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                      Barang Rp {formatRupiah(detail.items_value)} + ongkir/biaya Rp {formatRupiah(detail.additional_cost)}
                     </p>
                   </div>
-                </summary>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse min-w-[980px]">
-                    <thead>
-                      <tr className="bg-[#1e3a5f]">
-                        {["Komponen", "Qty beli", "Harga beli", "Jadi qty pakai", "Nilai baris", "Ongkir alokasi", "Harga akhir / satuan pakai"].map((h) => (
-                          <th key={h} className="px-3 py-2.5 text-left text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {purchase.items.map((item, index) => (
-                        <tr key={item.id} className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-blue-50/30 dark:bg-[#1a1d28]"} border-b border-gray-100 dark:border-slate-800/50`}>
-                          <td className="px-3 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">
-                            {item.component_code} · {item.component_name}
-                          </td>
-                          <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatQty(item.qty_buy)} {item.unit_buy}</td>
-                          <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(item.price_buy)}</td>
-                          <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatQty(item.qty_use)}</td>
-                          <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(item.line_value)}</td>
-                          <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(item.allocated_cost)}</td>
-                          <td className="px-3 py-2.5 text-xs font-black text-slate-900 dark:text-white whitespace-nowrap">Rp {formatRupiah(item.final_unit_price)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <Badge tone="blue">{detail.items.length} item</Badge>
                 </div>
-              </details>
-            ))}
-          </div>
-        )}
+              </div>
+
+              <div className={`${cardClass} p-4 grid grid-cols-2 gap-3`}>
+                <DetailField label="Tanggal" value={formatDate(detail.purchase_date)} />
+                <DetailField label="Supplier" value={detail.supplier || "Tanpa supplier"} />
+                <DetailField label="Dicatat oleh" value={detail.actor || "—"} />
+                <DetailField label="Jumlah item" value={`${detail.items.length} baris`} />
+              </div>
+
+              {detail.notes ? (
+                <div className={`${cardClass} p-4`}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Catatan</p>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-200 break-words">{detail.notes}</p>
+                </div>
+              ) : null}
+
+              <div>
+                <p className="mb-2 text-sm font-bold text-slate-900 dark:text-white">Rincian barang</p>
+                <div className="space-y-3">
+                  {detail.items.map((item) => (
+                    <div key={item.id} className={`${cardClass} p-4`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-mono font-semibold text-slate-400 truncate">{item.component_code}</p>
+                          <p className="text-[13px] font-black text-slate-900 dark:text-white break-words">{item.component_name}</p>
+                          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                            {formatQty(item.qty_buy)} {item.unit_buy}
+                            <span className="mx-1 text-slate-300">→</span>
+                            {formatQty(item.qty_use)} {item.unit_use || ""}
+                            {item.conversion && item.conversion !== 1 ? (
+                              <span className="ml-1 text-slate-400">(1 {item.unit_buy} = {formatQty(item.conversion)} {item.unit_use || ""})</span>
+                            ) : null}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Harga akhir</p>
+                          <p className="mt-0.5 text-[13px] font-black text-slate-900 dark:text-white whitespace-nowrap tabular-nums">
+                            Rp {formatRupiah(item.final_unit_price)}
+                          </p>
+                          <p className="text-[10px] text-slate-400">/ {item.unit_use || "satuan pakai"}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <MiniStat label={`Harga beli / ${item.unit_buy}`} value={`Rp ${formatRupiah(item.price_buy)}`} />
+                        <MiniStat label="Ongkir alokasi" value={`Rp ${formatRupiah(item.allocated_cost)}`} />
+                        <MiniStat label="Nilai baris" value={`Rp ${formatRupiah(item.line_value)}`} />
+                        <MiniStat label="Harga Real setelah" value={`Rp ${formatRupiah(item.real_price_after)}`} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </Drawer>
 
         <Drawer
           open={open}
@@ -425,5 +544,23 @@ export default function PembelianView() {
         </Drawer>
       </div>
     </AccessGate>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="mt-0.5 text-xs font-semibold text-slate-800 dark:text-slate-100 break-words">{value}</p>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 px-2.5 py-2 min-w-0">
+      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 leading-tight">{label}</p>
+      <p className="mt-0.5 text-[11px] font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap tabular-nums">{value}</p>
+    </div>
   );
 }

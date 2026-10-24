@@ -53,6 +53,14 @@ export async function GET(req: NextRequest) {
         .order("created_at", { ascending: true })
     : { data: [] as any[] };
 
+  const componentIds = Array.from(
+    new Set((items || []).map((item: any) => item.component_id).filter(Boolean)),
+  );
+  const { data: componentRows } = componentIds.length
+    ? await admin.from("production_components").select("id, unit_use").in("id", componentIds)
+    : { data: [] as any[] };
+  const unitUseById = new Map((componentRows || []).map((c: any) => [c.id, c.unit_use]));
+
   const byPurchase = new Map<string, any[]>();
   for (const item of items || []) {
     const list = byPurchase.get(item.purchase_id) || [];
@@ -63,6 +71,7 @@ export async function GET(req: NextRequest) {
       component_name: item.component_name,
       qty_buy: Number(item.qty_buy) || 0,
       unit_buy: item.unit_buy,
+      unit_use: unitUseById.get(item.component_id) || "",
       price_buy: Number(item.price_buy) || 0,
       conversion: Number(item.conversion) || 1,
       qty_use: Number(item.qty_use) || 0,

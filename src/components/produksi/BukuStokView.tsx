@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight, Loader2, Plus, X } from "lucide-react";
+import Link from "next/link";
+import { ArrowDown, ArrowUp, ChevronRight, Loader2, Plus, X } from "lucide-react";
 import {
   MOVEMENT_TYPES,
   formatDate,
@@ -41,6 +42,7 @@ type Movement = {
   unit_price?: number;
   value?: number;
   ref_type: string;
+  ref_label?: string;
   notes: string;
   actor: string;
   created_at: string;
@@ -322,46 +324,84 @@ export default function BukuStokView() {
           title="Detail Pergerakan Stok"
           subtitle={detail ? `${detail.component_code} · ${detail.component_name}` : ""}
           footer={
-            <div className="flex justify-end">
-              <button className={btnSecondary} onClick={() => setDetail(null)}>Tutup</button>
-            </div>
+            detail ? (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Link href={`/ops/produksi/komponen/${detail.component_id}`} className={btnSecondary}>
+                  Lihat komponen
+                </Link>
+                <button className={btnPrimary} onClick={() => setDetail(null)}>Tutup</button>
+              </div>
+            ) : null
           }
         >
           {detail ? (
             <div className="space-y-4">
-              <div className={`${cardClass} p-4 flex items-start justify-between gap-4`}>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Jenis transaksi</p>
-                  <div className="mt-1.5">
-                    <Badge tone={detail.type === "opname" || detail.type === "penyesuaian" ? "blue" : detail.qty > 0 ? "green" : "red"}>
-                      {movementLabel(detail.type)}
-                    </Badge>
+              {/* Ringkasan transaksi */}
+              <div
+                className={`rounded-2xl border p-5 ${
+                  detail.qty > 0
+                    ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/40 dark:bg-emerald-900/15"
+                    : "border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-900/15"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div
+                      className={`grid place-items-center h-11 w-11 shrink-0 rounded-2xl border ${
+                        detail.qty > 0
+                          ? "border-emerald-200 bg-white/80 text-emerald-600 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                          : "border-red-200 bg-white/80 text-red-600 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300"
+                      }`}
+                    >
+                      {detail.qty > 0 ? <ArrowDown size={20} /> : <ArrowUp size={20} />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className={`text-[10px] font-bold uppercase tracking-wider ${detail.qty > 0 ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}`}>
+                        {detail.qty > 0 ? "Stok masuk" : "Stok keluar"}
+                      </p>
+                      <p className={`mt-1 text-3xl font-black whitespace-nowrap tabular-nums leading-none ${detail.qty > 0 ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}`}>
+                        {detail.qty > 0 ? "+" : "−"}{formatQty(Math.abs(detail.qty))}
+                        <span className="ml-1 text-sm font-semibold opacity-60">{detail.unit_use}</span>
+                      </p>
+                      <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">{formatDate(detail.movement_date)}</p>
+                    </div>
                   </div>
-                  <p className="mt-3 text-sm font-black text-slate-900 dark:text-white break-words">{detail.component_name}</p>
-                  <p className="text-[11px] font-mono text-slate-400">{detail.component_code}</p>
+                  <Badge tone={detail.type === "opname" || detail.type === "penyesuaian" ? "blue" : detail.qty > 0 ? "green" : "red"}>
+                    {movementLabel(detail.type)}
+                  </Badge>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Jumlah</p>
-                  <p className={`mt-1 text-2xl font-black whitespace-nowrap tabular-nums ${detail.qty > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                    {detail.qty > 0 ? "+" : "−"}{formatQty(Math.abs(detail.qty))}
-                    <span className="ml-1 text-xs font-semibold text-slate-400">{detail.unit_use}</span>
-                  </p>
-                  <p className="mt-1 text-[11px] text-slate-400">{formatDate(detail.movement_date)}</p>
+
+                <div className="mt-4 pt-4 border-t border-black/5 dark:border-white/10 min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Komponen</p>
+                  <p className="mt-0.5 text-sm font-black text-slate-900 dark:text-white break-words">{detail.component_name}</p>
+                  <p className="text-[11px] font-mono text-slate-400 break-all">{detail.component_code}</p>
                 </div>
               </div>
 
-              <div className={`${cardClass} p-4 grid grid-cols-2 gap-x-4 gap-y-3`}>
-                <DetailField label="Tanggal" value={formatDate(detail.movement_date)} />
-                <DetailField label="Dicatat" value={formatDateTime(detail.created_at)} />
-                {access.role === "owner" ? (
-                  <>
-                    <DetailField label={`Harga satuan / ${detail.unit_use}`} value={`Rp ${formatRupiah(detail.unit_price)}`} />
-                    <DetailField label="Nilai" value={`Rp ${formatRupiah(detail.value)}`} />
-                  </>
-                ) : null}
-                <DetailField label="Referensi" value={referenceLabel(detail.ref_type)} />
-                <DetailField label="User" value={detail.actor || "—"} />
+              {/* Rincian */}
+              <div className={`${cardClass} overflow-hidden`}>
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">Rincian transaksi</p>
+                </div>
+                <div className="p-4 grid grid-cols-2 gap-3">
+                  <DetailField label="Tanggal transaksi" value={formatDate(detail.movement_date)} />
+                  <DetailField label="Dicatat" value={formatDateTime(detail.created_at)} />
+                  {access.role === "owner" ? (
+                    <>
+                      <DetailField label={`Harga satuan / ${detail.unit_use}`} value={`Rp ${formatRupiah(detail.unit_price)}`} />
+                      <DetailField label="Nilai" value={`Rp ${formatRupiah(detail.value)}`} />
+                    </>
+                  ) : null}
+                  <DetailField label="Referensi" value={detail.ref_label || referenceLabel(detail.ref_type)} />
+                  <DetailField label="Dicatat oleh" value={detail.actor || "—"} />
+                </div>
               </div>
+
+              {access.role !== "owner" ? (
+                <p className="rounded-xl bg-slate-50 dark:bg-slate-800/60 px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">
+                  Harga satuan dan nilai transaksi disembunyikan untuk role Leader.
+                </p>
+              ) : null}
 
               <div className={`${cardClass} p-4`}>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Catatan</p>

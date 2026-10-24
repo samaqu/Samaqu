@@ -80,6 +80,7 @@ export function mapMovement(row: any, showPrices: boolean) {
     qty,
     ref_type: row?.ref_type || "",
     ref_id: row?.ref_id || null,
+    ref_label: row?.ref_label || "",
     notes: row?.notes || "",
     actor: row?.actor || "",
     created_at: row?.created_at,
