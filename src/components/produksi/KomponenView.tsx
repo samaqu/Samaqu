@@ -50,6 +50,8 @@ type ComponentRow = {
   fabric_type_name: string;
   is_active: boolean;
   stock: number;
+  reserved_stock?: number;
+  available_stock?: number;
   status: "aman" | "menipis" | "habis";
   safe_price?: number;
   real_price?: number;
@@ -415,21 +417,25 @@ export default function KomponenView() {
             <colgroup>
               {access.role === "owner" ? (
                 <>
-                  <col className="w-[13%]" />
-                  <col className="w-[36%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[24%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[3%]" />
+                </>
+              ) : (
+                <>
+                  <col className="w-[12%]" />
+                  <col className="w-[38%]" />
                   <col className="w-[12%]" />
                   <col className="w-[13%]" />
                   <col className="w-[13%]" />
                   <col className="w-[9%]" />
-                  <col className="w-[4%]" />
-                </>
-              ) : (
-                <>
-                  <col className="w-[16%]" />
-                  <col className="w-[56%]" />
-                  <col className="w-[16%]" />
-                  <col className="w-[8%]" />
-                  <col className="w-[4%]" />
+                  <col className="w-[3%]" />
                 </>
               )}
             </colgroup>
@@ -439,6 +445,8 @@ export default function KomponenView() {
                   { label: "Kode", align: "text-left" },
                   { label: "Komponen", align: "text-left" },
                   { label: "Stok", align: "text-right" },
+                  { label: "Dicadangkan", align: "text-right" },
+                  { label: "Tersedia", align: "text-right" },
                   ...(access.role === "owner"
                     ? [
                         { label: "Harga Real", align: "text-right" },
@@ -456,9 +464,9 @@ export default function KomponenView() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
               {loading ? (
-                <tr><td colSpan={access.role === "owner" ? 7 : 5}><Spinner /></td></tr>
+                <tr><td colSpan={access.role === "owner" ? 9 : 7}><Spinner /></td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan={access.role === "owner" ? 7 : 5}><EmptyState title="Belum ada komponen" description="Tambahkan komponen pertama atau tempel data dari Excel." /></td></tr>
+                <tr><td colSpan={access.role === "owner" ? 9 : 7}><EmptyState title="Belum ada komponen" description="Tambahkan komponen pertama atau tempel data dari Excel." /></td></tr>
               ) : (
                 items.map((row) => {
                   const statusKey = stockStatus(row.stock, row.min_stock);
@@ -486,9 +494,15 @@ export default function KomponenView() {
                           {!row.is_active ? <Badge tone="slate">Nonaktif</Badge> : null}
                         </span>
                       </td>
-                      <td className="px-3.5 py-3.5 align-middle text-right whitespace-nowrap tabular-nums">
+                      <td className="px-2.5 py-3.5 align-middle text-right whitespace-nowrap tabular-nums">
                         <span className="text-[13px] font-bold text-slate-900 dark:text-white">{formatQty(row.stock)}</span>
-                        <span className="ml-1 text-[11px] font-semibold text-slate-400">{row.unit_use}</span>
+                        <span className="ml-0.5 text-[10px] font-semibold text-slate-400">{row.unit_use}</span>
+                      </td>
+                      <td className="px-2.5 py-3.5 align-middle text-right text-[12px] font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap tabular-nums">
+                        {formatQty(row.reserved_stock || 0)}
+                      </td>
+                      <td className="px-2.5 py-3.5 align-middle text-right text-[12px] font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap tabular-nums">
+                        {formatQty(row.available_stock ?? row.stock)}
                       </td>
                       {access.role === "owner" ? (
                         <>
@@ -619,6 +633,8 @@ export default function KomponenView() {
                     <DetailField label="Satuan beli" value={`${detail.unit_buy} · 1 = ${formatQty(detail.conversion)} ${detail.unit_use}`} />
                     <DetailField label="Supplier utama" value={detail.supplier || "—"} />
                     <DetailField label="Jenis kain" value={detail.fabric_type_name || "—"} />
+                    <DetailField label="Dicadangkan" value={`${formatQty(detail.reserved_stock || 0)} ${detail.unit_use}`} />
+                    <DetailField label="Tersedia" value={`${formatQty(detail.available_stock ?? detail.stock)} ${detail.unit_use}`} />
                   </div>
 
                   {detail.notes ? (

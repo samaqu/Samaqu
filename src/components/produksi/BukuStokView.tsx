@@ -198,7 +198,10 @@ export default function BukuStokView() {
           <select className={`${inputClass} w-auto min-w-[160px]`} value={type} onChange={(e) => setType(e.target.value)}>
             <option value="">Semua jenis</option>
             {Object.entries(MOVEMENT_TYPES)
-              .filter(([key]) => ["stok_awal", "pembelian", "opname", "rusak_hilang", "penyesuaian"].includes(key))
+              .filter(([key]) => [
+                "stok_awal", "pembelian", "opname", "rusak_hilang", "penyesuaian",
+                "keluar_produksi", "retur_sisa_bahan",
+              ].includes(key))
               .map(([key, meta]) => (
                 <option key={key} value={key}>{meta.label}</option>
               ))}
@@ -479,6 +482,7 @@ function referenceLabel(ref?: string | null): string {
   if (key === "opname") return "Stok Opname";
   if (key === "rusak_hilang") return "Rusak / Hilang";
   if (key === "penyesuaian") return "Penyesuaian";
+  if (key === "production_schedule") return "Jadwal Produksi";
   return key || "—";
 }
 

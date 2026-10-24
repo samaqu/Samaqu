@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { canSeePrices, productionGuard } from "@/lib/ops-auth";
 import { mapComponent, nextComponentCode } from "@/lib/produksi-server";
 import { stockStatus } from "@/lib/produksi";
+import { loadReservedMap } from "@/lib/produksi-jadwal-server";
 
 /**
  * Master komponen & bahan (menu Produksi → Komponen & Bahan).
@@ -92,6 +93,17 @@ export async function GET(req: NextRequest) {
     stockValue += stock * (Number((row as any).real_price) || 0);
   }
   if (showPrices) summary.stock_value = Math.round(stockValue);
+
+  // Reservasi jadwal Disetujui (Fase 3). Tersedia = stok fisik - dicadangkan.
+  const reservedMap = await loadReservedMap(admin);
+  items = items.map((item: any) => {
+    const reserved = reservedMap.get(String(item.id)) || 0;
+    return {
+      ...item,
+      reserved_stock: reserved,
+      available_stock: Math.round((Number(item.stock) - reserved) * 10000) / 10000,
+    };
+  });
 
   return NextResponse.json({
     items,

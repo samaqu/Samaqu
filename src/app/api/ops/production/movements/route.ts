@@ -60,15 +60,33 @@ export async function GET(req: NextRequest) {
     : { data: [] as any[] };
   const purchaseNumberById = new Map((purchases || []).map((p: any) => [p.id, p.purchase_number]));
 
+  const scheduleIds = Array.from(
+    new Set(
+      (data || [])
+        .filter((row: any) => row.ref_type === "production_schedule" && row.ref_id)
+        .map((row: any) => row.ref_id),
+    ),
+  );
+  const { data: schedules } = scheduleIds.length
+    ? await admin.from("production_schedules").select("id, schedule_number").in("id", scheduleIds)
+    : { data: [] as any[] };
+  const scheduleNumberById = new Map((schedules || []).map((s: any) => [s.id, s.schedule_number]));
+
   const items = (data || []).map((row: any) => {
     const component = componentById.get(row.component_id) as any;
+    const refLabel =
+      row.ref_type === "purchase"
+        ? purchaseNumberById.get(row.ref_id) || ""
+        : row.ref_type === "production_schedule"
+          ? scheduleNumberById.get(row.ref_id) || ""
+          : "";
     return mapMovement(
       {
         ...row,
         component_code: component?.code || "",
         component_name: component?.name || "",
         unit_use: component?.unit_use || "",
-        ref_label: row.ref_type === "purchase" ? purchaseNumberById.get(row.ref_id) || "" : "",
+        ref_label: refLabel,
       },
       showPrices,
     );

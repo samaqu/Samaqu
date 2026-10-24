@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { canSeePrices, productionGuard } from "@/lib/ops-auth";
 import { mapComponent, mapMovement } from "@/lib/produksi-server";
+import { loadReservedMap } from "@/lib/produksi-jadwal-server";
 
 /** Detail komponen: informasi, saldo stok, dan riwayat buku stok (saldo berjalan). */
 export async function GET(
@@ -78,8 +79,16 @@ export async function GET(
     });
   }
 
+  const reservedMap = await loadReservedMap(admin);
+  const mapped = mapComponent(component, showPrices);
+  const reserved = reservedMap.get(String((component as any).id)) || 0;
+
   return NextResponse.json({
-    item: mapComponent(component, showPrices),
+    item: {
+      ...mapped,
+      reserved_stock: reserved,
+      available_stock: Math.round((Number((mapped as any).stock) - reserved) * 10000) / 10000,
+    },
     movements: withBalance,
     purchases,
     role: access.role,
