@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { ChevronRight, ClipboardList, Loader2, Pencil, Plus, Search, X } from "lucide-react";
 import {
   COMPONENT_CATEGORIES,
   COMPONENT_UNITS,
+  MOVEMENT_TYPES,
   STOCK_STATUS_LABEL,
   categoryLabel,
   formatDate,
@@ -66,6 +66,37 @@ type Summary = {
   stock_value?: number;
 };
 
+type DetailMovement = {
+  id: string;
+  movement_date: string;
+  type: string;
+  qty: number;
+  unit_use?: string;
+  unit_price?: number;
+  value?: number;
+  running_balance: number;
+  ref_type: string;
+  ref_label?: string;
+  notes: string;
+  actor: string;
+  created_at: string;
+};
+
+type DetailPurchase = {
+  id: string;
+  purchase_number: string;
+  purchase_date: string;
+  supplier: string;
+  qty_buy: number;
+  unit_buy: string;
+  unit_use?: string;
+  price_buy: number;
+  qty_use: number;
+  line_value: number;
+  allocated_cost: number;
+  final_unit_price: number;
+};
+
 const statusTone = { aman: "green", menipis: "amber", habis: "red" } as const;
 
 const emptyForm = () => ({
@@ -107,25 +138,49 @@ export default function KomponenView() {
 
   const [importOpen, setImportOpen] = useState(false);
   const [detail, setDetail] = useState<ComponentRow | null>(null);
-  const [detailMovements, setDetailMovements] = useState<any[]>([]);
+  const [detailMovements, setDetailMovements] = useState<DetailMovement[]>([]);
+  const [detailPurchases, setDetailPurchases] = useState<DetailPurchase[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailTab, setDetailTab] = useState<"ringkasan" | "riwayat" | "pembelian">("ringkasan");
+  const [movementType, setMovementType] = useState("");
+  const [movementStart, setMovementStart] = useState("");
+  const [movementEnd, setMovementEnd] = useState("");
 
   async function openDetail(row: ComponentRow) {
     setDetail(row);
     setDetailMovements([]);
+    setDetailPurchases([]);
+    setDetailTab("ringkasan");
+    setMovementType("");
+    setMovementStart("");
+    setMovementEnd("");
     setDetailLoading(true);
     try {
-      const json = await produksiFetch<{ item: ComponentRow; movements: any[] }>(
-        `/api/ops/production/components/${row.id}`,
-      );
+      const json = await produksiFetch<{
+        item: ComponentRow;
+        movements: DetailMovement[];
+        purchases: DetailPurchase[];
+      }>(`/api/ops/production/components/${row.id}`);
       setDetail(json.item || row);
-      setDetailMovements((json.movements || []).slice(0, 6));
+      setDetailMovements(json.movements || []);
+      setDetailPurchases(json.purchases || []);
     } catch {
       /* tetap tampilkan data baris yang sudah ada */
     } finally {
       setDetailLoading(false);
     }
   }
+
+  const filteredMovements = useMemo(
+    () =>
+      detailMovements.filter((movement) => {
+        if (movementType && movement.type !== movementType) return false;
+        if (movementStart && String(movement.movement_date).slice(0, 10) < movementStart) return false;
+        if (movementEnd && String(movement.movement_date).slice(0, 10) > movementEnd) return false;
+        return true;
+      }),
+    [detailMovements, movementType, movementStart, movementEnd],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -472,32 +527,27 @@ export default function KomponenView() {
           subtitle={detail ? `${detail.code} · ${detail.name}` : ""}
           footer={
             detail ? (
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <Link href={`/ops/produksi/komponen/${detail.id}`} className={btnSecondary}>
-                  Buka riwayat lengkap
-                </Link>
-                <div className="flex items-center gap-2">
-                  {access.canWrite ? (
-                    <button
-                      className={btnSecondary}
-                      onClick={() => {
-                        const row = detail;
-                        setDetail(null);
-                        openEdit(row);
-                      }}
-                    >
-                      <Pencil size={15} /> Edit
-                    </button>
-                  ) : null}
-                  <button className={btnPrimary} onClick={() => setDetail(null)}>Tutup</button>
-                </div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {access.canWrite ? (
+                  <button
+                    className={btnSecondary}
+                    onClick={() => {
+                      const row = detail;
+                      setDetail(null);
+                      openEdit(row);
+                    }}
+                  >
+                    <Pencil size={15} /> Edit
+                  </button>
+                ) : null}
+                <button className={btnPrimary} onClick={() => setDetail(null)}>Tutup</button>
               </div>
             ) : null
           }
         >
           {detail ? (
             <div className="space-y-4">
-              <div className={`${cardClass} p-4 flex items-start justify-between gap-4`}>
+              <div className={`${cardClass} p-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4`}>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone={stockStatus(detail.stock, detail.min_stock) === "aman" ? "green" : stockStatus(detail.stock, detail.min_stock) === "menipis" ? "amber" : "red"}>
@@ -510,7 +560,7 @@ export default function KomponenView() {
                     {categoryLabel(detail.category)}{detail.fabric_type_name ? ` · ${detail.fabric_type_name}` : ""}
                   </p>
                 </div>
-                <div className="text-right shrink-0">
+                <div className="sm:text-right shrink-0 rounded-xl bg-slate-50 dark:bg-slate-800/60 px-3 py-2 sm:bg-transparent sm:dark:bg-transparent sm:px-0 sm:py-0">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Stok saat ini</p>
                   <p className="mt-1 text-2xl font-black whitespace-nowrap tabular-nums text-slate-900 dark:text-white">
                     {formatQty(detail.stock)}
@@ -520,75 +570,240 @@ export default function KomponenView() {
                 </div>
               </div>
 
-              {access.role === "owner" ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <DetailField label="Harga Real" value={`Rp ${formatRupiah(detail.real_price)} / ${detail.unit_use}`} />
-                  <DetailField label="Harga Aman" value={`Rp ${formatRupiah(detail.safe_price)} / ${detail.unit_use}`} />
-                  <DetailField
-                    label="Selisih Aman − Real"
-                    value={`${Number(detail.price_gap) < 0 ? "−" : "+"}Rp ${formatRupiah(Math.abs(Number(detail.price_gap) || 0))}`}
-                    tone={Number(detail.price_gap) < 0 ? "danger" : "positive"}
-                  />
-                  <DetailField label="Nilai stok" value={`Rp ${formatRupiah(detail.stock_value)}`} />
-                </div>
-              ) : null}
-
-              <div className={`${cardClass} p-4 grid grid-cols-2 gap-x-4 gap-y-3`}>
-                <DetailField label="Satuan pakai" value={detail.unit_use} />
-                <DetailField label="Satuan beli" value={`${detail.unit_buy} · 1 = ${formatQty(detail.conversion)} ${detail.unit_use}`} />
-                <DetailField label="Supplier utama" value={detail.supplier || "—"} />
-                <DetailField label="Jenis kain" value={detail.fabric_type_name || "—"} />
+              {/* Tab */}
+              <div role="tablist" aria-label="Detail komponen" className="flex gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/70 overflow-x-auto no-scrollbar">
+                {[
+                  { key: "ringkasan" as const, label: "Ringkasan", count: null },
+                  { key: "riwayat" as const, label: "Riwayat Stok", count: detailMovements.length },
+                  ...(access.role === "owner"
+                    ? [{ key: "pembelian" as const, label: "Pembelian", count: detailPurchases.length }]
+                    : []),
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={detailTab === tab.key}
+                    onClick={() => setDetailTab(tab.key)}
+                    className={`flex-1 sm:flex-none shrink-0 px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
+                      detailTab === tab.key
+                        ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                    }`}
+                  >
+                    {tab.label}
+                    {tab.count !== null ? (
+                      <span className={`ml-1.5 tabular-nums ${detailTab === tab.key ? "text-slate-400" : "text-slate-400/70"}`}>{tab.count}</span>
+                    ) : null}
+                  </button>
+                ))}
               </div>
 
-              {detail.notes ? (
-                <div className={`${cardClass} p-4`}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Catatan</p>
-                  <p className="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-200 break-words">{detail.notes}</p>
-                </div>
-              ) : null}
+              {detailTab === "ringkasan" ? (
+                <div className="space-y-4">
+                  {access.role === "owner" ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <DetailField label="Harga Real" value={`Rp ${formatRupiah(detail.real_price)} / ${detail.unit_use}`} />
+                      <DetailField label="Harga Aman" value={`Rp ${formatRupiah(detail.safe_price)} / ${detail.unit_use}`} />
+                      <DetailField
+                        label="Selisih Aman − Real"
+                        value={`${Number(detail.price_gap) < 0 ? "−" : "+"}Rp ${formatRupiah(Math.abs(Number(detail.price_gap) || 0))}`}
+                        tone={Number(detail.price_gap) < 0 ? "danger" : "positive"}
+                      />
+                      <DetailField label="Nilai stok" value={`Rp ${formatRupiah(detail.stock_value)}`} />
+                    </div>
+                  ) : null}
 
-              <div className={`${cardClass} overflow-hidden`}>
-                <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
-                  <p className="text-sm font-bold text-slate-900 dark:text-white">Pergerakan terakhir</p>
-                </div>
-                {detailLoading ? (
-                  <Spinner label="Memuat pergerakan…" />
-                ) : detailMovements.length === 0 ? (
-                  <p className="px-4 py-6 text-center text-xs text-slate-400">Belum ada pergerakan stok.</p>
-                ) : (
-                  <table className="w-full border-collapse table-fixed">
-                    <colgroup>
-                      <col className="w-[27%]" />
-                      <col className="w-[33%]" />
-                      <col className="w-[20%]" />
-                      <col className="w-[20%]" />
-                    </colgroup>
-                    <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-800/60">
-                        {["Tanggal", "Jenis", "Jumlah", "Saldo"].map((h, i) => (
-                          <th key={h} className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 ${i >= 2 ? "text-right" : "text-left"}`}>
-                            {h}
-                          </th>
+                  <div className={`${cardClass} p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3`}>
+                    <DetailField label="Satuan pakai" value={detail.unit_use} />
+                    <DetailField label="Satuan beli" value={`${detail.unit_buy} · 1 = ${formatQty(detail.conversion)} ${detail.unit_use}`} />
+                    <DetailField label="Supplier utama" value={detail.supplier || "—"} />
+                    <DetailField label="Jenis kain" value={detail.fabric_type_name || "—"} />
+                  </div>
+
+                  {detail.notes ? (
+                    <div className={`${cardClass} p-4`}>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Catatan</p>
+                      <p className="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-200 break-words">{detail.notes}</p>
+                    </div>
+                  ) : null}
+
+                  <div className={`${cardClass} overflow-hidden`}>
+                    <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-slate-900 dark:text-white">Aktivitas terakhir</p>
+                      {detailMovements.length > 3 ? (
+                        <button type="button" onClick={() => setDetailTab("riwayat")} className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                          Lihat semua
+                        </button>
+                      ) : null}
+                    </div>
+                    {detailLoading ? (
+                      <Spinner label="Memuat pergerakan…" />
+                    ) : detailMovements.length === 0 ? (
+                      <p className="px-4 py-6 text-center text-xs text-slate-400">Belum ada pergerakan stok.</p>
+                    ) : (
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                        {detailMovements.slice(0, 3).map((movement) => (
+                          <div key={movement.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{movementLabel(movement.type)}</p>
+                              <p className="text-[11px] text-slate-400 truncate">
+                                {formatDate(movement.movement_date)}{movement.ref_label ? ` · ${movement.ref_label}` : ""}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className={`text-xs font-bold whitespace-nowrap tabular-nums ${movement.qty > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                {movement.qty > 0 ? "+" : "−"}{formatQty(Math.abs(movement.qty))} {movement.unit_use || detail.unit_use}
+                              </p>
+                              <p className="text-[10px] text-slate-400">saldo {formatQty(movement.running_balance)}</p>
+                            </div>
+                          </div>
                         ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
-                      {detailMovements.map((movement) => (
-                        <tr key={movement.id}>
-                          <td className="px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDate(movement.movement_date)}</td>
-                          <td className="px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200 truncate">{movementLabel(movement.type)}</td>
-                          <td className={`px-3 py-2 text-right text-[11px] font-bold whitespace-nowrap tabular-nums ${movement.qty > 0 ? "text-emerald-600" : "text-red-600"}`}>
-                            {movement.qty > 0 ? "+" : "−"}{formatQty(Math.abs(movement.qty))}
-                          </td>
-                          <td className="px-3 py-2 text-right text-[11px] font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap tabular-nums">
-                            {formatQty(movement.running_balance)}
-                          </td>
-                        </tr>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              {detailTab === "riwayat" ? (
+                <div className="space-y-3">
+                  <div className={`${cardClass} p-3 space-y-2`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <select className={inputClass} value={movementType} onChange={(e) => setMovementType(e.target.value)}>
+                        <option value="">Semua jenis</option>
+                        {Object.entries(MOVEMENT_TYPES)
+                          .filter(([key]) => ["stok_awal", "pembelian", "opname", "rusak_hilang", "penyesuaian"].includes(key))
+                          .map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
+                      </select>
+                      <input type="date" className={inputClass} value={movementStart} onChange={(e) => setMovementStart(e.target.value)} aria-label="Dari tanggal" />
+                      <input type="date" className={inputClass} value={movementEnd} onChange={(e) => setMovementEnd(e.target.value)} aria-label="Sampai tanggal" />
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] text-slate-400">{filteredMovements.length} pergerakan</p>
+                      {(movementType || movementStart || movementEnd) ? (
+                        <button type="button" className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline" onClick={() => { setMovementType(""); setMovementStart(""); setMovementEnd(""); }}>
+                          Reset filter
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {detailLoading ? (
+                    <div className={cardClass}><Spinner label="Memuat riwayat…" /></div>
+                  ) : filteredMovements.length === 0 ? (
+                    <div className={cardClass}><EmptyState title="Tidak ada pergerakan" description="Ubah filter atau catat transaksi baru." /></div>
+                  ) : (
+                    <>
+                      <div className={`${cardClass} overflow-hidden hidden md:block`}>
+                        <table className="w-full border-collapse table-fixed">
+                          <colgroup>
+                            {access.role === "owner" ? (
+                              <>
+                                <col className="w-[15%]" />
+                                <col className="w-[35%]" />
+                                <col className="w-[16%]" />
+                                <col className="w-[16%]" />
+                                <col className="w-[18%]" />
+                              </>
+                            ) : (
+                              <>
+                                <col className="w-[18%]" />
+                                <col className="w-[48%]" />
+                                <col className="w-[18%]" />
+                                <col className="w-[16%]" />
+                              </>
+                            )}
+                          </colgroup>
+                          <thead>
+                            <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700">
+                              {["Tanggal", "Jenis", "Jumlah", ...(access.role === "owner" ? ["Harga"] : []), "Saldo"].map((h, i) => (
+                                <th key={h} className={`px-3 py-2.5 ${i >= 2 ? "text-right" : "text-left"} text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400`}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                            {filteredMovements.map((movement) => (
+                              <tr key={movement.id} className="hover:bg-blue-50/50 dark:hover:bg-slate-800/60">
+                                <td className="px-3 py-2.5 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap tabular-nums">{formatDate(movement.movement_date)}</td>
+                                <td className="px-3 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 truncate" title={movement.notes}>{movementLabel(movement.type)}</td>
+                                <td className={`px-3 py-2.5 text-right text-xs font-bold whitespace-nowrap tabular-nums ${movement.qty > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                  {movement.qty > 0 ? "+" : "−"}{formatQty(Math.abs(movement.qty))} {movement.unit_use || detail.unit_use}
+                                </td>
+                                {access.role === "owner" ? (
+                                  <td className="px-3 py-2.5 text-right text-xs font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap tabular-nums">Rp {formatRupiah(movement.unit_price)}</td>
+                                ) : null}
+                                <td className="px-3 py-2.5 text-right text-xs font-black text-slate-900 dark:text-white whitespace-nowrap tabular-nums">{formatQty(movement.running_balance)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="md:hidden space-y-2">
+                        {filteredMovements.map((movement) => (
+                          <div key={movement.id} className={`${cardClass} p-3`}>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{movementLabel(movement.type)}</p>
+                                <p className="text-[11px] text-slate-400">{formatDate(movement.movement_date)}</p>
+                                <p className="text-[11px] text-slate-400 truncate">{movement.ref_label || movement.notes || "—"}</p>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p className={`text-sm font-black whitespace-nowrap tabular-nums ${movement.qty > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                  {movement.qty > 0 ? "+" : "−"}{formatQty(Math.abs(movement.qty))} {movement.unit_use || detail.unit_use}
+                                </p>
+                                <p className="text-[11px] text-slate-400">saldo {formatQty(movement.running_balance)}</p>
+                                {access.role === "owner" ? (
+                                  <p className="text-[11px] text-slate-400">Rp {formatRupiah(movement.unit_price)}</p>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : null}
+
+              {detailTab === "pembelian" && access.role === "owner" ? (
+                <div className="space-y-3">
+                  {detailLoading ? (
+                    <div className={cardClass}><Spinner label="Memuat pembelian…" /></div>
+                  ) : detailPurchases.length === 0 ? (
+                    <div className={cardClass}><EmptyState title="Belum ada pembelian" description="Komponen ini belum pernah masuk lewat Pembelian Bahan." /></div>
+                  ) : (
+                    <>
+                      <p className="text-[11px] text-slate-400">{detailPurchases.length} baris pembelian terakhir</p>
+                      {detailPurchases.map((purchase) => (
+                        <div key={purchase.id} className={`${cardClass} p-4`}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-[13px] font-black text-slate-900 dark:text-white">{purchase.purchase_number}</p>
+                              <p className="text-[11px] text-slate-400">
+                                {formatDate(purchase.purchase_date)} · {purchase.supplier || "Tanpa supplier"}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Harga akhir</p>
+                              <p className="text-[13px] font-black text-slate-900 dark:text-white whitespace-nowrap tabular-nums">
+                                Rp {formatRupiah(purchase.final_unit_price)}
+                              </p>
+                              <p className="text-[10px] text-slate-400">/ {purchase.unit_use || detail.unit_use}</p>
+                            </div>
+                          </div>
+                          <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <MiniStat label="Qty beli" value={`${formatQty(purchase.qty_buy)} ${purchase.unit_buy}`} />
+                            <MiniStat label="Harga beli" value={`Rp ${formatRupiah(purchase.price_buy)}`} />
+                            <MiniStat label="Ongkir" value={`Rp ${formatRupiah(purchase.allocated_cost)}`} />
+                            <MiniStat label="Qty pakai" value={`${formatQty(purchase.qty_use)} ${purchase.unit_use || detail.unit_use}`} />
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+                    </>
+                  )}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </Drawer>
@@ -753,6 +968,15 @@ function DetailField({
     <div className="min-w-0 rounded-xl border border-gray-100 dark:border-slate-800 p-3">
       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
       <p className={`mt-0.5 text-xs font-bold break-words tabular-nums ${color}`}>{value}</p>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 px-2.5 py-2 min-w-0">
+      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 leading-tight">{label}</p>
+      <p className="mt-0.5 text-[11px] font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap tabular-nums">{value}</p>
     </div>
   );
 }
