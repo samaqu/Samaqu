@@ -63,6 +63,9 @@ type Purchase = {
 
 const emptyRow = () => ({ component_id: "", qty_buy: "", price_buy: "" });
 
+const moneyDigits = (value: string) => value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+const moneyInputValue = (value: string) => (value ? formatRupiah(value) : "");
+
 export default function PembelianView() {
   const access = useProduksiAccess();
   const [items, setItems] = useState<Purchase[]>([]);
@@ -454,10 +457,10 @@ export default function PembelianView() {
             <div>
               <label className={labelClass}>Ongkir / biaya tambahan (total pembelian)</label>
               <input
-                className={inputClass}
-                inputMode="decimal"
-                value={form.additional_cost}
-                onChange={(e) => setForm({ ...form, additional_cost: e.target.value })}
+                className={`${inputClass} text-right tabular-nums`}
+                inputMode="numeric"
+                value={moneyInputValue(form.additional_cost)}
+                onChange={(e) => setForm({ ...form, additional_cost: moneyDigits(e.target.value) })}
                 placeholder="0"
               />
               <p className="mt-1 text-[11px] text-slate-400">
@@ -504,7 +507,13 @@ export default function PembelianView() {
                       </div>
                       <div>
                         <label className={labelClass}>Harga per {component?.unit_buy || "satuan beli"}</label>
-                        <input className={inputClass} inputMode="decimal" value={row.price_buy} onChange={(e) => updateRow(index, { price_buy: e.target.value })} placeholder="0" />
+                        <input
+                          className={`${inputClass} text-right tabular-nums`}
+                          inputMode="numeric"
+                          value={moneyInputValue(row.price_buy)}
+                          onChange={(e) => updateRow(index, { price_buy: moneyDigits(e.target.value) })}
+                          placeholder="0"
+                        />
                       </div>
                     </div>
 
