@@ -951,6 +951,14 @@ tanpa menyentuh status ataupun logika database sama sekali.
   tengah turn ia mencoba SPA nav dan gagal (`navigation_failed`, URL berubah tapi konten tetap).
   Jadi: **jalankan perintah shell dulu**, baru `preview_screenshot({path:'/admin'})`, lalu
   `preview_execute_code` tanpa shell/edit di antaranya.
+  **Cara yang lebih andal (2026-10-24, terbukti):** `preview_execute_code` cukup membuat
+  `<iframe src="/admin">` (same-origin, lebar 375/867/1280 px sebagai pengganti `setViewport`) lalu
+  membaca `frame.contentDocument` — halaman admin dimuat penuh di dalam iframe tanpa menyentuh URL
+  preview, jadi route admin **bisa** diperiksa: teks/lebar elemen (`scrollWidth` vs `clientWidth`
+  untuk mendeteksi teks terpotong), posisi baris (`getBoundingClientRect().top` untuk membuktikan
+  kartu sejajar), `documentElement.scrollWidth - clientWidth` untuk scroll samping, plus
+  `consoleLogs`. `navigate()` tetap gagal (`navigation_failed`) dan URL-nya tertinggal menunjuk
+  route admin — panggil `reload_preview` kalau halaman preview sendiri perlu bersih.
 
 ## "Atur Pesanan" â€” resi J&T diterbitkan admin (ala Shopee Seller Centre)
 
@@ -1341,3 +1349,439 @@ semua"); `prevUnits: 0` → label "Baru", tanpa persen. Katalog dibaca **sekali*
 
 Kartu Produk Terlaris di `/ops/dashboard` dan dashboard admin masih memakai `src/lib/top-products.ts`
 (per varian) — sengaja tidak diubah.
+
+## Ongkir J&T — cross-check tagihan J&T (menu Ops → Keuangan, 2026-10-23)
+
+Menu baru **Ongkir J&T** (`/ops/ongkir-jnt`, sidebar grup Keuangan di `OpsShell`'s `MENU_GROUPS`)
+untuk mencocokkan tagihan bulanan J&T dengan ongkir yang dibayar customer. Halaman dirakit dari
+empat file: `src/app/ops/ongkir-jnt/page.tsx` (route tipis) → `src/components/ops/OngkirJntView.tsx`
+(pemilih bulan + kartu ringkasan) + `JntInvoiceForm.tsx` (angka invoice) + `JntUploadCard.tsx`
+(upload Excel) + `JntItemsTable.tsx` (tabel per resi).
+
+**Aturan uang (jangan diubah tanpa membahas ulang dengan pemilik):**
+
+- **Diskon J&T = pengurang biaya, bukan pendapatan.** Biaya yang dibukukan selalu `net_cost`
+  (bruto − diskon). Efek diskon sudah otomatis masuk margin dihitung dari net; kalau dihitung dari
+  bruto, laba terbaca lebih kecil dari yang sebenarnya.
+- **Beban masuk ke bulan TANGGAL PENGIRIMAN** (`jnt_invoice_items.delivery_date`), bukan bulan bayar.
+- **Tiga lapis angka sengaja tidak digabung**: (1) tagihan J&T — basis tanggal pengiriman;
+  (2) ongkir yang dibayar customer (`orders.shipping_cost`); (3) omzet produk (`total − shipping_cost`)
+  — keduanya basis **`orders.created_at` (WIB) + `SALE_STATUSES`**, sama seperti `/api/ops/laporan`
+  dan Produk Terlaris. Sejak 2026-10-23 rumus lapisan (3) dipusatkan di
+  **`orderRevenue(order)`** (`src/lib/transaksi.ts`) dan **semua kartu omset/penjualan** memakainya —
+  Laporan (`Omzet Bruto` + ringkasan metode pembayaran + tren), Dashboard ops (`Omzet Bruto`,
+  tren harian, AOV, laba, margin), menu Transaksi (`Omset bulan ini`), Database Kota
+  (`Total Omset`, rata-rata per pesanan), panel-admin (`Omset hari ini`), dashboard admin
+  (`dashRevenue`), dan tool AI `ringkas_operasional`. Jangan menjumlahkan `orders.total` langsung
+  lagi di kartu omset: nilainya masih memuat ongkir. Query-nya harus ikut menarik `shipping_cost`
+  (route kota, dashboard ops, laporan, admin-tools). Basis itu juga **dilabeli di UI** (2026-10-23):
+  kartu `Pendapatan` + judul grafik `Pendapatan Bulanan` di dashboard admin
+  (`src/components/admin/DashboardView.tsx`) dan kartu `Omset hari ini` di panel-admin
+  (`src/app/panel-admin/(panel)/page.tsx`) memakai keterangan kecil **"Hanya harga produk (tanpa
+  ongkir)"** (`note` di `metrics`/`MetricCard`, gaya `.stNote` di `panel.module.css`); grafik
+  "Pendapatan Bulanan" yang dulu menjumlah `o.total` kini ikut `orderRevenue()` (`DashboardOrder`
+  membawa `shipping_cost`). **Revisi 2026-10-23 (sore)**: di dashboard admin keterangan itu
+  dipendekkan jadi bagian dari caption satu baris **"126 transaksi · tanpa ongkir"** dan basis
+  lengkapnya pindah ke subjudul grafik + tooltip kartu — lihat bagian "Kartu dashboard admin"
+  di bawah; panel-admin belum ikut diubah. Margin ongkir = (2) − (1) net, **hanya dari resi yang cocok ke pesanan**;
+  omzet produk tidak pernah ikut ke angka margin. PPN invoice punya baris sendiri (menunggu
+  keputusan akuntan) dan belum digabung ke biaya ongkir.
+- **Jumlah transaksi = `saleCount()` + `SALE_COUNT_NOTE`** (`src/lib/transaksi.ts`, 2026-10-23).
+  Kartu "Total Transaksi" (dashboard ops) dan "N transaksi" (Laporan Keuangan) memang sudah memakai
+  `SALE_STATUSES`, tapi dashboard admin & panel admin cuma menampilkan jumlah SEMUA pesanan masuk —
+  itulah yang membuat angka "jumlah transaksi" beda antar layar. Sekarang kartu pesanan di kedua
+  dashboard membawa keterangan kecil **"N transaksi diakui"** dari `saleCount(orders)` —
+  keterangannya **dipendekkan 2026-10-23** (pemilik: "keterangan card di dashboard update broo biar
+  ga terlalu panjang bikin informatif"): dulu *"Termasuk belum bayar/batal · N transaksi diakui
+  (diproses/dikirim/selesai)"*, sekarang `SALE_COUNT_NOTE` = "transaksi diakui" saja
+  (`src/lib/transaksi.ts`; status yang dihitung tetap `SALE_STATUSES`). Dulu angka besar kartunya =
+  jumlah SEMUA pesanan masuk dan `saleCount` hanya jadi keterangan kecil; **sejak 2026-10-24** kartu
+  "Pesanan Masuk" (dashboard admin) dan "Pesanan masuk" (beranda panel-admin) memakai `saleCount()`
+  sebagai NILAI besarnya dengan keterangan "dari N pesanan masuk \<periode\>" (N = semua pesanan
+  periode itu). Jangan menghitung ulang filter status di layar — pakai `saleCount`.
+  **Menu Transaksi** (`/panel-admin/transaksi` dan `/ops/transaksi`, satu komponen
+  `src/app/ops/transaksi/page.jsx`) sempat beda sendiri: kartu **"Total transaksi"** di sana memakai
+  `orders.length`, jadi menampilkan SEMUA baris bulan itu (mis. 143 = 126 diakui + 5 belum bayar +
+  12 batal) sementara dashboard ops & laporan berbunyi 126. Sekarang **angka besarnya
+  `saleCount(orders)`**, jadi angkanya sama dengan laporan. Keterangan kartunya **sejak 2026-10-24
+  memakai kalimat kartu dashboard admin** (permintaan pemilik: *"kalimat dashboard persis"*):
+  `Total transaksi` → **"Di luar batal & belum bayar"**, `Omset bulan ini` → **"N transaksi
+  berhasil"**, `Belum bayar` → **"menunggu pembayaran"** (kartu `Perlu diproses` tidak punya
+  padanan di dashboard, keterangannya tetap "Packing + siap kirim"). Label periode tidak lagi
+  ditulis di keterangan — dulu *"dari N pesanan masuk <bulan>"*, sebelumnya lagi *"Oktober 2026 ·
+  dari 143 pesanan masuk"* — karena pemilih bulan di bar filter sudah menunjukkannya;
+  `panelKpis.ordersIn` dihapus karena sudah tidak dipakai. Tab tahap di
+  bawahnya tetap menghitung semua baris — tab itu filter daftar, bukan angka transaksi.
+  **Panel Order Management dashboard admin** (`src/components/admin/OrdersView.tsx`, 2026-10-23) ikut
+  disamakan: kartu **"Total transaksi"** di sana dulu memakai `orders.length`, jadi menampilkan SEMUA
+  baris periode itu (143 = 126 diakui + 5 belum bayar + 12 batal, angka yang terlihat di layar admin),
+  padahal layar lain berbunyi 126. Sekarang angka besarnya `saleCount(orders)` dan keterangannya
+  memakai **kalimat dashboard admin yang sama persis** (2026-10-24) — `Total transaksi` → "Di luar
+  batal & belum bayar" (kartu *Pesanan Masuk*), `Omset bulan ini` → "N transaksi berhasil" (kartu
+  *Pendapatan*), `Belum bayar` → "menunggu pembayaran"; `kpis.ordersIn` dihapus karena label
+  periode tidak lagi ditulis di keterangan (pemilih bulan di bar filter sudah menunjukkannya). Kartu
+  **"Omset bulan ini"** di panel yang sama juga ikut `orderRevenue()` (dulu menjumlah `o.total`, jadi
+  masih memuat ongkir: 51.634.621 vs 48.331.123 pada 2026-10). Tab tahap + filter "Belum di packing"
+  tetap menghitung semua baris — itu filter daftar, bukan angka transaksi.
+
+## Kartu dashboard admin: 126 vs 143, keterangan satu baris, tren, grafik batang (2026-10-23/24)
+
+Pemilik bertanya "transaksi yang benar berapa, 126 apa 143" sambil meminta keterangan kartu **satu
+baris**, grafik **naik-turun**, desain lebih modern, dan kartu "Kategori Teratas" diganti. Semua
+angka dijawab dari data nyata, tanpa mengubah aturan hitung mana pun.
+
+**Jawaban angkanya (Oktober 2026, dicek langsung lewat REST `orders`):** 143 = SEMUA pesanan masuk
+bulan itu (belum bayar 5 + diproses 13 + dikirim 14 + selesai 99 + dibatalkan 12); **126** = yang
+diakui sebagai transaksi (`saleCount`, `SALE_STATUSES`), jadi 143 − 126 = 17 (5 belum bayar +
+12 batal). Keduanya benar, beda pertanyaan — dan itu sekarang terbaca di UI: kartu berl label
+**"Pesanan Masuk"** bernilai 143 dengan keterangan **"126 transaksi diakui"** (tooltip kartunya
+menyebut rincian 126/5/12), sedangkan kartu `Pendapatan` berketerangan "126 transaksi · tanpa
+ongkir" dan donut `Per Status` memecah 143 per status. Jangan "menyamakan" 143 dan 126: angkanya
+memang beda per definisi. **Revisi 2026-10-24 (malam):** kartu "Pesanan Masuk" tidak lagi 143 maupun
+132 — nilainya sekarang `saleCount()` = **126** (belum bayar & batal sama-sama tidak dihitung),
+lihat butir terakhir di bagian ini.
+
+- **Keterangan kartu satu baris** (permintaan pemilik: "tulisan keterangan di card bikin sejajar
+  1 baris"): kartu metrik di `src/components/admin/DashboardView.tsx` sekarang label (uppercase) +
+  chip tren di baris atas, nilai besar, lalu caption `.truncate` (satu baris, dipotong `…` kalau
+  tidak muat). **Caption wajib pendek** — di `xl` kartu hanya ~205 px, jadi kalimat panjang
+  terpotong; caption terpanjang sekarang "126 transaksi · tanpa ongkir" (28 karakter). Rincian
+  panjang ditaruh di `title` kartu (tooltip), bukan di caption. Kalau menambah kartu/keterangan
+  baru, ukur lagi di 4 kolom sebelum menyerahkannya.
+  **Revisi 2026-10-24 (pemilik: "tulisan d card nya kepotong"):** nama kartu **tanpa `truncate`**
+  (sempat `flex-wrap` + chip di baris kedua; lihat revisi berikutnya — chip itu sudah dipindah).
+  **Revisi terakhir 2026-10-24 (pemilik mengirim contoh desain: "dibikin kaya gini sih broo yg
+  trend naik turun nya sama grafik nya juga"):** susunan kartu mengikuti contoh itu —
+  **nama kartu sendiri di barisnya → nilai besar → tren → caption**. Nama kartu jadi tidak pernah
+  bersaing ruang dengan apa pun (itu akar keluhan `RATA-RATA PESAN…`), dan baris tren dibungkus
+  `h-[18px]` yang **selalu ada** (kartu tanpa pembanding, mis. "Belum Bayar", menyisakan baris
+  kosong) supaya caption keempat kartu tetap segaris. Pertahankan urutan itu; **jangan**
+  mengembalikan `truncate` ke nama kartu atau menaruh tren sebaris dengan nama kartu lagi.
+  Verifikasi (2026-10-24, `/admin` dibuka lewat iframe same-origin di preview, data termuat):
+  `Pendapatan Rp 48.331.123 · +615,8% ▲ dari Sep` · `Pesanan Masuk 126 · +869,2% ▲ dari Sep` ·
+  `Rata-rata Rp 383.580 · -26,1% ▼ dari Sep` · `Belum Bayar 7`; nama kartu & caption tidak
+  terpotong di 4 kolom desktop maupun tablet 867 px; tren terbaca tepat di bawah nilai; tanpa
+  scroll samping & 0 error console.
+- **Keterangan tiga kartu + animasi counter (2026-10-24, permintaan pemilik).** `Pendapatan` kini
+  berketerangan **"126 transaksi berhasil"** (angkanya dinamis, `saleCount(orders)` — basis "tanpa
+  ongkir" tinggal di tooltip kartu + subjudul grafik), `Pesanan Masuk` **"Di luar batal & belum
+  bayar"**, `Rata-rata Pesanan` **"Rata-rata nilai pesanan"** (dulu `per transaksi diakui`;
+  `SALE_COUNT_NOTE` karena itu tidak lagi diimpor di `DashboardView.tsx`), sedangkan kartu
+  **`Belum Bayar` tidak diubah** ("menunggu pembayaran"). Ketiganya ≤ 27 karakter dan **tidak
+  terpotong** di 4 kolom (1280 px: `scrollWidth == clientWidth` = 163 px). Angka kartu bukan lagi
+  string jadi: `Metric` membawa **`num` + `format`**, dirender **`CountUp`**
+  (`src/components/admin/CountUp.tsx`, requestAnimationFrame ~700 ms ease-out;
+  `prefers-reduced-motion: reduce` → langsung angka akhir) supaya nilai kartu "dihitung naik" saat
+  kartu muncul / nilainya berubah — berlaku ke **keempat** kartu (termasuk `Belum Bayar`, hanya
+  keterangannya yang tidak disentuh), dan nilai besar memakai `tabular-nums` supaya lebarnya tidak
+  melompat. Kartu tanpa transaksi tetap menampilkan "—", bukan Rp 0.
+  Verifikasi (2026-10-24, `/admin` dimuat di iframe same-origin): counter terbaca berubah frame demi
+  frame (`Rp 0` → `Rp 4.162.119` → … → `Rp 48.331.123`, 18 nilai berbeda) lalu berhenti tepat di
+  angka aslinya; keempat caption utuh; badge `▲ 615,8% dari Sep` (hijau `rgb(22,163,74)`) ·
+  `▲ 869,2% dari Sep` · `▼ 26,1% dari Sep` (merah `rgb(220,38,38)`) dengan latar transparan 11 px;
+  batang grafik `rgb(17,17,17)` hanya di Okt, 5 lain `rgb(217,217,217)`; 0 error console.
+- **Tren naik/turun** (`TrendDelta`, dulu `TrendChip`) = pembanding bulan sebelumnya: panah + persen
+  lalu `dari <bulan>` kecil abu — mis. `▲ 615,8% dari Sep` (Oktober 2026). **Tanpa latar chip.**
+  **Revisi 2026-10-24 (pemilik: badge tren "kurang clean dan terlalu mencolok")**: gayanya
+  diperkecil jadi panah 9 px + persen 11 px `font-semibold tabular-nums` (naik hijau `#16a34a`,
+  turun merah `#dc2626`) **tanpa tanda `+`/`-`** — arah dibaca dari panah + warna; jarak `gap-0.5`,
+  `dari <bulan>` 10 px abu. Jangan kembalikan `font-black` 12 px bertanda + warna tua `#047857`.
+  Bulan lalu tanpa data (prev = 0) → **disembunyikan**, bukan dibagi nol/dikarang. Nilai pembanding
+  dihitung dari jendela grafik 6 bulan (`chartOrders`), bukan query tambahan. Komponen yang sama
+  dipakai untuk tren di header grafik "Pendapatan Bulanan".
+- **Kartu "Kategori Teratas" diganti "Belum di Packing"** (jumlah pesanan lunas yang resinya belum
+  dibuat) memakai **`orderStage()`** dari `src/lib/order-flow.ts` — jadi angkanya selalu sama dengan
+  tab "Belum di Packing" di panel Order Management. Prop `products` di `DashboardView` (dulu hanya
+  untuk kategori teratas) sudah dihapus dari komponen **dan** pemanggilnya.
+  **Kartu keempat diganti lagi 2026-10-24** (pemilik: "Belum di Packing card ini harusnya buat Blm
+  bayar bro lebih enak"): isinya sekarang **"Belum Bayar"** — nilai `orderStage(o) === "belum_bayar"`
+  (`ORDER_STAGE_LABEL.belum_bayar`), jadi selalu sama dengan tab "Belum Bayar" di panel Order
+  Management dan irisan `pending` di donut `Per Status` (Oktober 2026: **6**), caption satu baris
+  **"menunggu pembayaran"**, rincian di tooltip kartu. `toPackOrders` dihapus dari komponen; status
+  "Belum di Packing"/"Menunggu Pickup" tetap terbaca di tab & filter cepat panel Order Management
+  serta menu Transaksi ops — jangan menambahkannya kembali sebagai kartu dashboard tanpa permintaan
+  baru. Verifikasi (2026-10-24, sesi admin diputar ulang): `/admin` menampilkan kartu **BELUM BAYAR
+  6 / "menunggu pembayaran"** (cocok dengan donut `pending` 6), kartu "Belum di Packing" tidak ada
+  lagi, caption keempat kartu tidak terpotong, 0 error console.
+- **Grafik "Pendapatan Bulanan" jadi BATANG naik-turun** (`src/components/admin/MonthlyTrendChart.tsx`;
+  kurva/area SVG lama diganti HTML-CSS 2026-10-24 mengikuti contoh desain pemilik, tetap **tanpa
+  dependency chart baru**): 6 batang Mei–Okt berujung membulat, **batang bulan PERIODE TERPILIH
+  selalu HITAM `#111111`** (batang "bulan aktif"; bulan lain abu muda `#d9d9d9`, batang yang
+  disorot abu `#6b6b6b`) — **revisi 2026-10-24 (pemilik: "grafik nya warna hitam broo")**: batangnya
+  monokrom, hijau `#00a36c`/`#7fd3b1`/`#cdeee0` sudah tidak dipakai (lihat konstanta
+  `BAR_ACTIVE`/`BAR_HOVER`/`BAR_REST`); grid 5 garis + sumbu Y ringkas (`20jt`/`800rb`), label bulan di
+  bawah tiap batang. Bulan beromzet Rp 0 tidak digambar (batangnya memang nol), bukan dihilangkan
+  dari label. **Tooltip melayang** — kartu putih ber-shadow berisi titik hitam + `Pendapatan · <bulan>`
+  + nominal tebal + `N pesanan` — menempel di batang bulan terpilih saat tidak ada mouse (dulu
+  nilainya hanya teks di titik tertinggi), dan ikut pindah ke batang yang disorot. Judulnya tetap
+  bersubjudul "6 bulan terakhir · hanya harga produk (tanpa ongkir)" + tren.
+  Angka & aturan hitungnya tidak disentuh — presentasi saja.
+  Verifikasi (2026-10-24, `/admin` lewat iframe): 6 batang (Mei–Agu Rp 0 → tanpa batang, Sep 22 px,
+  Okt 155 px ≈ 60% dari batas 80jt) dengan warna `rgb(0,163,108)` hanya di Okt, label bulan
+  Mei–Okt, sumbu `0/20jt/40jt/60jt/80jt`, tooltip default `PENDAPATAN · OKT / Rp 48.331.123 /
+  133 pesanan`. **Belum terverifikasi otomatis**: tooltip pindah saat batang lain DI-HOVER —
+  gerakan mouse nyata tidak bisa didorong dari kode preview (`MouseEvent` yang disebar tidak
+  memicu `onMouseEnter`), jadi periksa manual dengan kursor.
+- **Datanya sekarang 6 bulan ASLI.** Dulu `chartOrders={orders}` = 50 pesanan terbaru, jadi bulan
+  lama tampak Rp 0. Sekarang `src/app/admin/page.tsx` mengambil **jendela 6 bulan** (bulan terpilih
+  + 5 sebelumnya, `monthRangeWIB` + `monthShift`, `/api/ops/orders?from&to&limit=1000`) bersama
+  query bulan terpilih lewat satu `Promise.all`, lalu mengirimnya sebagai prop `chartOrders`;
+  `DashboardView` mengelompokkannya per bulan WIB (`monthKeyWIB`) untuk 6 titik yang berakhir di
+  bulan terpilih. Prop baru: **`periodValue`** ("YYYY-MM", dasar label & jendela grafik).
+- **Satu sumber bulan WIB**: modul baru **`src/lib/month-period.ts`** (`currentMonthWIB`, `monthShift`,
+  `monthLabelID`, `monthShortID`, `monthKeyWIB`, `monthRangeWIB`). `src/app/admin/page.tsx` tidak
+  lagi menyimpan `currentMonthValue`/`monthLabelParts`/`monthRangeUTC`/regex pergeseran bulan —
+  semuanya memanggil modul itu, supaya rentang query, label periode, label grafik, dan chip tren
+  tidak bisa berbeda. Dashboard ops masih punya perhitungannya sendiri (belum diubah).
+- **Donut `Per Status`** tetap seperti sebelumnya (irisan per status + total di tengah), hanya
+  keterangannya ditambah "semua pesanan masuk" dan **persen** per baris legenda.
+- **Pesanan DIBATALKAN tidak dihitung sebagai "pesanan masuk"** (permintaan pemilik 2026-10-24:
+  "harusnya yg batal jgn di itung dong"). Satu predikat `isCancelledOrder()` di
+  `src/components/admin/DashboardView.tsx` dipakai untuk EMPAT angka sekaligus supaya tidak bisa
+  beda lagi: kartu **"Pesanan Masuk"** (Oktober 2026: 144 → **132**), angka tengah + irisan donut
+  `Per Status` (subjudulnya jadi "{periode} · tanpa pesanan dibatalkan"; irisan `dibatalkan` tidak
+  lagi digambar), chip tren **"vs bulan lalu"** (bulan pembanding dihitung dari himpunan yang
+  sama — terbukti "+915,4% vs Sep" = 132 vs 13, bukan 132 vs 16), dan jumlah pesanan di tooltip
+  grafik tren (`MonthlyTrendChart`). Jumlah pesanan batal tetap terbaca di tooltip kartu
+  ("12 dibatalkan tidak dihitung"), di tab **Dibatalkan** panel Order Management, dan di donut
+  bulan lain. **Jangan** mengembalikan `orders.length` untuk kartu itu.
+  Verifikasi (2026-10-24, sesi admin diputar ulang): kartu "Pesanan Masuk" **132** / "126 transaksi
+  diakui"; donut **132 pesanan masuk** (selesai 99 · 75%, dikirim 14 · 11%, diproses 13 · 10%,
+  pending 6 · 5%, tanpa baris dibatalkan); klik `<` → September 2026 **13** (16 − 3 batal) dengan
+  donut 13 (selesai 13 · 100%); 0 error console.
+- **Kartu "Pesanan Masuk" juga TIDAK menghitung pesanan BELUM BAYAR** (permintaan pemilik
+  2026-10-24: "blm bayar juga jgn harus nya broo"). Nilai kartunya sekarang `saleCount(orders)`
+  (`SALE_STATUSES` — diproses/dikirim/selesai; Oktober 2026: 132 → **126**), keterangan satu baris
+  **"tanpa belum bayar & batal"**, tooltipnya menyebut rinciannya ("6 belum bayar dan 12 dibatalkan
+  tidak dihitung"), dan chip tren membandingkan himpunan yang sama (126 vs 13 September = 869,2%;
+  dulu 132 vs 13 = 915,4%). Pemilik memilih **hanya kartu ini** yang berubah lewat pertanyaan
+  klarifikasi — donut `Per Status` (angka tengah 132 + irisan `pending` 6) dan jumlah pesanan di
+  tooltip grafik tren **tetap** "semua pesanan minus dibatalkan" (angka mentahnya 132). Keterangan
+  kartu di panel Order Management/menu Transaksi sendiri sekarang memakai kalimat kartu dashboard
+  (2026-10-24) — lihat bagian "Ongkir J&T". Jadi kartu (126) memang lebih kecil dari donut (132) tepat
+  sebesar 6 pesanan belum bayar — disengaja, **jangan** "disamakan". Di kode, `incomingOrders`
+  (semua minus batal) hanya dipakai donut + grafik; kartu dan chip-nya memakai `saleOrders` /
+  `prevSales`.
+  Verifikasi (2026-10-24, sesi admin diputar ulang, tablet 867 px): kartu "Pesanan Masuk" **126** /
+  "tanpa belum bayar & batal" · Pendapatan Rp 48.331.123 / "126 transaksi · tanpa ongkir" ·
+  Rata-rata Rp 383.580 / "per transaksi diakui" · Belum di Packing 10; donut tetap **132**
+  (selesai 99 · 75%, diproses 13 · 10%, dikirim 14 · 11%, pending 6 · 5%) = 126 + 6; klik `<` →
+  September kartu **13** (0 belum bayar, 3 batal) dan donut 13; caption keempat kartu **tidak
+  terpotong** di 4 kolom desktop maupun 375 px; 0 error console. Kartu "Pesanan masuk" di panel-admin
+  **sudah disamakan 2026-10-24** (lihat "Keterangan kartu Transaksi"). **Belum diuji**: angka
+  mentah REST (`/api/ops/orders` membalas 401 untuk sesi preview, jadi kecocokan 132 − 6 = 126
+  dibuktikan dari donut di halaman yang sama, bukan dari query terpisah).
+- **Verifikasi (2026-10-23, sesi admin diputar ulang via preview)**: `npx tsc --noEmit` bersih;
+  `curl /admin` & `/id/admin` = 200; di `/admin` kartu berbunyi Pendapatan Rp 48.331.123
+  (+615,8% vs Sep) · Pesanan Masuk 143 / "126 transaksi diakui" · Rata-rata Rp 383.580 (−26,1% vs
+  Sep) · Belum di Packing 10 — semuanya sama dengan hitungan REST; caption **satu baris dan tidak
+  terpotong** di tablet 867 px, mobile 375 px, dan desktop 4 kolom (205 px), tanpa scroll samping di
+  ketiganya; grafik menampilkan 6 label bulan Mei–Okt (nilai puncak Rp 48.331.123) dan sorot mouse
+  pada titik Mei mengubah label nilainya jadi Rp 0; donut 143 (selesai 99 · 69%, diproses 13 · 9%,
+  dikirim 14 · 10%, pending 5 · 3%, dibatalkan 12 · 8%); klik `<` → September 2026
+  (Rp 6.752.000 / 16 pesanan masuk / 13 transaksi diakui) lalu `>` kembali ke Oktober; 0 error
+  console. **Belum diuji**: tampilan tanpa sesi admin, dan chip tren untuk bulan yang bulan
+  sebelumnya kosong (Agustus) — logikanya `previous > 0` (chip disembunyikan), belum dilihat di
+  browser.
+- **Basis tanggal omzet di Laporan Keuangan saat ini = `orders.created_at`** (bulan WIB, hanya
+  `SALE_STATUSES`), sedangkan beban ongkir di halaman ini memakai tanggal pengiriman. Dua basis itu
+  memang beda dan sudah dilabeli di UI — jangan disamakan tanpa mengubah Laporan juga.
+
+**Data.** `supabase/migrations/20261023_jnt_invoices.sql` membuat `jnt_invoices` (header bulanan,
+satu baris per `period` 'YYYY-MM'), `jnt_invoice_items` (baris per resi, **`awb_no` UNIQUE** = kunci
+idempoten; `net_cost`, `has_discount`, `order_number`, `shipping_cost`), index, RLS aktif **tanpa
+policy** (data keuangan: hanya service role), plus view **`jnt_ongkir_expense`** (beban net per
+bulan) yang adalah SATU sumber untuk Pengeluaran & Laporan Keuangan nanti — jangan catat beban
+ongkir J&T sebagai pengeluaran manual supaya tidak terhitung dua kali. **Dijalankan manual** di SQL
+Editor Supabase (sandbox tidak punya jalur DDL, sama seperti `jnt-settings.sql`).
+
+**API** (`isOpsAdmin`): `GET /api/ops/ongkir-jnt?period=YYYY-MM` (header + rincian + ringkasan),
+`POST` yang sama untuk menyimpan header invoice, dan `POST /api/ops/ongkir-jnt/upload` (multipart
+`file` + `period`). Logika berat ada di dua modul: `src/lib/xlsx-lite.ts` (pembaca .xlsx
+**tanpa dependency** — zip via `node:zlib` + parser XML; `package-lock.json` proyek ini pernah drift
+dan `npm ci` gagal, jadi jangan tambah library hanya demi ini) dan `src/lib/jnt-invoice.ts` (peta
+header→item, `toNumber`/`toIsoDate`, ringkasan — modul murni, bisa diuji lewat Node), plus
+`src/lib/jnt-invoice-db.ts` (query + pencocokan `orders.awb_no`). Kolom dicari lewat NAMA header,
+bukan posisi, jadi urutan kolom ekspor J&T boleh berubah — tapi header wajib memuat
+`No. Waybill` + `Biaya Kirim`, kalau tidak request dibalas 400 dengan pesan yang menyebut "Resi Saya".
+
+**Tabel per resi harus muat tanpa geser.** `JntItemsTable.tsx` sempat memakai `min-w-[1000px]`,
+sehingga di desktop 1280 px — kolom konten hanya **911 px** setelah sidebar 248 px + `lg:p-8` —
+kolom terakhir **Selisih terpotong** walau pembungkusnya `overflow-x-auto` (pemilik melihatnya
+sebagai "tabelnya kepotong"). Sekarang `w-full min-w-[760px]`, padding sel `pr-2`, dua header
+dipendekkan (`Tgl Kirim`, `Net Dibukukan`), dan kolom Tujuan dipotong `max-w-[150px]`: lebar alami
+tabel **853 px**, jadi muat penuh (0 px geser) mulai lebar viewport ~1200 px ke atas dan tidak ada
+scroll samping di halaman. Di bawah itu 10 kolom memang tidak bisa dipadatkan lagi → tabel tetap
+bisa digeser mendatar (petunjuk "Geser tabel ke samping…", `xl:hidden`). **Jangan** menaikkan
+`min-width`-nya lagi atau menghapus pembungkus `overflow-x-auto` tanpa mengukur ulang di 1280 px
+(uji: 1280 → 0 px geser, 1024 → 198 px, 375 → 567 px).
+
+**Revisi 2026-10-24 (pemilik: "no resi sama tgl terlalu banyak space kosong, semua tulisan bikin
+sejajar").** Dua kolom pertama dipatok selebar isinya (`w-[1%]` + `whitespace-nowrap` di `th`
+No. Resi & Tgl Kirim) dan badge **"Tanpa Diskon" dipindah ke baris kedua** di bawah nomor resi
+(`mt-1 flex w-fit`, dulu `ml-2 inline-flex` sebaris) — badge yang cuma dipakai 2 resi
+(`JO0329572178`, `JO0329677967`) itulah yang melebarkan kolom No. Resi untuk SEMUA baris. Seluruh
+baris juga `align-top` (`td`/`th` mewarisi `vertical-align` dari `<tr>`, jadi semua baris kode baru
+ikut tanpa menyetel tiap sel); sebelumnya sel memakai `vertical-align` bawaan sehingga sel 2 baris
+(badge / nomor pesanan di bawah ongkir) membuat baris pertama tiap kolom tidak sebaris.
+Hasil ukur (iframe same-origin di preview, sesi admin diputar ulang, 2026-10-24): lebar kolom
+`No. Resi 110 · Tgl Kirim 77 · Tujuan 159 · Layanan 64 · Berat 46 · Biaya Kirim 80 · Diskon 76 ·
+Net Dibukukan 105 · Ongkir Customer 128 · Selisih 65` px → tabel **911 px = lebar pembungkus**
+(0 px geser) di 1280 px, `vertical-align` semua sel `top` dan garis atas teks pertama tiap sel
+dalam satu baris berbeda ≤1 px, 125 baris, tanpa scroll samping di 1280/1024/375 px, 0 error
+console. **Jangan** mengembalikan badge itu sebaris dengan nomor resi atau menghapus `align-top`.
+Catatan tool: trik **`<iframe src="/ops/ongkir-jnt">`** (same-origin, lalu baca
+`frame.contentDocument` / `frame.contentWindow.getComputedStyle` — pakai `contentDocument.createRange()`
+untuk mengukur baris teks) juga bekerja untuk route `/ops/*`; `navigate()` tetap gagal di sana dan
+sesi admin putaran preview 2026-10-24 bisa membuka halaman ini beserta 125 barisnya, jadi catatan
+2026-10-23 yang menyebut `/ops/*` selalu menampilkan login tidak lagi berlaku.
+
+**Idempotensi & pratinjau.** Bulan tagihan setiap baris diambil dari tanggal pengirimannya (satu
+file boleh memuat dua bulan; invoice baris dibuat otomatis per bulan). Upload ulang file yang sama →
+`new: 0`, `existing: 125`, `failed: 0`, tidak ada baris ganda. Kalau tabelnya belum ada, upload
+**tidak** mati: route membalas `tableReady:false` + `saved:false` berisi hasil BACA file (jumlah
+resi per bulan, baris gagal, total) dan UI menampilkannya sebagai **pratinjau** dengan peringatan
+jelas — tidak ada satu baris pun yang ditulis.
+
+**Verifikasi (2026-10-23).** Pembaca + peta diuji langsung lewat Node terhadap dua ekspor asli
+"Resi Saya" milik pemilik: file 50 resi → 50 item, bruto Rp1.654.500, diskon Rp397.875, net
+Rp1.256.625; file 125 resi → 125 item, bruto Rp3.207.000, diskon Rp786.000, net Rp2.421.000 (sama
+dengan hitungan manual di luar app). Berkas uji bersisi rusak (resi kosong, tanggal tak dikenal,
+biaya bukan angka, resi dobel) → 3 item + 4 baris gagal dengan alasannya; header salah → ditolak.
+`tsc --noEmit` bersih; `/ops/ongkir-jnt` = 200 (gerbang login ops); `/api/ops/ongkir-jnt` dan
+`/upload` tanpa sesi = 401. **BELUM terbukti end-to-end** (dan tidak bisa dari sandbox): simpan
+header invoice, tulis baris upload, idempotensi di database, pencocokan `orders.awb_no`, dan angka
+margin — semuanya butuh (a) migration dijalankan lebih dulu dan (b) sesi admin ops di browser
+preview (putaran sesi yang tersedia bukan sesi admin, jadi `/ops/*` selalu menampilkan login).
+Jangan tandai butir-butir itu "verified" sebelum keduanya ada.
+
+**Pertanyaan terbuka untuk J&T.** Ekspor kedua (125 resi) memuat **2 resi bertanda "Tanpa Diskon"**
+(`JO0329572178` Rp47.000 dan `JO0329677967` Rp16.000) sedangkan baris lain dapat diskon 25%; kalau
+keduanya seharusnya dapat diskon, ada potensi kelebihan bayar ±Rp15.750. Selain itu, invoice periode
+yang ditagih belum tentu sama dengan file yang diunggah — filter tanggal portal J&T harus dicek
+lewat angka "Total X" sebelum menekan Ekspor, dan `outsidePeriod` di balasan upload menandai baris
+yang tanggalnya di luar bulan terpilih.
+
+**Tata letak form "Angka Invoice J&T" (2026-10-24).** `JntInvoiceForm.tsx` dirapikan supaya kolomnya
+enak diisi: dua blok berjudul (`Identitas invoice` / `Angka tagihan`), semua field setinggi `h-11`,
+grid 2 kolom di `sm+` (bertumpuk di mobile), kolom uang **dijajar kanan** dengan awalan tanda
+(`Rp` / `−` / `+` / `=`) dan **pemisah ribuan yang hidup saat diketik**, lalu strip hasil (DPP +
+total + chip cek invoice) di bawah kolom — baris footer teks lama dihapus karena isinya sudah pindah
+ke strip itu. Pil status di header juga dihapus: dulu status bayar tampil DUA kali (pil di header
+DAN kotak teks "Status Bayar" read-only); sekarang satu field "Status Bayar" berisi segmented
+control-nya (`role="group"` + `aria-pressed`, hint "Menunggu pembayaran"/"Sudah dibayar" di
+bawahnya). **Jangan** menambahkan kembali pil status ke header.
+**Bahaya pemisah ribuan:** `toNumber()` **bukan** parser format Indonesia untuk angka berkelompok —
+"1.234.567" jatuh ke `Number()` mentah → `NaN` → `null` → 0 (percabangan di sana cuma mengurus
+bentuk ekspor "21000.00" dan "21.000,50"). Karena itu **state form wajib menyimpan digit polos +
+koma desimal** (`bersihAngka` dipakai di `onChange`, `angka()` memetakan nilai DB ke bentuk bersih
+itu) dan pemisah ribuan hanya dipasang untuk TAMPILAN (`tampilAngka`). Kalau suatu saat nilai
+berformat ikut disimpan/dikirim, angka invoice akan diam-diam tersimpan sebagai 0.
+Verifikasi (2026-10-24, `/ops/ongkir-jnt` lewat iframe same-origin — `navigate()` tidak bekerja
+untuk `/ops/*`): ketik `3207000` / `786000` / `241000` → kolomnya menampilkan `3.207.000` /
+`786.000` / `241.000` dan strip berbunyi DPP `Rp 2.421.000` + total `Rp 2.662.000` (angka asli,
+bukan 0); paste `3.179.000` ke Total Dibayar → chip `Selisih Rp -517.000` (= 2.662.000 − 3.179.000,
+jadi terbaca 3179000 — bukan 3179); klik **Lunas** → hint jadi "Sudah dibayar"; 2 kolom sejajar di
+desktop (y sama, tinggi 42 px) dan menumpuk di 375 px, tanpa label terpotong (`scrollWidth ==
+clientWidth`), `documentElement` tidak geser samping di kedua lebar, 0 error console. Tombol
+**Simpan Angka Invoice tidak ditekan** saat uji (akan menulis header invoice bulan itu) — jalur
+simpan tidak disentuh perubahan ini.
+
+## Keterangan kartu Transaksi & "tidak ada loading saat pindah menu" (2026-10-24)
+
+Permintaan pemilik: keterangan kartu diganti mengikuti mockup dashboard ops ("biar admin enak baca"),
+dan **setiap pindah menu tidak boleh ada layar loading**, diterapkan di tiga dashboard internal
+(admin, ops, panel-admin).
+
+**Keterangan kartu** (mockup, menggantikan kalimat "dashboard persis" 2026-10-24 pagi):
+
+| Kartu | Angka besar | Keterangan sekarang |
+|-------|-------------|---------------------|
+| Total transaksi | `saleCount(orders)` (126) | **"Di luar batal & belum bayar"** (`SALE_BASIS_NOTE` di `src/lib/transaksi.ts`) — revisi 2026-10-24 malam, menggantikan "dari <semua pesanan periode> pesanan masuk <periode>" (mis. "dari 145 pesanan masuk Oktober 2026") |
+| Omset bulan ini | `orderRevenue()` total | "Tidak termasuk dibatalkan" |
+| Belum bayar | `orderStage() === "belum_bayar"` | "Perlu follow-up" |
+| Perlu diproses | tahap belum/sudah dipacking | "Packing + siap kirim" |
+
+Keterangan itu **selalu tampil** — tidak lagi bergantian dengan label periode/teks loading
+(`coverageLabel`, `periodCaption`, `sourceLabelText` sudah dihapus). Berkasnya:
+`src/app/ops/transaksi/page.jsx` (dipakai `/ops/transaksi` **dan** `/panel-admin/transaksi` lewat
+`variant="panel"`) dan `src/components/admin/OrdersView.tsx` (panel Order Management). Angka besar
+tetap `saleCount` — **jangan** kembalikan `orders.length` sebagai nilai kartu; jumlah semua pesanan
+periode itu hanya muncul di keterangan.
+
+**Kartu dashboard admin (panel Dashboard) ikut disamakan 2026-10-24** (permintaan pemilik:
+*"keterangan yg di panel admin samain kaya yg lain di menu transaksi sama dashboard"*) — keterangan
+empat kartu `src/components/admin/DashboardView.tsx`: `Pendapatan` → **"Tidak termasuk dibatalkan"**,
+`Pesanan Masuk` → **"dari N pesanan masuk <periode>"** (N = `orders.length` periode itu; kalimat dan
+angkanya sama persis dengan kartu `Total transaksi` di menu Transaksi, karena keduanya menerima
+`dashOrders` yang sama), `Belum Bayar` → **"Perlu follow-up"**. Kartu `Rata-rata Pesanan` **tetap**
+"Rata-rata nilai pesanan" — sama seperti kartu `Perlu diproses` di menu Transaksi, tidak punya
+padanan di layar lain. Jadi keempat keterangan mockup sekarang terbaca di panel Dashboard **dan**
+menu Transaksi; jumlah SEMUA pesanan periode itu (mis. 145) hanya muncul di keterangan, **bukan**
+sebagai nilai kartu (`saleCount` tetap nilai besarnya). `npx tsc --noEmit` bersih; tampilan belum
+diperiksa ulang di browser (pemilik minta tidak diverifikasi lama).
+
+**Beranda panel admin disamakan 2026-10-24** (permintaan pemilik: *"samakan semua teks caption KPI
+di Panel-Admin agar seragam dengan Admin dan Ops"*, lalu jawabannya *"dari 145 pesanan masuk
+Oktober 2026 yg ini loh"* + pilihan **"Ikut Admin persis"**): kartu **"Pesanan masuk"** di
+`src/app/panel-admin/(panel)/page.tsx` sekarang **persis** kartu *Pesanan Masuk* dashboard admin —
+nilai besarnya `saleCount(todayOrders)` (transaksi diakui) dan keterangannya **"dari N pesanan
+masuk hari ini"** (N = SEMUA pesanan hari itu); catatan kecil "N transaksi diakui" dihapus (angkanya
+sudah jadi nilai besar) dan rinciannya pindah ke tooltip kartu (`hint`), sedangkan chip tren
+membandingkan himpunan yang sama (`saleCount` hari ini vs kemarin) seperti di admin. Karena itu
+`SALE_COUNT_NOTE` tidak lagi diimpor di file itu. Tiga kartu lain sengaja **tidak** diubah — tidak
+punya padanan di Admin/Ops: `Omset hari ini` (keterangan "Dari kemarin" = pembanding harian),
+`Perlu dikirim`/"Menunggu resi", dan `Varian menipis`/"Sisa stok 1–5 unit". Caption kartunya kini
+~30 karakter sementara `.stFoot` dulu `white-space: nowrap` → `panel.module.css` membuat baris kaki
+kartu **membungkus** (`flex-wrap: wrap`, `nowrap` dilepas) seperti caption kartu menu Transaksi yang
+juga panjang; tanpa itu keterangannya meluber keluar kartu di layar 4 kolom.
+Verifikasi (2026-10-24, sesi admin diputar ulang, `/panel-admin` dimuat lewat iframe same-origin —
+`navigate()` memang tidak bekerja untuk route ini): kartu "Pesanan masuk" bernilai **0**
+berketerangan **"dari 2 pesanan masuk hari ini"** (hari itu 2 pesanan, keduanya belum diakui → 0,
+jadi angkanya memang lebih kecil dari N seperti di admin), catatan kecil "transaksi diakui" hilang,
+tooltip berbunyi "0 dari 2 pesanan masuk hari ini (diproses/dikirim/selesai · belum bayar &
+dibatalkan tidak dihitung)", chip tren "↘ 100%"; tidak ada kartu statistik yang meluber (tepi kanan
+foot 313 ≤ tepi kartu 334 di client 360 px) pada 1280 px, 1050 px, maupun 375 px; `npx tsc --noEmit`
+bersih; 0 error console. **Catatan pre-existing**: di 375 px Beranda masih punya geser samping
+±48 px dari baris daftar "Pesanan terbaru"/"Stok menipis" (`.listVal` `white-space: nowrap`), bukan
+dari kartu KPI — tidak diperbaiki karena di luar permintaan.
+
+**Pindah menu tanpa loading.**
+
+- **Dashboard admin** (`src/app/admin/page.tsx`): panel yang sudah pernah dibuka tetap **terpasang**
+  dan cuma disembunyikan (`keepPanels` + pembungkus `KeptPanel`, animasi masuk lama tetap dipakai),
+  jadi pindah menu tidak me-render ulang panelnya dan tidak mengambil datanya lagi. Menu dimuat
+  lebih awal lewat `preloadPanel` pada **klik** dan **`onMouseEnter`/`onFocus`** item sidebar, dan
+  panel awal dari `?panel=` juga ikut di-preload — **wajib**, karena tanpa itu panel dari URL tidak
+  dirender sama sekali (screenshot pembuktian: area konten kosong).
+- **Panel admin** (`src/app/panel-admin/(panel)/page.tsx`): data Beranda disimpan di cache modul
+  (`panelCache` berisi `day` + orders + variants) sehingga kembali ke Beranda langsung menampilkan
+  data terakhir tanpa "Memuat…"; cache dibuang kalau hari WIB berganti.
+- **Dashboard ops**: tidak diubah — QueryClient global di `OpsShell` sudah memakai
+  `staleTime 60 detik` + `gcTime 10 menit` dan sidebar mem-prefetch route saat kursor menyentuh
+  menu, jadi kunjungan ulang sudah memakai cache (skeleton tinggal di kunjungan pertama, saat
+  datanya memang belum ada).
+- **Pitfall** (dua-duanya ketangkap saat verifikasi): `const` yang dipakai di dependency array
+  `useEffect` harus dideklarasikan **sebelum** effect-nya (`Cannot access 'preloadPanel' before
+  initialization`), dan panel yang hanya dirender lewat `keepPanels` harus ikut diisi saat panel
+  awal dipilih dari URL.
+- Verifikasi (2026-10-24, iframe same-origin sesuai catatan tool di atas): `/admin?panel=orders` →
+  keempat keterangan baru terbaca (`dari 0 pesanan masuk Oktober 2026` saat data belum tiba,
+  `Tidak termasuk dibatalkan`, `Perlu follow-up`, `Packing + siap kirim`); `/ops/transaksi` →
+  keterangan yang sama; klik **Pelanggan → Dashboard → Pelanggan** → kunjungan pertama memuat data
+  (`Memuat…` muncul), kunjungan kedua **tanpa** teks Memuat/skeleton dan langsung menampilkan
+  daftar pelanggan (219 baris); 0 error console.
+
+**Revisi 2026-10-24 (malam) — keterangan kartu jadi "Di luar batal & belum bayar".** Pemilik
+meminta kalimat "dari 145 pesanan masuk Oktober 2026" diganti **"Di luar batal & belum bayar"**:
+angka besarnya memang `saleCount()` (diproses/dikirim/selesai), jadi keterangannya kini menyebut
+status yang TIDAK dihitung, bukan jumlah semua pesanan periode itu. Kalimatnya dipusatkan sebagai
+konstanta **`SALE_BASIS_NOTE`** di `src/lib/transaksi.ts` supaya tidak bisa beda antar layar lagi —
+keempat pemakainya: `src/app/ops/transaksi/page.jsx` (dipakai `/ops/transaksi` **dan**
+`/panel-admin/transaksi`), `src/components/admin/OrdersView.tsx` (panel Order Management),
+`src/components/admin/DashboardView.tsx` (kartu **Pesanan Masuk**), dan
+`src/app/panel-admin/(panel)/page.tsx` (kartu **Pesanan masuk** beranda, dulu "dari N pesanan masuk
+hari ini"). Jangan menulis ulang kalimatnya literal di satu layar — impor konstanta itu. Karena
+captionnya tidak lagi memuat periode/jumlah, `periodeKartu` + `formatTanggalID` di halaman
+Transaksi dihapus (tidak terpakai; `orders.length` tetap dipakai tab tahap, dan jumlah hariannya
+tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` bersih.

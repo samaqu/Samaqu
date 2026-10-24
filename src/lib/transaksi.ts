@@ -87,6 +87,52 @@ export function statusLabel(status: unknown): string {
  */
 export const SALE_STATUSES: string[] = ["diproses", "dikirim", "selesai"];
 
+/**
+ * Jumlah TRANSAKSI (pesanan sah) dari sekumpulan pesanan — satu aturan bersama `SALE_STATUSES`.
+ *
+ * Angkanya sama persis dengan kartu "Total Transaksi" di dashboard ops dan "N transaksi" di
+ * Laporan Keuangan, dan sejak 2026-10-24 juga jadi NILAI kartu "Pesanan Masuk" di dashboard admin
+ * (permintaan pemilik: "belum bayar juga jangan dihitung") — pesanan yang belum dibayar/batal
+ * memang bukan pesanan masuk. Kartu "Pesanan masuk" di beranda panel admin ikut aturan yang sama
+ * (permintaan pemilik 2026-10-24: "ikut Admin persis"): nilainya angka ini, keterangannya
+ * `SALE_BASIS_NOTE` ("Di luar batal & belum bayar") — kalimat yang sama di keempat layar.
+ */
+export function saleCount(orders: { status?: string | null }[] | null | undefined): number {
+  return (orders || []).filter((o) => SALE_STATUSES.includes(String(o?.status || "").toLowerCase())).length;
+}
+
+/**
+ * Kalimat basis "jumlah transaksi" — teks yang SAMA di dashboard admin, panel admin, ops, dan laporan.
+ * Dipendekkan atas permintaan pemilik ("keterangan card jangan terlalu panjang"): status mana yang
+ * dihitung tetap dijelaskan sekali di komentar `SALE_STATUSES` di atas, bukan di setiap kartu.
+ */
+export const SALE_COUNT_NOTE = "transaksi diakui";
+
+/**
+ * Keterangan kartu hitungan pesanan/transaksi — teks yang SAMA di dashboard admin, menu Transaksi
+ * (ops & panel admin), dan beranda panel admin. Nilai besarnya selalu `saleCount()` (diproses /
+ * dikirim / selesai), jadi keterangannya menyebut status yang TIDAK dihitung.
+ *
+ * 2026-10-24 (permintaan pemilik): kalimat "dari N pesanan masuk <periode>" diganti
+ * "Di luar batal & belum bayar".
+ */
+export const SALE_BASIS_NOTE = "Di luar batal & belum bayar";
+
+/**
+ * Omset satu pesanan = HARGA PRODUK saja (total − ongkir).
+ *
+ * Ongkir yang dibayar customer bukan pendapatan toko: itu uang titipan untuk jasa kirim, dan
+ * biaya J&T-nya sendiri sudah dibukukan sebagai pengurang di menu Ongkir J&T (lapisan "omzet
+ * produk" di sana memakai rumus yang sama). Kalau ongkir ikut dihitung, omset terbaca lebih
+ * besar dari penjualan sebenarnya.
+ *
+ * Rumusnya `total - ongkir` (bukan kolom `subtotal`) supaya diskon voucher tetap terpotong dan
+ * nilainya persis sama dengan jumlah `order_items.price × quantity`.
+ */
+export function orderRevenue(order?: { total?: unknown; shipping_cost?: unknown } | null): number {
+  return Math.max(0, (Number(order?.total) || 0) - (Number(order?.shipping_cost) || 0));
+}
+
 /** Ringkasan produk satu baris daftar, mis. `Jiharkah B-01 x2 +1 lainnya`. */
 export function itemSummary(
   items: { series?: string | null; kain?: string | null; product_name?: string | null; quantity?: number | null }[],

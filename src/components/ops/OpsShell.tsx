@@ -12,6 +12,7 @@ import {
   MapPin,
   Menu,
   Package,
+  Receipt,
   RotateCcw,
   ShoppingBag,
   Target,
@@ -56,6 +57,7 @@ const MENU_GROUPS: { label: string; items: MenuItem[] }[] = [
       { title: "Pengeluaran", href: "/ops/pengeluaran", icon: WalletIcon, soon: true },
       { title: "Target Profit", href: "/ops/target-penjualan", icon: Target, soon: true },
       { title: "Laporan", href: "/ops/laporan", icon: BarChart3 },
+      { title: "Ongkir J&T", href: "/ops/ongkir-jnt", icon: Receipt },
     ],
   },
 ];

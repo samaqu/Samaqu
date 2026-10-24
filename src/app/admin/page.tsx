@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { getThumbnailFromImages } from "@/lib/product-thumbnail";
 import {
   LayoutDashboard, ShoppingBag, Package, Users, FileText, Settings,
@@ -22,7 +23,8 @@ import NotifikasiKatalog from "@/components/admin/NotifikasiKatalog";
 import OrdersView from "@/components/admin/OrdersView";
 import DashboardView from "@/components/admin/DashboardView";
 import { rankTopProducts } from "@/lib/top-products";
-import { SALE_STATUSES } from "@/lib/transaksi";
+import { SALE_STATUSES, orderRevenue } from "@/lib/transaksi";
+import { currentMonthWIB, monthLabelID, monthRangeWIB, monthShift } from "@/lib/month-period";
 import ProductsCatalog from "@/components/admin/ProductsCatalog";
 import ProductDetailDrawer from "@/components/admin/ProductDetailDrawer";
 import LiveChatView from "@/components/admin/LiveChatView";
@@ -203,39 +205,26 @@ function groupByMainProduct(raw: Product[]): AdminCatalogProduct[] {
   return items;
 }
 
-/* ── Periode bulan (WIB) untuk filter dashboard — pola sama dengan dashboard ops ── */
+/* ── Periode bulan (WIB) dashboard — semuanya dari `src/lib/month-period.ts` supaya
+   rentang query, label periode, dan label grafik memakai definisi bulan yang sama. ── */
+const JENDELA_GRAFIK_BULAN = 6;
 
-const MONTH_NAMES_ID = [
-  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-];
-
-/** Bulan WIB sekarang dalam format "YYYY-MM". */
-function currentMonthValue(): string {
-  const wib = new Date(Date.now() + 7 * 60 * 60 * 1000);
-  return `${wib.getUTCFullYear()}-${String(wib.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-/** "2026-10" → { name: "Oktober", year: "2026" }. */
-function monthLabelParts(value: string): { name: string; year: string } {
-  const m = /^(\d{4})-(\d{2})$/.exec(value || "");
-  const now = new Date(Date.now() + 7 * 60 * 60 * 1000);
-  const year = m ? m[1] : String(now.getUTCFullYear());
-  const idx = m ? Number(m[2]) - 1 : now.getUTCMonth();
-  return { name: MONTH_NAMES_ID[idx] || MONTH_NAMES_ID[now.getUTCMonth()], year };
-}
-
-/** Rentang UTC [awal, akhir) untuk bulan WIB terpilih (00:00 WIB = 17:00 UTC hari sebelumnya). */
-function monthRangeUTC(value: string): { startISO: string; endISO: string } {
-  const m = /^(\d{4})-(\d{2})$/.exec(value || "");
-  const now = new Date(Date.now() + 7 * 60 * 60 * 1000);
-  const y = m ? Number(m[1]) : now.getUTCFullYear();
-  const mi = m ? Number(m[2]) - 1 : now.getUTCMonth();
-  const WIB_MS = 7 * 60 * 60 * 1000;
-  return {
-    startISO: new Date(Date.UTC(y, mi, 1) - WIB_MS).toISOString(),
-    endISO: new Date(Date.UTC(y, mi + 1, 1) - WIB_MS).toISOString(),
-  };
+/**
+ * Pembungkus panel dashboard yang tetap terpasang setelah pernah dibuka — pindah menu cuma
+ * mengganti panel mana yang tampak, jadi panelnya tidak di-render ulang (tidak ada loading).
+ * Animasi masuk yang lama tetap dipakai saat panelnya pertama kali muncul.
+ */
+function KeptPanel({ active, children }: { active: boolean; children: ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: active ? 1 : 0, y: active ? 0 : 8 }}
+      transition={{ duration: 0.25 }}
+      style={{ display: active ? undefined : "none" }}
+    >
+      {children}
+    </motion.div>
+  );
 }
 
 function AdminPageInner() {
@@ -247,6 +236,14 @@ function AdminPageInner() {
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [activePanel, setActivePanel] = useState<Panel>("dashboard");
+  // Panel yang pernah dibuka tetap TERPASANG (cuma disembunyikan) supaya pindah menu tidak
+  // me-render ulang panelnya: datanya tidak diambil lagi dan tidak ada layar loading.
+  const [keepPanels, setKeepPanels] = useState<Panel[]>(["dashboard"]);
+  /** Muat panelnya lebih awal — dipanggil saat menu diklik DAN saat kursor menyentuh menunya,
+   *  supaya begitu menu dibuka isinya sudah siap (tidak ada layar loading). */
+  const preloadPanel = useCallback((panel: Panel) => {
+    setKeepPanels((prev) => (prev.includes(panel) ? prev : [...prev, panel]));
+  }, []);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -264,21 +261,21 @@ function AdminPageInner() {
   // Filter bulan dashboard (YYYY-MM, WIB) — sama pola dengan dashboard ops.
   // `dashOrders` diambil terpisah dari server per bulan, jadi kartu dashboard tidak
   // bergantung pada 50 pesanan terakhir yang dipakai panel Order Management.
-  const [bulanValue, setBulanValue] = useState<string>(() => currentMonthValue());
+  const [bulanValue, setBulanValue] = useState<string>(() => currentMonthWIB());
   const [dashOrders, setDashOrders] = useState<Order[]>([]);
+  // Jendela 6 bulan (bulan terpilih + 5 bulan sebelumnya) — sumber garis grafik
+  // "Pendapatan Bulanan" dan pembanding "vs bulan lalu" di kartu dashboard.
+  const [trendOrders, setTrendOrders] = useState<Order[]>([]);
   const [dashLoading, setDashLoading] = useState(true);
 
   // All useMemo/useCallback hooks
-  const periodLabel = useMemo(() => {
-    const p = monthLabelParts(bulanValue);
-    return `${p.name} ${p.year}`;
-  }, [bulanValue]);
+  const periodLabel = useMemo(() => monthLabelID(bulanValue), [bulanValue]);
 
   /** Pendapatan periode terpilih — SATU aturan bersama `SALE_STATUSES` (src/lib/transaksi.ts):
    *  hanya pesanan yang sudah dibayar (`diproses`/`dikirim`/`selesai`). Dulu filternya
    *  "bukan pending", jadi pesanan `dibatalkan` ikut dihitung sebagai pendapatan. */
   const dashRevenue = useMemo(
-    () => dashOrders.filter((o) => SALE_STATUSES.includes(String(o.status || "").toLowerCase())).reduce((sum, o) => sum + o.total, 0),
+    () => dashOrders.filter((o) => SALE_STATUSES.includes(String(o.status || "").toLowerCase())).reduce((sum, o) => sum + orderRevenue(o), 0),
     [dashOrders]
   );
 
@@ -421,23 +418,34 @@ function AdminPageInner() {
 
   // Pesanan bulan terpilih untuk dashboard — diambil langsung dari server (bukan disaring
   // dari 50 pesanan terakhir), supaya bulan lama tetap punya data walau pesanan baru menumpuk.
+  // Sekalian jendela 6 bulan terakhir diambil, karena grafik "Pendapatan Bulanan" + tren
+  // "vs bulan lalu" butuh omzet per bulan: dulu grafiknya memakai 50 pesanan terbaru, jadi
+  // bulan-bulan lama tampak Rp 0 walaupun penjualannya ada.
   useEffect(() => {
     if (!user || role !== "admin") return;
     let mounted = true;
     async function fetchDashMonth() {
       setDashLoading(true);
       try {
-        const { startISO, endISO } = monthRangeUTC(bulanValue);
-        const monthRes = await fetch(
-          `/api/ops/orders?from=${encodeURIComponent(startISO)}&to=${encodeURIComponent(endISO)}&limit=1000`,
-          { headers: await authHeaders() }
-        );
+        const { startISO, endISO } = monthRangeWIB(bulanValue);
+        const { startISO: trendFromISO } = monthRangeWIB(monthShift(bulanValue, -(JENDELA_GRAFIK_BULAN - 1)));
+        const headers = await authHeaders();
+        const [monthRes, trendRes] = await Promise.all([
+          fetch(`/api/ops/orders?from=${encodeURIComponent(startISO)}&to=${encodeURIComponent(endISO)}&limit=1000`, { headers }),
+          fetch(`/api/ops/orders?from=${encodeURIComponent(trendFromISO)}&to=${encodeURIComponent(endISO)}&limit=1000`, { headers }),
+        ]);
         const monthJson = await monthRes.json().catch(() => ({}));
-        const data = monthJson?.orders;
-        if (mounted) setDashOrders((data as Order[]) || []);
+        const trendJson = await trendRes.json().catch(() => ({}));
+        if (mounted) {
+          setDashOrders((monthJson?.orders as Order[]) || []);
+          setTrendOrders((trendJson?.orders as Order[]) || []);
+        }
       } catch (err) {
         console.error("Error fetching dashboard month:", err);
-        if (mounted) setDashOrders([]);
+        if (mounted) {
+          setDashOrders([]);
+          setTrendOrders([]);
+        }
       } finally {
         if (mounted) setDashLoading(false);
       }
@@ -459,20 +467,16 @@ function AdminPageInner() {
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("panel");
     if (requested && (Object.keys(panelTitles) as Panel[]).includes(requested as Panel)) {
+      // Panel dari URL ikut "dipasang" — tanpa ini panelnya tidak dirender sama sekali
+      // (daftar panel yang terpasang cuma berisi Dashboard di awal).
+      preloadPanel(requested as Panel);
       setActivePanel(requested as Panel);
     }
-  }, []);
+  }, [preloadPanel]);
 
   // Handler functions (not hooks)
   function shiftDashMonth(delta: number) {
-    setBulanValue((prev) => {
-      const m = /^(\d{4})-(\d{2})$/.exec(prev);
-      const now = new Date(Date.now() + 7 * 60 * 60 * 1000);
-      const y = m ? Number(m[1]) : now.getUTCFullYear();
-      const mi = m ? Number(m[2]) - 1 : now.getUTCMonth();
-      const d = new Date(Date.UTC(y, mi + delta, 1));
-      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-    });
+    setBulanValue((prev) => monthShift(prev, delta));
   }
   async function handleAuth(e: React.FormEvent) {
     e.preventDefault();
@@ -501,6 +505,7 @@ function AdminPageInner() {
     setRole(null);
     setOrders([]);
     setDashOrders([]);
+    setTrendOrders([]);
     setProducts([]);
     setActivePanel("dashboard");
   }
@@ -681,6 +686,7 @@ function AdminPageInner() {
   }
 
   function go(panel: Panel) {
+    preloadPanel(panel);
     setActivePanel(panel);
     setSidebarOpen(false);
   }
@@ -827,7 +833,12 @@ function AdminPageInner() {
                 {group.items.map((item) => (
                   <li key={item.label}>
                     {"panel" in item ? (
-                      <button onClick={() => go(item.panel)} className={`sidebar-link ${activePanel === item.panel ? "active" : ""}`}>
+                      <button
+                        onClick={() => go(item.panel)}
+                        onMouseEnter={() => preloadPanel(item.panel)}
+                        onFocus={() => preloadPanel(item.panel)}
+                        className={`sidebar-link ${activePanel === item.panel ? "active" : ""}`}
+                      >
                         <item.icon size={16} strokeWidth={1.9} />
                         <span className="flex-1 text-left truncate">{item.label}</span>
                         {item.badge && orders.filter((o) => o.status === "pending").length > 0 && (
@@ -927,85 +938,106 @@ function AdminPageInner() {
         </header>
 
         {/* Content */}
+        {/* Panel yang sudah pernah dibuka tetap TERPASANG dan cuma disembunyikan (`KeptPanel`),
+            jadi pindah menu tidak me-render ulang panelnya: datanya tidak diambil lagi dan tidak
+            ada layar loading. Menu yang kursor-nya sempat menyentuh juga sudah dimuat lebih dulu. */}
         <main className="flex-1 p-5 lg:p-8 overflow-x-hidden">
-          <AnimatePresence mode="wait">
-            <motion.div key={activePanel} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+          {/* DASHBOARD */}
+          {keepPanels.includes("dashboard") && (
+            <KeptPanel active={activePanel === "dashboard"}>
+              <DashboardView
+                revenue={dashRevenue}
+                orders={dashOrders}
+                chartOrders={trendOrders}
+                topProducts={topProducts}
+                loading={loading || dashLoading}
+                periodValue={bulanValue}
+                periodLabel={periodLabel}
+                onPrevMonth={() => shiftDashMonth(-1)}
+                onNextMonth={() => shiftDashMonth(1)}
+                onThisMonth={() => setBulanValue(currentMonthWIB())}
+              />
+            </KeptPanel>
+          )}
 
-              {/* DASHBOARD */}
-              {activePanel === "dashboard" && (
-                <DashboardView
-                  revenue={dashRevenue}
-                  orders={dashOrders}
-                  chartOrders={orders}
-                  products={products}
-                  topProducts={topProducts}
-                  loading={loading || dashLoading}
-                  periodLabel={periodLabel}
-                  onPrevMonth={() => shiftDashMonth(-1)}
-                  onNextMonth={() => shiftDashMonth(1)}
-                  onThisMonth={() => setBulanValue(currentMonthValue())}
-                />
-              )}
+          {/* ORDER MANAGEMENT — ala Shopee Seller Centre: tab tahap + daftar.
+              Seluruh alurnya (tab sumber, pencarian, tab tahap, daftar, tabel) hidup di
+              `OrdersView` supaya file ini tidak lagi menampung panel pesanan sepanjang itu.
+              Aksi pesanan (Atur Pesanan / Cetak Label / Hubungi Pembeli) sengaja hanya ada di
+              drawer detail, jadi halaman ini tidak mengoper `arrangeOrder` ke daftarnya. */}
+          {keepPanels.includes("orders") && (
+            <KeptPanel active={activePanel === "orders"}>
+              <OrdersView
+                orders={dashOrders}
+                loading={dashLoading}
+                periodLabel={periodLabel}
+                onPrevMonth={() => shiftDashMonth(-1)}
+                onNextMonth={() => shiftDashMonth(1)}
+                onSelect={(row) => setSelectedOrder(dashOrders.find((o) => o.id === row.id) || null)}
+              />
+            </KeptPanel>
+          )}
 
-              {/* ORDER MANAGEMENT — ala Shopee Seller Centre: tab tahap + daftar.
-                  Seluruh alurnya (tab sumber, pencarian, tab tahap, daftar, tabel) hidup di
-                  `OrdersView` supaya file ini tidak lagi menampung panel pesanan sepanjang itu.
-                  Aksi pesanan (Atur Pesanan / Cetak Label / Hubungi Pembeli) sengaja hanya ada di
-                  drawer detail, jadi halaman ini tidak mengoper `arrangeOrder` ke daftarnya. */}
-              {activePanel === "orders" && (
-                <OrdersView
-                  orders={dashOrders}
-                  loading={dashLoading}
-                  periodLabel={periodLabel}
-                  onPrevMonth={() => shiftDashMonth(-1)}
-                  onNextMonth={() => shiftDashMonth(1)}
-                  onSelect={(row) => setSelectedOrder(dashOrders.find((o) => o.id === row.id) || null)}
-                />
-              )}
+          {/* PRODUCTS */}
+          {keepPanels.includes("products") && (
+            <KeptPanel active={activePanel === "products"}>
+              <ProductsCatalog
+                items={filteredCatalogItems}
+                total={catalogItemsWithStock.length}
+                thumbnails={productThumbnails}
+                search={productSearch}
+                setSearch={setProductSearch}
+                onDelete={handleDeleteProduct}
+                onDetail={setSelectedProductId}
+                loading={loading}
+              />
+            </KeptPanel>
+          )}
 
-              {/* PRODUCTS */}
-              {activePanel === "products" && (
-                <ProductsCatalog
-                  items={filteredCatalogItems}
-                  total={catalogItemsWithStock.length}
-                  thumbnails={productThumbnails}
-                  search={productSearch}
-                  setSearch={setProductSearch}
-                  onDelete={handleDeleteProduct}
-                  onDetail={setSelectedProductId}
-                  loading={loading}
-                />
-              )}
+          {/* CUSTOMERS */}
+          {keepPanels.includes("customers") && (
+            <KeptPanel active={activePanel === "customers"}>
+              <CustomersView />
+            </KeptPanel>
+          )}
 
-              {/* CUSTOMERS */}
-              {activePanel === "customers" && <CustomersView />}
+          {/* LIVE CHAT — tab Percakapan + Pengaturan asisten AI */}
+          {keepPanels.includes("chats") && (
+            <KeptPanel active={activePanel === "chats"}>
+              <LiveChatView />
+            </KeptPanel>
+          )}
 
-              {/* LIVE CHAT — tab Percakapan + Pengaturan asisten AI */}
-              {activePanel === "chats" && <LiveChatView />}
+          {/* CONTENT */}
+          {keepPanels.includes("content") && (
+            <KeptPanel active={activePanel === "content"}>
+              <div>
+                <h2 className="text-2xl italic mb-1" style={{ fontFamily: "var(--font-cormorant), Georgia, serif" }}>Konten Website</h2>
+                <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>Kelola bagian yang tampil di samaqu.vercel.app</p>
+                <Link href="/admin/konten-website" className="card p-5 flex items-center justify-between hover:shadow-md transition-shadow" style={{ cursor: "pointer" }}>
+                  <div>
+                    <h3 className="font-semibold mb-1" style={{ color: "var(--espresso)" }}>Kelola Konten Halaman</h3>
+                    <p className="text-sm" style={{ color: "var(--text-muted)" }}>Edit Hero, Koleksi Pilihan, Cara Pemesanan, Testimoni</p>
+                  </div>
+                  <span className="text-sm font-semibold" style={{ color: "var(--gold)" }}>Buka →</span>
+                </Link>
+              </div>
+            </KeptPanel>
+          )}
 
-              {/* CONTENT */}
-              {activePanel === "content" && (
-                <div>
-                  <h2 className="text-2xl italic mb-1" style={{ fontFamily: "var(--font-cormorant), Georgia, serif" }}>Konten Website</h2>
-                  <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>Kelola bagian yang tampil di samaqu.vercel.app</p>
-                  <Link href="/admin/konten-website" className="card p-5 flex items-center justify-between hover:shadow-md transition-shadow" style={{ cursor: "pointer" }}>
-                    <div>
-                      <h3 className="font-semibold mb-1" style={{ color: "var(--espresso)" }}>Kelola Konten Halaman</h3>
-                      <p className="text-sm" style={{ color: "var(--text-muted)" }}>Edit Hero, Koleksi Pilihan, Cara Pemesanan, Testimoni</p>
-                    </div>
-                    <span className="text-sm font-semibold" style={{ color: "var(--gold)" }}>Buka →</span>
-                  </Link>
-                </div>
-              )}
+          {/* TEMPLATE NOTIF — dipisah dari Pengaturan; logic simpan tetap sama. */}
+          {keepPanels.includes("notif-template") && (
+            <KeptPanel active={activePanel === "notif-template"}>
+              <NotifikasiKatalog />
+            </KeptPanel>
+          )}
 
-              {/* TEMPLATE NOTIF — dipisah dari Pengaturan; logic simpan tetap sama. */}
-              {activePanel === "notif-template" && <NotifikasiKatalog />}
-
-              {/* SETTINGS */}
-              {activePanel === "settings" && <SettingsPanel />}
-
-            </motion.div>
-          </AnimatePresence>
+          {/* SETTINGS */}
+          {keepPanels.includes("settings") && (
+            <KeptPanel active={activePanel === "settings"}>
+              <SettingsPanel />
+            </KeptPanel>
+          )}
         </main>
       </div>
 

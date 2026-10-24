@@ -4,7 +4,7 @@ import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
 import { jakartaDayBounds, jakartaMonthBounds, BIZ_OFFSET_MS } from "@/lib/ops-followup";
 import { resolveStock } from "@/lib/ops-stock";
 import { rankTopProducts, isSaleOrder } from "@/lib/top-products";
-import { SALE_STATUSES } from "@/lib/transaksi";
+import { SALE_STATUSES, orderRevenue } from "@/lib/transaksi";
 
 /**
  * Dashboard ops — ringkasan lintas modul dalam satu request.
@@ -16,6 +16,9 @@ import { SALE_STATUSES } from "@/lib/transaksi";
 
 /**
  * Penjualan (omset/HPP/laba/AOV/margin) hanya dihitung dari pesanan yang SUDAH DIBAYAR.
+ * Omset = `orderRevenue()` (harga PRODUK saja = total − ongkir, lihat src/lib/transaksi.ts);
+ * ongkir yang dibayar customer bukan pendapatan — biaya kirimnya dibukukan terpisah di menu
+ * Ongkir J&T.
  * `pending` = menunggu transfer: stoknya sudah direservasi saat order dibuat
  * (lihat /api/orders & /api/open-order), tapi uangnya belum masuk. `dibatalkan` tentu tidak.
  *
@@ -66,11 +69,11 @@ export async function GET(req: NextRequest) {
     countOf((q) => q.is("do_not_contact", false).gte("next_followup_at", startIso).lt("next_followup_at", endIso).or(activeLead)),
     countOf((q) => q.is("do_not_contact", false).not("next_followup_at", "is", null).lt("next_followup_at", startIso).or(activeLead)),
     countOf((q) => q.eq("outcome", "bought").gte("last_contact_at", month.startIso).lt("last_contact_at", month.endIso)),
-    admin.from("orders").select("id, total, status, created_at").gte("created_at", month.startIso).lt("created_at", month.endIso),
+    admin.from("orders").select("id, total, shipping_cost, status, created_at").gte("created_at", month.startIso).lt("created_at", month.endIso),
     admin.from("product_variants").select("product_id, stock, base_product_id"),
     admin.from("lead_activities").select("id, lead_id, action, note, created_at, actor").order("created_at", { ascending: false }).limit(6),
     // Order 7 hari terakhir (WIB) — sumber grafik `trendHarian` (batas bulan ≠ jendela 7 hari).
-    admin.from("orders").select("id, total, status, created_at").gte("created_at", trendStartIso).lt("created_at", endIso),
+    admin.from("orders").select("id, total, shipping_cost, status, created_at").gte("created_at", trendStartIso).lt("created_at", endIso),
   ]);
 
   const orders = (ordersMonth.data || []) as any[];
@@ -78,7 +81,7 @@ export async function GET(req: NextRequest) {
   // transfer) dan `dibatalkan` tidak dihitung — lihat PAID_ORDER_STATUS di atas.
   const valid = orders.filter(isPaidOrder);
   const validIds = valid.map((o) => o.id);
-  const omset = valid.reduce((s, o) => s + (Number(o.total) || 0), 0);
+  const omset = valid.reduce((s, o) => s + orderRevenue(o), 0);
   const transaksi = valid.length;
   const rataRata = transaksi > 0 ? Math.round(omset / transaksi) : 0;
 
@@ -141,7 +144,7 @@ export async function GET(req: NextRequest) {
     const created = new Date(o.created_at);
     if (Number.isNaN(created.getTime())) continue;
     const wibDay = new Date(created.getTime() + BIZ_OFFSET_MS).toISOString().slice(0, 10);
-    dailyMap.set(wibDay, (dailyMap.get(wibDay) || 0) + (Number(o.total) || 0));
+    dailyMap.set(wibDay, (dailyMap.get(wibDay) || 0) + orderRevenue(o));
   }
   const trend: { tanggal: string; hari: string; omset: number }[] = [];
   for (let d = 1; d <= month.daysInMonth; d++) {
@@ -159,7 +162,7 @@ export async function GET(req: NextRequest) {
     const created = new Date(o.created_at);
     if (Number.isNaN(created.getTime())) continue;
     const wibDay = new Date(created.getTime() + BIZ_OFFSET_MS).toISOString().slice(0, 10);
-    trendDailyMap.set(wibDay, (trendDailyMap.get(wibDay) || 0) + (Number(o.total) || 0));
+    trendDailyMap.set(wibDay, (trendDailyMap.get(wibDay) || 0) + orderRevenue(o));
   }
 
   const trendHarian: { tanggal: string; label: string; omset: number }[] = [];

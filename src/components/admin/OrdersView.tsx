@@ -18,9 +18,11 @@ import {
   orderStage,
   type OrderStageFilter,
 } from "@/lib/order-flow";
-import { ORDER_SOURCE_LABEL, SALE_STATUSES, orderSourceKey, orderSourceLabel } from "@/lib/transaksi";
+import { ORDER_SOURCE_LABEL, SALE_BASIS_NOTE, SALE_STATUSES, orderRevenue, orderSourceKey, orderSourceLabel, saleCount } from "@/lib/transaksi";
 import StageIcon from "@/components/ops/transaksi/StageIcon";
-import AnimatedNumber from "@/components/AnimatedNumber";
+// Animasi angka kartu KPI memakai komponen yang SAMA dengan kartu metrik dashboard admin
+// (`CountUp`) supaya geraknya konsisten: angka naik dari 0 saat data masuk.
+import CountUp from "@/components/admin/CountUp";
 import "@/app/ops/ops-transaksi.css";
 
 /** Field yang dipakai daftar; `Order` di halaman admin memenuhinya. */
@@ -36,6 +38,8 @@ export interface AdminOrderRow {
   shipping_status?: string | null;
   status: string;
   total: number;
+  /** Ongkir yang dibayar customer — diambil dari `order.total` oleh `orderRevenue()`. */
+  shipping_cost?: number | null;
   created_at: string;
   /** Sumber mentah dari database; label selalu lewat helper `orderSource*`. */
   source?: string | null;
@@ -70,6 +74,11 @@ function jam(iso: string) {
 
 function rupiah(n: number) {
   return "Rp " + Math.round(Number(n) || 0).toLocaleString("id-ID");
+}
+
+/** Angka bulat tanpa pemisah ribuan — pemformat yang sama dengan `count` di DashboardView. */
+function angka(n: number) {
+  return String(Math.round(n));
 }
 
 /** "Kain X · Series · Warna · Ukuran" — bagian yang sama dengan kolom Produk di ops. */
@@ -147,11 +156,20 @@ export default function OrdersView({
     [searchedOrders, orderFilter],
   );
 
+  // KPI dihitung dari SELURUH pesanan periode itu (bukan hasil filter) — sama seperti menu Transaksi.
+  //
+  // Jumlah TRANSAKSI memakai aturan bersama `saleCount()` (diproses/dikirim/selesai): angka yang sama
+  // dengan menu Transaksi, dashboard ops, dan "N transaksi" di Laporan Keuangan. Dulu kartu ini
+  // menghitung SEMUA baris periode itu (termasuk belum bayar & dibatalkan), jadi angkanya beda
+  // sendiri dari layar lain.
+  //
+  // Omset memakai `orderRevenue()` (harga PRODUK saja = total − ongkir) supaya sama dengan kartu
+  // "Omset bulan ini" di menu Transaksi & Laporan — `orders.total` masih memuat ongkir.
   const kpis = useMemo(() => {
     const sold = orders.filter((o) => (SALE_STATUSES as readonly string[]).includes(o.status));
     return {
-      total: orders.length,
-      revenue: sold.reduce((sum, o) => sum + (Number(o.total) || 0), 0),
+      total: saleCount(orders),
+      revenue: sold.reduce((sum, o) => sum + orderRevenue(o), 0),
       unpaid: orders.filter((o) => orderStage(o) === "belum_bayar").length,
       toProcess: orders.filter((o) => {
         const stage = orderStage(o);
@@ -172,8 +190,17 @@ export default function OrdersView({
     [orders],
   );
 
-  const sourceLabelText =
-    orderSource === "all" ? "Semua sumber" : ORDER_SOURCE_LABEL[orderSource] || orderSource;
+  /**
+   * Keterangan kartu KPI mengikuti kartu dashboard admin & menu Transaksi (permintaan pemilik
+   * 2026-10-24): angka besar = transaksi diakui (`saleCount`), jadi keterangannya menyebut status
+   * yang TIDAK dihitung — `SALE_BASIS_NOTE` ("Di luar batal & belum bayar"). "Tidak termasuk
+   * dibatalkan" untuk omset, "Perlu follow-up" untuk belum bayar, dan "Packing + siap kirim"
+   * untuk perlu diproses.
+   *
+   * Keterangannya SELALU tampil — tidak ada teks loading yang berganti-ganti saat pindah menu.
+   */
+  const captionTotal = SALE_BASIS_NOTE;
+  const captionOmset = "Tidak termasuk dibatalkan";
   const filtersActive = Boolean(orderQuery) || orderFilter !== "semua" || orderSource !== "all";
   const resetFilters = () => {
     setOrderSearch("");
@@ -191,22 +218,22 @@ export default function OrdersView({
       <section className="ks">
         <div className="card k">
           <small>Total transaksi</small>
-          <b><AnimatedNumber value={loading ? 0 : kpis.total} /></b>
-          <i>{periodLabel || sourceLabelText}</i>
+          <b><CountUp value={loading ? 0 : kpis.total} format={angka} /></b>
+          <i>{captionTotal}</i>
         </div>
         <div className="card k">
           <small>Omset bulan ini</small>
-          <b><AnimatedNumber value={loading ? 0 : kpis.revenue} format={(n) => rupiah(n)} /></b>
-          <i>Tidak termasuk dibatalkan</i>
+          <b><CountUp value={loading ? 0 : kpis.revenue} format={rupiah} /></b>
+          <i>{captionOmset}</i>
         </div>
         <div className="card k">
           <small>Belum bayar</small>
-          <b style={{ color: "#c76f00" }}><AnimatedNumber value={loading ? 0 : kpis.unpaid} /></b>
+          <b style={{ color: "#c76f00" }}><CountUp value={loading ? 0 : kpis.unpaid} format={angka} /></b>
           <i>Perlu follow-up</i>
         </div>
         <div className="card k">
           <small>Perlu diproses</small>
-          <b style={{ color: "#2e64c9" }}><AnimatedNumber value={loading ? 0 : kpis.toProcess} /></b>
+          <b style={{ color: "#2e64c9" }}><CountUp value={loading ? 0 : kpis.toProcess} format={angka} /></b>
           <i>Packing + siap kirim</i>
         </div>
       </section>

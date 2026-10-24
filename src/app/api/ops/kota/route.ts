@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
 import { KOTA_KOSONG, kotaFromShipping, kotaKey, prettifyCity, prettifyProvince, provinceOfCity } from "@/lib/kota";
-import { ORDER_SOURCE_LABEL, SALE_STATUSES, orderSourceKey } from "@/lib/transaksi";
+import { ORDER_SOURCE_LABEL, SALE_STATUSES, orderRevenue, orderSourceKey } from "@/lib/transaksi";
 
 /**
  * "Database Kota" — sebaran pesanan per kota, dihitung langsung dari pesanan yang sudah ada
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
   let query = admin
     .from("orders")
     .select(
-      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, total, shipping_city, shipping_province, shipping_kecamatan",
+      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, total, shipping_cost, shipping_city, shipping_province, shipping_kecamatan",
     )
     .neq("status", "dibatalkan")
     .order("created_at", { ascending: false })
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
       whatsapp: order.customer_whatsapp || "",
       status: String(order.status || ""),
       source: orderSourceKey(order),
-      total: Number(order.total) || 0,
+      total: orderRevenue(order),
       paid: SALE_STATUSES.includes(String(order.status || "")),
       cityKey: key || "__kosong__",
       city: rawCity ? prettifyCity(rawCity) : KOTA_KOSONG,

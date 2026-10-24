@@ -8,7 +8,7 @@
  * Omset mengikuti aturan bersama `SALE_STATUSES` (diproses/dikirim/selesai) seperti dashboard lain.
  */
 import { useEffect, useState } from "react";
-import { statusLabel, SALE_STATUSES } from "@/lib/transaksi";
+import { statusLabel, SALE_BASIS_NOTE, SALE_STATUSES, saleCount, orderRevenue } from "@/lib/transaksi";
 import { orderStatusKey } from "@/lib/order-flow";
 import { opsGet } from "../panel-api";
 import { useWibGreeting, useWibToday, wibDateOffset, dailyIndexForDate } from "../wib-date";
@@ -74,6 +74,7 @@ type TxRow = {
   time_wib?: string;
   status: string;
   total: number;
+  shipping_cost?: number;
   customer_name?: string;
   qty_total?: number;
   awb_no?: string | null;
@@ -103,6 +104,8 @@ type MetricCard = {
   valueColor?: string;
   /** Tooltip untuk memperjelas arti angka. */
   hint?: string;
+  /** Keterangan kecil di bawah angka — dipakai untuk basis hitung (mis. omzet tanpa ongkir). */
+  note?: string;
 };
 
 function Heart() {
@@ -183,11 +186,19 @@ function EmptyStockArt() {
   );
 }
 
+/**
+ * Cache modul: data terakhir disimpan DI LUAR komponen supaya pindah menu lalu balik ke Beranda
+ * tidak menampilkan layar "Memuat…" lagi — data terakhir langsung tampil, lalu disegarkan di
+ * belakang. Tanggalnya ikut disimpan; kalau harinya (WIB) sudah berganti, data lama tetap tampil
+ * sebentar sambil versi hari barunya diambil.
+ */
+let panelCache: { day: string; orders: TxRow[]; variants: VariantRow[] } | null = null;
+
 export default function PanelAdminHome() {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!panelCache);
   const [error, setError] = useState<string | null>(null);
-  const [orders, setOrders] = useState<TxRow[]>([]);
-  const [variants, setVariants] = useState<VariantRow[]>([]);
+  const [orders, setOrders] = useState<TxRow[]>(panelCache?.orders ?? []);
+  const [variants, setVariants] = useState<VariantRow[]>(panelCache?.variants ?? []);
   // Kunci tanggal WIB hari ini — ikut berubah otomatis saat lewat tengah malam WIB.
   const today = useWibToday();
   const greeting = useWibGreeting();
@@ -205,8 +216,11 @@ export default function PanelAdminHome() {
           opsGet<{ items?: VariantRow[] }>("/api/ops/product-variants"),
         ]);
         if (cancelled) return;
-        setOrders(Array.isArray(tx.items) ? tx.items : []);
-        setVariants(Array.isArray(vr.items) ? vr.items : []);
+        const nextOrders = Array.isArray(tx.items) ? tx.items : [];
+        const nextVariants = Array.isArray(vr.items) ? vr.items : [];
+        panelCache = { day: today, orders: nextOrders, variants: nextVariants };
+        setOrders(nextOrders);
+        setVariants(nextVariants);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Gagal memuat data");
       } finally {
@@ -223,11 +237,16 @@ export default function PanelAdminHome() {
 
   const todayOrders = orders.filter((o) => o.date_wib === today);
   const yestOrders = orders.filter((o) => o.date_wib === yesterday);
-  const omsetToday = todayOrders.filter((o) => isSale(o.status)).reduce((a, o) => a + (Number(o.total) || 0), 0);
-  const omsetYest = yestOrders.filter((o) => isSale(o.status)).reduce((a, o) => a + (Number(o.total) || 0), 0);
+  const omsetToday = todayOrders.filter((o) => isSale(o.status)).reduce((a, o) => a + orderRevenue(o), 0);
+  const omsetYest = yestOrders.filter((o) => isSale(o.status)).reduce((a, o) => a + orderRevenue(o), 0);
   const deltaOmset = omsetYest > 0 ? Math.round(((omsetToday - omsetYest) / omsetYest) * 100) : omsetToday > 0 ? 100 : 0;
+  /** Jumlah TRANSAKSI hari ini — aturan bersama `SALE_STATUSES`, angka yang SAMA dengan laporan. */
+  const transaksiToday = saleCount(todayOrders);
+  const transaksiYest = saleCount(yestOrders);
+  /** Tren kartu "Pesanan masuk" membandingkan himpunan yang SAMA dengan angka besarnya (transaksi
+   *  diakui), persis seperti chip tren kartu "Pesanan Masuk" di dashboard admin. */
   const deltaMasuk =
-    yestOrders.length > 0 ? Math.round(((todayOrders.length - yestOrders.length) / yestOrders.length) * 100) : todayOrders.length > 0 ? 100 : 0;
+    transaksiYest > 0 ? Math.round(((transaksiToday - transaksiYest) / transaksiYest) * 100) : transaksiToday > 0 ? 100 : 0;
 
   const perluDikirim = orders.filter((o) => o.status === "diproses" && !o.awb_no).length;
   const lowStock = variants.filter((v) => {
@@ -244,19 +263,26 @@ export default function PanelAdminHome() {
       label: "Omset hari ini",
       value: rupiah(omsetToday),
       caption: "Dari kemarin",
+      note: "Hanya harga produk (tanpa ongkir)",
       delta: `${deltaOmset >= 0 ? "↗" : "↘"} ${Math.abs(deltaOmset)}%`,
       down: deltaOmset < 0,
       icon: "bag",
       iconColor: "var(--panel-metric-revenue, currentColor)",
     },
     {
+      // Kartu ini mengikuti kartu "Pesanan Masuk" di dashboard admin persis (permintaan pemilik
+      // 2026-10-24: "ikut Admin persis") — angka besarnya transaksi diakui (`saleCount`), dan
+      // keterangannya memakai kalimat yang sama dengan dashboard admin / menu Transaksi
+      // (`SALE_BASIS_NOTE` = "Di luar batal & belum bayar", permintaan pemilik 2026-10-24).
+      // Rincian hariannya (mis. "0 dari 2 pesanan masuk hari ini") ada di tooltip kartu.
       label: "Pesanan masuk",
-      value: String(todayOrders.length),
-      caption: "Hari ini",
+      value: String(transaksiToday),
+      caption: SALE_BASIS_NOTE,
       delta: `${deltaMasuk >= 0 ? "↗" : "↘"} ${Math.abs(deltaMasuk)}%`,
       down: deltaMasuk < 0,
       icon: "basket",
       iconColor: "var(--panel-metric-orders, currentColor)",
+      hint: `${transaksiToday} dari ${todayOrders.length} pesanan masuk hari ini (diproses/dikirim/selesai · belum bayar & dibatalkan tidak dihitung)`,
     },
     {
       label: "Perlu dikirim",
@@ -310,6 +336,7 @@ export default function PanelAdminHome() {
             <div className={styles.stValue} style={m.valueColor ? { color: m.valueColor } : undefined}>
               {loading ? "—" : m.value}
             </div>
+            {m.note ? <div className={styles.stNote}>{m.note}</div> : null}
             <div className={styles.stFoot}>
               {m.delta ? (
                 <span
