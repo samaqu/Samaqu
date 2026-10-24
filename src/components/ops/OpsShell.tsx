@@ -209,12 +209,13 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
       { title: "Buku Stok", href: "/ops/produksi/buku-stok", icon: IconBookOpen },
       { title: "Stok Awal", href: "/ops/produksi/stok-awal", icon: IconPackagePlus },
       { title: "Stok Opname", href: "/ops/produksi/opname", icon: IconClipboardCheck },
+      { title: "Laporan", href: "/ops/produksi/laporan", icon: BarChart3 },
     ];
 
     // Leader hanya melihat stok & status; semua menu berisi harga disembunyikan.
     const visible = prodAccess.role === "owner"
       ? productionItems
-      : productionItems.filter((item) => ["/ops/produksi/komponen", "/ops/produksi/buku-stok"].includes(item.href));
+      : productionItems.filter((item) => ["/ops/produksi/komponen", "/ops/produksi/buku-stok", "/ops/produksi/laporan"].includes(item.href));
 
     const groups = [...BASE_MENU_GROUPS];
     groups.splice(3, 0, { label: "Produksi", items: visible });
