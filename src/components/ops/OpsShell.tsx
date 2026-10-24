@@ -28,6 +28,7 @@ const IconBoxes: any = (LucideIcons as any).Boxes ?? Package;
 const IconBookOpen: any = (LucideIcons as any).BookOpen ?? FileText;
 const IconPackagePlus: any = (LucideIcons as any).PackagePlus ?? Package;
 const IconClipboardCheck: any = (LucideIcons as any).ClipboardCheck ?? FileText;
+const IconRecipe: any = (LucideIcons as any).NotebookPen ?? (LucideIcons as any).Notebook ?? FileText;
 import { supabase } from "@/lib/supabase";
 import { Toaster } from "@/components/ops/ui/toaster";
 import OpsFooter from "@/components/ops/OpsFooter";
@@ -201,6 +202,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
 
     const productionItems: MenuItem[] = [
       { title: "Komponen & Bahan", href: "/ops/produksi/komponen", icon: IconBoxes },
+      { title: "Resep Produk", href: "/ops/produksi/resep", icon: IconRecipe },
       { title: "Pembelian Bahan", href: "/ops/produksi/pembelian", icon: ShoppingBag },
       { title: "Buku Stok", href: "/ops/produksi/buku-stok", icon: IconBookOpen },
       { title: "Stok Awal", href: "/ops/produksi/stok-awal", icon: IconPackagePlus },

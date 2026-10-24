@@ -112,6 +112,19 @@ export async function productionGuard(
   return { ok: true, email: identity.email, role: identity.role, canWrite: identity.role === "owner" };
 }
 
+/**
+ * Gerbang menu Resep Produk: HANYA Owner.
+ * Leader, Admin, dan Admin Operasional ditolak di server (bukan cuma menu disembunyikan).
+ */
+export async function ownerProductionGuard(req: NextRequest): Promise<ProductionAccess> {
+  const identity = await readIdentity(req);
+  if (!identity) return { ok: false, response: unauthorized() };
+  if (identity.role !== "owner") {
+    return { ok: false, response: forbidden("Menu Resep Produk hanya untuk Owner") };
+  }
+  return { ok: true, email: identity.email, role: "owner", canWrite: true };
+}
+
 /** Leader tidak boleh melihat angka harga sama sekali (bukan hanya disembunyikan di UI). */
 export function canSeePrices(role: string): boolean {
   return role === "owner";
