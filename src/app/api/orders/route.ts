@@ -18,6 +18,7 @@ import { orderLookupToken } from "@/lib/order-token";
 import { formatProductLabel } from "@/lib/item-label";
 import { resolveAttribution } from "@/lib/affiliate/referral";
 import { recordCommissionForOrder } from "@/lib/affiliate/commission";
+import { snapshotOrderHpp } from "@/lib/produksi-order-hpp";
 
 /**
  * Semua baca/tulis pesanan di route ini memakai service role (server-side), supaya policy RLS
@@ -381,6 +382,13 @@ export async function POST(request: NextRequest) {
       await supabase.from("orders").delete().eq("id", order.id);
       await rollbackStock();
       return NextResponse.json({ error: "Gagal menyimpan detail pesanan" }, { status: 500 });
+    }
+
+    // Snapshot HPP per baris. Kegagalan snapshot tidak boleh menggagalkan checkout.
+    try {
+      await snapshotOrderHpp(supabase, order.id);
+    } catch (snapshotError) {
+      console.error("[ORDERS] snapshot HPP:", orderNumber, snapshotError);
     }
 
     // Catat komisi affiliate (idempoten: `orders.affiliate_commissions.order_id` UNIQUE).

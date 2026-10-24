@@ -50,6 +50,8 @@ export const MOVEMENT_TYPES: Record<string, { label: string; tone: "in" | "out" 
   keluar_produksi: { label: "Keluar ke Produksi", tone: "out" },
   retur_sisa_bahan: { label: "Retur Sisa Bahan", tone: "in" },
   packaging_pesanan: { label: "Packaging Pesanan", tone: "out" },
+  keluar_packaging: { label: "Keluar ke Packaging", tone: "out" },
+  retur_packaging: { label: "Retur Packaging", tone: "in" },
 };
 
 export const OPNAME_REASONS = [

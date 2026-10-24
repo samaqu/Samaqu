@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
+import { isOpsAdmin, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { cancelOrderCompletely, type CancelableOrder } from "@/lib/cancel-order";
 import { MANUAL_PRICE_MAX, MANUAL_PRICE_MIN, MANUAL_SOURCE_KEYS, hasManualPrice, itemSummary, manualPrice, orderSourceKey, orderSourceLabel, sourceKey, statusLabel } from "@/lib/transaksi";
 import { localPhone } from "@/lib/whatsapp";
@@ -15,6 +15,7 @@ import {
   type VariantWeightMap,
   type WeightMap,
 } from "@/lib/shipping-weight";
+import { snapshotOrderHpp } from "@/lib/produksi-order-hpp";
 
 /**
  * Menu "Transaksi" dashboard internal.
@@ -258,6 +259,8 @@ async function restoreStock(admin: Admin, items: Snapshot[]) {
 /** Daftar transaksi per PESANAN (bukan per item) untuk bulan terpilih. */
 export async function GET(req: NextRequest) {
   if (!(await isOpsAdmin(req))) return unauthorized();
+  const identity = await opsIdentity(req);
+  const hppVisible = identity?.role === "owner";
 
   const sp = new URL(req.url).searchParams;
   const start = String(sp.get("start") || "").trim();
@@ -282,6 +285,27 @@ export async function GET(req: NextRequest) {
 
   const list = orders || [];
   if (list.length === 0) return NextResponse.json({ items: [] });
+
+  const orderIds = list.map((order: any) => String(order.id));
+  const { data: hppHeaders } = await admin
+    .from("production_order_hpp")
+    .select("order_id, hpp_goods, packaging_cost, total_hpp, packaging_status, packaging_warning, packaged_at, returned_at")
+    .in("order_id", orderIds);
+  const hppByOrder = new Map((hppHeaders || []).map((row: any) => [String(row.order_id), row]));
+
+  let hppItemsByOrder = new Map<string, any[]>();
+  if (hppVisible) {
+    const { data: hppItems } = await admin
+      .from("production_order_hpp_items")
+      .select("order_id, product_id, product_name, color, size, quantity, hpp_unit, hpp_total, source")
+      .in("order_id", orderIds);
+    for (const row of hppItems || []) {
+      const key = String(row.order_id);
+      const current = hppItemsByOrder.get(key) || [];
+      current.push(row);
+      hppItemsByOrder.set(key, current);
+    }
+  }
 
   const { data: lineItems } = await admin
     .from("order_items")
@@ -380,6 +404,36 @@ export async function GET(req: NextRequest) {
       jnt_order_id: order.jnt_order_id || "",
       shipping_status: order.shipping_status || "",
       tracking_status_code: typeof order.tracking_status_code === "number" ? order.tracking_status_code : null,
+      // Peringatan kemasan boleh dilihat semua admin (tanpa harga/HPP).
+      packaging_warning: Boolean(hppByOrder.get(order.id)?.packaging_warning),
+      packaging_status: hppByOrder.get(order.id)?.packaging_status || null,
+      hpp_visible: hppVisible,
+      ...(hppVisible
+        ? {
+            hpp: (() => {
+              const header = hppByOrder.get(order.id);
+              if (!header) return null;
+              return {
+                hpp_goods: Number(header.hpp_goods) || 0,
+                packaging_cost: Number(header.packaging_cost) || 0,
+                total_hpp: Number(header.total_hpp) || 0,
+                packaging_status: header.packaging_status || null,
+                packaged_at: header.packaged_at || null,
+                returned_at: header.returned_at || null,
+                items: (hppItemsByOrder.get(order.id) || []).map((item: any) => ({
+                  product_id: item.product_id,
+                  product_name: item.product_name,
+                  color: item.color || "default",
+                  size: item.size,
+                  quantity: Number(item.quantity) || 0,
+                  hpp_unit: item.hpp_unit == null ? null : Number(item.hpp_unit) || 0,
+                  hpp_total: item.hpp_total == null ? null : Number(item.hpp_total) || 0,
+                  source: item.source,
+                })),
+              };
+            })(),
+          }
+        : {}),
       // Pesanan website hanya dipantau dari sini (sumbernya read-only); yang boleh
       // diubah/dibatalkan dari menu ini cuma transaksi yang dicatat manual.
       can_edit: key !== "website" && status !== "dibatalkan",
@@ -515,6 +569,13 @@ export async function POST(req: NextRequest) {
       await restoreStock(admin, items);
       console.error("[OPS] transaksi items:", itemsError.message);
       return bad("Gagal menyimpan produk transaksi. Coba lagi.");
+    }
+
+    // Snapshot HPP per baris. Kegagalan snapshot tidak boleh menggagalkan transaksi.
+    try {
+      await snapshotOrderHpp(admin, order.id);
+    } catch (snapshotError) {
+      console.error("[OPS] snapshot HPP order:", order.order_number, snapshotError);
     }
 
     // Alamat baru (kalau admin menambahkannya) ikut masuk buku alamat pelanggan.

@@ -17,11 +17,12 @@
  * `Transaction.createResi` (route admin `PATCH /api/admin/orders` aksi `createJnt`, apa adanya).
  */
 
-import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, Clipboard, ClipboardCheck, Truck } from "lucide-react";
 import { base44 } from "@/lib/ops-api";
 import { formatWeightExact } from "@/lib/shipping-weight";
+import { formatRupiah } from "@/components/ops/transaksi/transaksi-format";
 import { formatTrackingTime } from "@/lib/jnt/track-status";
 import { jntServiceCodeFromShippingMethod } from "@/lib/jnt/layanan";
 
@@ -70,6 +71,11 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
   const [manualAwb, setManualAwb] = useState("");
   const [manualShipped, setManualShipped] = useState("belum");
   const [manualBusy, setManualBusy] = useState(false);
+  const [packagingPreview, setPackagingPreview] = useState(null);
+  const [packagingQty, setPackagingQty] = useState({});
+  const [useCover, setUseCover] = useState(false);
+  const [packagingLoading, setPackagingLoading] = useState(false);
+  const [packagingWarning, setPackagingWarning] = useState(false);
   const [manualError, setManualError] = useState("");
   const [shippingBusy, setShippingBusy] = useState(false);
 
@@ -104,6 +110,48 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
     shippingStatus !== "dikirim" &&
     shippingStatus !== "selesai";
 
+  /** Paket kemasan default dari resep; harga hanya ada kalau pemanggil Owner. */
+  const loadPackaging = async () => {
+    if (!order.order_number) return;
+    setPackagingLoading(true);
+    setPackagingPreview(null);
+    setPackagingWarning(false);
+    try {
+      const data = await base44.entities.Transaction.packaging(order.order_number);
+      setPackagingPreview(data);
+      setUseCover(Boolean(data?.use_cover_hanger));
+      setPackagingQty(
+        Object.fromEntries(
+          (data?.items || []).map((item) => [item.component_id, String(item.qty)]),
+        ),
+      );
+    } catch {
+      setPackagingPreview(null);
+    } finally {
+      setPackagingLoading(false);
+    }
+  };
+
+  const getPackagingPayload = () => {
+    if (!packagingPreview || packagingPreview.already_packaged) return undefined;
+    return {
+      use_cover_hanger: useCover,
+      items: (packagingPreview.items || [])
+        .filter((item) => useCover || item.kind !== "cover_hanger")
+        .map((item) => ({
+          component_id: item.component_id,
+          qty: Number(packagingQty[item.component_id] ?? item.qty),
+        }))
+        .filter((item) => Number.isFinite(item.qty) && item.qty > 0),
+    };
+  };
+
+  useEffect(() => {
+    if (!manualFormOpen) return;
+    loadPackaging();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manualFormOpen, order.order_number]);
+
   /** Langkah 1: pra-cek baca-saja (server memeriksa alamat, nomor, kode area J&T, berat). */
   const openResiConfirm = async () => {
     if (resiLock.current || resiChecking) return;
@@ -114,6 +162,7 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
     // Selalu mulai dari belum dicentang — pengaman dari klik tak sengaja.
     setSiapKirim(false);
     setResiCheck(null);
+    void loadPackaging();
     try {
       const result = await base44.entities.Resi.check(order.order_number);
       setResiCheck(result);
@@ -139,8 +188,9 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
     setResiBusy(true);
     setResiError("");
     try {
-      const result = await base44.entities.Transaction.createResi(order.order_number);
+      const result = await base44.entities.Transaction.createResi(order.order_number, getPackagingPayload());
       const awbNo = result?.awbNo || "";
+      setPackagingWarning(Boolean(result?.packagingWarning));
       setCreatedAwb(awbNo);
       setResiBusy(false);
       setResiCheck(null);
@@ -207,8 +257,10 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
         order.order_number,
         resi,
         manualShipped === "sudah",
+        getPackagingPayload(),
       );
       const awbNo = result?.awbNo || resi;
+      setPackagingWarning(Boolean(result?.packagingWarning));
       setCreatedAwb(awbNo);
       setManualOpen(false);
       onResiCreated?.({
@@ -246,6 +298,86 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
   const inputClass =
     "mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold text-slate-900 dark:text-white focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none disabled:opacity-60";
 
+  const packagingForm = (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          Paket kemasan
+        </p>
+        {packagingPreview?.already_packaged ? (
+          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+            Sudah dikemas
+          </span>
+        ) : null}
+      </div>
+
+      {packagingLoading ? (
+        <p className="mt-2 text-[11px] font-semibold text-slate-400">Memuat paket kemasan…</p>
+      ) : !packagingPreview ? (
+        <p className="mt-2 text-[11px] font-semibold text-slate-400">
+          Paket default akan dihitung server saat resi dibuat.
+        </p>
+      ) : (packagingPreview.items || []).length === 0 ? (
+        <p className="mt-2 text-[11px] font-semibold text-slate-400">
+          Tidak ada komponen kemasan di resep kategori ini.
+        </p>
+      ) : (
+        <>
+          {packagingPreview.has_cover_hanger && !packagingPreview.already_packaged ? (
+            <label className="mt-2 flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-2 dark:bg-slate-800/60">
+              <input
+                type="checkbox"
+                checked={useCover}
+                onChange={(event) => setUseCover(event.target.checked)}
+                className="h-4 w-4 accent-slate-900 dark:accent-white"
+              />
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                Pakai Cover &amp; Hanger
+              </span>
+            </label>
+          ) : null}
+
+          <div className="mt-2 space-y-1.5">
+            {(packagingPreview.items || [])
+              .filter((item) => useCover || item.kind !== "cover_hanger")
+              .map((item) => {
+                const qty = Number(packagingQty[item.component_id] ?? item.qty) || 0;
+                const shortage = item.stock != null && qty > Number(item.stock);
+                return (
+                  <div key={item.component_id} className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                        {item.component_name}
+                      </p>
+                      <p className={`text-[9.5px] font-semibold ${shortage ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`}>
+                        {item.stock != null ? `stok ${item.stock} ${item.unit_use || ""}` : item.unit_use || ""}
+                        {shortage ? " · akan minus" : ""}
+                        {item.real_price != null ? ` · Rp ${formatRupiah(item.real_price)}` : ""}
+                      </p>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      value={packagingQty[item.component_id] ?? item.qty}
+                      onChange={(event) =>
+                        setPackagingQty((current) => ({
+                          ...current,
+                          [item.component_id]: event.target.value,
+                        }))
+                      }
+                      disabled={packagingPreview.already_packaged}
+                      className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-right text-xs font-bold text-slate-800 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+                );
+              })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   const manualForm = (
     <div className="space-y-2.5">
       <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -278,6 +410,7 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
           <option value="sudah">Sudah dikirim</option>
         </select>
       </label>
+      {packagingForm}
       {manualError ? <p className="text-xs font-semibold text-red-600 dark:text-red-400">{manualError}</p> : null}
       <div className="flex gap-2">
         {awb ? (
@@ -307,6 +440,12 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
 
   return (
     <>
+      {packagingWarning ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-200">
+          Stok komponen kemasan ada yang minus. Cek stok di menu Produksi.
+        </div>
+      ) : null}
+
       {awb ? (
         <>
           <div className="flex items-center justify-between gap-2">
@@ -497,6 +636,8 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
                   <p className="text-sm font-bold text-slate-900 dark:text-white">{formatWeightExact(resiCheck.weight_grams)}</p>
                 </div>
               </div>
+
+              <div className="mt-3">{packagingForm}</div>
 
               <ul className="mt-3 space-y-1.5">
                 {(resiCheck.checks || []).map((check) => (

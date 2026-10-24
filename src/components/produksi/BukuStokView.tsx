@@ -207,7 +207,7 @@ export default function BukuStokView() {
             {Object.entries(MOVEMENT_TYPES)
               .filter(([key]) => [
                 "stok_awal", "pembelian", "opname", "rusak_hilang", "penyesuaian",
-                "keluar_produksi", "retur_sisa_bahan",
+                "keluar_produksi", "retur_sisa_bahan", "keluar_packaging", "retur_packaging",
               ].includes(key))
               .map(([key, meta]) => (
                 <option key={key} value={key}>{meta.label}</option>

@@ -679,7 +679,10 @@ export default function KomponenView() {
                     <FilterSelect value={movementType} onChange={setMovementType} ariaLabel="Filter jenis pergerakan" minWidthClass="sm:min-w-[150px]">
                       <option value="">Semua jenis</option>
                       {Object.entries(MOVEMENT_TYPES)
-                        .filter(([key]) => ["stok_awal", "pembelian", "opname", "rusak_hilang", "penyesuaian"].includes(key))
+                        .filter(([key]) => [
+                          "stok_awal", "pembelian", "opname", "rusak_hilang", "penyesuaian",
+                          "keluar_produksi", "retur_sisa_bahan", "keluar_packaging", "retur_packaging",
+                        ].includes(key))
                         .map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
                     </FilterSelect>
                     <FilterDateRange start={movementStart} end={movementEnd} onStart={setMovementStart} onEnd={setMovementEnd} />

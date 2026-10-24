@@ -4,8 +4,8 @@
  * Detail transaksi (panel samping) untuk menu Transaksi.
  *
  * Isinya sengaja hanya data yang benar-benar tercatat: info pelanggan, daftar item,
- * ongkir/diskon, total, sumber, status, dan waktu dicatat. HPP/keuntungan TIDAK
- * ditampilkan (datanya belum ada).
+ * ongkir/diskon, total, sumber, status, dan waktu dicatat. Snapshot HPP hanya
+ * ditampilkan kalau server mengirimkannya (Owner).
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -309,6 +309,9 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                     <span style={{ color: "var(--panel-accent, #c2255c)" }}>Rp {formatRupiah(order.total)}</span>
                   </div>
                 </div>
+
+                <PackagingWarning warning={order.packaging_warning} />
+                <HppBlock order={order} />
 
                 <div className="sec2">
                   <div className="sh">
@@ -670,6 +673,9 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                   </span>
                 </div>
               </div>
+
+              <PackagingWarning warning={order.packaging_warning} />
+              <HppBlock order={order} />
             </div>
 
             {(order.can_edit || order.can_cancel) && (
@@ -696,6 +702,82 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
         </>
       )}
     </AnimatePresence>
+  );
+}
+
+function PackagingWarning({ warning }) {
+  if (!warning) return null;
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-semibold text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-200">
+      Stok komponen kemasan sempat kurang saat pesanan dikemas. Cek stok komponen di menu Produksi.
+    </div>
+  );
+}
+
+function HppBlock({ order }) {
+  if (!order?.hpp_visible) return null;
+  const hpp = order.hpp;
+  const sourceLabel = { aktual: "aktual", standar: "standar", none: "belum ada" };
+
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-800 p-3.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">HPP Pesanan</p>
+        {hpp?.packaging_status === "belum" ? (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+            Belum dikemas
+          </span>
+        ) : null}
+      </div>
+
+      {!hpp ? (
+        <p className="mt-2 text-xs font-semibold text-slate-400">Belum ada HPP (transaksi lama).</p>
+      ) : (
+        <>
+          <div className="mt-2 space-y-1.5">
+            {(hpp.items || []).map((item, index) => (
+              <div key={`${item.product_id}-${item.color}-${item.size}-${index}`} className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-[11px] font-bold text-slate-800 dark:text-slate-100">
+                    {item.product_name}
+                  </p>
+                  <p className="text-[9.5px] text-slate-400">
+                    {item.color && item.color !== "default" ? `${item.color} · ` : ""}{item.size} × {item.quantity}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100 tabular-nums">
+                    {item.hpp_unit == null ? "-" : `Rp ${formatRupiah(item.hpp_unit)}`}
+                  </p>
+                  <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                    {sourceLabel[item.source] || item.source || "-"}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {(hpp.items || []).length === 0 ? (
+              <p className="text-xs font-semibold text-slate-400">Belum ada HPP per item.</p>
+            ) : null}
+          </div>
+
+          <div className="mt-3 space-y-1 border-t border-slate-100 pt-2 dark:border-slate-800">
+            <div className="flex justify-between text-[11px]">
+              <span className="text-slate-500">HPP barang</span>
+              <b className="text-slate-800 dark:text-slate-100 tabular-nums">Rp {formatRupiah(hpp.hpp_goods)}</b>
+            </div>
+            <div className="flex justify-between text-[11px]">
+              <span className="text-slate-500">Biaya kemasan</span>
+              <b className="text-slate-800 dark:text-slate-100 tabular-nums">Rp {formatRupiah(hpp.packaging_cost)}</b>
+            </div>
+            <div className="flex justify-between text-xs border-t border-slate-100 pt-1 dark:border-slate-800">
+              <span className="font-bold text-slate-700 dark:text-slate-200">Total HPP</span>
+              <b className="font-black text-slate-900 dark:text-white tabular-nums">Rp {formatRupiah(hpp.total_hpp)}</b>
+            </div>
+            <p className="text-[9px] text-slate-400">Ongkir tidak termasuk HPP.</p>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

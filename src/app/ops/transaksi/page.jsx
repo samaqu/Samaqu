@@ -99,6 +99,9 @@ export default function Transaksi({ variant = "ops" }) {
 
   const markedDates = useMemo(() => [...new Set(orders.map((o) => o.date_wib).filter(Boolean))], [orders]);
 
+  // Kolom HPP hanya dirender kalau server mengirim data HPP (Owner).
+  const hppVisible = orders.some((order) => order.hpp_visible);
+
   const filtersActive =
     Boolean(search) ||
     sourceFilter !== "all" ||
@@ -434,13 +437,14 @@ export default function Transaksi({ variant = "ops" }) {
             <table>
               {/* Lebar kolom dipatok di sini (`table-layout: fixed`) supaya semua tab tampil sama. */}
               <colgroup>
-                <col style={{ width: "16%" }} />
-                <col style={{ width: "20%" }} />
-                <col style={{ width: "24%" }} />
-                <col style={{ width: "11%" }} />
-                <col style={{ width: "13%" }} />
-                <col style={{ width: "12%" }} />
-                <col style={{ width: "4%" }} />
+                <col style={{ width: hppVisible ? "15%" : "16%" }} />
+                <col style={{ width: hppVisible ? "18%" : "20%" }} />
+                <col style={{ width: hppVisible ? "21%" : "24%" }} />
+                <col style={{ width: hppVisible ? "9%" : "11%" }} />
+                {hppVisible ? <col style={{ width: "11%" }} /> : null}
+                <col style={{ width: hppVisible ? "11%" : "13%" }} />
+                <col style={{ width: hppVisible ? "10%" : "12%" }} />
+                <col style={{ width: hppVisible ? "5%" : "4%" }} />
               </colgroup>
               <thead>
                 <tr>
@@ -448,6 +452,7 @@ export default function Transaksi({ variant = "ops" }) {
                   <th>Pelanggan</th>
                   <th>Produk</th>
                   <th style={{ textAlign: "right" }}>Total</th>
+                  {hppVisible ? <th style={{ textAlign: "right" }}>HPP</th> : null}
                   <th>No. Resi</th>
                   <th>Status</th>
                   <th className="chev" />
@@ -483,6 +488,14 @@ export default function Transaksi({ variant = "ops" }) {
                           {SOURCE_STYLES[order.source_key]?.label || order.source_label}
                         </small>
                       </td>
+                      {hppVisible ? (
+                        <td className="mono" style={{ textAlign: "right" }} data-label="HPP">
+                          {order.hpp ? `Rp ${formatRupiah(order.hpp.total_hpp)}` : "-"}
+                          {order.hpp?.packaging_status === "belum" ? (
+                            <small style={{ textAlign: "right" }}>belum dikemas</small>
+                          ) : null}
+                        </td>
+                      ) : null}
                       <td data-label="No. Resi">
                         {order.awb_no ? (
                           <span

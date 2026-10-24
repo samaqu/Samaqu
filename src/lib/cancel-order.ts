@@ -113,6 +113,20 @@ export async function cancelOrderCompletely(
     }
   }
 
+  // Packaging hanya dikembalikan kalau pesanan belum dikirim. Setelah dikirim,
+  // kemasan dianggap sudah terpakai dan tidak ada retur otomatis.
+  if (order.status !== "dikirim" && order.status !== "selesai") {
+    try {
+      await supabase.rpc("production_return_order_packaging", {
+        p_order_id: order.id,
+        p_reason: remark,
+        p_actor: "cancel-order",
+      });
+    } catch (e) {
+      console.error("[CANCEL] Gagal retur packaging:", order.order_number, e);
+    }
+  }
+
   // Tabel `orders` tidak punya trigger yang mengisi jam pembatalan, jadi jamnya ditulis sendiri:
   // linimasa "Pesanan dibatalkan" (strukSteps) membacanya. Dua kolom ditulis — `cancelled_at`
   // (jam batal yang sebenarnya, akurat) dan `updated_at` (dipakai baris lama, lihat `waktuBatal`

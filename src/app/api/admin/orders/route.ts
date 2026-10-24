@@ -7,8 +7,9 @@ import { cancelOrderCompletely } from "@/lib/cancel-order";
 import { notifyCustomerOrderPaid, notifyCustomerOrderShipped } from "@/lib/fonnte";
 import { claimOrderNotification, recordShippedNotifyStatus, sendOnce } from "@/lib/order-notify";
 import { isCodOrderPayment } from "@/lib/payment-methods";
-import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
+import { isOpsAdmin, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { syncCommissionStatus } from "@/lib/affiliate/commission";
+import { computeOrderPackaging, packagingItemsForRpc } from "@/lib/produksi-order-hpp";
 
 /**
  * Notifikasi "pesanan dikirim" untuk resi yang disimpan manual (HBO) — memakai klaim atomik
@@ -52,10 +53,41 @@ async function syncCommissionStatusSafe(
   }
 }
 
+async function packOrderForResi(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  orderId: string,
+  packaging: any,
+  actor: string,
+) {
+  const computed = await computeOrderPackaging(
+    admin,
+    orderId,
+    packaging?.use_cover_hanger == null ? null : Boolean(packaging.use_cover_hanger),
+  );
+  const items = packagingItemsForRpc(computed.items, packaging?.items);
+  if (items.length === 0) return { packed: false, warning: false };
+
+  const { data, error } = await admin.rpc("production_pack_order", {
+    p_order_id: orderId,
+    p_items: items,
+    p_use_cover_hanger: computed.use_cover_hanger,
+    p_request_id: `pack:${orderId}`,
+    p_actor: actor,
+  });
+  if (error) throw new Error(error.message);
+
+  return {
+    packed: !Boolean(data?.already),
+    warning: Boolean(data?.warning),
+  };
+}
+
 export async function PATCH(request: NextRequest) {
   if (!(await isOpsAdmin(request))) return unauthorized();
   try {
-    const { orderId, orderNumber, status, action, awbNo, shipped } = await request.json();
+    const { orderId, orderNumber, status, action, awbNo, shipped, packaging } = await request.json();
+    const identity = await opsIdentity(request);
+    const actor = identity?.email || "admin";
     const identifier = orderNumber || orderId;
     console.log("[ADMIN] PATCH request:", { identifier, status, action });
 
@@ -120,6 +152,17 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: "Pesanan sudah dibatalkan, resi tidak bisa dibuat." }, { status: 400 });
       }
 
+      let packResult: { packed: boolean; warning: boolean } = { packed: false, warning: false };
+      try {
+        packResult = await packOrderForResi(supabaseAdmin, order.id, packaging, actor);
+      } catch (packError) {
+        console.error("[ADMIN] packaging gagal:", identifier, packError);
+        return NextResponse.json(
+          { error: `Gagal mencatat paket kemasan: ${packError instanceof Error ? packError.message : "unknown"}` },
+          { status: 400 },
+        );
+      }
+
       const result = await createJntOrderForOrder({
         order_number: order.order_number,
         customer_name: order.customer_name,
@@ -139,6 +182,13 @@ export async function PATCH(request: NextRequest) {
       });
 
       if (!result.success || !result.awbNo) {
+        if (packResult.packed) {
+          await supabaseAdmin.rpc("production_return_order_packaging", {
+            p_order_id: order.id,
+            p_reason: "Resi J&T gagal dibuat",
+            p_actor: actor,
+          });
+        }
         console.error("[ADMIN] J&T order create failed:", identifier, result.error);
         return NextResponse.json({ error: `Gagal membuat resi J&T: ${result.error}` }, { status: 400 });
       }
@@ -163,6 +213,13 @@ export async function PATCH(request: NextRequest) {
         .eq("id", order.id);
 
       if (updateError) {
+        if (packResult.packed) {
+          await supabaseAdmin.rpc("production_return_order_packaging", {
+            p_order_id: order.id,
+            p_reason: "Gagal menyimpan resi J&T",
+            p_actor: actor,
+          });
+        }
         console.error("[ADMIN] Failed to save J&T AWB:", updateError);
         return NextResponse.json({ error: "Resi J&T terbit tapi gagal disimpan. Coba lagi." }, { status: 500 });
       }
@@ -174,6 +231,7 @@ export async function PATCH(request: NextRequest) {
         status: "diproses",
         shippingStatus: "menunggu_pickup",
         serviceCode: result.serviceCode,
+        packagingWarning: packResult.warning,
       });
     }
 
@@ -231,6 +289,17 @@ export async function PATCH(request: NextRequest) {
           ? order.shipping_status || "dikirim"
           : "menunggu_pickup";
 
+      let packResult: { packed: boolean; warning: boolean } = { packed: false, warning: false };
+      try {
+        packResult = await packOrderForResi(supabaseAdmin, order.id, packaging, actor);
+      } catch (packError) {
+        console.error("[ADMIN] packaging manual gagal:", identifier, packError);
+        return NextResponse.json(
+          { error: `Gagal mencatat paket kemasan: ${packError instanceof Error ? packError.message : "unknown"}` },
+          { status: 400 },
+        );
+      }
+
       const { error: updateError } = await supabaseAdmin
         .from("orders")
         .update({
@@ -243,6 +312,13 @@ export async function PATCH(request: NextRequest) {
         .eq("id", order.id);
 
       if (updateError) {
+        if (packResult.packed) {
+          await supabaseAdmin.rpc("production_return_order_packaging", {
+            p_order_id: order.id,
+            p_reason: "Gagal menyimpan resi manual",
+            p_actor: actor,
+          });
+        }
         console.error("[ADMIN] Gagal simpan resi manual HBO:", identifier, updateError);
         return NextResponse.json({ error: "Gagal menyimpan nomor resi. Coba lagi." }, { status: 500 });
       }
@@ -266,6 +342,7 @@ export async function PATCH(request: NextRequest) {
         status: nextStatus,
         shippingStatus: nextShip,
         serviceCode: "HBO",
+        packagingWarning: packResult.warning,
       });
     }
 

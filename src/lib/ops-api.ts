@@ -249,12 +249,17 @@ export const base44 = {
        * Kontrak responsnya dipertahankan: sukses `{ success, awbNo, status, shippingStatus }`,
        * gagal melempar Error dengan pesan server apa adanya.
        */
-      async createResi(orderNumber: string) {
-        return call<{ success: boolean; awbNo: string; status: string; shippingStatus: string; serviceCode?: string }>(
+      async createResi(orderNumber: string, packaging?: any) {
+        return call<{ success: boolean; awbNo: string; status: string; shippingStatus: string; serviceCode?: string; packagingWarning?: boolean }>(
           "PATCH",
           ADMIN_ORDERS,
-          { orderNumber, action: "createJnt" },
+          { orderNumber, action: "createJnt", packaging },
         );
+      },
+
+      /** Paket kemasan default/sudah tersimpan untuk satu pesanan. */
+      async packaging(orderNumber: string) {
+        return call<any>("GET", `/api/ops/orders/${encodeURIComponent(orderNumber)}/packaging`);
       },
 
       /**
@@ -262,11 +267,11 @@ export const base44 = {
        * dikirim (status langsung `dikirim` + notifikasi), false = resi dibuat, menunggu pickup.
        * Memakai route admin yang sama: `PATCH /api/admin/orders { action: "manualResi" }`.
        */
-      async createManualResi(orderNumber: string, awbNo: string, shipped: boolean) {
-        return call<{ success: boolean; awbNo: string; status: string; shippingStatus: string; serviceCode?: string }>(
+      async createManualResi(orderNumber: string, awbNo: string, shipped: boolean, packaging?: any) {
+        return call<{ success: boolean; awbNo: string; status: string; shippingStatus: string; serviceCode?: string; packagingWarning?: boolean }>(
           "PATCH",
           ADMIN_ORDERS,
-          { orderNumber, action: "manualResi", awbNo, shipped },
+          { orderNumber, action: "manualResi", awbNo, shipped, packaging },
         );
       },
 
