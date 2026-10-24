@@ -102,6 +102,8 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
   const isHbo = jntServiceCodeFromShippingMethod(order.shipping_method) === "HBO";
   /** Pesanan sudah diterima: resi final, opsi ganti/input resi manual ditutup. */
   const resiFinal = cancelled || order.status === "selesai" || shippingStatus === "selesai";
+  /** Status Dikirim: link resi manual memakai teks "Ubah nomor resi". */
+  const isDikirim = order.status === "dikirim" || shippingStatus === "dikirim";
   const manualFormOpen = !resiFinal && (manualOpen || (isHbo && !awb));
   const bisaTandaiDikirim =
     !!awb &&
@@ -504,7 +506,7 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
                 }}
                 className="w-full text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 transition-colors"
               >
-                {isHbo ? "Ubah nomor resi" : "Ganti ke resi HBO (input manual)"}
+                {isHbo || isDikirim ? "Ubah nomor resi" : "Ganti ke resi HBO (input manual)"}
               </button>
             )
           ) : null}

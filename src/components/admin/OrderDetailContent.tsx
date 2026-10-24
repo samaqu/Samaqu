@@ -425,6 +425,8 @@ export default function OrderDetailContent({
   const shipped = SHIPPED_STATES.includes(shippingStatusOf(order) || "") || SHIPPED_STATES.includes(order.status);
   /** Paket sudah diterima: resi final, form input/ubah resi HBO tidak boleh muncul lagi. */
   const delivered = order.status === "selesai" || shippingStatusOf(order) === "selesai";
+  /** Status Dikirim: kontrol resi HBO tampil sebagai link kecil, form baru muncul setelah diklik. */
+  const isDikirim = order.status === "dikirim" || shippingStatusOf(order) === "dikirim";
 
   // ── Resi HBO ── dibuat admin langsung di J&T VIP (di luar sistem), jadi nomor resinya
   // diinput manual di sini. Alur statusnya sama dengan resi EZ/ECO: resi tersimpan → menunggu
@@ -652,7 +654,7 @@ export default function OrderDetailContent({
               ) : null}
 
               {/* Resi HBO — pesanan dibuat admin di J&T VIP, resinya diinput manual di sini. */}
-              {order.status !== "dibatalkan" && !delivered && (isHbo || manualFormOpen) ? (
+              {order.status !== "dibatalkan" && !delivered && (manualOpen || (isHbo && !isDikirim)) ? (
                 <div className="od-manual">
                   <p className="od-title">Resi J&amp;T HBO</p>
                   <p className="od-hint">Pesanan HBO dibuat manual di J&amp;T VIP, masukkan nomor resi di sini.</p>
@@ -764,6 +766,22 @@ export default function OrderDetailContent({
                   }}
                 >
                   Input resi manual (HBO)
+                </button>
+              ) : null}
+
+              {/* Status Dikirim: link kecil, bukan form terbuka. Alur simpan resi tetap sama. */}
+              {isDikirim && !manualOpen && !delivered ? (
+                <button
+                  type="button"
+                  className="od-link"
+                  onClick={() => {
+                    setManualOpen(true);
+                    setManualAwb(resi);
+                    setManualError("");
+                    setManualShipped("sudah");
+                  }}
+                >
+                  Ubah nomor resi
                 </button>
               ) : null}
               {!manualFormOpen && manualError ? <p className="od-error">{manualError}</p> : null}
