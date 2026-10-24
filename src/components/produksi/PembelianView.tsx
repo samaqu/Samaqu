@@ -89,6 +89,11 @@ export default function PembelianView() {
   const [rows, setRows] = useState([emptyRow()]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Purchase | null>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -210,6 +215,31 @@ export default function PembelianView() {
     }
   }
 
+  async function hapusPembelian() {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const json = await produksiFetch<{ result: { purchase_number: string } }>(
+        `/api/ops/production/purchases/${deleteTarget.id}`,
+        {
+          method: "DELETE",
+          body: JSON.stringify({ reason: deleteReason }),
+        },
+      );
+      const number = json?.result?.purchase_number || deleteTarget.purchase_number;
+      setDeleteTarget(null);
+      setDetail(null);
+      setDeleteReason("");
+      setNotice(`Pembelian ${number} dihapus. Stok, Harga Real, dan harga beli terakhir sudah dihitung ulang.`);
+      await load();
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Gagal menghapus pembelian.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <AccessGate access={access} ownerOnly>
       <div className="space-y-4">
@@ -224,6 +254,20 @@ export default function PembelianView() {
         />
 
         <ErrorBox message={error} />
+
+        {notice ? (
+          <div className="flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-200">
+            <span>{notice}</span>
+            <button
+              type="button"
+              onClick={() => setNotice("")}
+              className="rounded-lg p-0.5 text-emerald-600 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
+              aria-label="Tutup pemberitahuan"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatCard label="Pembelian tercatat" value={String(items.length)} hint="Sesuai filter" />
@@ -341,7 +385,21 @@ export default function PembelianView() {
           title="Detail Pembelian"
           subtitle={detail ? `${detail.purchase_number} · ${formatDate(detail.purchase_date)}` : ""}
           footer={
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-2">
+              {detail && access.canWrite ? (
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-red-700"
+                  onClick={() => {
+                    setDeleteTarget(detail);
+                    setDeleteReason("");
+                    setDeleteError("");
+                    setDetail(null);
+                  }}
+                >
+                  <Trash2 size={15} /> Hapus Pembelian
+                </button>
+              ) : <span />}
               <button className={btnPrimary} onClick={() => setDetail(null)}>Tutup</button>
             </div>
           }
@@ -414,6 +472,102 @@ export default function PembelianView() {
                   ))}
                 </div>
               </div>
+            </div>
+          ) : null}
+        </Drawer>
+
+        <Drawer
+          open={Boolean(deleteTarget)}
+          onClose={() => {
+            if (deleting) return;
+            setDeleteTarget(null);
+            setDeleteError("");
+          }}
+          title="Hapus Pembelian"
+          subtitle={
+            deleteTarget
+              ? `${deleteTarget.purchase_number} · ${formatDate(deleteTarget.purchase_date)} · Rp ${formatRupiah(deleteTarget.total_value)}`
+              : ""
+          }
+          footer={
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                className={btnSecondary}
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setDeleteError("");
+                }}
+                disabled={deleting}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={hapusPembelian}
+                disabled={deleting}
+              >
+                {deleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                {deleting ? "Menghapus…" : "Hapus Permanen"}
+              </button>
+            </div>
+          }
+        >
+          {deleteTarget ? (
+            <div className="space-y-4">
+              <ErrorBox message={deleteError} />
+
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/40 dark:bg-red-900/20">
+                <p className="text-sm font-bold text-red-800 dark:text-red-200">Semua efek pembelian akan ditarik</p>
+                <p className="mt-1 text-xs leading-relaxed text-red-700 dark:text-red-200/80">
+                  Stok masuk, rincian, dan header pembelian dihapus. Harga Real serta harga beli terakhir komponen
+                  dihitung ulang. Tindakan ini tidak bisa dibatalkan.
+                </p>
+              </div>
+
+              <div className={`${cardClass} p-4`}>
+                <div className="grid grid-cols-2 gap-3">
+                  <DetailField label="Supplier" value={deleteTarget.supplier || "Tanpa supplier"} />
+                  <DetailField label="Jumlah item" value={`${deleteTarget.items.length} baris`} />
+                  <DetailField label="Nilai barang" value={`Rp ${formatRupiah(deleteTarget.items_value)}`} />
+                  <DetailField label="Ongkir" value={`Rp ${formatRupiah(deleteTarget.additional_cost)}`} />
+                </div>
+              </div>
+
+              <div className={`${cardClass} overflow-hidden`}>
+                <div className="border-b border-slate-100 px-4 py-2.5 dark:border-slate-800">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Stok yang ditarik</p>
+                </div>
+                <div className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                  {deleteTarget.items.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-mono text-slate-400">{item.component_code}</p>
+                        <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">{item.component_name}</p>
+                      </div>
+                      <p className="shrink-0 text-xs font-bold text-slate-700 dark:text-slate-200 tabular-nums">
+                        −{formatQty(item.qty_use)} {item.unit_use || "satuan pakai"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className={labelClass}>Alasan hapus (opsional)</label>
+                <input
+                  className={inputClass}
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  placeholder="Misalnya: salah input supplier / qty"
+                />
+              </div>
+
+              <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                Kalau stok dari pembelian ini sudah terpakai, hapus akan ditolak. Koreksi stok lewat Stok Opname
+                terlebih dahulu, lalu coba hapus lagi.
+              </p>
             </div>
           ) : null}
         </Drawer>
