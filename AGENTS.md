@@ -1454,9 +1454,30 @@ lihat butir terakhir di bagian ini.
   `Rata-rata Rp 383.580 · -26,1% ▼ dari Sep` · `Belum Bayar 7`; nama kartu & caption tidak
   terpotong di 4 kolom desktop maupun tablet 867 px; tren terbaca tepat di bawah nilai; tanpa
   scroll samping & 0 error console.
-- **Tren naik/turun** (`TrendDelta`, dulu `TrendChip`) = pembanding bulan sebelumnya, mengikuti
-  contoh desain: persen **bertanda** + panah (naik hijau `#047857`, turun merah `#dc2626`), lalu
-  `dari <bulan>` kecil abu — mis. `+615,8% ▲ dari Sep` (Oktober 2026). **Tanpa latar chip** lagi.
+- **Keterangan tiga kartu + animasi counter (2026-10-24, permintaan pemilik).** `Pendapatan` kini
+  berketerangan **"126 transaksi berhasil"** (angkanya dinamis, `saleCount(orders)` — basis "tanpa
+  ongkir" tinggal di tooltip kartu + subjudul grafik), `Pesanan Masuk` **"Di luar batal & belum
+  bayar"**, `Rata-rata Pesanan` **"Rata-rata nilai pesanan"** (dulu `per transaksi diakui`;
+  `SALE_COUNT_NOTE` karena itu tidak lagi diimpor di `DashboardView.tsx`), sedangkan kartu
+  **`Belum Bayar` tidak diubah** ("menunggu pembayaran"). Ketiganya ≤ 27 karakter dan **tidak
+  terpotong** di 4 kolom (1280 px: `scrollWidth == clientWidth` = 163 px). Angka kartu bukan lagi
+  string jadi: `Metric` membawa **`num` + `format`**, dirender **`CountUp`**
+  (`src/components/admin/CountUp.tsx`, requestAnimationFrame ~700 ms ease-out;
+  `prefers-reduced-motion: reduce` → langsung angka akhir) supaya nilai kartu "dihitung naik" saat
+  kartu muncul / nilainya berubah — berlaku ke **keempat** kartu (termasuk `Belum Bayar`, hanya
+  keterangannya yang tidak disentuh), dan nilai besar memakai `tabular-nums` supaya lebarnya tidak
+  melompat. Kartu tanpa transaksi tetap menampilkan "—", bukan Rp 0.
+  Verifikasi (2026-10-24, `/admin` dimuat di iframe same-origin): counter terbaca berubah frame demi
+  frame (`Rp 0` → `Rp 4.162.119` → … → `Rp 48.331.123`, 18 nilai berbeda) lalu berhenti tepat di
+  angka aslinya; keempat caption utuh; badge `▲ 615,8% dari Sep` (hijau `rgb(22,163,74)`) ·
+  `▲ 869,2% dari Sep` · `▼ 26,1% dari Sep` (merah `rgb(220,38,38)`) dengan latar transparan 11 px;
+  batang grafik `rgb(17,17,17)` hanya di Okt, 5 lain `rgb(217,217,217)`; 0 error console.
+- **Tren naik/turun** (`TrendDelta`, dulu `TrendChip`) = pembanding bulan sebelumnya: panah + persen
+  lalu `dari <bulan>` kecil abu — mis. `▲ 615,8% dari Sep` (Oktober 2026). **Tanpa latar chip.**
+  **Revisi 2026-10-24 (pemilik: badge tren "kurang clean dan terlalu mencolok")**: gayanya
+  diperkecil jadi panah 9 px + persen 11 px `font-semibold tabular-nums` (naik hijau `#16a34a`,
+  turun merah `#dc2626`) **tanpa tanda `+`/`-`** — arah dibaca dari panah + warna; jarak `gap-0.5`,
+  `dari <bulan>` 10 px abu. Jangan kembalikan `font-black` 12 px bertanda + warna tua `#047857`.
   Bulan lalu tanpa data (prev = 0) → **disembunyikan**, bukan dibagi nol/dikarang. Nilai pembanding
   dihitung dari jendela grafik 6 bulan (`chartOrders`), bukan query tambahan. Komponen yang sama
   dipakai untuk tren di header grafik "Pendapatan Bulanan".
@@ -1477,10 +1498,12 @@ lihat butir terakhir di bagian ini.
 - **Grafik "Pendapatan Bulanan" jadi BATANG naik-turun** (`src/components/admin/MonthlyTrendChart.tsx`;
   kurva/area SVG lama diganti HTML-CSS 2026-10-24 mengikuti contoh desain pemilik, tetap **tanpa
   dependency chart baru**): 6 batang Mei–Okt berujung membulat, **batang bulan PERIODE TERPILIH
-  selalu hijau tua `#00a36c`** (batang "bulan aktif"; bulan lain hijau muda `#cdeee0`, batang yang
-  disorot lebih tua `#7fd3b1`), grid 5 garis + sumbu Y ringkas (`20jt`/`800rb`), label bulan di
+  selalu HITAM `#111111`** (batang "bulan aktif"; bulan lain abu muda `#d9d9d9`, batang yang
+  disorot abu `#6b6b6b`) — **revisi 2026-10-24 (pemilik: "grafik nya warna hitam broo")**: batangnya
+  monokrom, hijau `#00a36c`/`#7fd3b1`/`#cdeee0` sudah tidak dipakai (lihat konstanta
+  `BAR_ACTIVE`/`BAR_HOVER`/`BAR_REST`); grid 5 garis + sumbu Y ringkas (`20jt`/`800rb`), label bulan di
   bawah tiap batang. Bulan beromzet Rp 0 tidak digambar (batangnya memang nol), bukan dihilangkan
-  dari label. **Tooltip melayang** — kartu putih ber-shadow berisi titik hijau + `Pendapatan · <bulan>`
+  dari label. **Tooltip melayang** — kartu putih ber-shadow berisi titik hitam + `Pendapatan · <bulan>`
   + nominal tebal + `N pesanan` — menempel di batang bulan terpilih saat tidak ada mouse (dulu
   nilainya hanya teks di titik tertinggi), dan ikut pindah ke batang yang disorot. Judulnya tetap
   bersubjudul "6 bulan terakhir · hanya harga produk (tanpa ongkir)" + tren.

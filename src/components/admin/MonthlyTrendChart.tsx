@@ -9,8 +9,8 @@
  * bulan (dihitung `DashboardView`), tidak ada angka contoh.
  *
  * Detail yang disengaja:
- *  - batang bulan PERIODE TERPILIH (bulan terakhir jendela 6 bulan) selalu hijau tua — "bulan aktif";
- *    bulan lain hijau muda, dan batang yang disorot mouse jadi lebih tua;
+ *  - batang bulan PERIODE TERPILIH (bulan terakhir jendela 6 bulan) selalu hitam — "bulan aktif";
+ *    bulan lain abu muda, dan batang yang disorot mouse jadi abu lebih tua;
  *  - tooltip melayang (kartu putih: titik + label + nominal + jumlah pesanan). Tanpa mouse, tooltip
  *    menempel di batang bulan terpilih, jadi nominal bulan itu tetap terbaca;
  *  - sumbu Y ringkas (`20jt`/`800rb`) dengan 4 langkah, label bulan di bawah tiap batang.
@@ -46,10 +46,11 @@ function niceTop(rawMax: number, ticks = 4): number {
   return nf * pow * ticks;
 }
 
-/* Warna batang: bulan terpilih hijau tua, bulan lain hijau muda, yang disorot lebih tua. */
-const BAR_ACTIVE = "#00a36c";
-const BAR_HOVER = "#7fd3b1";
-const BAR_REST = "#cdeee0";
+/* Warna batang MONOKROM (permintaan pemilik 2026-10-24: "grafik nya warna hitam"): batang bulan
+   PERIODE TERPILIH hitam, bulan lain abu muda, yang disorot mouse abu lebih tua. */
+const BAR_ACTIVE = "#111111";
+const BAR_HOVER = "#6b6b6b";
+const BAR_REST = "#d9d9d9";
 
 export default function MonthlyTrendChart({ data }: { data: MonthlyTrendPoint[] }) {
   const [hover, setHover] = useState<number | null>(null);

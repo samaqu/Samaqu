@@ -24,10 +24,13 @@
 
 import { orderStage, ORDER_STAGE_LABEL } from "@/lib/order-flow";
 import { monthKeyWIB, monthShift, monthShortID } from "@/lib/month-period";
-import { SALE_COUNT_NOTE, SALE_STATUSES, orderRevenue, saleCount } from "@/lib/transaksi";
+import { SALE_STATUSES, orderRevenue, saleCount } from "@/lib/transaksi";
 import MonthlyTrendChart, { type MonthlyTrendPoint } from "@/components/admin/MonthlyTrendChart";
+import CountUp from "@/components/admin/CountUp";
 
 const money = (n: number) => "Rp " + Math.round(n).toLocaleString("id-ID");
+/** Angka bulat tanpa pemisah ribuan — untuk jumlah pesanan/transaksi. */
+const count = (n: number) => String(Math.round(n));
 
 /** Aturan bersama "sudah dibayar" — lihat SALE_STATUSES (src/lib/transaksi.ts). */
 const isPaidOrder = (status?: string | null) => SALE_STATUSES.includes(String(status || "").toLowerCase());
@@ -69,7 +72,10 @@ export interface TopProduct {
 
 interface Metric {
   label: string;
-  value: string;
+  /** Angka mentah kartu — dianimasikan naik (`CountUp`), bukan teks jadi. */
+  num: number;
+  /** Cara menampilkan `num` (dipakai juga untuk tiap frame animasi counter). */
+  format: (n: number) => string;
   /** Keterangan SATU BARIS (dipotong kalau layar sempit) — bagian dipisah " · ". */
   caption: string;
   /** Penjelasan lengkap saat kursor diarahkan ke kartu. */
@@ -82,24 +88,23 @@ interface Metric {
   deltaTitle?: string;
 }
 
-/** Tren naik/turun vs bulan sebelumnya — persen + panah (hijau naik, merah turun), lalu pembanding
- *  "dari <bulan>" yang lebih kecil. Gaya mengikuti contoh desain pemilik 2026-10-24: tren menempel di
- *  bawah nilai, bukan lagi chip di baris nama kartu (itu yang dulu memotong nama kartu di 4 kolom). */
+/** Tren naik/turun vs bulan sebelumnya — panah kecil + persen sejajar (hijau naik `#16a34a`, merah
+ *  turun `#dc2626`), lalu pembanding "dari <bulan>" kecil abu. Minimalis: tanpa latar/padding chip,
+ *  permintaan pemilik 2026-10-24 ("badge trend-nya kurang clean & terlalu mencolok"). Tren tetap
+ *  menempel di bawah nilai, bukan chip di baris nama kartu (itu yang dulu memotong nama kartu). */
 function TrendDelta({ delta, label, title }: { delta: number; label: string; title?: string }) {
   const up = delta >= 0;
   const pct = Math.abs(delta).toFixed(1).replace(".", ",");
+  const color = up ? "#16a34a" : "#dc2626";
   return (
-    <span title={title} className="inline-flex items-center gap-1 min-w-0 whitespace-nowrap">
-      <span className="text-[12px] font-black" style={{ color: up ? "#047857" : "#dc2626" }}>
-        {up ? "+" : "-"}{pct}%
-      </span>
+    <span title={title} className="inline-flex items-center gap-0.5 min-w-0">
       <svg
-        width="10"
-        height="10"
+        width="9"
+        height="9"
         viewBox="0 0 24 24"
         fill="none"
-        stroke={up ? "#047857" : "#dc2626"}
-        strokeWidth="3.5"
+        stroke={color}
+        strokeWidth="4"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden
@@ -107,7 +112,12 @@ function TrendDelta({ delta, label, title }: { delta: number; label: string; tit
       >
         {up ? <path d="M6 14l6-6 6 6" /> : <path d="M6 10l6 6 6-6" />}
       </svg>
-      <span className="text-[10px] font-semibold truncate" style={{ color: "var(--fg3)" }}>dari {label}</span>
+      <span className="text-[11px] font-semibold leading-none tabular-nums" style={{ color }}>
+        {pct}%
+      </span>
+      <span className="text-[10px] font-medium truncate ml-1" style={{ color: "var(--fg3)" }}>
+        dari {label}
+      </span>
     </span>
   );
 }
@@ -219,8 +229,12 @@ export default function DashboardView({
   const metrics: Metric[] = [
     {
       label: "Pendapatan",
-      value: money(revenue),
-      caption: `${saleOrders} transaksi · tanpa ongkir`,
+      num: revenue,
+      format: money,
+      // Keterangan kartu ini menyebut jumlah transaksinya sendiri (permintaan pemilik 2026-10-24:
+      // "Pendapatan" → "126 transaksi berhasil"); basis "tanpa ongkir" pindah ke tooltip +
+      // subjudul grafik supaya caption tetap satu baris.
+      caption: `${saleOrders} transaksi berhasil`,
       detail: `${money(revenue)} dari ${saleOrders} transaksi diakui · hanya harga produk (ongkir tidak dihitung)`,
       delta: revenueDelta,
       deltaLabel: prevLabel,
@@ -228,10 +242,11 @@ export default function DashboardView({
     },
     {
       label: "Pesanan Masuk",
-      value: String(saleOrders),
+      num: saleOrders,
+      format: count,
       // Keterangan sengaja pendek: kartu ini sempit di layar 4 kolom, jadi kalimat panjang akan
       // terpotong. Rincian lengkapnya ada di tooltip kartu + donut "Per Status".
-      caption: "tanpa belum bayar & batal",
+      caption: "Di luar batal & belum bayar",
       detail:
         `${saleOrders} pesanan masuk bulan ${periodLabel} (sudah dibayar: diproses/dikirim/selesai) ` +
         `· ${pendingOrders} belum bayar dan ${cancelledOrders} dibatalkan tidak dihitung`,
@@ -241,8 +256,10 @@ export default function DashboardView({
     },
     {
       label: "Rata-rata Pesanan",
-      value: avgOrder ? money(avgOrder) : "—",
-      caption: `per ${SALE_COUNT_NOTE}`,
+      num: avgOrder,
+      // Tanpa transaksi diakui → rata-ratanya memang tidak ada, jadi tampil "—" (bukan Rp 0).
+      format: (n) => (avgOrder ? money(n) : "—"),
+      caption: "Rata-rata nilai pesanan",
       detail: `${money(revenue)} ÷ ${saleOrders} transaksi diakui bulan ${periodLabel}`,
       delta: delta(avgOrder, prevAvg),
       deltaLabel: prevLabel,
@@ -250,7 +267,8 @@ export default function DashboardView({
     },
     {
       label: ORDER_STAGE_LABEL.belum_bayar,
-      value: String(unpaidOrders),
+      num: unpaidOrders,
+      format: count,
       caption: "menunggu pembayaran",
       detail: `${unpaidOrders} pesanan belum dibayar bulan ${periodLabel} (tahap sama dengan tab "${ORDER_STAGE_LABEL.belum_bayar}" di Order Management)`,
     },
@@ -314,10 +332,12 @@ export default function DashboardView({
             {/* Ukuran font fluid supaya nominal panjang (mis. "Rp 48.331.123") tidak pernah
                 terpotong di layar sempit / zoom tinggi. */}
             <div
-              className="font-extrabold leading-none whitespace-nowrap text-[clamp(1.25rem,1.8vw,1.75rem)]"
+              className="font-extrabold leading-none whitespace-nowrap tabular-nums text-[clamp(1.25rem,1.8vw,1.75rem)]"
               style={{ color: "var(--fg)" }}
             >
-              {m.value}
+              {/* Angka dihitung naik saat kartu muncul / nilainya berubah (permintaan pemilik
+                  2026-10-24: "kasih animasi counter di masing2 card nya"). */}
+              <CountUp value={m.num} format={m.format} />
             </div>
             {/* Tren naik/turun tepat DI BAWAH nilai (contoh desain pemilik). Barisnya selalu ada —
                 tinggi dijaga sama walau kartunya tidak punya pembanding — supaya caption keempat
