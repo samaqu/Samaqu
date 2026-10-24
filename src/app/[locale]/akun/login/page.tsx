@@ -113,6 +113,15 @@ export default function LoginPage() {
                 />
               </div>
             </div>
+            <div className="flex justify-end -mt-1">
+              <Link
+                href={`/${locale}/akun/lupa-password`}
+                className="text-[12px] font-semibold"
+                style={{ color: "var(--gold)" }}
+              >
+                Lupa password?
+              </Link>
+            </div>
             {error && (
               <div className="rounded-xl px-4 py-3 text-[13px]" style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c" }}>
                 {error}

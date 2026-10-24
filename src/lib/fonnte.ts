@@ -717,6 +717,37 @@ async function sendToCustomer(
   return sendFonnteMessage(customer.token, target, message);
 }
 
+/**
+ * Kode OTP reset password ke WhatsApp customer.
+ *
+ * Sengaja TIDAK lewat `buildNotifikasi`: teks OTP tidak boleh bisa diubah dari panel admin,
+ * karena salah edit bisa menghilangkan kodenya. Memakai jalur customer (device Lite) supaya
+ * tidak ber-watermark.
+ */
+export async function notifyCustomerPasswordResetOtp(
+  customerWhatsapp: string | null | undefined,
+  code: string
+): Promise<boolean> {
+  const { customer } = await getFonnteConfigs();
+  if (!customer.enabled || !customer.token) return false;
+
+  const target = normalizeWhatsappTarget(String(customerWhatsapp ?? ""));
+  if (!target) return false;
+
+  const message = [
+    "SAMAQU",
+    "",
+    `Kode verifikasi kamu: ${code}`,
+    "Berlaku 5 menit.",
+    "",
+    "Jangan bagikan kode ini ke siapa pun, termasuk admin SAMAQU.",
+    "",
+    "Bukan kamu? Abaikan pesan ini.",
+  ].join("\n");
+
+  return sendFonnteMessage(customer.token, target, message);
+}
+
 export async function notifyCustomerOrderCreated(
   order: CustomerOrderNotification
 ): Promise<boolean> {

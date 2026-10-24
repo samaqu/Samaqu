@@ -12,6 +12,7 @@
 
 import { useState } from "react";
 import { getCurrentCustomer, loginCustomer, registerCustomer } from "@/lib/customer-auth";
+import ForgotPasswordFlow from "@/components/akun/ForgotPasswordFlow";
 import { DANGER, Field, INK, MUTED, PrimaryButton, TextInput } from "./ui";
 
 export interface AuthAccount {
@@ -21,7 +22,7 @@ export interface AuthAccount {
   email: string;
 }
 
-type Mode = "masuk" | "daftar";
+type Mode = "masuk" | "daftar" | "lupa";
 
 export default function StepAuth({ onAuthenticated }: { onAuthenticated: (account: AuthAccount) => void }) {
   const [mode, setMode] = useState<Mode>("masuk");
@@ -100,6 +101,23 @@ export default function StepAuth({ onAuthenticated }: { onAuthenticated: (accoun
       setNotice("Akun dibuat. Cek email untuk verifikasi (kalau diminta), lalu masuk di sini.");
     }
     setLoading(false);
+  }
+
+  if (mode === "lupa") {
+    return (
+      <div className="rounded-3xl p-5 sm:p-6" style={{ background: "var(--cream-bright)", border: "1px solid rgba(0,0,0,.3)" }}>
+        <ForgotPasswordFlow
+          onCancel={() => switchMode("masuk")}
+          onAuthenticated={async () => {
+            const ok = await continueWithSession();
+            if (!ok) {
+              switchMode("masuk");
+              setNotice("Password sudah diganti. Silakan masuk.");
+            }
+          }}
+        />
+      </div>
+    );
   }
 
   return (
@@ -197,6 +215,19 @@ export default function StepAuth({ onAuthenticated }: { onAuthenticated: (accoun
             {loading ? "Memproses…" : mode === "masuk" ? "Masuk & Lanjut" : "Daftar & Lanjut"}
           </PrimaryButton>
         </form>
+
+        {mode === "masuk" && (
+          <div className="mt-3 text-center">
+            <button
+              type="button"
+              onClick={() => switchMode("lupa")}
+              className="text-[12px] font-semibold"
+              style={{ color: INK }}
+            >
+              Lupa password?
+            </button>
+          </div>
+        )}
       </div>
 
       <p className="mt-4 text-[11.5px] leading-relaxed" style={{ color: MUTED }}>
