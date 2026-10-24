@@ -91,7 +91,11 @@ export default function AkunShell({ children }: { children: ReactNode }) {
   }
 
   const bare = pathname.replace(/^\/(id|en)/, "") || "/";
-  if (bare === "/akun/login" || bare === "/akun/register") {
+  if (
+    bare === "/akun/login" ||
+    bare === "/akun/register" ||
+    bare === "/akun/lupa-password"
+  ) {
     return <>{children}</>;
   }
 

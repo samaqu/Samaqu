@@ -38,7 +38,8 @@ export function AkunProvider({ children }: { children: ReactNode }) {
   const to = (href: string) => `${prefix}${href}`;
 
   const bare = pathname.replace(/^\/(id|en)/, "") || "/";
-  const isAuthRoute = bare === "/akun/login" || bare === "/akun/register";
+  const isAuthRoute =
+    bare === "/akun/login" || bare === "/akun/register" || bare === "/akun/lupa-password";
 
   useEffect(() => {
     let alive = true;
