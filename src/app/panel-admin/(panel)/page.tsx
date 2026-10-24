@@ -8,7 +8,7 @@
  * Omset mengikuti aturan bersama `SALE_STATUSES` (diproses/dikirim/selesai) seperti dashboard lain.
  */
 import { useEffect, useState } from "react";
-import { statusLabel, SALE_STATUSES, saleCount, orderRevenue } from "@/lib/transaksi";
+import { statusLabel, SALE_BASIS_NOTE, SALE_STATUSES, saleCount, orderRevenue } from "@/lib/transaksi";
 import { orderStatusKey } from "@/lib/order-flow";
 import { opsGet } from "../panel-api";
 import { useWibGreeting, useWibToday, wibDateOffset, dailyIndexForDate } from "../wib-date";
@@ -272,11 +272,12 @@ export default function PanelAdminHome() {
     {
       // Kartu ini mengikuti kartu "Pesanan Masuk" di dashboard admin persis (permintaan pemilik
       // 2026-10-24: "ikut Admin persis") — angka besarnya transaksi diakui (`saleCount`), dan
-      // keterangannya menyebut SEMUA pesanan masuk hari itu. Dulu angkanya semua pesanan hari itu
-      // dengan keterangan "Hari ini" + catatan kecil "N transaksi diakui".
+      // keterangannya memakai kalimat yang sama dengan dashboard admin / menu Transaksi
+      // (`SALE_BASIS_NOTE` = "Di luar batal & belum bayar", permintaan pemilik 2026-10-24).
+      // Rincian hariannya (mis. "0 dari 2 pesanan masuk hari ini") ada di tooltip kartu.
       label: "Pesanan masuk",
       value: String(transaksiToday),
-      caption: `dari ${todayOrders.length} pesanan masuk hari ini`,
+      caption: SALE_BASIS_NOTE,
       delta: `${deltaMasuk >= 0 ? "↗" : "↘"} ${Math.abs(deltaMasuk)}%`,
       down: deltaMasuk < 0,
       icon: "basket",

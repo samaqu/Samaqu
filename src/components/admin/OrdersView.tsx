@@ -18,7 +18,7 @@ import {
   orderStage,
   type OrderStageFilter,
 } from "@/lib/order-flow";
-import { ORDER_SOURCE_LABEL, SALE_STATUSES, orderRevenue, orderSourceKey, orderSourceLabel, saleCount } from "@/lib/transaksi";
+import { ORDER_SOURCE_LABEL, SALE_BASIS_NOTE, SALE_STATUSES, orderRevenue, orderSourceKey, orderSourceLabel, saleCount } from "@/lib/transaksi";
 import StageIcon from "@/components/ops/transaksi/StageIcon";
 // Animasi angka kartu KPI memakai komponen yang SAMA dengan kartu metrik dashboard admin
 // (`CountUp`) supaya geraknya konsisten: angka naik dari 0 saat data masuk.
@@ -191,14 +191,15 @@ export default function OrdersView({
   );
 
   /**
-   * Keterangan kartu KPI mengikuti mockup dashboard ops (permintaan pemilik 2026-10-24):
-   * "dari 145 pesanan masuk Oktober 2026" untuk jumlah transaksi (126) di antara SEMUA pesanan
-   * periode itu, "Tidak termasuk dibatalkan" untuk omset, "Perlu follow-up" untuk belum bayar,
-   * dan "Packing + siap kirim" untuk perlu diproses.
+   * Keterangan kartu KPI mengikuti kartu dashboard admin & menu Transaksi (permintaan pemilik
+   * 2026-10-24): angka besar = transaksi diakui (`saleCount`), jadi keterangannya menyebut status
+   * yang TIDAK dihitung — `SALE_BASIS_NOTE` ("Di luar batal & belum bayar"). "Tidak termasuk
+   * dibatalkan" untuk omset, "Perlu follow-up" untuk belum bayar, dan "Packing + siap kirim"
+   * untuk perlu diproses.
    *
    * Keterangannya SELALU tampil — tidak ada teks loading yang berganti-ganti saat pindah menu.
    */
-  const captionTotal = `dari ${orders.length} pesanan masuk ${periodLabel || "bulan ini"}`;
+  const captionTotal = SALE_BASIS_NOTE;
   const captionOmset = "Tidak termasuk dibatalkan";
   const filtersActive = Boolean(orderQuery) || orderFilter !== "semua" || orderSource !== "all";
   const resetFilters = () => {

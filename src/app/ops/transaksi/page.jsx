@@ -16,9 +16,9 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { base44 } from "@/lib/ops-api";
-import { SALE_STATUSES, orderRevenue, saleCount } from "@/lib/transaksi";
+import { SALE_BASIS_NOTE, SALE_STATUSES, orderRevenue, saleCount } from "@/lib/transaksi";
 import { ORDER_STAGE_TABS, matchesStage, orderStage } from "@/lib/order-flow";
-import DateFilter, { formatTanggalID } from "@/components/ops/leads/DateFilter";
+import DateFilter from "@/components/ops/leads/DateFilter";
 import ConfirmDeleteModal from "@/components/ops/ConfirmDeleteModal";
 import TransaksiFormModal from "@/components/ops/transaksi/TransaksiFormModal";
 import TransaksiDetailDrawer from "@/components/ops/transaksi/TransaksiDetailDrawer";
@@ -111,9 +111,6 @@ export default function Transaksi({ variant = "ops" }) {
     setStageFilter("semua");
     setSelectedDate("");
   };
-
-  /** Periode kartu KPI (mis. "Oktober 2026") — dipakai keterangan kartu "Total transaksi". */
-  const periodeKartu = selectedDate ? formatTanggalID(selectedDate) : `${MONTHS[month]} ${year}`;
 
   const prevMonth = () => {
     setSelectedDate("");
@@ -311,11 +308,12 @@ export default function Transaksi({ variant = "ops" }) {
           <div className="card k">
             <small>Total transaksi</small>
             <b><AnimatedNumber value={isLoading ? 0 : panelKpis.total} /></b>
-            {/* Keterangan kartu mengikuti mockup dashboard ops (permintaan pemilik 2026-10-24):
-                angka besar = transaksi diakui (`saleCount`), sedangkan keterangannya menyebut
-                SEMUA pesanan yang masuk periode itu — mis. "dari 145 pesanan masuk Oktober 2026".
-                Keterangan ini selalu tampil (tidak berganti jadi teks loading). */}
-            <i>dari {orders.length} pesanan masuk {periodeKartu}</i>
+            {/* Keterangan kartu (permintaan pemilik 2026-10-24): angka besar = transaksi diakui
+                (`saleCount`), jadi keterangannya menyebut status yang TIDAK dihitung —
+                `SALE_BASIS_NOTE` ("Di luar batal & belum bayar"), kalimat yang sama di dashboard
+                admin, panel Order Management, dan beranda panel admin. Keterangan ini selalu
+                tampil (tidak berganti jadi teks loading). */}
+            <i>{SALE_BASIS_NOTE}</i>
           </div>
           <div className="card k">
             <small>Omset bulan ini</small>

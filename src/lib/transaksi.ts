@@ -95,7 +95,7 @@ export const SALE_STATUSES: string[] = ["diproses", "dikirim", "selesai"];
  * (permintaan pemilik: "belum bayar juga jangan dihitung") — pesanan yang belum dibayar/batal
  * memang bukan pesanan masuk. Kartu "Pesanan masuk" di beranda panel admin ikut aturan yang sama
  * (permintaan pemilik 2026-10-24: "ikut Admin persis"): nilainya angka ini, keterangannya
- * "dari N pesanan masuk <periode>" — N = SEMUA pesanan periode itu, bukan hanya yang diakui.
+ * `SALE_BASIS_NOTE` ("Di luar batal & belum bayar") — kalimat yang sama di keempat layar.
  */
 export function saleCount(orders: { status?: string | null }[] | null | undefined): number {
   return (orders || []).filter((o) => SALE_STATUSES.includes(String(o?.status || "").toLowerCase())).length;
@@ -107,6 +107,16 @@ export function saleCount(orders: { status?: string | null }[] | null | undefine
  * dihitung tetap dijelaskan sekali di komentar `SALE_STATUSES` di atas, bukan di setiap kartu.
  */
 export const SALE_COUNT_NOTE = "transaksi diakui";
+
+/**
+ * Keterangan kartu hitungan pesanan/transaksi — teks yang SAMA di dashboard admin, menu Transaksi
+ * (ops & panel admin), dan beranda panel admin. Nilai besarnya selalu `saleCount()` (diproses /
+ * dikirim / selesai), jadi keterangannya menyebut status yang TIDAK dihitung.
+ *
+ * 2026-10-24 (permintaan pemilik): kalimat "dari N pesanan masuk <periode>" diganti
+ * "Di luar batal & belum bayar".
+ */
+export const SALE_BASIS_NOTE = "Di luar batal & belum bayar";
 
 /**
  * Omset satu pesanan = HARGA PRODUK saja (total − ongkir).

@@ -1641,7 +1641,7 @@ dan **setiap pindah menu tidak boleh ada layar loading**, diterapkan di tiga das
 
 | Kartu | Angka besar | Keterangan sekarang |
 |-------|-------------|---------------------|
-| Total transaksi | `saleCount(orders)` (126) | `dari <semua pesanan periode> pesanan masuk <periode>` — mis. "dari 145 pesanan masuk Oktober 2026" |
+| Total transaksi | `saleCount(orders)` (126) | **"Di luar batal & belum bayar"** (`SALE_BASIS_NOTE` di `src/lib/transaksi.ts`) — revisi 2026-10-24 malam, menggantikan "dari <semua pesanan periode> pesanan masuk <periode>" (mis. "dari 145 pesanan masuk Oktober 2026") |
 | Omset bulan ini | `orderRevenue()` total | "Tidak termasuk dibatalkan" |
 | Belum bayar | `orderStage() === "belum_bayar"` | "Perlu follow-up" |
 | Perlu diproses | tahap belum/sudah dipacking | "Packing + siap kirim" |
@@ -1715,3 +1715,17 @@ dari kartu KPI — tidak diperbaiki karena di luar permintaan.
   keterangan yang sama; klik **Pelanggan → Dashboard → Pelanggan** → kunjungan pertama memuat data
   (`Memuat…` muncul), kunjungan kedua **tanpa** teks Memuat/skeleton dan langsung menampilkan
   daftar pelanggan (219 baris); 0 error console.
+
+**Revisi 2026-10-24 (malam) — keterangan kartu jadi "Di luar batal & belum bayar".** Pemilik
+meminta kalimat "dari 145 pesanan masuk Oktober 2026" diganti **"Di luar batal & belum bayar"**:
+angka besarnya memang `saleCount()` (diproses/dikirim/selesai), jadi keterangannya kini menyebut
+status yang TIDAK dihitung, bukan jumlah semua pesanan periode itu. Kalimatnya dipusatkan sebagai
+konstanta **`SALE_BASIS_NOTE`** di `src/lib/transaksi.ts` supaya tidak bisa beda antar layar lagi —
+keempat pemakainya: `src/app/ops/transaksi/page.jsx` (dipakai `/ops/transaksi` **dan**
+`/panel-admin/transaksi`), `src/components/admin/OrdersView.tsx` (panel Order Management),
+`src/components/admin/DashboardView.tsx` (kartu **Pesanan Masuk**), dan
+`src/app/panel-admin/(panel)/page.tsx` (kartu **Pesanan masuk** beranda, dulu "dari N pesanan masuk
+hari ini"). Jangan menulis ulang kalimatnya literal di satu layar — impor konstanta itu. Karena
+captionnya tidak lagi memuat periode/jumlah, `periodeKartu` + `formatTanggalID` di halaman
+Transaksi dihapus (tidak terpakai; `orders.length` tetap dipakai tab tahap, dan jumlah hariannya
+tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` bersih.

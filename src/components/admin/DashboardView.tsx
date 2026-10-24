@@ -24,7 +24,7 @@
 
 import { orderStage, ORDER_STAGE_LABEL } from "@/lib/order-flow";
 import { monthKeyWIB, monthShift, monthShortID } from "@/lib/month-period";
-import { SALE_STATUSES, orderRevenue, saleCount } from "@/lib/transaksi";
+import { SALE_BASIS_NOTE, SALE_STATUSES, orderRevenue, saleCount } from "@/lib/transaksi";
 import MonthlyTrendChart, { type MonthlyTrendPoint } from "@/components/admin/MonthlyTrendChart";
 import CountUp from "@/components/admin/CountUp";
 
@@ -245,10 +245,11 @@ export default function DashboardView({
       label: "Pesanan Masuk",
       num: saleOrders,
       format: count,
-      // Keterangan SAMA PERSIS dengan kartu "Total transaksi" di menu Transaksi (angka besarnya
-      // juga sama: `saleCount`), jadi kedua layar menyebut jumlah pesanan periode itu dengan
-      // kalimat yang identik. Rincian lengkapnya ada di tooltip kartu + donut "Per Status".
-      caption: `dari ${orders.length} pesanan masuk ${periodLabel}`,
+      // Keterangan SAMA PERSIS dengan kartu "Total transaksi" di menu Transaksi & panel Order
+      // Management (angka besarnya juga sama: `saleCount`), jadi keempat layar memakai satu
+      // kalimat: `SALE_BASIS_NOTE` ("Di luar batal & belum bayar"). Rincian lengkapnya
+      // (mis. 6 belum bayar dan 12 dibatalkan) ada di tooltip kartu + donut "Per Status".
+      caption: SALE_BASIS_NOTE,
       detail:
         `${saleOrders} pesanan masuk bulan ${periodLabel} (sudah dibayar: diproses/dikirim/selesai) ` +
         `· ${pendingOrders} belum bayar dan ${cancelledOrders} dibatalkan tidak dihitung`,
