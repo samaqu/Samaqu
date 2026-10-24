@@ -310,9 +310,10 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                   </div>
                 </div>
 
-                <PackagingWarning warning={order.packaging_warning} />
-                <HppBlock order={order} />
-
+                {/* HPP & peringatan kemasan sengaja TIDAK ditampilkan di sini.
+                    Detail pesanan disamakan dengan /admin (OrderDetailPanel): hanya
+                    data pesanan, tanpa kartu HPP internal. Snapshot HPP tetap ada di
+                    database dan dipakai laporan/produksi. */}
                 <div className="sec2">
                   <div className="sh">
                     <CreditCard />
@@ -674,8 +675,6 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                 </div>
               </div>
 
-              <PackagingWarning warning={order.packaging_warning} />
-              <HppBlock order={order} />
             </div>
 
             {(order.can_edit || order.can_cancel) && (
