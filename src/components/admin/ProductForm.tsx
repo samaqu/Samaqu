@@ -1067,21 +1067,94 @@ export default function TambahProdukPage({
     }));
   }
 
+  function activeSeriesVariant(block: SeriesBlock): Variant | undefined {
+    return (
+      block.variants.find((v) => v.color === block.activeColor) ||
+      block.variants[0]
+    );
+  }
+
+  function addSeriesColor(seriesName: string, color: string, hex?: string) {
+    const nextColor = String(color || "").trim();
+    if (!nextColor) return;
+    setSeriesBlocks((prev) => {
+      const block = prev[seriesName];
+      if (!block) return prev;
+      if (block.variants.some((v) => v.color === nextColor)) {
+        return { ...prev, [seriesName]: { ...block, activeColor: nextColor } };
+      }
+
+      const first = block.variants[0];
+      const onlyDefault =
+        block.variants.length === 1 &&
+        String(first?.color || "").trim().toLowerCase() === "default";
+      const resolvedDefault = resolveColorName({
+        color: "default",
+        productName: name,
+        category: "Thobe",
+        series: seriesName,
+      });
+      const placeholderEmpty =
+        !!first &&
+        first.sizes.every((s) => !s.stock && !s.sku && !s.priceOverride && s.size === "M");
+      const sameAsName =
+        !!resolvedDefault && resolvedDefault.trim().toLowerCase() === nextColor.toLowerCase();
+      const replaceDefault = onlyDefault && (placeholderEmpty || sameAsName);
+      const nextVariant: Variant = {
+        color: nextColor,
+        hex: hex || colorMap[nextColor] || "#141414",
+        sizes: replaceDefault
+          ? first.sizes
+          : [{ size: "M", stock: 0, priceOverride: "", sku: "" }],
+      };
+
+      return {
+        ...prev,
+        [seriesName]: {
+          ...block,
+          variants: replaceDefault ? [nextVariant] : [...block.variants, nextVariant],
+          activeColor: nextColor,
+        },
+      };
+    });
+  }
+
+  function removeSeriesColor(seriesName: string, color: string) {
+    setSeriesBlocks((prev) => {
+      const block = prev[seriesName];
+      if (!block || block.variants.length <= 1) return prev;
+      const variants = block.variants.filter((v) => v.color !== color);
+      return {
+        ...prev,
+        [seriesName]: {
+          ...block,
+          variants,
+          activeColor:
+            block.activeColor === color
+              ? variants[0]?.color || null
+              : block.activeColor,
+        },
+      };
+    });
+  }
+
   function addSizeToSeriesBlock(seriesName: string) {
     setSeriesBlocks((prev) => {
       const block = prev[seriesName];
       if (!block) return prev;
-      const v = block.variants[0];
-      const usedSizes = v?.sizes.map((s) => s.size) || [];
+      const v = activeSeriesVariant(block);
+      if (!v) return prev;
+      const usedSizes = v.sizes.map((s) => s.size);
       const nextSize = SIZES.find((s) => !usedSizes.includes(s)) || "M";
       return {
         ...prev,
         [seriesName]: {
           ...block,
-          variants: [{
-            ...v,
-            sizes: [...v.sizes, { size: nextSize, stock: 0, priceOverride: "", sku: "" }],
-          }],
+          variants: block.variants.map((item) =>
+            item.color === v.color
+              ? { ...item, sizes: [...item.sizes, { size: nextSize, stock: 0, priceOverride: "", sku: "" }] }
+              : item,
+          ),
         },
       };
     });
@@ -1091,15 +1164,17 @@ export default function TambahProdukPage({
     setSeriesBlocks((prev) => {
       const block = prev[seriesName];
       if (!block) return prev;
-      const v = block.variants[0];
+      const v = activeSeriesVariant(block);
+      if (!v) return prev;
       return {
         ...prev,
         [seriesName]: {
           ...block,
-          variants: [{
-            ...v,
-            sizes: v.sizes.filter((_, i) => i !== sizeIdx),
-          }],
+          variants: block.variants.map((item) =>
+            item.color === v.color
+              ? { ...item, sizes: item.sizes.filter((_, i) => i !== sizeIdx) }
+              : item,
+          ),
         },
       };
     });
@@ -1109,32 +1184,38 @@ export default function TambahProdukPage({
     setSeriesBlocks((prev) => {
       const block = prev[seriesName];
       if (!block) return prev;
-      const v = block.variants[0];
+      const v = activeSeriesVariant(block);
+      if (!v) return prev;
       const sizes = [...v.sizes];
       sizes[sizeIdx] = { ...sizes[sizeIdx], [field]: value };
       return {
         ...prev,
         [seriesName]: {
           ...block,
-          variants: [{ ...v, sizes }],
+          variants: block.variants.map((item) =>
+            item.color === v.color ? { ...item, sizes } : item,
+          ),
         },
       };
     });
   }
 
-  /** Ubah satu field untuk SEMUA ukuran series sekaligus — SATU update state. */
+  /** Ubah satu field untuk SEMUA ukuran pada warna aktif series — SATU update state. */
   function updateSeriesBlockSizesBulk(seriesName: string, field: string, value: string | number) {
     setSeriesBlocks((prev) => {
       const block = prev[seriesName];
       if (!block) return prev;
+      const v = activeSeriesVariant(block);
+      if (!v) return prev;
       return {
         ...prev,
         [seriesName]: {
           ...block,
-          variants: block.variants.map((v) => ({
-            ...v,
-            sizes: v.sizes.map((s) => ({ ...s, [field]: value })),
-          })),
+          variants: block.variants.map((item) =>
+            item.color === v.color
+              ? { ...item, sizes: item.sizes.map((s) => ({ ...s, [field]: value })) }
+              : item,
+          ),
         },
       };
     });
@@ -1240,6 +1321,16 @@ export default function TambahProdukPage({
       for (const sn of selectedSeries) {
         const block = seriesBlocks[sn];
         if (!block) continue;
+        if (block.variants.length === 0) {
+          e[`series_${sn}_color`] = `Warna ${sn} wajib diisi minimal 1`;
+        } else {
+          const colors = block.variants.map((v) => String(v.color || "").trim().toLowerCase());
+          if (colors.some((color) => !color)) {
+            e[`series_${sn}_color`] = `Warna ${sn} tidak boleh kosong`;
+          } else if (new Set(colors).size !== colors.length) {
+            e[`series_${sn}_color`] = `Warna ${sn} tidak boleh kembar`;
+          }
+        }
         if (!isOps && (!block.price || parseInt(block.price) <= 0)) e[`series_${sn}_price`] = `Harga ${sn} wajib diisi`;
         if (block.cypEnabled && (!block.minimumPrice || parseInt(block.minimumPrice) <= 0)) e[`series_${sn}_min`] = `Harga Minimum ${sn} wajib diisi`;
         if (!isOps) {
@@ -1428,7 +1519,8 @@ export default function TambahProdukPage({
             ...(rowWeight > 0 ? { weight: rowWeight } : {}),
             image: block.media.find((m) => m.url)?.url || "",
             images: block.media.filter((m) => m.url).map((m) => m.url),
-            colors: block.variants.map((v) => v.color),
+            // Jangan pernah menimpa warna lama dengan array kosong.
+            ...(block.variants.length > 0 ? { colors: block.variants.map((v) => v.color) } : {}),
             jenis_kain_id: selectedJenisKainId || null,
             series: seriesName,
             catatan_harga: catatanHarga.trim() || null,
@@ -1529,7 +1621,8 @@ export default function TambahProdukPage({
           ...(rowWeight > 0 ? { weight: rowWeight } : {}),
           image: media.find((m) => m.url)?.url || "",
           images: media.filter((m) => m.url).map((m) => m.url),
-          colors: variants.map((v) => v.color),
+          // Jangan pernah menimpa warna lama dengan array kosong.
+          ...(variants.length > 0 ? { colors: variants.map((v) => v.color) } : {}),
           jenis_kain_id: selectedJenisKainId || null,
           series: series.trim() || null,
           catatan_harga: catatanHarga.trim() || null,
@@ -1968,7 +2061,7 @@ export default function TambahProdukPage({
                 {activeSeriesTab && seriesBlocks[activeSeriesTab] && (() => {
                   const sn = activeSeriesTab;
                   const block = seriesBlocks[sn];
-                  const v0 = block.variants[0];
+                  const v0 = activeSeriesVariant(block);
                   return (
                     <div className="space-y-6">
                       {/* ── Harga & CYP ── */}
@@ -2063,6 +2156,79 @@ export default function TambahProdukPage({
                         </div>
                       </div>)}
 
+                      {/* ── Warna series ── */}
+                      <div>
+                        <p className="text-sm font-semibold mb-1" style={{ color: "var(--espresso)" }}>
+                          <span style={{ color: "var(--gold)" }}>{sn}</span> — Warna
+                        </p>
+                        <p className="pf-hint mb-3">
+                          Warna menjadi bagian SKU varian. Produk lama yang masih memakai warna bawaan
+                          ditampilkan dengan warna dari nama produk.
+                        </p>
+                        {errors[`series_${sn}_color`] && (
+                          <p className="pf-error mb-2">{errors[`series_${sn}_color`]}</p>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          {block.variants.map((variant) => {
+                            const label =
+                              String(variant.color).toLowerCase() === "default"
+                                ? resolveColorName({
+                                    color: "default",
+                                    productName: name,
+                                    category: "Thobe",
+                                    series: sn,
+                                  }) || "default"
+                                : variant.color;
+                            const active =
+                              (block.activeColor || block.variants[0]?.color) === variant.color;
+                            return (
+                              <button
+                                key={variant.color}
+                                type="button"
+                                onClick={() => updateSeriesBlock(sn, { activeColor: variant.color })}
+                                className={`pf-chip${active ? " active" : ""}`}
+                              >
+                                <span
+                                  className="w-3 h-3 rounded-full"
+                                  style={{
+                                    background: variant.hex || colorMap[variant.color] || "#ccc",
+                                    border: "1px solid rgba(42,33,27,.1)",
+                                  }}
+                                />
+                                {label}
+                                {block.variants.length > 1 ? (
+                                  <span
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label={`Hapus warna ${label}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removeSeriesColor(sn, variant.color);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        removeSeriesColor(sn, variant.color);
+                                      }
+                                    }}
+                                    className="ml-1 hover:opacity-60"
+                                  >
+                                    <X size={12} />
+                                  </span>
+                                ) : null}
+                              </button>
+                            );
+                          })}
+                          <PresetColorPicker
+                            existing={block.variants
+                              .filter((variant) => String(variant.color).toLowerCase() !== "default")
+                              .map((variant) => variant.color)}
+                            onAdd={(color, hex) => addSeriesColor(sn, color, hex)}
+                          />
+                        </div>
+                      </div>
+
                       {/* ── Shared Stock Pool ── */}
                       <div>
                         <p className="text-sm font-semibold mb-3" style={{ color: "var(--espresso)" }}>
@@ -2122,7 +2288,7 @@ export default function TambahProdukPage({
                               Berat tetap diisi per series ini karena potongan &amp; kerahnya berbeda.
                             </p>
                             <SizeGrid
-                              sizes={v0.sizes}
+                              sizes={v0?.sizes || []}
                               onUpdate={(i, field, value) => updateSeriesBlockSizeField(sn, i, field, value)}
                               onUpdateAll={(field, value) => updateSeriesBlockSizesBulk(sn, field, value)}
                               onRemove={(i) => removeSizeFromSeriesBlock(sn, i)}
@@ -2136,7 +2302,7 @@ export default function TambahProdukPage({
                         ) : (
                         <div className="pf-panel">
                           <SizeGrid
-                            sizes={v0.sizes}
+                            sizes={v0?.sizes || []}
                             onUpdate={(i, field, value) => updateSeriesBlockSizeField(sn, i, field, value)}
                             onUpdateAll={(field, value) => updateSeriesBlockSizesBulk(sn, field, value)}
                             onRemove={(i) => removeSizeFromSeriesBlock(sn, i)}
