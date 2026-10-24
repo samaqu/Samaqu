@@ -583,7 +583,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       );
       return paket[0] || null;
     }
-    if (!row.kain) return null;
+    // Koko/Vest tidak punya jenis kain. Jangan wajibkan `kain` di sini —
+    // rowsFor() sudah mencocokkan kain kosong dengan data yang memang kosong.
     const step = seriesStep(row.category, row.kain, row.warna);
     if (step.show && row.series === null) return null;
     const series = step.show ? row.series : "";
