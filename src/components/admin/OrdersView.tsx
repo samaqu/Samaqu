@@ -161,7 +161,7 @@ export default function OrdersView({
   // Jumlah TRANSAKSI memakai aturan bersama `saleCount()` (diproses/dikirim/selesai): angka yang sama
   // dengan menu Transaksi, dashboard ops, dan "N transaksi" di Laporan Keuangan. Dulu kartu ini
   // menghitung SEMUA baris periode itu (termasuk belum bayar & dibatalkan), jadi angkanya beda
-  // sendiri dari layar lain. Jumlah semua pesanan masuk tetap tampil sebagai keterangan (`ordersIn`).
+  // sendiri dari layar lain.
   //
   // Omset memakai `orderRevenue()` (harga PRODUK saja = total − ongkir) supaya sama dengan kartu
   // "Omset bulan ini" di menu Transaksi & Laporan — `orders.total` masih memuat ongkir.
@@ -169,7 +169,6 @@ export default function OrdersView({
     const sold = orders.filter((o) => (SALE_STATUSES as readonly string[]).includes(o.status));
     return {
       total: saleCount(orders),
-      ordersIn: orders.length,
       revenue: sold.reduce((sum, o) => sum + orderRevenue(o), 0),
       unpaid: orders.filter((o) => orderStage(o) === "belum_bayar").length,
       toProcess: orders.filter((o) => {
@@ -196,15 +195,15 @@ export default function OrdersView({
   /** Label periode (mis. "Oktober 2026") — dipakai saat kartu masih memuat. */
   const periodCaption = periodLabel || sourceLabelText;
   /**
-   * Keterangan kartu "Total transaksi": HANYA pesanan periode yang sedang dipilih, mis.
-   * "dari 143 pesanan masuk bulan Oktober 2026" — jadi angka 143 tidak terbaca sebagai total
-   * sepanjang waktu. Dulu bunyinya "Oktober 2026 · dari 143 pesanan masuk" (periode di depan,
-   * "dari" di tengah) dan pemilik menanyakan 143 itu pesanan bulan mana. Bentuknya sama dengan
-   * menu Transaksi ops.
+   * Keterangan kartu KPI memakai KALIMAT YANG SAMA PERSIS dengan kartu metrik dashboard admin
+   * (`DashboardView`) — permintaan pemilik 2026-10-24: "kalimat dashboard persis". Jadi angka yang
+   * sama tidak terbaca berbeda antar layar: `126 transaksi berhasil` (kartu Pendapatan) untuk kartu
+   * omset, dan `Di luar batal & belum bayar` (kartu Pesanan Masuk) untuk kartu jumlah transaksi.
+   * Label periode tidak lagi ditulis di keterangan karena pemilih bulan di bar filter sudah
+   * menunjukkannya, dan kalimatnya jadi identik dengan dashboard.
    */
-  const ordersNote = periodLabel
-    ? `dari ${kpis.ordersIn} pesanan masuk bulan ${periodLabel}`
-    : `dari ${kpis.ordersIn} pesanan masuk`;
+  const captionTotal = "Di luar batal & belum bayar";
+  const captionOmset = `${kpis.total} transaksi berhasil`;
   const filtersActive = Boolean(orderQuery) || orderFilter !== "semua" || orderSource !== "all";
   const resetFilters = () => {
     setOrderSearch("");
@@ -223,17 +222,17 @@ export default function OrdersView({
         <div className="card k">
           <small>Total transaksi</small>
           <b><CountUp value={loading ? 0 : kpis.total} format={angka} /></b>
-          <i>{loading ? periodCaption : ordersNote}</i>
+          <i>{loading ? periodCaption : captionTotal}</i>
         </div>
         <div className="card k">
           <small>Omset bulan ini</small>
           <b><CountUp value={loading ? 0 : kpis.revenue} format={rupiah} /></b>
-          <i>Tidak termasuk dibatalkan</i>
+          <i>{loading ? periodCaption : captionOmset}</i>
         </div>
         <div className="card k">
           <small>Belum bayar</small>
           <b style={{ color: "#c76f00" }}><CountUp value={loading ? 0 : kpis.unpaid} format={angka} /></b>
-          <i>Perlu follow-up</i>
+          <i>menunggu pembayaran</i>
         </div>
         <div className="card k">
           <small>Perlu diproses</small>

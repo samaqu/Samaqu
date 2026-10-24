@@ -1401,17 +1401,23 @@ empat file: `src/app/ops/ongkir-jnt/page.tsx` (route tipis) → `src/components/
   `src/app/ops/transaksi/page.jsx`) sempat beda sendiri: kartu **"Total transaksi"** di sana memakai
   `orders.length`, jadi menampilkan SEMUA baris bulan itu (mis. 143 = 126 diakui + 5 belum bayar +
   12 batal) sementara dashboard ops & laporan berbunyi 126. Sekarang **angka besarnya
-  `saleCount(orders)`** dan keterangannya *"dari N pesanan masuk <bulan>"* (`panelKpis.ordersIn`) —
-  **urutan periode dipindah ke belakang 2026-10-23** karena bentuk lama *"Oktober 2026 · dari 143
-  pesanan masuk"* membuat pemilik bertanya 143 itu pesanan bulan mana — sehingga angkanya sama
-  dengan laporan dan jumlah pesanan masuk (periode terpilih) tetap terlihat. Tab tahap di
+  `saleCount(orders)`**, jadi angkanya sama dengan laporan. Keterangan kartunya **sejak 2026-10-24
+  memakai kalimat kartu dashboard admin** (permintaan pemilik: *"kalimat dashboard persis"*):
+  `Total transaksi` → **"Di luar batal & belum bayar"**, `Omset bulan ini` → **"N transaksi
+  berhasil"**, `Belum bayar` → **"menunggu pembayaran"** (kartu `Perlu diproses` tidak punya
+  padanan di dashboard, keterangannya tetap "Packing + siap kirim"). Label periode tidak lagi
+  ditulis di keterangan — dulu *"dari N pesanan masuk <bulan>"*, sebelumnya lagi *"Oktober 2026 ·
+  dari 143 pesanan masuk"* — karena pemilih bulan di bar filter sudah menunjukkannya;
+  `panelKpis.ordersIn` dihapus karena sudah tidak dipakai. Tab tahap di
   bawahnya tetap menghitung semua baris — tab itu filter daftar, bukan angka transaksi.
   **Panel Order Management dashboard admin** (`src/components/admin/OrdersView.tsx`, 2026-10-23) ikut
   disamakan: kartu **"Total transaksi"** di sana dulu memakai `orders.length`, jadi menampilkan SEMUA
   baris periode itu (143 = 126 diakui + 5 belum bayar + 12 batal, angka yang terlihat di layar admin),
   padahal layar lain berbunyi 126. Sekarang angka besarnya `saleCount(orders)` dan keterangannya
-  *"dari N pesanan masuk bulan <periode terpilih>"* (`kpis.ordersIn`) — satu bentuk dengan menu
-  Transaksi, dan **hanya** pesanan periode itu (bukan total sepanjang waktu). Kartu
+  memakai **kalimat dashboard admin yang sama persis** (2026-10-24) — `Total transaksi` → "Di luar
+  batal & belum bayar" (kartu *Pesanan Masuk*), `Omset bulan ini` → "N transaksi berhasil" (kartu
+  *Pendapatan*), `Belum bayar` → "menunggu pembayaran"; `kpis.ordersIn` dihapus karena label
+  periode tidak lagi ditulis di keterangan (pemilih bulan di bar filter sudah menunjukkannya). Kartu
   **"Omset bulan ini"** di panel yang sama juga ikut `orderRevenue()` (dulu menjumlah `o.total`, jadi
   masih memuat ongkir: 51.634.621 vs 48.331.123 pada 2026-10). Tab tahap + filter "Belum di packing"
   tetap menghitung semua baris — itu filter daftar, bukan angka transaksi.
@@ -1547,9 +1553,10 @@ lihat butir terakhir di bagian ini.
   **"tanpa belum bayar & batal"**, tooltipnya menyebut rinciannya ("6 belum bayar dan 12 dibatalkan
   tidak dihitung"), dan chip tren membandingkan himpunan yang sama (126 vs 13 September = 869,2%;
   dulu 132 vs 13 = 915,4%). Pemilik memilih **hanya kartu ini** yang berubah lewat pertanyaan
-  klarifikasi — donut `Per Status` (angka tengah 132 + irisan `pending` 6), jumlah pesanan di
-  tooltip grafik tren, dan keterangan *"dari N pesanan masuk"* di panel Order Management **tetap**
-  "semua pesanan minus dibatalkan". Jadi kartu (126) memang lebih kecil dari donut (132) tepat
+  klarifikasi — donut `Per Status` (angka tengah 132 + irisan `pending` 6) dan jumlah pesanan di
+  tooltip grafik tren **tetap** "semua pesanan minus dibatalkan" (angka mentahnya 132). Keterangan
+  kartu di panel Order Management/menu Transaksi sendiri sekarang memakai kalimat kartu dashboard
+  (2026-10-24) — lihat bagian "Ongkir J&T". Jadi kartu (126) memang lebih kecil dari donut (132) tepat
   sebesar 6 pesanan belum bayar — disengaja, **jangan** "disamakan". Di kode, `incomingOrders`
   (semua minus batal) hanya dipakai donut + grafik; kartu dan chip-nya memakai `saleOrders` /
   `prevSales`.

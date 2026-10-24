@@ -215,13 +215,11 @@ export default function Transaksi({ variant = "ops" }) {
   // Jumlah TRANSAKSI memakai aturan bersama `saleCount()` (diproses/dikirim/selesai) — sama angka
   // dengan kartu "Total Transaksi" di dashboard ops dan "N transaksi" di Laporan Keuangan. Dulu
   // kartu ini menghitung SEMUA baris bulan itu, termasuk yang belum bayar & dibatalkan, jadi
-  // angkanya beda sendiri dari layar lain. Jumlah semua pesanan masuk tetap ditampilkan sebagai
-  // keterangan (`ordersIn`), bukan sebagai angka besar.
+  // angkanya beda sendiri dari layar lain.
   const panelKpis = useMemo(() => {
     const sold = orders.filter((order) => SALE_STATUSES.includes(order.status));
     return {
       total: saleCount(orders),
-      ordersIn: orders.length,
       revenue: sold.reduce((sum, order) => sum + orderRevenue(order), 0),
       unpaid: orders.filter((order) => orderStage(order) === "belum_bayar").length,
       toProcess: orders.filter((order) => orderStage(order) === "belum_dipacking" || orderStage(order) === "sudah_dipacking").length,
@@ -312,20 +310,21 @@ export default function Transaksi({ variant = "ops" }) {
           <div className="card k">
             <small>Total transaksi</small>
             <b><AnimatedNumber value={isLoading ? 0 : panelKpis.total} /></b>
-            {/* Keterangan kartu: HANYA pesanan periode yang dipilih (bulan, atau satu tanggal
-                kalau filter tanggal aktif) — dulu periodenya di depan ("Oktober 2026 · dari 143
-                pesanan masuk"), jadi angka 143 terbaca seperti total sepanjang waktu. */}
-            <i>{isLoading ? coverageLabel : `dari ${panelKpis.ordersIn} pesanan masuk ${coverageLabel}`}</i>
+            {/* Keterangan kartu = KALIMAT YANG SAMA PERSIS dengan kartu metrik dashboard admin
+                (`DashboardView`) — permintaan pemilik 2026-10-24: "kalimat dashboard persis".
+                Dulu periodenya ditulis di sini ("dari 143 pesanan masuk bulan Oktober 2026");
+                sekarang pemilih bulan di bar filter sudah menunjukkan periodenya. */}
+            <i>{isLoading ? coverageLabel : "Di luar batal & belum bayar"}</i>
           </div>
           <div className="card k">
             <small>Omset bulan ini</small>
             <b><AnimatedNumber value={isLoading ? 0 : panelKpis.revenue} format={(n) => `Rp ${formatRupiah(n)}`} /></b>
-            <i>Tidak termasuk dibatalkan</i>
+            <i>{isLoading ? coverageLabel : `${panelKpis.total} transaksi berhasil`}</i>
           </div>
           <div className="card k">
             <small>Belum bayar</small>
             <b style={{ color: "#c76f00" }}><AnimatedNumber value={isLoading ? 0 : panelKpis.unpaid} /></b>
-            <i>Perlu follow-up</i>
+            <i>menunggu pembayaran</i>
           </div>
           <div className="card k">
             <small>Perlu diproses</small>
