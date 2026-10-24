@@ -107,7 +107,7 @@ export default function KomponenDetailView({ id }: { id: string }) {
 
   return (
     <AccessGate access={access}>
-      <div className="space-y-4">
+      <div className="space-y-4 min-w-0 max-w-full overflow-x-hidden">
         <Link
           href="/ops/produksi/komponen"
           className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
@@ -186,7 +186,7 @@ export default function KomponenDetailView({ id }: { id: string }) {
                 <p className="text-sm font-bold text-slate-900 dark:text-white">Buku stok</p>
                 <p className="text-[11px] text-slate-400">Append-only — koreksi lewat transaksi baru</p>
               </div>
-              <div>
+              <div className="min-w-0 max-w-full overflow-hidden">
                 <table className="w-full border-collapse table-fixed">
                   <colgroup>
                     {access.role === "owner" ? (
@@ -249,7 +249,7 @@ export default function KomponenDetailView({ id }: { id: string }) {
                 <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
                   <p className="text-sm font-bold text-slate-900 dark:text-white">Riwayat pembelian</p>
                 </div>
-                <div>
+                <div className="min-w-0 max-w-full overflow-hidden">
                   <table className="w-full border-collapse table-fixed">
                     <colgroup>
                       <col className="w-[13%]" />
