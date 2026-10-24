@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { ownerProductionGuard } from "@/lib/ops-auth";
 import { CATEGORY_ORDER, SERIES_ORDER } from "@/lib/ops-order";
-import { COST_GROUP_EXAMPLES } from "@/lib/produksi-resep";
+import { COST_GROUP_DEFAULTS } from "@/lib/produksi-resep";
 
 /**
  * Pilihan untuk form resep. Semua daftar diambil dari data yang SUDAH ada:
@@ -14,10 +14,22 @@ export async function GET(req: NextRequest) {
   if (!access.ok) return access.response;
 
   const admin = getSupabaseAdmin();
-  const [{ data: fabrics }, { data: products }, { data: variants }] = await Promise.all([
+  const [
+    { data: fabrics },
+    { data: products },
+    { data: variants },
+    { data: savedGroups },
+    { data: usedGroups },
+  ] = await Promise.all([
     admin.from("jenis_kain").select("id, name").order("name", { ascending: true }),
     admin.from("products").select("category, series, colors"),
     admin.from("product_variants").select("size, color"),
+    admin.from("production_cost_groups").select("name").order("name", { ascending: true }),
+    admin
+      .from("production_recipe_lines")
+      .select("group_label")
+      .eq("line_type", "biaya")
+      .not("group_label", "is", null),
   ]);
 
   const categories = [...CATEGORY_ORDER];
@@ -38,12 +50,28 @@ export async function GET(req: NextRequest) {
     if (color && color.toLowerCase() !== "default") colorSet.add(color);
   }
 
+  // Dropdown kelompok biaya: daftar tetap dulu, lalu kelompok tambahan & label
+  // lama (teks bebas) supaya data lama tetap bisa dipilih tanpa diubah.
+  const defaultKeys = new Set(COST_GROUP_DEFAULTS.map((name) => name.toLowerCase()));
+  const extra = new Map<string, string>();
+  for (const item of [...(savedGroups || []), ...(usedGroups || [])]) {
+    const name = String((item as any)?.name || (item as any)?.group_label || "").trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (defaultKeys.has(key) || extra.has(key)) continue;
+    extra.set(key, name);
+  }
+  const costGroups = [
+    ...COST_GROUP_DEFAULTS,
+    ...Array.from(extra.values()).sort((a, b) => a.localeCompare(b, "id")),
+  ];
+
   return NextResponse.json({
     categories,
     series: Array.from(seriesSet),
     sizes: Array.from(sizeSet),
     colors: Array.from(colorSet).sort((a, b) => a.localeCompare(b, "id")),
     fabrics: fabrics || [],
-    cost_groups: COST_GROUP_EXAMPLES,
+    cost_groups: costGroups,
   });
 }

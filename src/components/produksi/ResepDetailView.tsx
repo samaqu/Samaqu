@@ -8,7 +8,6 @@ import { formatDate, formatQty, formatRupiah } from "@/lib/produksi";
 import { produksiFetch } from "@/lib/produksi-api";
 import {
   BAHAN_GROUPS,
-  COST_GROUP_EXAMPLES,
   bahanGroupLabel,
   filterSummary,
   parseBahanPaste,
@@ -606,17 +605,59 @@ function LineDrawer({
 }) {
   const [form, setForm] = useState<LineForm>(() => toForm(initial, type));
   const [error, setError] = useState("");
+  const [extraGroups, setExtraGroups] = useState<string[]>([]);
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [addingGroup, setAddingGroup] = useState(false);
+  const [groupError, setGroupError] = useState("");
 
   useEffect(() => {
     if (open) {
       setForm(toForm(initial, type));
       setError("");
+      setNewGroupOpen(false);
+      setNewGroupName("");
+      setGroupError("");
     }
   }, [open, initial, type]);
 
   const isBahan = form.line_type === "bahan";
   const isKain = isBahan && form.group_code === "kain";
   const selectedComponent = components.find((c) => c.id === form.component_id);
+
+  // Daftar kelompok biaya: default + tambahan Owner + label lama (teks bebas).
+  const costGroups = useMemo(() => {
+    const list = [...(options?.cost_groups || []), ...extraGroups];
+    if (form.group_label) list.push(form.group_label);
+    const seen = new Set<string>();
+    return list.filter((name) => {
+      const key = name.trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [options, extraGroups, form.group_label]);
+
+  async function addGroup() {
+    const name = newGroupName.trim();
+    if (!name) return setGroupError("Nama kelompok wajib diisi.");
+    setAddingGroup(true);
+    setGroupError("");
+    try {
+      const json = await produksiFetch<{ name: string }>("/api/ops/production/cost-groups", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      });
+      setExtraGroups((current) => Array.from(new Set([...current, json.name])));
+      setForm((current) => ({ ...current, group_label: json.name }));
+      setNewGroupOpen(false);
+      setNewGroupName("");
+    } catch (e) {
+      setGroupError(e instanceof Error ? e.message : "Gagal menambah kelompok.");
+    } finally {
+      setAddingGroup(false);
+    }
+  }
 
   function save() {
     setError("");
@@ -701,16 +742,47 @@ function LineDrawer({
           ) : (
             <div>
               <label className={labelClass}>Kelompok biaya</label>
-              <input
+              <select
                 className={inputClass}
-                list="cost-groups"
                 value={form.group_label}
-                onChange={(e) => setForm({ ...form, group_label: e.target.value })}
-                placeholder="Biaya Jahit"
-              />
-              <datalist id="cost-groups">
-                {COST_GROUP_EXAMPLES.map((group) => <option key={group} value={group} />)}
-              </datalist>
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "__new__") {
+                    setNewGroupOpen(true);
+                    return;
+                  }
+                  setForm({ ...form, group_label: value });
+                  setNewGroupOpen(false);
+                  setGroupError("");
+                }}
+              >
+                <option value="">— Pilih kelompok —</option>
+                {costGroups.map((group) => <option key={group} value={group}>{group}</option>)}
+                <option value="__new__">+ Tambah kelompok baru…</option>
+              </select>
+              {newGroupOpen ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    className={inputClass}
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder="Nama kelompok baru"
+                    autoFocus
+                  />
+                  <button type="button" className={btnSecondary} onClick={addGroup} disabled={addingGroup}>
+                    {addingGroup ? <Loader2 size={14} className="animate-spin" /> : null}
+                    Tambah
+                  </button>
+                  <button
+                    type="button"
+                    className="text-[11px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
+                    onClick={() => { setNewGroupOpen(false); setNewGroupName(""); setGroupError(""); }}
+                  >
+                    Batal
+                  </button>
+                </div>
+              ) : null}
+              {groupError ? <p className="mt-1 text-[11px] font-semibold text-red-600">{groupError}</p> : null}
             </div>
           )}
         </div>
@@ -1126,6 +1198,9 @@ function KalkulatorTab({ recipeId, options }: { recipeId: string; options: Optio
           <input type="checkbox" checked={includeOptional} onChange={(e) => setIncludeOptional(e.target.checked)} className="h-4 w-4 rounded" />
           Hitung Cover &amp; Hanger (Tambahan Opsional)
         </label>
+        <p className="mt-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+          HPP dihitung dengan harga komponen saat ini.
+        </p>
       </div>
 
       <ErrorBox message={error} />
@@ -1242,16 +1317,12 @@ function MatriksTab({ recipeId, options }: { recipeId: string; options: Options 
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!options) return;
-    setSize((current) => current || (options.sizes.includes("L") ? "L" : options.sizes[0] || ""));
-  }, [options]);
-
-  useEffect(() => {
-    if (!size) return;
     let cancelled = false;
     setLoading(true);
+    const params = new URLSearchParams();
+    if (size) params.set("size", size);
     produksiFetch<MatrixResponse>(
-      `/api/ops/production/recipes/${recipeId}/matrix?size=${encodeURIComponent(size)}`,
+      `/api/ops/production/recipes/${recipeId}/matrix?${params.toString()}`,
     )
       .then((json) => {
         if (!cancelled) { setData(json); setError(""); }
@@ -1270,14 +1341,20 @@ function MatriksTab({ recipeId, options }: { recipeId: string; options: Options 
       <div className={`${cardClass} p-4 flex flex-wrap items-end gap-3`}>
         <div>
           <label className={labelClass}>Ukuran</label>
-          <select className={`${inputClass} w-auto min-w-[120px]`} value={size} onChange={(e) => setSize(e.target.value)}>
+          <select className={`${inputClass} w-auto min-w-[220px]`} value={size} onChange={(e) => setSize(e.target.value)}>
+            <option value="">Acuan (jumlah kain default)</option>
             {(options?.sizes || []).map((value) => <option key={value} value={value}>{value}</option>)}
           </select>
         </div>
-        <p className="text-[11px] text-slate-400 max-w-md">
-          Matriks memakai harga komponen saat ini. Kombinasi mengikuti resep:{" "}
-          {data?.uses_series ? "Jenis Kain × Series" : "Jenis Kain saja"}.
-        </p>
+        <div className="max-w-md">
+          <p className="text-[11px] text-slate-400">
+            Matriks mengikuti resep: {data?.uses_series ? "Jenis Kain × Series" : "Jenis Kain saja"}. Ukuran opsional,
+            hanya memengaruhi baris kain yang punya jumlah berbeda per ukuran.
+          </p>
+          <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+            HPP dihitung dengan harga komponen saat ini.
+          </p>
+        </div>
       </div>
 
       <ErrorBox message={error} />

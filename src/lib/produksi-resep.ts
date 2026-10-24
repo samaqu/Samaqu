@@ -24,15 +24,18 @@ export const BAHAN_GROUP_LABEL: Record<string, string> = {
   biaya: "Biaya Non-Bahan",
 };
 
-/** Contoh kelompok biaya yang sudah dipakai di sheet HPP. */
-export const COST_GROUP_EXAMPLES = [
+/** Kelompok biaya tetap. Owner boleh menambah lewat dropdown (disimpan di DB). */
+export const COST_GROUP_DEFAULTS = [
   "Biaya Jahit",
   "Kain Keras",
   "Trikot & Vislin",
-  "Potong/Finishing/QC",
-  "Pembuatan Tali Tarboosh dan pasang kancing jepret",
+  "Potong/Finishing/QC (OPEX)",
+  "Jasa Tarboosh",
   "Biaya Lain-lain",
 ];
+
+/** Alias lama supaya import lain tidak langsung rusak. */
+export const COST_GROUP_EXAMPLES = COST_GROUP_DEFAULTS;
 
 export type RecipeLine = {
   id?: string;
