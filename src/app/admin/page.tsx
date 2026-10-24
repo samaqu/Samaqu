@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { getThumbnailFromImages } from "@/lib/product-thumbnail";
 import {
   LayoutDashboard, ShoppingBag, Package, Users, FileText, Settings,
@@ -208,6 +209,24 @@ function groupByMainProduct(raw: Product[]): AdminCatalogProduct[] {
    rentang query, label periode, dan label grafik memakai definisi bulan yang sama. ── */
 const JENDELA_GRAFIK_BULAN = 6;
 
+/**
+ * Pembungkus panel dashboard yang tetap terpasang setelah pernah dibuka — pindah menu cuma
+ * mengganti panel mana yang tampak, jadi panelnya tidak di-render ulang (tidak ada loading).
+ * Animasi masuk yang lama tetap dipakai saat panelnya pertama kali muncul.
+ */
+function KeptPanel({ active, children }: { active: boolean; children: ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: active ? 1 : 0, y: active ? 0 : 8 }}
+      transition={{ duration: 0.25 }}
+      style={{ display: active ? undefined : "none" }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 function AdminPageInner() {
   // ALL hooks must be declared BEFORE any early returns
   const [user, setUser] = useState<User | null>(null);
@@ -217,6 +236,14 @@ function AdminPageInner() {
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [activePanel, setActivePanel] = useState<Panel>("dashboard");
+  // Panel yang pernah dibuka tetap TERPASANG (cuma disembunyikan) supaya pindah menu tidak
+  // me-render ulang panelnya: datanya tidak diambil lagi dan tidak ada layar loading.
+  const [keepPanels, setKeepPanels] = useState<Panel[]>(["dashboard"]);
+  /** Muat panelnya lebih awal — dipanggil saat menu diklik DAN saat kursor menyentuh menunya,
+   *  supaya begitu menu dibuka isinya sudah siap (tidak ada layar loading). */
+  const preloadPanel = useCallback((panel: Panel) => {
+    setKeepPanels((prev) => (prev.includes(panel) ? prev : [...prev, panel]));
+  }, []);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -440,9 +467,12 @@ function AdminPageInner() {
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("panel");
     if (requested && (Object.keys(panelTitles) as Panel[]).includes(requested as Panel)) {
+      // Panel dari URL ikut "dipasang" — tanpa ini panelnya tidak dirender sama sekali
+      // (daftar panel yang terpasang cuma berisi Dashboard di awal).
+      preloadPanel(requested as Panel);
       setActivePanel(requested as Panel);
     }
-  }, []);
+  }, [preloadPanel]);
 
   // Handler functions (not hooks)
   function shiftDashMonth(delta: number) {
@@ -656,6 +686,7 @@ function AdminPageInner() {
   }
 
   function go(panel: Panel) {
+    preloadPanel(panel);
     setActivePanel(panel);
     setSidebarOpen(false);
   }
@@ -802,7 +833,12 @@ function AdminPageInner() {
                 {group.items.map((item) => (
                   <li key={item.label}>
                     {"panel" in item ? (
-                      <button onClick={() => go(item.panel)} className={`sidebar-link ${activePanel === item.panel ? "active" : ""}`}>
+                      <button
+                        onClick={() => go(item.panel)}
+                        onMouseEnter={() => preloadPanel(item.panel)}
+                        onFocus={() => preloadPanel(item.panel)}
+                        className={`sidebar-link ${activePanel === item.panel ? "active" : ""}`}
+                      >
                         <item.icon size={16} strokeWidth={1.9} />
                         <span className="flex-1 text-left truncate">{item.label}</span>
                         {item.badge && orders.filter((o) => o.status === "pending").length > 0 && (
@@ -902,85 +938,106 @@ function AdminPageInner() {
         </header>
 
         {/* Content */}
+        {/* Panel yang sudah pernah dibuka tetap TERPASANG dan cuma disembunyikan (`KeptPanel`),
+            jadi pindah menu tidak me-render ulang panelnya: datanya tidak diambil lagi dan tidak
+            ada layar loading. Menu yang kursor-nya sempat menyentuh juga sudah dimuat lebih dulu. */}
         <main className="flex-1 p-5 lg:p-8 overflow-x-hidden">
-          <AnimatePresence mode="wait">
-            <motion.div key={activePanel} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+          {/* DASHBOARD */}
+          {keepPanels.includes("dashboard") && (
+            <KeptPanel active={activePanel === "dashboard"}>
+              <DashboardView
+                revenue={dashRevenue}
+                orders={dashOrders}
+                chartOrders={trendOrders}
+                topProducts={topProducts}
+                loading={loading || dashLoading}
+                periodValue={bulanValue}
+                periodLabel={periodLabel}
+                onPrevMonth={() => shiftDashMonth(-1)}
+                onNextMonth={() => shiftDashMonth(1)}
+                onThisMonth={() => setBulanValue(currentMonthWIB())}
+              />
+            </KeptPanel>
+          )}
 
-              {/* DASHBOARD */}
-              {activePanel === "dashboard" && (
-                <DashboardView
-                  revenue={dashRevenue}
-                  orders={dashOrders}
-                  chartOrders={trendOrders}
-                  topProducts={topProducts}
-                  loading={loading || dashLoading}
-                  periodValue={bulanValue}
-                  periodLabel={periodLabel}
-                  onPrevMonth={() => shiftDashMonth(-1)}
-                  onNextMonth={() => shiftDashMonth(1)}
-                  onThisMonth={() => setBulanValue(currentMonthWIB())}
-                />
-              )}
+          {/* ORDER MANAGEMENT — ala Shopee Seller Centre: tab tahap + daftar.
+              Seluruh alurnya (tab sumber, pencarian, tab tahap, daftar, tabel) hidup di
+              `OrdersView` supaya file ini tidak lagi menampung panel pesanan sepanjang itu.
+              Aksi pesanan (Atur Pesanan / Cetak Label / Hubungi Pembeli) sengaja hanya ada di
+              drawer detail, jadi halaman ini tidak mengoper `arrangeOrder` ke daftarnya. */}
+          {keepPanels.includes("orders") && (
+            <KeptPanel active={activePanel === "orders"}>
+              <OrdersView
+                orders={dashOrders}
+                loading={dashLoading}
+                periodLabel={periodLabel}
+                onPrevMonth={() => shiftDashMonth(-1)}
+                onNextMonth={() => shiftDashMonth(1)}
+                onSelect={(row) => setSelectedOrder(dashOrders.find((o) => o.id === row.id) || null)}
+              />
+            </KeptPanel>
+          )}
 
-              {/* ORDER MANAGEMENT — ala Shopee Seller Centre: tab tahap + daftar.
-                  Seluruh alurnya (tab sumber, pencarian, tab tahap, daftar, tabel) hidup di
-                  `OrdersView` supaya file ini tidak lagi menampung panel pesanan sepanjang itu.
-                  Aksi pesanan (Atur Pesanan / Cetak Label / Hubungi Pembeli) sengaja hanya ada di
-                  drawer detail, jadi halaman ini tidak mengoper `arrangeOrder` ke daftarnya. */}
-              {activePanel === "orders" && (
-                <OrdersView
-                  orders={dashOrders}
-                  loading={dashLoading}
-                  periodLabel={periodLabel}
-                  onPrevMonth={() => shiftDashMonth(-1)}
-                  onNextMonth={() => shiftDashMonth(1)}
-                  onSelect={(row) => setSelectedOrder(dashOrders.find((o) => o.id === row.id) || null)}
-                />
-              )}
+          {/* PRODUCTS */}
+          {keepPanels.includes("products") && (
+            <KeptPanel active={activePanel === "products"}>
+              <ProductsCatalog
+                items={filteredCatalogItems}
+                total={catalogItemsWithStock.length}
+                thumbnails={productThumbnails}
+                search={productSearch}
+                setSearch={setProductSearch}
+                onDelete={handleDeleteProduct}
+                onDetail={setSelectedProductId}
+                loading={loading}
+              />
+            </KeptPanel>
+          )}
 
-              {/* PRODUCTS */}
-              {activePanel === "products" && (
-                <ProductsCatalog
-                  items={filteredCatalogItems}
-                  total={catalogItemsWithStock.length}
-                  thumbnails={productThumbnails}
-                  search={productSearch}
-                  setSearch={setProductSearch}
-                  onDelete={handleDeleteProduct}
-                  onDetail={setSelectedProductId}
-                  loading={loading}
-                />
-              )}
+          {/* CUSTOMERS */}
+          {keepPanels.includes("customers") && (
+            <KeptPanel active={activePanel === "customers"}>
+              <CustomersView />
+            </KeptPanel>
+          )}
 
-              {/* CUSTOMERS */}
-              {activePanel === "customers" && <CustomersView />}
+          {/* LIVE CHAT — tab Percakapan + Pengaturan asisten AI */}
+          {keepPanels.includes("chats") && (
+            <KeptPanel active={activePanel === "chats"}>
+              <LiveChatView />
+            </KeptPanel>
+          )}
 
-              {/* LIVE CHAT — tab Percakapan + Pengaturan asisten AI */}
-              {activePanel === "chats" && <LiveChatView />}
+          {/* CONTENT */}
+          {keepPanels.includes("content") && (
+            <KeptPanel active={activePanel === "content"}>
+              <div>
+                <h2 className="text-2xl italic mb-1" style={{ fontFamily: "var(--font-cormorant), Georgia, serif" }}>Konten Website</h2>
+                <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>Kelola bagian yang tampil di samaqu.vercel.app</p>
+                <Link href="/admin/konten-website" className="card p-5 flex items-center justify-between hover:shadow-md transition-shadow" style={{ cursor: "pointer" }}>
+                  <div>
+                    <h3 className="font-semibold mb-1" style={{ color: "var(--espresso)" }}>Kelola Konten Halaman</h3>
+                    <p className="text-sm" style={{ color: "var(--text-muted)" }}>Edit Hero, Koleksi Pilihan, Cara Pemesanan, Testimoni</p>
+                  </div>
+                  <span className="text-sm font-semibold" style={{ color: "var(--gold)" }}>Buka →</span>
+                </Link>
+              </div>
+            </KeptPanel>
+          )}
 
-              {/* CONTENT */}
-              {activePanel === "content" && (
-                <div>
-                  <h2 className="text-2xl italic mb-1" style={{ fontFamily: "var(--font-cormorant), Georgia, serif" }}>Konten Website</h2>
-                  <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>Kelola bagian yang tampil di samaqu.vercel.app</p>
-                  <Link href="/admin/konten-website" className="card p-5 flex items-center justify-between hover:shadow-md transition-shadow" style={{ cursor: "pointer" }}>
-                    <div>
-                      <h3 className="font-semibold mb-1" style={{ color: "var(--espresso)" }}>Kelola Konten Halaman</h3>
-                      <p className="text-sm" style={{ color: "var(--text-muted)" }}>Edit Hero, Koleksi Pilihan, Cara Pemesanan, Testimoni</p>
-                    </div>
-                    <span className="text-sm font-semibold" style={{ color: "var(--gold)" }}>Buka →</span>
-                  </Link>
-                </div>
-              )}
+          {/* TEMPLATE NOTIF — dipisah dari Pengaturan; logic simpan tetap sama. */}
+          {keepPanels.includes("notif-template") && (
+            <KeptPanel active={activePanel === "notif-template"}>
+              <NotifikasiKatalog />
+            </KeptPanel>
+          )}
 
-              {/* TEMPLATE NOTIF — dipisah dari Pengaturan; logic simpan tetap sama. */}
-              {activePanel === "notif-template" && <NotifikasiKatalog />}
-
-              {/* SETTINGS */}
-              {activePanel === "settings" && <SettingsPanel />}
-
-            </motion.div>
-          </AnimatePresence>
+          {/* SETTINGS */}
+          {keepPanels.includes("settings") && (
+            <KeptPanel active={activePanel === "settings"}>
+              <SettingsPanel />
+            </KeptPanel>
+          )}
         </main>
       </div>
 

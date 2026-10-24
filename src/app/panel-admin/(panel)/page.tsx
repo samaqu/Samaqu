@@ -186,11 +186,19 @@ function EmptyStockArt() {
   );
 }
 
+/**
+ * Cache modul: data terakhir disimpan DI LUAR komponen supaya pindah menu lalu balik ke Beranda
+ * tidak menampilkan layar "Memuat…" lagi — data terakhir langsung tampil, lalu disegarkan di
+ * belakang. Tanggalnya ikut disimpan; kalau harinya (WIB) sudah berganti, data lama tetap tampil
+ * sebentar sambil versi hari barunya diambil.
+ */
+let panelCache: { day: string; orders: TxRow[]; variants: VariantRow[] } | null = null;
+
 export default function PanelAdminHome() {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!panelCache);
   const [error, setError] = useState<string | null>(null);
-  const [orders, setOrders] = useState<TxRow[]>([]);
-  const [variants, setVariants] = useState<VariantRow[]>([]);
+  const [orders, setOrders] = useState<TxRow[]>(panelCache?.orders ?? []);
+  const [variants, setVariants] = useState<VariantRow[]>(panelCache?.variants ?? []);
   // Kunci tanggal WIB hari ini — ikut berubah otomatis saat lewat tengah malam WIB.
   const today = useWibToday();
   const greeting = useWibGreeting();
@@ -208,8 +216,11 @@ export default function PanelAdminHome() {
           opsGet<{ items?: VariantRow[] }>("/api/ops/product-variants"),
         ]);
         if (cancelled) return;
-        setOrders(Array.isArray(tx.items) ? tx.items : []);
-        setVariants(Array.isArray(vr.items) ? vr.items : []);
+        const nextOrders = Array.isArray(tx.items) ? tx.items : [];
+        const nextVariants = Array.isArray(vr.items) ? vr.items : [];
+        panelCache = { day: today, orders: nextOrders, variants: nextVariants };
+        setOrders(nextOrders);
+        setVariants(nextVariants);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Gagal memuat data");
       } finally {

@@ -112,7 +112,8 @@ export default function Transaksi({ variant = "ops" }) {
     setSelectedDate("");
   };
 
-  const coverageLabel = selectedDate ? formatTanggalID(selectedDate) : `${MONTHS[month]} ${year}`;
+  /** Periode kartu KPI (mis. "Oktober 2026") — dipakai keterangan kartu "Total transaksi". */
+  const periodeKartu = selectedDate ? formatTanggalID(selectedDate) : `${MONTHS[month]} ${year}`;
 
   const prevMonth = () => {
     setSelectedDate("");
@@ -310,21 +311,21 @@ export default function Transaksi({ variant = "ops" }) {
           <div className="card k">
             <small>Total transaksi</small>
             <b><AnimatedNumber value={isLoading ? 0 : panelKpis.total} /></b>
-            {/* Keterangan kartu = KALIMAT YANG SAMA PERSIS dengan kartu metrik dashboard admin
-                (`DashboardView`) — permintaan pemilik 2026-10-24: "kalimat dashboard persis".
-                Dulu periodenya ditulis di sini ("dari 143 pesanan masuk bulan Oktober 2026");
-                sekarang pemilih bulan di bar filter sudah menunjukkan periodenya. */}
-            <i>{isLoading ? coverageLabel : "Di luar batal & belum bayar"}</i>
+            {/* Keterangan kartu mengikuti mockup dashboard ops (permintaan pemilik 2026-10-24):
+                angka besar = transaksi diakui (`saleCount`), sedangkan keterangannya menyebut
+                SEMUA pesanan yang masuk periode itu — mis. "dari 145 pesanan masuk Oktober 2026".
+                Keterangan ini selalu tampil (tidak berganti jadi teks loading). */}
+            <i>dari {orders.length} pesanan masuk {periodeKartu}</i>
           </div>
           <div className="card k">
             <small>Omset bulan ini</small>
             <b><AnimatedNumber value={isLoading ? 0 : panelKpis.revenue} format={(n) => `Rp ${formatRupiah(n)}`} /></b>
-            <i>{isLoading ? coverageLabel : `${panelKpis.total} transaksi berhasil`}</i>
+            <i>Tidak termasuk dibatalkan</i>
           </div>
           <div className="card k">
             <small>Belum bayar</small>
             <b style={{ color: "#c76f00" }}><AnimatedNumber value={isLoading ? 0 : panelKpis.unpaid} /></b>
-            <i>menunggu pembayaran</i>
+            <i>Perlu follow-up</i>
           </div>
           <div className="card k">
             <small>Perlu diproses</small>

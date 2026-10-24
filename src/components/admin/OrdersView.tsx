@@ -190,20 +190,16 @@ export default function OrdersView({
     [orders],
   );
 
-  const sourceLabelText =
-    orderSource === "all" ? "Semua sumber" : ORDER_SOURCE_LABEL[orderSource] || orderSource;
-  /** Label periode (mis. "Oktober 2026") — dipakai saat kartu masih memuat. */
-  const periodCaption = periodLabel || sourceLabelText;
   /**
-   * Keterangan kartu KPI memakai KALIMAT YANG SAMA PERSIS dengan kartu metrik dashboard admin
-   * (`DashboardView`) — permintaan pemilik 2026-10-24: "kalimat dashboard persis". Jadi angka yang
-   * sama tidak terbaca berbeda antar layar: `126 transaksi berhasil` (kartu Pendapatan) untuk kartu
-   * omset, dan `Di luar batal & belum bayar` (kartu Pesanan Masuk) untuk kartu jumlah transaksi.
-   * Label periode tidak lagi ditulis di keterangan karena pemilih bulan di bar filter sudah
-   * menunjukkannya, dan kalimatnya jadi identik dengan dashboard.
+   * Keterangan kartu KPI mengikuti mockup dashboard ops (permintaan pemilik 2026-10-24):
+   * "dari 145 pesanan masuk Oktober 2026" untuk jumlah transaksi (126) di antara SEMUA pesanan
+   * periode itu, "Tidak termasuk dibatalkan" untuk omset, "Perlu follow-up" untuk belum bayar,
+   * dan "Packing + siap kirim" untuk perlu diproses.
+   *
+   * Keterangannya SELALU tampil — tidak ada teks loading yang berganti-ganti saat pindah menu.
    */
-  const captionTotal = "Di luar batal & belum bayar";
-  const captionOmset = `${kpis.total} transaksi berhasil`;
+  const captionTotal = `dari ${orders.length} pesanan masuk ${periodLabel || "bulan ini"}`;
+  const captionOmset = "Tidak termasuk dibatalkan";
   const filtersActive = Boolean(orderQuery) || orderFilter !== "semua" || orderSource !== "all";
   const resetFilters = () => {
     setOrderSearch("");
@@ -222,17 +218,17 @@ export default function OrdersView({
         <div className="card k">
           <small>Total transaksi</small>
           <b><CountUp value={loading ? 0 : kpis.total} format={angka} /></b>
-          <i>{loading ? periodCaption : captionTotal}</i>
+          <i>{captionTotal}</i>
         </div>
         <div className="card k">
           <small>Omset bulan ini</small>
           <b><CountUp value={loading ? 0 : kpis.revenue} format={rupiah} /></b>
-          <i>{loading ? periodCaption : captionOmset}</i>
+          <i>{captionOmset}</i>
         </div>
         <div className="card k">
           <small>Belum bayar</small>
           <b style={{ color: "#c76f00" }}><CountUp value={loading ? 0 : kpis.unpaid} format={angka} /></b>
-          <i>menunggu pembayaran</i>
+          <i>Perlu follow-up</i>
         </div>
         <div className="card k">
           <small>Perlu diproses</small>

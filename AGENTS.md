@@ -1628,3 +1628,51 @@ keduanya seharusnya dapat diskon, ada potensi kelebihan bayar ±Rp15.750. Selain
 yang ditagih belum tentu sama dengan file yang diunggah — filter tanggal portal J&T harus dicek
 lewat angka "Total X" sebelum menekan Ekspor, dan `outsidePeriod` di balasan upload menandai baris
 yang tanggalnya di luar bulan terpilih.
+
+## Keterangan kartu Transaksi & "tidak ada loading saat pindah menu" (2026-10-24)
+
+Permintaan pemilik: keterangan kartu diganti mengikuti mockup dashboard ops ("biar admin enak baca"),
+dan **setiap pindah menu tidak boleh ada layar loading**, diterapkan di tiga dashboard internal
+(admin, ops, panel-admin).
+
+**Keterangan kartu** (mockup, menggantikan kalimat "dashboard persis" 2026-10-24 pagi):
+
+| Kartu | Angka besar | Keterangan sekarang |
+|-------|-------------|---------------------|
+| Total transaksi | `saleCount(orders)` (126) | `dari <semua pesanan periode> pesanan masuk <periode>` — mis. "dari 145 pesanan masuk Oktober 2026" |
+| Omset bulan ini | `orderRevenue()` total | "Tidak termasuk dibatalkan" |
+| Belum bayar | `orderStage() === "belum_bayar"` | "Perlu follow-up" |
+| Perlu diproses | tahap belum/sudah dipacking | "Packing + siap kirim" |
+
+Keterangan itu **selalu tampil** — tidak lagi bergantian dengan label periode/teks loading
+(`coverageLabel`, `periodCaption`, `sourceLabelText` sudah dihapus). Berkasnya:
+`src/app/ops/transaksi/page.jsx` (dipakai `/ops/transaksi` **dan** `/panel-admin/transaksi` lewat
+`variant="panel"`) dan `src/components/admin/OrdersView.tsx` (panel Order Management). Angka besar
+tetap `saleCount` — **jangan** kembalikan `orders.length` sebagai nilai kartu; jumlah semua pesanan
+periode itu hanya muncul di keterangan.
+
+**Pindah menu tanpa loading.**
+
+- **Dashboard admin** (`src/app/admin/page.tsx`): panel yang sudah pernah dibuka tetap **terpasang**
+  dan cuma disembunyikan (`keepPanels` + pembungkus `KeptPanel`, animasi masuk lama tetap dipakai),
+  jadi pindah menu tidak me-render ulang panelnya dan tidak mengambil datanya lagi. Menu dimuat
+  lebih awal lewat `preloadPanel` pada **klik** dan **`onMouseEnter`/`onFocus`** item sidebar, dan
+  panel awal dari `?panel=` juga ikut di-preload — **wajib**, karena tanpa itu panel dari URL tidak
+  dirender sama sekali (screenshot pembuktian: area konten kosong).
+- **Panel admin** (`src/app/panel-admin/(panel)/page.tsx`): data Beranda disimpan di cache modul
+  (`panelCache` berisi `day` + orders + variants) sehingga kembali ke Beranda langsung menampilkan
+  data terakhir tanpa "Memuat…"; cache dibuang kalau hari WIB berganti.
+- **Dashboard ops**: tidak diubah — QueryClient global di `OpsShell` sudah memakai
+  `staleTime 60 detik` + `gcTime 10 menit` dan sidebar mem-prefetch route saat kursor menyentuh
+  menu, jadi kunjungan ulang sudah memakai cache (skeleton tinggal di kunjungan pertama, saat
+  datanya memang belum ada).
+- **Pitfall** (dua-duanya ketangkap saat verifikasi): `const` yang dipakai di dependency array
+  `useEffect` harus dideklarasikan **sebelum** effect-nya (`Cannot access 'preloadPanel' before
+  initialization`), dan panel yang hanya dirender lewat `keepPanels` harus ikut diisi saat panel
+  awal dipilih dari URL.
+- Verifikasi (2026-10-24, iframe same-origin sesuai catatan tool di atas): `/admin?panel=orders` →
+  keempat keterangan baru terbaca (`dari 0 pesanan masuk Oktober 2026` saat data belum tiba,
+  `Tidak termasuk dibatalkan`, `Perlu follow-up`, `Packing + siap kirim`); `/ops/transaksi` →
+  keterangan yang sama; klik **Pelanggan → Dashboard → Pelanggan** → kunjungan pertama memuat data
+  (`Memuat…` muncul), kunjungan kedua **tanpa** teks Memuat/skeleton dan langsung menampilkan
+  daftar pelanggan (219 baris); 0 error console.
