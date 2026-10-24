@@ -183,12 +183,15 @@ export async function GET(
   });
 
   const totalOutstandingRework = Array.from(outstanding.values()).reduce((sum, qty) => sum + qty, 0);
-  const totalLolos = receiptSummary.lolos + receiptSummary.resolvedLolos;
+  const completed = schedule.status === "selesai";
+  const totalLolosFromReceipts = receiptSummary.lolos + receiptSummary.resolvedLolos;
+  const totalLolos = completed && schedule.final_lolos != null
+    ? Number(schedule.final_lolos)
+    : totalLolosFromReceipts;
   const totalReject = receiptSummary.reject + receiptSummary.resolvedReject;
   const totalResult = totalLolos + totalOutstandingRework + totalReject;
   // Setelah Selesai, biaya bahan memakai pemakaian aktual (dikeluarkan − retur).
   // Sebelumnya, penerimaan memakai alokasi biaya yang sudah dikeluarkan.
-  const completed = schedule.status === "selesai";
   const finalMaterialCost = Math.max(0, issuedCostTotal - returnedCostTotal);
   const summaryMaterialCost = completed && schedule.final_material_cost != null
     ? Number(schedule.final_material_cost)
@@ -257,20 +260,30 @@ export async function GET(
   const hppProductIds = Array.from(
     new Set((hppContributionRows || []).map((row: any) => String(row.product_id))),
   );
-  const [{ data: hppProducts }, { data: hppGlobalRows }] = hppProductIds.length > 0
+  const [{ data: hppProducts }, { data: hppGlobalRows }, { data: hppStockRows }] = hppProductIds.length > 0
     ? await Promise.all([
         admin.from("products").select("id, name").in("id", hppProductIds),
         admin
           .from("production_finished_hpp")
           .select("product_id, color, size, qty_received, hpp_avg")
           .in("product_id", hppProductIds),
+        admin
+          .from("product_variants")
+          .select("product_id, color, size, stock")
+          .in("product_id", hppProductIds),
       ])
-    : [{ data: [] as any[] }, { data: [] as any[] }];
+    : [{ data: [] as any[] }, { data: [] as any[] }, { data: [] as any[] }];
   const productNameById = new Map((hppProducts || []).map((row: any) => [String(row.id), String(row.name || "")]));
   const globalHppByKey = new Map(
     (hppGlobalRows || []).map((row: any) => [
       `${row.product_id}|${row.color}|${row.size}`,
       row,
+    ]),
+  );
+  const stockByKey = new Map(
+    (hppStockRows || []).map((row: any) => [
+      `${row.product_id}|${row.color}|${row.size}`,
+      Number(row.stock) || 0,
     ]),
   );
   const contributionMap = new Map<
@@ -294,6 +307,7 @@ export async function GET(
     contributionMap.set(key, current);
   }
   const finishedHpp = Array.from(contributionMap.values())
+    .filter((row) => row.qty > 0)
     .map((row) => {
       const key = `${row.product_id}|${row.color}|${row.size}`;
       const global = globalHppByKey.get(key);
@@ -303,6 +317,7 @@ export async function GET(
         color: row.color,
         size: row.size,
         qty: Math.round(row.qty * 10000) / 10000,
+        stock: stockByKey.get(key) || 0,
         hpp_schedule: row.qty > 0 ? Math.round((row.value / row.qty) * 100) / 100 : 0,
         hpp_avg: global ? Number(global.hpp_avg) || 0 : 0,
         qty_received: global ? Number(global.qty_received) || 0 : 0,
@@ -310,6 +325,32 @@ export async function GET(
       };
     })
     .sort((a, b) => a.product_name.localeCompare(b.product_name, "id") || a.size.localeCompare(b.size));
+
+  const { data: correctionRows } = await admin
+    .from("production_qc_corrections")
+    .select("*")
+    .eq("schedule_id", id)
+    .order("created_at", { ascending: false });
+  const corrections = (correctionRows || []).map((row: any) => ({
+    id: row.id,
+    schedule_id: row.schedule_id,
+    product_id: row.product_id,
+    product_name: row.product_name || productNameById.get(row.product_id) || row.product_id,
+    color: row.color || "default",
+    size: row.size,
+    qty_before: Number(row.qty_before) || 0,
+    qty_after: Number(row.qty_after) || 0,
+    delta: Number(row.delta) || 0,
+    stock_before: Number(row.stock_before) || 0,
+    stock_after: Number(row.stock_after) || 0,
+    hpp_before: Number(row.hpp_before) || 0,
+    hpp_after: Number(row.hpp_after) || 0,
+    final_lolos_before: Number(row.final_lolos_before) || 0,
+    final_lolos_after: Number(row.final_lolos_after) || 0,
+    reason: row.reason || "",
+    actor: row.actor || "",
+    created_at: row.created_at,
+  }));
 
   return NextResponse.json({
     item: schedule,
@@ -336,6 +377,7 @@ export async function GET(
     },
     receipts,
     finished_hpp: finishedHpp,
+    corrections,
     results,
     outstanding_rework: totalOutstandingRework,
     usage,

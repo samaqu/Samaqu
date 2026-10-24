@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, Copy, Loader2, Pencil, Play, Plus, X } from "lucide-react";
-import { formatQty, formatRupiah } from "@/lib/produksi";
+import { formatDateTime, formatQty, formatRupiah } from "@/lib/produksi";
 import { produksiFetch } from "@/lib/produksi-api";
 import {
   formatScheduleDate,
@@ -135,10 +135,32 @@ type FinishedHppRow = {
   color: string;
   size: string;
   qty: number;
+  stock: number;
   hpp_schedule: number;
   hpp_avg: number;
   qty_received: number;
   is_final: boolean;
+};
+
+type Correction = {
+  id: string;
+  schedule_id: string;
+  product_id: string;
+  product_name: string;
+  color: string;
+  size: string;
+  qty_before: number;
+  qty_after: number;
+  delta: number;
+  stock_before: number;
+  stock_after: number;
+  hpp_before: number;
+  hpp_after: number;
+  final_lolos_before: number;
+  final_lolos_after: number;
+  reason: string;
+  actor: string;
+  created_at: string;
 };
 
 type Requirement = {
@@ -156,6 +178,15 @@ type Requirement = {
   value: number;
 };
 
+const hppKey = (row: { product_id: string; color: string; size: string }) =>
+  `${row.product_id}|${row.color}|${row.size}`;
+
+function newRequestId(): string {
+  const cryptoApi = globalThis.crypto;
+  if (cryptoApi && typeof cryptoApi.randomUUID === "function") return cryptoApi.randomUUID();
+  return `qc-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 type DetailResponse = {
   item: Schedule;
   targets: Target[];
@@ -165,6 +196,7 @@ type DetailResponse = {
   recipes_used: { recipe_id: string; version: number; category: string }[];
   receipts: Receipt[];
   finished_hpp: FinishedHppRow[];
+  corrections: Correction[];
   results: ReceiptResult[];
   outstanding_rework: number;
   usage: UsageRow[];
@@ -188,6 +220,14 @@ export default function JadwalDetailView({ id }: { id: string }) {
   const [busy, setBusy] = useState(false);
 
   const [formOpen, setFormOpen] = useState(false);
+  const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [correctionKey, setCorrectionKey] = useState("");
+  const [correctionQty, setCorrectionQty] = useState("");
+  const [correctionReason, setCorrectionReason] = useState("");
+  const [correctionRequestId, setCorrectionRequestId] = useState("");
+  const [correctionError, setCorrectionError] = useState("");
+  const [correcting, setCorrecting] = useState(false);
+  const [notice, setNotice] = useState("");
   const [approveOpen, setApproveOpen] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -315,6 +355,68 @@ export default function JadwalDetailView({ id }: { id: string }) {
   }));
   const completeInvalid = completeRows.some((row) => row.qty < 0 || row.qty > row.issued_qty + 0.0001);
 
+  const correctionVariant = (data?.finished_hpp || []).find((row) => hppKey(row) === correctionKey);
+  const correctionNewQty = Number(correctionQty) || 0;
+  const correctionDelta = correctionVariant ? correctionVariant.qty - correctionNewQty : 0;
+  const correctionProjectedLolos = data?.item.final_lolos
+    ? Number(data.item.final_lolos) - correctionDelta
+    : 0;
+  const correctionProjectedHpp =
+    correctionProjectedLolos > 0 && data?.item.final_total_cost != null
+      ? Number(data.item.final_total_cost) / correctionProjectedLolos
+      : 0;
+  const correctionValidationMessage = (() => {
+    if (!correctionVariant) return "Pilih varian yang mau dikoreksi.";
+    if (correctionNewQty < 1) return "Lolos 0 tidak didukung. Gunakan pembatalan/koreksi terpisah.";
+    if (correctionNewQty > correctionVariant.qty) return "Koreksi naik tidak didukung. Gunakan penerimaan susulan.";
+    if (correctionNewQty === correctionVariant.qty) return "Tidak ada perubahan pada qty lolos.";
+    if (correctionDelta > correctionVariant.stock) {
+      return `Stok saat ini ${formatQty(correctionVariant.stock)} pcs, koreksi ${formatQty(correctionDelta)} pcs, kurang ${formatQty(correctionDelta - correctionVariant.stock)} pcs.`;
+    }
+    if (!correctionReason.trim()) return "Alasan koreksi wajib diisi.";
+    return "";
+  })();
+
+  function openCorrection() {
+    if (!data) return;
+    const first = data.finished_hpp[0];
+    if (!first) return;
+    setCorrectionKey(hppKey(first));
+    setCorrectionQty(String(first.qty));
+    setCorrectionReason("");
+    setCorrectionError("");
+    setCorrectionRequestId(newRequestId());
+    setCorrectionOpen(true);
+  }
+
+  async function submitCorrection() {
+    if (!data || !correctionVariant || correctionValidationMessage || correcting) return;
+    setCorrecting(true);
+    setCorrectionError("");
+    try {
+      await produksiFetch(`/api/ops/production/schedules/${data.item.id}/qc-corrections`, {
+        method: "POST",
+        body: JSON.stringify({
+          product_id: correctionVariant.product_id,
+          color: correctionVariant.color,
+          size: correctionVariant.size,
+          new_lolos: correctionNewQty,
+          reason: correctionReason.trim(),
+          request_id: correctionRequestId,
+        }),
+      });
+      setCorrectionOpen(false);
+      setNotice(
+        `Koreksi ${correctionVariant.product_name} ${correctionVariant.size} disimpan. Stok dan HPP final sudah diperbarui.`,
+      );
+      await load();
+    } catch (e) {
+      setCorrectionError(e instanceof Error ? e.message : "Gagal menyimpan koreksi.");
+    } finally {
+      setCorrecting(false);
+    }
+  }
+
   async function submitIssue() {
     if (!issueRow || issueInvalid) return;
     await runAction("issue", {
@@ -409,6 +511,11 @@ export default function JadwalDetailView({ id }: { id: string }) {
                       <Check size={15} /> Selesai
                     </button>
                   ) : null}
+                  {data.item.status === "selesai" && data.finished_hpp.length > 0 ? (
+                    <button className={btnSecondary} onClick={openCorrection}>
+                      <Pencil size={15} /> Koreksi Lolos QC
+                    </button>
+                  ) : null}
                   {data.can_cancel ? (
                     <button className={btnSecondary} onClick={() => setCancelOpen(true)}>
                       <X size={15} /> Batal
@@ -419,6 +526,20 @@ export default function JadwalDetailView({ id }: { id: string }) {
             />
 
             <ErrorBox message={actionError} />
+
+            {notice ? (
+              <div className="flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-200">
+                <span>{notice}</span>
+                <button
+                  type="button"
+                  className="rounded-lg p-0.5 text-emerald-600 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
+                  onClick={() => setNotice("")}
+                  aria-label="Tutup pemberitahuan"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <StatCard label="Total target" value={`${formatQty(data.total_pcs)} pcs`} hint={`${data.targets.length} baris target`} />
@@ -590,6 +711,86 @@ export default function JadwalDetailView({ id }: { id: string }) {
                             </div>
                           );
                         })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {data.corrections.length > 0 ? (
+              <div className={`${cardClass} overflow-hidden`}>
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">Riwayat Koreksi Lolos QC</p>
+                  <p className="text-[11px] text-slate-400">
+                    Koreksi turun setelah jadwal Selesai. Riwayat penerimaan tidak diubah.
+                  </p>
+                </div>
+
+                <div className="hidden md:block">
+                  <table className="w-full border-collapse table-fixed">
+                    <colgroup>
+                      <col className="w-[18%]" />
+                      <col className="w-[28%]" />
+                      <col className="w-[14%]" />
+                      <col className="w-[14%]" />
+                      <col className="w-[14%]" />
+                      <col className="w-[12%]" />
+                    </colgroup>
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700">
+                        {["Waktu", "Varian", "Lolos", "Stok", "HPP final", "Alasan"].map((head, index) => (
+                          <th key={head} className={`px-3 py-2.5 ${index > 1 && index < 5 ? "text-right" : "text-left"} text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400`}>{head}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                      {data.corrections.map((row) => (
+                        <tr key={row.id}>
+                          <td className="px-3 py-2.5 text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDateTime(row.created_at)}</td>
+                          <td className="px-3 py-2.5 min-w-0">
+                            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{row.product_name}</p>
+                            <p className="text-[10px] text-slate-400 truncate">{row.color !== "default" ? `${row.color} · ` : ""}{row.size}</p>
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-xs font-bold text-slate-800 dark:text-slate-100 tabular-nums whitespace-nowrap">
+                            {row.qty_before} → {row.qty_after}
+                            <span className="block text-[10px] font-semibold text-red-600">−{row.delta}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-xs text-slate-600 dark:text-slate-300 tabular-nums whitespace-nowrap">
+                            {row.stock_before} → {row.stock_after}
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-xs font-bold text-slate-800 dark:text-slate-100 tabular-nums whitespace-nowrap">
+                            Rp {formatRupiah(row.hpp_after)}
+                          </td>
+                          <td className="px-3 py-2.5 min-w-0">
+                            <p className="text-[10px] text-slate-600 dark:text-slate-300 truncate" title={row.reason}>{row.reason || "—"}</p>
+                            <p className="text-[9px] text-slate-400 truncate">{row.actor || "—"}</p>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/70">
+                  {data.corrections.map((row) => (
+                    <div key={row.id} className="p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 dark:text-white">{row.product_name}</p>
+                          <p className="text-[10px] text-slate-400">{row.color !== "default" ? `${row.color} · ` : ""}{row.size} · {formatDateTime(row.created_at)}</p>
+                        </div>
+                        <span className="shrink-0 rounded-lg bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700 dark:bg-red-900/30 dark:text-red-300">−{row.delta} pcs</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                        <span className="text-slate-400">Lolos</span>
+                        <span className="text-right font-bold text-slate-800 dark:text-slate-100">{row.qty_before} → {row.qty_after}</span>
+                        <span className="text-slate-400">Stok</span>
+                        <span className="text-right text-slate-700 dark:text-slate-200">{row.stock_before} → {row.stock_after}</span>
+                        <span className="text-slate-400">HPP final</span>
+                        <span className="text-right font-bold text-slate-800 dark:text-slate-100">Rp {formatRupiah(row.hpp_after)}</span>
+                        <span className="text-slate-400">Alasan</span>
+                        <span className="text-right text-slate-700 dark:text-slate-200">{row.reason || "—"}</span>
                       </div>
                     </div>
                   ))}
@@ -1032,6 +1233,142 @@ export default function JadwalDetailView({ id }: { id: string }) {
                   Jadwal akan dibatalkan. Jika status Disetujui, reservasi bahan otomatis dilepas. Stok fisik tidak berubah.
                 </p>
               )}
+            </Drawer>
+
+            <Drawer
+              open={correctionOpen}
+              onClose={() => {
+                if (correcting) return;
+                setCorrectionOpen(false);
+                setCorrectionError("");
+              }}
+              title="Koreksi Lolos QC"
+              subtitle={`${data.item.schedule_number} · stok berkurang, HPP final dihitung ulang`}
+              footer={
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    className={btnSecondary}
+                    onClick={() => {
+                      setCorrectionOpen(false);
+                      setCorrectionError("");
+                    }}
+                    disabled={correcting}
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    className={btnPrimary}
+                    onClick={submitCorrection}
+                    disabled={Boolean(correctionValidationMessage) || correcting}
+                  >
+                    {correcting ? <Loader2 size={15} className="animate-spin" /> : <Pencil size={15} />}
+                    {correcting ? "Menyimpan…" : "Simpan Koreksi"}
+                  </button>
+                </div>
+              }
+            >
+              <div className="space-y-4">
+                <ErrorBox message={correctionError} />
+
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-900/20">
+                  <p className="text-sm font-bold text-amber-800 dark:text-amber-200">Koreksi turun saja</p>
+                  <p className="mt-1 text-xs leading-relaxed text-amber-700 dark:text-amber-200/80">
+                    Stok barang jadi berkurang sesuai selisih. Riwayat penerimaan tetap utuh. Kalau stok sudah terjual,
+                    koreksi sebesar stok tersisa saja.
+                  </p>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Varian yang dikoreksi</label>
+                  <select
+                    className={inputClass}
+                    value={correctionKey}
+                    onChange={(event) => {
+                      const key = event.target.value;
+                      setCorrectionKey(key);
+                      const row = data.finished_hpp.find((item) => hppKey(item) === key);
+                      setCorrectionQty(row ? String(row.qty) : "");
+                      setCorrectionError("");
+                    }}
+                  >
+                    {data.finished_hpp.map((row) => (
+                      <option key={hppKey(row)} value={hppKey(row)}>
+                        {row.product_name} · {row.color !== "default" ? `${row.color} · ` : ""}{row.size}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {correctionVariant ? (
+                  <>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className={`${cardClass} p-3`}>
+                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Lolos saat ini</p>
+                        <p className="mt-1 text-sm font-black text-slate-900 dark:text-white tabular-nums">{formatQty(correctionVariant.qty)} pcs</p>
+                      </div>
+                      <div className={`${cardClass} p-3`}>
+                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Stok tersedia</p>
+                        <p className="mt-1 text-sm font-black text-slate-900 dark:text-white tabular-nums">{formatQty(correctionVariant.stock)} pcs</p>
+                      </div>
+                      <div className={`${cardClass} p-3`}>
+                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">HPP final jadwal</p>
+                        <p className="mt-1 text-sm font-black text-slate-900 dark:text-white tabular-nums">Rp {formatRupiah(correctionVariant.hpp_schedule)}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelClass}>Qty lolos baru</label>
+                        <input
+                          className={`${inputClass} text-right tabular-nums`}
+                          inputMode="numeric"
+                          value={correctionQty}
+                          onChange={(event) => setCorrectionQty(event.target.value)}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Alasan koreksi (wajib)</label>
+                        <input
+                          className={inputClass}
+                          value={correctionReason}
+                          onChange={(event) => setCorrectionReason(event.target.value)}
+                          placeholder="Misalnya: salah hitung lolos QC"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl bg-slate-50 px-4 py-3 text-xs dark:bg-slate-800/60">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-slate-500 dark:text-slate-400">Selisih koreksi</span>
+                        <span className={`font-black tabular-nums ${correctionDelta > 0 ? "text-red-600" : "text-slate-700 dark:text-slate-200"}`}>
+                          {correctionDelta > 0 ? `−${formatQty(correctionDelta)} pcs` : "—"}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-slate-500 dark:text-slate-400">HPP final setelah koreksi</span>
+                        <span className="font-black text-slate-800 dark:text-slate-100 tabular-nums">
+                          {correctionProjectedHpp > 0 ? `Rp ${formatRupiah(correctionProjectedHpp)}` : "—"}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-slate-500 dark:text-slate-400">Total lolos setelah koreksi</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-200 tabular-nums">
+                          {correctionProjectedLolos > 0 ? `${formatQty(correctionProjectedLolos)} pcs` : "—"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {correctionValidationMessage && correctionNewQty !== correctionVariant.qty ? (
+                      <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">{correctionValidationMessage}</p>
+                    ) : (
+                      <p className="text-[11px] text-slate-400">Ubah qty lolos untuk melihat selisih dan HPP final baru.</p>
+                    )}
+                  </>
+                ) : null}
+              </div>
             </Drawer>
 
             <PenerimaanDrawer

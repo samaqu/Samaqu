@@ -31,6 +31,7 @@ const SOURCE_LABEL: Record<string, string> = {
   tukar_size: "Tukar size",
   batal: "Pembatalan",
   manual: "Manual",
+  koreksi_produksi: "Koreksi Produksi",
 };
 
 function sourceLabel(source?: string | null): string {
