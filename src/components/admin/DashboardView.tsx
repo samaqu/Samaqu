@@ -82,31 +82,32 @@ interface Metric {
   deltaTitle?: string;
 }
 
-/** Chip tren naik/turun vs bulan sebelumnya — hijau naik, merah turun. */
-function TrendChip({ delta, label, title }: { delta: number; label: string; title?: string }) {
+/** Tren naik/turun vs bulan sebelumnya — persen + panah (hijau naik, merah turun), lalu pembanding
+ *  "dari <bulan>" yang lebih kecil. Gaya mengikuti contoh desain pemilik 2026-10-24: tren menempel di
+ *  bawah nilai, bukan lagi chip di baris nama kartu (itu yang dulu memotong nama kartu di 4 kolom). */
+function TrendDelta({ delta, label, title }: { delta: number; label: string; title?: string }) {
   const up = delta >= 0;
   const pct = Math.abs(delta).toFixed(1).replace(".", ",");
   return (
-    <span
-      title={title}
-      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-black whitespace-nowrap shrink-0"
-      style={{ background: up ? "#ecfdf5" : "#fef2f2", color: up ? "#047857" : "#dc2626" }}
-    >
+    <span title={title} className="inline-flex items-center gap-1 min-w-0 whitespace-nowrap">
+      <span className="text-[12px] font-black" style={{ color: up ? "#047857" : "#dc2626" }}>
+        {up ? "+" : "-"}{pct}%
+      </span>
       <svg
         width="10"
         height="10"
         viewBox="0 0 24 24"
         fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
+        stroke={up ? "#047857" : "#dc2626"}
+        strokeWidth="3.5"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden
+        className="shrink-0"
       >
         {up ? <path d="M6 14l6-6 6 6" /> : <path d="M6 10l6 6 6-6" />}
       </svg>
-      {pct}%
-      <span className="font-bold" style={{ opacity: 0.75 }}>vs {label}</span>
+      <span className="text-[10px] font-semibold truncate" style={{ color: "var(--fg3)" }}>dari {label}</span>
     </span>
   );
 }
@@ -305,19 +306,11 @@ export default function DashboardView({
             className="p-5 flex flex-col gap-3 transition-shadow hover:shadow-[0_8px_24px_rgba(0,0,0,0.07)]"
             style={{ background: "var(--card)", border: "1px solid var(--bd)", borderRadius: "var(--rad3)" }}
           >
-            {/* Nama kartu + chip tren. Di kartu 4 kolom (~190 px isi) chip tren tidak lagi
-                memotong nama kartu: chip turun ke baris kedua, dan tinggi baris chip dijaga
-                sama di semua kartu (termasuk yang tanpa chip) supaya isi kartu tetap sejajar. */}
-            <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
-              <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--fg3)" }}>
-                {m.label}
-              </span>
-              <span className="shrink-0 h-[18px] flex items-center justify-end xl:w-full">
-                {m.delta != null ? (
-                  <TrendChip delta={m.delta} label={m.deltaLabel || prevLabel} title={m.deltaTitle} />
-                ) : null}
-              </span>
-            </div>
+            {/* Nama kartu — sendirian di barisnya (contoh desain pemilik 2026-10-24): tren tidak lagi
+                duduk sebaris dengan nama, jadi nama kartu tidak pernah terpotong di 4 kolom. */}
+            <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--fg3)" }}>
+              {m.label}
+            </span>
             {/* Ukuran font fluid supaya nominal panjang (mis. "Rp 48.331.123") tidak pernah
                 terpotong di layar sempit / zoom tinggi. */}
             <div
@@ -325,6 +318,14 @@ export default function DashboardView({
               style={{ color: "var(--fg)" }}
             >
               {m.value}
+            </div>
+            {/* Tren naik/turun tepat DI BAWAH nilai (contoh desain pemilik). Barisnya selalu ada —
+                tinggi dijaga sama walau kartunya tidak punya pembanding — supaya caption keempat
+                kartu tetap sejajar. */}
+            <div className="h-[18px] flex items-center">
+              {m.delta != null ? (
+                <TrendDelta delta={m.delta} label={m.deltaLabel || prevLabel} title={m.deltaTitle} />
+              ) : null}
             </div>
             {/* Keterangan satu baris (permintaan pemilik: "tulisan keterangan di card bikin sejajar 1 baris") */}
             <p className="text-[11px] font-semibold truncate" style={{ color: "var(--fg3)" }}>
@@ -345,7 +346,7 @@ export default function DashboardView({
               </p>
             </div>
             {!loading && revenueDelta != null ? (
-              <TrendChip
+              <TrendDelta
                 delta={revenueDelta}
                 label={prevLabel}
                 title={prevDetail(`${money(prevRevenue)} · ${money(revenue)} bulan ${periodLabel}`)}

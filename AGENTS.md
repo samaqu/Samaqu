@@ -1416,7 +1416,7 @@ empat file: `src/app/ops/ongkir-jnt/page.tsx` (route tipis) → `src/components/
   masih memuat ongkir: 51.634.621 vs 48.331.123 pada 2026-10). Tab tahap + filter "Belum di packing"
   tetap menghitung semua baris — itu filter daftar, bukan angka transaksi.
 
-## Kartu dashboard admin: 126 vs 143, keterangan satu baris, tren, grafik garis (2026-10-23)
+## Kartu dashboard admin: 126 vs 143, keterangan satu baris, tren, grafik batang (2026-10-23/24)
 
 Pemilik bertanya "transaksi yang benar berapa, 126 apa 143" sambil meminta keterangan kartu **satu
 baris**, grafik **naik-turun**, desain lebih modern, dan kartu "Kategori Teratas" diganti. Semua
@@ -1440,16 +1440,26 @@ lihat butir terakhir di bagian ini.
   terpotong; caption terpanjang sekarang "126 transaksi · tanpa ongkir" (28 karakter). Rincian
   panjang ditaruh di `title` kartu (tooltip), bukan di caption. Kalau menambah kartu/keterangan
   baru, ukur lagi di 4 kolom sebelum menyerahkannya.
-  **Revisi 2026-10-24 (pemilik: "tulisan d card nya kepotong"):** chip tren tidak lagi duduk
-  sebaris dengan nama kartu di `xl`. Di 4 kolom (isi kartu ~190 px) nama kartu dulu kalah ruang
-  dari chip sehingga terpotong `…` (`RATA-RATA PESAN…`) — itu yang dikeluhkan. Nama kartu sekarang
-  **tanpa `truncate`** dan barisnya `flex-wrap`: chip turun ke baris kedua (rata kanan) di `xl`,
-  sedangkan pembungkusnya tetap `h-[18px]` di semua lebar supaya keempat kartu punya tinggi baris
-  header yang sama (41 px di `xl`, 18 px di tablet) dan nilai + caption-nya tetap sejajar.
-  Jangan mengembalikan `truncate` ke nama kartu atau menaruh chip sebaris lagi di 4 kolom.
-- **Chip tren naik/turun** = pembanding bulan sebelumnya (`+615,8% vs Sep` hijau, `-26,1% vs Sep`
-  merah). Bulan lalu tanpa data (prev = 0) → chip **disembunyikan**, bukan dibagi nol/dikarang.
-  Nilai pembanding dihitung dari jendela grafik 6 bulan (`chartOrders`), bukan query tambahan.
+  **Revisi 2026-10-24 (pemilik: "tulisan d card nya kepotong"):** nama kartu **tanpa `truncate`**
+  (sempat `flex-wrap` + chip di baris kedua; lihat revisi berikutnya — chip itu sudah dipindah).
+  **Revisi terakhir 2026-10-24 (pemilik mengirim contoh desain: "dibikin kaya gini sih broo yg
+  trend naik turun nya sama grafik nya juga"):** susunan kartu mengikuti contoh itu —
+  **nama kartu sendiri di barisnya → nilai besar → tren → caption**. Nama kartu jadi tidak pernah
+  bersaing ruang dengan apa pun (itu akar keluhan `RATA-RATA PESAN…`), dan baris tren dibungkus
+  `h-[18px]` yang **selalu ada** (kartu tanpa pembanding, mis. "Belum Bayar", menyisakan baris
+  kosong) supaya caption keempat kartu tetap segaris. Pertahankan urutan itu; **jangan**
+  mengembalikan `truncate` ke nama kartu atau menaruh tren sebaris dengan nama kartu lagi.
+  Verifikasi (2026-10-24, `/admin` dibuka lewat iframe same-origin di preview, data termuat):
+  `Pendapatan Rp 48.331.123 · +615,8% ▲ dari Sep` · `Pesanan Masuk 126 · +869,2% ▲ dari Sep` ·
+  `Rata-rata Rp 383.580 · -26,1% ▼ dari Sep` · `Belum Bayar 7`; nama kartu & caption tidak
+  terpotong di 4 kolom desktop maupun tablet 867 px; tren terbaca tepat di bawah nilai; tanpa
+  scroll samping & 0 error console.
+- **Tren naik/turun** (`TrendDelta`, dulu `TrendChip`) = pembanding bulan sebelumnya, mengikuti
+  contoh desain: persen **bertanda** + panah (naik hijau `#047857`, turun merah `#dc2626`), lalu
+  `dari <bulan>` kecil abu — mis. `+615,8% ▲ dari Sep` (Oktober 2026). **Tanpa latar chip** lagi.
+  Bulan lalu tanpa data (prev = 0) → **disembunyikan**, bukan dibagi nol/dikarang. Nilai pembanding
+  dihitung dari jendela grafik 6 bulan (`chartOrders`), bukan query tambahan. Komponen yang sama
+  dipakai untuk tren di header grafik "Pendapatan Bulanan".
 - **Kartu "Kategori Teratas" diganti "Belum di Packing"** (jumlah pesanan lunas yang resinya belum
   dibuat) memakai **`orderStage()`** dari `src/lib/order-flow.ts` — jadi angkanya selalu sama dengan
   tab "Belum di Packing" di panel Order Management. Prop `products` di `DashboardView` (dulu hanya
@@ -1464,11 +1474,23 @@ lihat butir terakhir di bagian ini.
   baru. Verifikasi (2026-10-24, sesi admin diputar ulang): `/admin` menampilkan kartu **BELUM BAYAR
   6 / "menunggu pembayaran"** (cocok dengan donut `pending` 6), kartu "Belum di Packing" tidak ada
   lagi, caption keempat kartu tidak terpotong, 0 error console.
-- **Grafik "Pendapatan Bulanan" jadi garis/area naik-turun** (`src/components/admin/MonthlyTrendChart.tsx`,
-  SVG inline tanpa dependency baru): kurva halus yang tetap melewati tiap titik, area gradasi,
-  titik per bulan, label bulan, nilai titik tertinggi (atau titik yang disorot mouse), sumbu Y
-  ringkas (`20jt`/`800rb`). Judulnya diberi subjudul "6 bulan terakhir · hanya harga produk (tanpa
-  ongkir)" + chip tren.
+- **Grafik "Pendapatan Bulanan" jadi BATANG naik-turun** (`src/components/admin/MonthlyTrendChart.tsx`;
+  kurva/area SVG lama diganti HTML-CSS 2026-10-24 mengikuti contoh desain pemilik, tetap **tanpa
+  dependency chart baru**): 6 batang Mei–Okt berujung membulat, **batang bulan PERIODE TERPILIH
+  selalu hijau tua `#00a36c`** (batang "bulan aktif"; bulan lain hijau muda `#cdeee0`, batang yang
+  disorot lebih tua `#7fd3b1`), grid 5 garis + sumbu Y ringkas (`20jt`/`800rb`), label bulan di
+  bawah tiap batang. Bulan beromzet Rp 0 tidak digambar (batangnya memang nol), bukan dihilangkan
+  dari label. **Tooltip melayang** — kartu putih ber-shadow berisi titik hijau + `Pendapatan · <bulan>`
+  + nominal tebal + `N pesanan` — menempel di batang bulan terpilih saat tidak ada mouse (dulu
+  nilainya hanya teks di titik tertinggi), dan ikut pindah ke batang yang disorot. Judulnya tetap
+  bersubjudul "6 bulan terakhir · hanya harga produk (tanpa ongkir)" + tren.
+  Angka & aturan hitungnya tidak disentuh — presentasi saja.
+  Verifikasi (2026-10-24, `/admin` lewat iframe): 6 batang (Mei–Agu Rp 0 → tanpa batang, Sep 22 px,
+  Okt 155 px ≈ 60% dari batas 80jt) dengan warna `rgb(0,163,108)` hanya di Okt, label bulan
+  Mei–Okt, sumbu `0/20jt/40jt/60jt/80jt`, tooltip default `PENDAPATAN · OKT / Rp 48.331.123 /
+  133 pesanan`. **Belum terverifikasi otomatis**: tooltip pindah saat batang lain DI-HOVER —
+  gerakan mouse nyata tidak bisa didorong dari kode preview (`MouseEvent` yang disebar tidak
+  memicu `onMouseEnter`), jadi periksa manual dengan kursor.
 - **Datanya sekarang 6 bulan ASLI.** Dulu `chartOrders={orders}` = 50 pesanan terbaru, jadi bulan
   lama tampak Rp 0. Sekarang `src/app/admin/page.tsx` mengambil **jendela 6 bulan** (bulan terpilih
   + 5 sebelumnya, `monthRangeWIB` + `monthShift`, `/api/ops/orders?from&to&limit=1000`) bersama

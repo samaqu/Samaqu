@@ -1,17 +1,19 @@
 "use client";
 
 /**
- * Grafik garis "naik-turun" pendapatan bulanan dashboard admin.
+ * Grafik BATANG "naik-turun" pendapatan bulanan dashboard admin.
  *
- * Digambar dengan SVG inline (tanpa dependency chart baru) — pola yang sama dengan grafik
- * tren dashboard ops. Setiap titik datang dari data asli pesanan per bulan (dihitung
- * `DashboardView` dari `orders` yang dikirim halaman admin), tidak ada angka contoh.
+ * Digambar dengan HTML/CSS (tanpa dependency chart) — batang per bulan + grid horizontal, mengikuti
+ * contoh yang dikirim pemilik 2026-10-24 (kartu metrik: tren persen di bawah nilai, grafik batang
+ * dengan satu batang tersorot + tooltip melayang). Setiap batang datang dari data asli pesanan per
+ * bulan (dihitung `DashboardView`), tidak ada angka contoh.
  *
  * Detail yang disengaja:
- *  - kurva halus (Catmull-Rom → bezier) yang tetap melewati tiap titik data, jadi bulan yang
- *    omzetnya 0 benar-benar turun ke garis dasar;
- *  - area gradasi tipis di bawah garis + titik penanda tiap bulan;
- *  - titik tertinggi selalu berlabel, dan titik yang disorot mouse menampilkan nilainya.
+ *  - batang bulan PERIODE TERPILIH (bulan terakhir jendela 6 bulan) selalu hijau tua — "bulan aktif";
+ *    bulan lain hijau muda, dan batang yang disorot mouse jadi lebih tua;
+ *  - tooltip melayang (kartu putih: titik + label + nominal + jumlah pesanan). Tanpa mouse, tooltip
+ *    menempel di batang bulan terpilih, jadi nominal bulan itu tetap terbaca;
+ *  - sumbu Y ringkas (`20jt`/`800rb`) dengan 4 langkah, label bulan di bawah tiap batang.
  */
 
 import { useState } from "react";
@@ -44,25 +46,10 @@ function niceTop(rawMax: number, ticks = 4): number {
   return nf * pow * ticks;
 }
 
-/** Kurva halus yang melewati tiap titik; kontrolnya dijepit ke area grafik agar tidak melewati sumbu. */
-function smoothPath(points: { x: number; y: number }[], top: number, bottom: number): string {
-  if (points.length === 0) return "";
-  const clamp = (y: number) => Math.max(top, Math.min(bottom, y));
-  if (points.length < 3) return points.map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`).join(" ");
-  let d = `M ${points[0].x} ${points[0].y}`;
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i - 1] || points[i];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[i + 2] || p2;
-    const c1x = p1.x + (p2.x - p0.x) / 6;
-    const c1y = clamp(p1.y + (p2.y - p0.y) / 6);
-    const c2x = p2.x - (p3.x - p1.x) / 6;
-    const c2y = clamp(p2.y - (p3.y - p1.y) / 6);
-    d += ` C ${c1x} ${c1y} ${c2x} ${c2y} ${p2.x} ${p2.y}`;
-  }
-  return d;
-}
+/* Warna batang: bulan terpilih hijau tua, bulan lain hijau muda, yang disorot lebih tua. */
+const BAR_ACTIVE = "#00a36c";
+const BAR_HOVER = "#7fd3b1";
+const BAR_REST = "#cdeee0";
 
 export default function MonthlyTrendChart({ data }: { data: MonthlyTrendPoint[] }) {
   const [hover, setHover] = useState<number | null>(null);
@@ -75,116 +62,111 @@ export default function MonthlyTrendChart({ data }: { data: MonthlyTrendPoint[] 
     );
   }
 
-  const VB_W = 720;
-  const VB_H = 260;
-  const padL = 54; // ruang label sumbu Y
-  const padR = 16;
-  const padT = 18;
-  const padB = 32; // ruang label sumbu X
-  const plotW = VB_W - padL - padR;
-  const plotH = VB_H - padT - padB;
-  const baseY = padT + plotH;
-
+  const n = data.length;
   const max = data.reduce((m, d) => Math.max(m, Number(d.revenue) || 0), 0);
   const top = niceTop(max);
-  const n = data.length;
-  const slot = n > 1 ? plotW / (n - 1) : 0;
-  const points = data.map((d, i) => ({
-    x: n > 1 ? padL + i * slot : padL + plotW / 2,
-    y: baseY - ((Number(d.revenue) || 0) / top) * plotH,
-  }));
-  const line = smoothPath(points, padT, baseY);
-  const area = `${line} L ${points[n - 1].x} ${baseY} L ${points[0].x} ${baseY} Z`;
-  const peakIdx = data.reduce(
-    (best, d, i) => ((Number(d.revenue) || 0) > (Number(data[best].revenue) || 0) ? i : best),
-    0
-  );
-  const focusIdx = hover ?? peakIdx;
-  const focus = points[focusIdx];
+  const heightOf = (i: number) => (top > 0 ? ((Number(data[i].revenue) || 0) / top) * 100 : 0);
+  /* Batang "bulan aktif" = bulan terakhir jendela, yaitu bulan PERIODE TERPILIH. */
+  const activeIdx = n - 1;
+  const focusIdx = hover ?? activeIdx;
+  const focus = data[focusIdx];
 
   return (
-    <svg
-      viewBox={`0 0 ${VB_W} ${VB_H}`}
-      preserveAspectRatio="xMidYMid meet"
-      className="w-full h-56 lg:h-64 mt-4 overflow-visible"
+    <div
+      className="mt-5"
       role="img"
-      aria-label="Tren pendapatan bulanan (harga produk, tanpa ongkir)"
+      aria-label={`Tren pendapatan bulanan ${data[0].label}–${data[activeIdx].label} (harga produk, tanpa ongkir)`}
     >
-      <defs>
-        <linearGradient id="monthly-trend-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#1c1c1c" stopOpacity="0.16" />
-          <stop offset="100%" stopColor="#1c1c1c" stopOpacity="0" />
-        </linearGradient>
-      </defs>
+      <div className="flex gap-2">
+        {/* ── sumbu Y: 4 langkah dari Rp 0 sampai batas atas ── */}
+        <div className="relative w-11 shrink-0 h-56 lg:h-64">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <span
+              key={`y-${i}`}
+              className="absolute right-0 -translate-y-1/2 text-[11px] font-semibold tabular-nums"
+              style={{ top: `${(1 - i / 4) * 100}%`, color: "var(--fg3)" }}
+            >
+              {axisMoney((top / 4) * i)}
+            </span>
+          ))}
+        </div>
 
-      {/* Grid horizontal rata + label sumbu Y (5 tick) */}
-      {[0, 1, 2, 3, 4].map((i) => {
-        const value = (top / 4) * i;
-        const y = baseY - (value / top) * plotH;
-        return (
-          <g key={`grid-${i}`}>
-            <line x1={padL} y1={y} x2={VB_W - padR} y2={y} stroke="var(--bd)" strokeWidth="1" />
-            <text x={padL - 10} y={y} textAnchor="end" dominantBaseline="middle" fontSize="11" fontWeight="600" fill="var(--fg3)">
-              {axisMoney(value)}
-            </text>
-          </g>
-        );
-      })}
+        {/* ── area plot: grid + batang + tooltip melayang ── */}
+        <div className="relative flex-1 h-56 lg:h-64">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div
+              key={`grid-${i}`}
+              className="absolute inset-x-0 border-t"
+              style={{ top: `${(1 - i / 4) * 100}%`, borderColor: "var(--bd)" }}
+            />
+          ))}
 
-      {/* Area + garis tren */}
-      <path d={area} fill="url(#monthly-trend-fill)" />
-      <path d={line} fill="none" stroke="var(--fg)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          <div className="absolute inset-0 flex items-end gap-1.5 sm:gap-2">
+            {data.map((d, i) => {
+              const isActive = i === activeIdx;
+              const color = isActive ? BAR_ACTIVE : hover === i ? BAR_HOVER : BAR_REST;
+              return (
+                <div
+                  key={`${d.label}-${i}`}
+                  className="flex-1 h-full flex items-end justify-center"
+                  onMouseEnter={() => setHover(i)}
+                  onMouseLeave={() => setHover(null)}
+                >
+                  <span
+                    className="w-full max-w-[34px] rounded-t-md transition-colors duration-200"
+                    style={{ height: `${heightOf(i)}%`, minHeight: d.revenue > 0 ? 6 : 0, background: color }}
+                  />
+                </div>
+              );
+            })}
+          </div>
 
-      {/* Garis penunjuk titik yang disorot */}
-      {hover !== null ? (
-        <line x1={focus.x} y1={padT} x2={focus.x} y2={baseY} stroke="var(--fg3)" strokeWidth="1" strokeDasharray="3 3" />
-      ) : null}
+          {/* Nilai bulan yang disorot — tanpa mouse: bulan periode terpilih */}
+          <div
+            className="absolute z-10 pointer-events-none transition-all duration-200"
+            style={{
+              left: `${((focusIdx + 0.5) / n) * 100}%`,
+              bottom: `calc(${heightOf(focusIdx)}% + 10px)`,
+              transform: "translateX(-50%)",
+            }}
+          >
+            <div
+              className="rounded-xl px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.14)]"
+              style={{ background: "var(--card)", border: "1px solid var(--bd)" }}
+            >
+              <div
+                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide"
+                style={{ color: "var(--fg3)" }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: BAR_ACTIVE }} />
+                Pendapatan · {focus.label}
+              </div>
+              <p className="text-sm font-extrabold whitespace-nowrap mt-0.5" style={{ color: "var(--fg)" }}>
+                {rp(focus.revenue)}
+              </p>
+              <p className="text-[10px] font-semibold whitespace-nowrap" style={{ color: "var(--fg3)" }}>
+                {focus.orders} pesanan
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      {/* Titik tiap bulan + label bulan */}
-      {data.map((d, i) => {
-        const p = points[i];
-        const isFocus = i === focusIdx;
-        return (
-          <g key={`${d.label}-${i}`}>
-            {isFocus ? <circle cx={p.x} cy={p.y} r="9" fill="var(--fg)" opacity="0.08" /> : null}
-            <circle cx={p.x} cy={p.y} r={isFocus ? 5 : 3.5} fill="var(--card)" stroke="var(--fg)" strokeWidth="2" />
-            <text
-              x={p.x}
-              y={baseY + 20}
-              textAnchor="middle"
-              fontSize="11"
-              fontWeight="600"
-              fill={i === focusIdx ? "var(--fg2)" : "var(--fg3)"}
+      {/* ── label bulan di bawah tiap batang ── */}
+      <div className="flex gap-2 mt-2">
+        <span className="w-11 shrink-0" />
+        <div className="flex-1 flex gap-1.5 sm:gap-2">
+          {data.map((d, i) => (
+            <span
+              key={`x-${d.label}-${i}`}
+              className="flex-1 text-center text-[11px] font-bold"
+              style={{ color: i === focusIdx ? "var(--fg)" : "var(--fg3)" }}
             >
               {d.label}
-            </text>
-            {/* Kolom tak terlihat: area hover per bulan */}
-            <rect
-              x={p.x - Math.max(slot, 24) / 2}
-              y={padT}
-              width={Math.max(slot, 24)}
-              height={plotH}
-              fill="transparent"
-              onMouseEnter={() => setHover(i)}
-              onMouseLeave={() => setHover(null)}
-            >
-              <title>{`${d.label}: ${rp(d.revenue)} · ${d.orders} pesanan`}</title>
-            </rect>
-          </g>
-        );
-      })}
-
-      {/* Nilai titik yang disorot (titik tertinggi kalau tidak ada mouse) */}
-      <text
-        x={Math.max(padL + 40, Math.min(VB_W - padR - 40, focus.x))}
-        y={Math.max(padT + 10, focus.y - 12)}
-        textAnchor="middle"
-        fontSize="12"
-        fontWeight="800"
-        fill="var(--fg)"
-      >
-        {rp(data[focusIdx].revenue)}
-      </text>
-    </svg>
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
