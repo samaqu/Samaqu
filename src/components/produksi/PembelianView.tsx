@@ -454,7 +454,7 @@ export default function PembelianView() {
               </div>
             </div>
 
-            <div>
+            <div className="max-w-[280px]">
               <label className={labelClass}>Ongkir / biaya tambahan (total pembelian)</label>
               <input
                 className={`${inputClass} text-right tabular-nums`}
