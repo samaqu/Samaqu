@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight, ClipboardList, Loader2, Pencil, Plus, Search, X } from "lucide-react";
+import { ChevronRight, ClipboardList, Loader2, Pencil, Plus } from "lucide-react";
 import {
   COMPONENT_CATEGORIES,
   COMPONENT_UNITS,
@@ -25,6 +25,11 @@ import {
   Drawer,
   EmptyState,
   ErrorBox,
+  FilterBar,
+  FilterCheck,
+  FilterDateRange,
+  FilterSearch,
+  FilterSelect,
   PageHead,
   Spinner,
   StatCard,
@@ -364,47 +369,30 @@ export default function KomponenView() {
           ))}
         </div>
 
-        <div className={`${cardClass} p-3 flex flex-wrap items-center gap-2`}>
-          <div className="relative flex-1 min-w-[200px]">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              className={`${inputClass} pl-9`}
-              placeholder="Cari kode atau nama komponen…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <select className={`${inputClass} w-auto min-w-[150px]`} value={category} onChange={(e) => setCategory(e.target.value)}>
+        <FilterBar
+          active={Boolean(search || category || status || includeInactive)}
+          onReset={() => { setSearch(""); setCategory(""); setStatus(""); setIncludeInactive(false); }}
+        >
+          <FilterSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Cari kode atau nama komponen…"
+            ariaLabel="Cari komponen"
+          />
+          <FilterSelect value={category} onChange={setCategory} ariaLabel="Filter kategori" minWidthClass="sm:min-w-[150px]">
             <option value="">Semua kategori</option>
             {COMPONENT_CATEGORIES.map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
             ))}
-          </select>
-          <select className={`${inputClass} w-auto min-w-[130px]`} value={status} onChange={(e) => setStatus(e.target.value)}>
+          </FilterSelect>
+          <FilterSelect value={status} onChange={setStatus} ariaLabel="Filter status stok" minWidthClass="sm:min-w-[130px]">
             <option value="">Semua status</option>
             <option value="aman">Aman</option>
             <option value="menipis">Menipis</option>
             <option value="habis">Habis</option>
-          </select>
-          <label className="flex items-center gap-2 px-2 text-xs font-bold text-slate-600 dark:text-slate-300">
-            <input
-              type="checkbox"
-              checked={includeInactive}
-              onChange={(e) => setIncludeInactive(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300"
-            />
-            Nonaktif
-          </label>
-          {(search || category || status || includeInactive) && (
-            <button
-              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-              onClick={() => { setSearch(""); setCategory(""); setStatus(""); setIncludeInactive(false); }}
-              aria-label="Reset filter"
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
+          </FilterSelect>
+          <FilterCheck checked={includeInactive} onChange={setIncludeInactive} label="Nonaktif" />
+        </FilterBar>
 
         <div className={`${cardClass} overflow-hidden`}>
           <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
@@ -683,26 +671,19 @@ export default function KomponenView() {
 
               {detailTab === "riwayat" ? (
                 <div className="space-y-3">
-                  <div className={`${cardClass} p-3 space-y-2`}>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <select className={inputClass} value={movementType} onChange={(e) => setMovementType(e.target.value)}>
-                        <option value="">Semua jenis</option>
-                        {Object.entries(MOVEMENT_TYPES)
-                          .filter(([key]) => ["stok_awal", "pembelian", "opname", "rusak_hilang", "penyesuaian"].includes(key))
-                          .map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
-                      </select>
-                      <input type="date" className={inputClass} value={movementStart} onChange={(e) => setMovementStart(e.target.value)} aria-label="Dari tanggal" />
-                      <input type="date" className={inputClass} value={movementEnd} onChange={(e) => setMovementEnd(e.target.value)} aria-label="Sampai tanggal" />
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-[11px] text-slate-400">{filteredMovements.length} pergerakan</p>
-                      {(movementType || movementStart || movementEnd) ? (
-                        <button type="button" className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline" onClick={() => { setMovementType(""); setMovementStart(""); setMovementEnd(""); }}>
-                          Reset filter
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
+                  <FilterBar
+                    active={Boolean(movementType || movementStart || movementEnd)}
+                    onReset={() => { setMovementType(""); setMovementStart(""); setMovementEnd(""); }}
+                    meta={`${filteredMovements.length} pergerakan`}
+                  >
+                    <FilterSelect value={movementType} onChange={setMovementType} ariaLabel="Filter jenis pergerakan" minWidthClass="sm:min-w-[150px]">
+                      <option value="">Semua jenis</option>
+                      {Object.entries(MOVEMENT_TYPES)
+                        .filter(([key]) => ["stok_awal", "pembelian", "opname", "rusak_hilang", "penyesuaian"].includes(key))
+                        .map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
+                    </FilterSelect>
+                    <FilterDateRange start={movementStart} end={movementEnd} onStart={setMovementStart} onEnd={setMovementEnd} />
+                  </FilterBar>
 
                   {detailLoading ? (
                     <div className={cardClass}><Spinner label="Memuat riwayat…" /></div>

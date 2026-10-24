@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, ChevronRight, Loader2, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, Loader2, Plus } from "lucide-react";
 import {
   MOVEMENT_TYPES,
   formatDate,
@@ -20,6 +20,9 @@ import {
   Drawer,
   EmptyState,
   ErrorBox,
+  FilterBar,
+  FilterDateRange,
+  FilterSelect,
   PageHead,
   Spinner,
   StatCard,
@@ -188,14 +191,18 @@ export default function BukuStokView() {
           )}
         </div>
 
-        <div className={`${cardClass} p-3 flex flex-wrap items-center gap-2`}>
-          <select className={`${inputClass} w-auto min-w-[200px]`} value={componentId} onChange={(e) => setComponentId(e.target.value)}>
+        <FilterBar
+          active={Boolean(componentId || type || start || end)}
+          onReset={() => { setComponentId(""); setType(""); setStart(""); setEnd(""); }}
+          meta={`${items.length} baris`}
+        >
+          <FilterSelect value={componentId} onChange={setComponentId} ariaLabel="Filter komponen" minWidthClass="sm:min-w-[200px]">
             <option value="">Semua komponen</option>
             {components.map((c) => (
               <option key={c.id} value={c.id}>{c.code} · {c.name}</option>
             ))}
-          </select>
-          <select className={`${inputClass} w-auto min-w-[160px]`} value={type} onChange={(e) => setType(e.target.value)}>
+          </FilterSelect>
+          <FilterSelect value={type} onChange={setType} ariaLabel="Filter jenis pergerakan" minWidthClass="sm:min-w-[160px]">
             <option value="">Semua jenis</option>
             {Object.entries(MOVEMENT_TYPES)
               .filter(([key]) => [
@@ -205,20 +212,9 @@ export default function BukuStokView() {
               .map(([key, meta]) => (
                 <option key={key} value={key}>{meta.label}</option>
               ))}
-          </select>
-          <input type="date" className={`${inputClass} w-auto`} value={start} onChange={(e) => setStart(e.target.value)} />
-          <span className="text-xs font-bold text-slate-400">s/d</span>
-          <input type="date" className={`${inputClass} w-auto`} value={end} onChange={(e) => setEnd(e.target.value)} />
-          {(componentId || type || start || end) && (
-            <button
-              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-              onClick={() => { setComponentId(""); setType(""); setStart(""); setEnd(""); }}
-              aria-label="Reset filter"
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
+          </FilterSelect>
+          <FilterDateRange start={start} end={end} onStart={setStart} onEnd={setEnd} />
+        </FilterBar>
 
         <div className={`${cardClass} overflow-hidden`}>
           <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">

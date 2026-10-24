@@ -11,6 +11,9 @@ import {
   Drawer,
   EmptyState,
   ErrorBox,
+  FilterBar,
+  FilterDateRange,
+  FilterSearch,
   PageHead,
   Spinner,
   StatCard,
@@ -276,26 +279,18 @@ export default function PembelianView() {
           <StatCard label="Harga Real" value="Otomatis" hint="Rata-rata tertimbang semua barang masuk" tone="muted" />
         </div>
 
-        <div className={`${cardClass} p-3 flex flex-wrap items-center gap-2`}>
-          <input type="date" className={`${inputClass} w-auto`} value={start} onChange={(e) => setStart(e.target.value)} />
-          <span className="text-xs font-bold text-slate-400">s/d</span>
-          <input type="date" className={`${inputClass} w-auto`} value={end} onChange={(e) => setEnd(e.target.value)} />
-          <input
-            className={`${inputClass} w-auto min-w-[180px] flex-1`}
-            placeholder="Cari supplier…"
+        <FilterBar
+          active={Boolean(start || end || supplier)}
+          onReset={() => { setStart(""); setEnd(""); setSupplier(""); }}
+        >
+          <FilterDateRange start={start} end={end} onStart={setStart} onEnd={setEnd} />
+          <FilterSearch
             value={supplier}
-            onChange={(e) => setSupplier(e.target.value)}
+            onChange={setSupplier}
+            placeholder="Cari supplier…"
+            ariaLabel="Cari supplier"
           />
-          {(start || end || supplier) && (
-            <button
-              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-              onClick={() => { setStart(""); setEnd(""); setSupplier(""); }}
-              aria-label="Reset filter"
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
+        </FilterBar>
 
         <div className={`${cardClass} overflow-hidden`}>
           <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">

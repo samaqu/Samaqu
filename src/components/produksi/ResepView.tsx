@@ -14,6 +14,8 @@ import {
   Drawer,
   EmptyState,
   ErrorBox,
+  FilterBar,
+  FilterSelect,
   PageHead,
   Spinner,
   StatCard,
@@ -128,14 +130,14 @@ export default function ResepView() {
           <StatCard label="HPP" value="Perhitungan" hint="Tanpa mengurangi stok" tone="muted" />
         </div>
 
-        <div className={`${cardClass} p-3 flex flex-wrap items-center gap-2`}>
-          <select className={`${inputClass} w-auto min-w-[190px]`} value={category} onChange={(e) => setCategory(e.target.value)}>
+        <FilterBar active={Boolean(category)} onReset={() => setCategory("")}>
+          <FilterSelect value={category} onChange={setCategory} ariaLabel="Filter kategori resep" minWidthClass="sm:min-w-[190px]">
             <option value="">Semua kategori</option>
             {CATEGORY_ORDER.map((value) => (
               <option key={value} value={value}>{value}</option>
             ))}
-          </select>
-        </div>
+          </FilterSelect>
+        </FilterBar>
 
         <div className={`${cardClass} overflow-hidden`}>
           <div className="overflow-x-auto">

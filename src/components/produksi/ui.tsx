@@ -2,7 +2,17 @@
 
 import { useEffect, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, Loader2, Lock, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Calendar,
+  ChevronDown,
+  Loader2,
+  Lock,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import type { ProduksiAccess } from "./useAccess";
 
 export const inputClass =
@@ -15,6 +25,152 @@ export const btnSecondary =
   "inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border-2 border-gray-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors whitespace-nowrap";
 export const cardClass =
   "rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#1a1d28]";
+
+export function FilterBar({
+  children,
+  active = false,
+  onReset,
+  meta,
+}: {
+  children: ReactNode;
+  active?: boolean;
+  onReset?: () => void;
+  meta?: ReactNode;
+}) {
+  return (
+    <div className={`${cardClass} px-2.5 py-2`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5 pl-1 pr-0.5 text-slate-400">
+          <SlidersHorizontal size={14} />
+          <span className="text-[10px] font-bold uppercase tracking-wider">Filter</span>
+        </div>
+        {children}
+        {active && onReset ? (
+          <button
+            type="button"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-bold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+            onClick={onReset}
+          >
+            <RotateCcw size={13} /> Reset
+          </button>
+        ) : null}
+        {meta ? <div className="ml-auto text-[11px] font-semibold text-slate-400">{meta}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+export function FilterSelect({
+  value,
+  onChange,
+  children,
+  ariaLabel,
+  minWidthClass = "sm:min-w-[140px]",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+  ariaLabel?: string;
+  minWidthClass?: string;
+}) {
+  return (
+    <div className="relative w-full sm:w-auto">
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        aria-label={ariaLabel}
+        className={`h-9 w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 pl-3 pr-8 text-[12px] font-bold text-slate-700 outline-none transition-colors focus:border-blue-400 focus:ring-2 focus:ring-blue-100 sm:w-auto sm:max-w-[280px] ${minWidthClass} dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-blue-900/30`}
+      >
+        {children}
+      </select>
+      <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+    </div>
+  );
+}
+
+export function FilterSearch({
+  value,
+  onChange,
+  placeholder,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  ariaLabel?: string;
+}) {
+  return (
+    <div className="relative w-full sm:min-w-[200px] sm:flex-1">
+      <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        aria-label={ariaLabel || placeholder}
+        className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-3 text-[12px] font-semibold text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-blue-900/30"
+      />
+    </div>
+  );
+}
+
+export function FilterDateRange({
+  start,
+  end,
+  onStart,
+  onEnd,
+  startLabel = "Dari tanggal",
+  endLabel = "Sampai tanggal",
+}: {
+  start: string;
+  end: string;
+  onStart: (value: string) => void;
+  onEnd: (value: string) => void;
+  startLabel?: string;
+  endLabel?: string;
+}) {
+  return (
+    <div className="flex h-9 w-full items-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 sm:w-auto dark:border-slate-700 dark:bg-slate-900">
+      <Calendar size={14} className="ml-2.5 shrink-0 text-slate-400" />
+      <input
+        type="date"
+        value={start}
+        onChange={(event) => onStart(event.target.value)}
+        aria-label={startLabel}
+        className="h-9 min-w-0 flex-1 border-0 bg-transparent px-2 text-[12px] font-semibold text-slate-700 outline-none sm:w-[118px] sm:flex-none dark:text-slate-200"
+      />
+      <span className="shrink-0 text-[10px] font-bold text-slate-300 dark:text-slate-600">→</span>
+      <input
+        type="date"
+        value={end}
+        onChange={(event) => onEnd(event.target.value)}
+        aria-label={endLabel}
+        className="h-9 min-w-0 flex-1 border-0 bg-transparent px-2 text-[12px] font-semibold text-slate-700 outline-none sm:w-[118px] sm:flex-none dark:text-slate-200"
+      />
+    </div>
+  );
+}
+
+export function FilterCheck({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-[11px] font-bold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-3.5 w-3.5 rounded border-slate-300 accent-[#1e3a5f]"
+      />
+      {label}
+    </label>
+  );
+}
 
 export function PageHead({
   title,
