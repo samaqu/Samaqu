@@ -1662,6 +1662,31 @@ yang ditagih belum tentu sama dengan file yang diunggah — filter tanggal porta
 lewat angka "Total X" sebelum menekan Ekspor, dan `outsidePeriod` di balasan upload menandai baris
 yang tanggalnya di luar bulan terpilih.
 
+**Tata letak form "Angka Invoice J&T" (2026-10-24).** `JntInvoiceForm.tsx` dirapikan supaya kolomnya
+enak diisi: dua blok berjudul (`Identitas invoice` / `Angka tagihan`), semua field setinggi `h-11`,
+grid 2 kolom di `sm+` (bertumpuk di mobile), kolom uang **dijajar kanan** dengan awalan tanda
+(`Rp` / `−` / `+` / `=`) dan **pemisah ribuan yang hidup saat diketik**, lalu strip hasil (DPP +
+total + chip cek invoice) di bawah kolom — baris footer teks lama dihapus karena isinya sudah pindah
+ke strip itu. Pil status di header juga dihapus: dulu status bayar tampil DUA kali (pil di header
+DAN kotak teks "Status Bayar" read-only); sekarang satu field "Status Bayar" berisi segmented
+control-nya (`role="group"` + `aria-pressed`, hint "Menunggu pembayaran"/"Sudah dibayar" di
+bawahnya). **Jangan** menambahkan kembali pil status ke header.
+**Bahaya pemisah ribuan:** `toNumber()` **bukan** parser format Indonesia untuk angka berkelompok —
+"1.234.567" jatuh ke `Number()` mentah → `NaN` → `null` → 0 (percabangan di sana cuma mengurus
+bentuk ekspor "21000.00" dan "21.000,50"). Karena itu **state form wajib menyimpan digit polos +
+koma desimal** (`bersihAngka` dipakai di `onChange`, `angka()` memetakan nilai DB ke bentuk bersih
+itu) dan pemisah ribuan hanya dipasang untuk TAMPILAN (`tampilAngka`). Kalau suatu saat nilai
+berformat ikut disimpan/dikirim, angka invoice akan diam-diam tersimpan sebagai 0.
+Verifikasi (2026-10-24, `/ops/ongkir-jnt` lewat iframe same-origin — `navigate()` tidak bekerja
+untuk `/ops/*`): ketik `3207000` / `786000` / `241000` → kolomnya menampilkan `3.207.000` /
+`786.000` / `241.000` dan strip berbunyi DPP `Rp 2.421.000` + total `Rp 2.662.000` (angka asli,
+bukan 0); paste `3.179.000` ke Total Dibayar → chip `Selisih Rp -517.000` (= 2.662.000 − 3.179.000,
+jadi terbaca 3179000 — bukan 3179); klik **Lunas** → hint jadi "Sudah dibayar"; 2 kolom sejajar di
+desktop (y sama, tinggi 42 px) dan menumpuk di 375 px, tanpa label terpotong (`scrollWidth ==
+clientWidth`), `documentElement` tidak geser samping di kedua lebar, 0 error console. Tombol
+**Simpan Angka Invoice tidak ditekan** saat uji (akan menulis header invoice bulan itu) — jalur
+simpan tidak disentuh perubahan ini.
+
 ## Keterangan kartu Transaksi & "tidak ada loading saat pindah menu" (2026-10-24)
 
 Permintaan pemilik: keterangan kartu diganti mengikuti mockup dashboard ops ("biar admin enak baca"),
