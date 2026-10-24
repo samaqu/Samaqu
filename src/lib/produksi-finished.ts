@@ -3,7 +3,7 @@
  * Tidak menulis apa pun; stok barang jadi tetap lewat `samaqu_stock_in_batch`.
  */
 
-import { effectiveQty } from "@/lib/produksi-hpp";
+import { effectiveQty, missingSewingSeriesMessage } from "@/lib/produksi-hpp";
 import {
   lineMatchesTarget,
   type ComponentForSchedule,
@@ -243,13 +243,16 @@ export function computeStandardCost(
   processedByTargetSize: Map<string, number>,
   recipesByCategory: Map<string, RecipeForSchedule>,
   components: Map<string, ComponentForSchedule>,
-): { material: number; non_material: number; total: number } {
+): { material: number; non_material: number; total: number; warnings: string[] } {
   let material = 0;
   let nonMaterial = 0;
+  const warnings = new Set<string>();
 
   for (const target of targets) {
     const recipe = recipesByCategory.get(String(target.category || ""));
     if (!recipe) continue;
+    const sewingWarning = missingSewingSeriesMessage(recipe.lines, target.series);
+    if (sewingWarning) warnings.add(sewingWarning);
     for (const [key, qty] of processedByTargetSize.entries()) {
       const [targetId, size] = key.split("|");
       if (targetId !== String(target.id || "") || qty <= 0) continue;
@@ -273,6 +276,7 @@ export function computeStandardCost(
     material: round2(material),
     non_material: round2(nonMaterial),
     total: round2(material + nonMaterial),
+    warnings: Array.from(warnings),
   };
 }
 

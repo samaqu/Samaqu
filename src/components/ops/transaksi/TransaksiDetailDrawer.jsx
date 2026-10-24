@@ -752,6 +752,11 @@ function HppBlock({ order }) {
                   <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
                     {sourceLabel[item.source] || item.source || "-"}
                   </p>
+                  {item.hpp_warning ? (
+                    <p className="mt-0.5 max-w-[220px] text-[9px] font-semibold leading-snug text-amber-600 dark:text-amber-400">
+                      {item.hpp_warning}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ))}

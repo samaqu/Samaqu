@@ -59,18 +59,16 @@ async function packOrderForResi(
   packaging: any,
   actor: string,
 ) {
-  const computed = await computeOrderPackaging(
-    admin,
-    orderId,
-    packaging?.use_cover_hanger == null ? null : Boolean(packaging.use_cover_hanger),
-  );
+  const computed = await computeOrderPackaging(admin, orderId);
   const items = packagingItemsForRpc(computed.items, packaging?.items);
   if (items.length === 0) return { packed: false, warning: false };
 
   const { data, error } = await admin.rpc("production_pack_order", {
     p_order_id: orderId,
     p_items: items,
-    p_use_cover_hanger: computed.use_cover_hanger,
+    // Cover & Hanger kini produk berstok sendiri; tidak ada komponen opsional
+    // yang dipotong dari pesanan.
+    p_use_cover_hanger: false,
     p_request_id: `pack:${orderId}`,
     p_actor: actor,
   });

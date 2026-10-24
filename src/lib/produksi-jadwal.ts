@@ -5,7 +5,7 @@
  * Kebutuhan bahan = baris bahan produksi (termasuk kain) × qty target × (1+susut).
  */
 
-import { effectiveQty } from "@/lib/produksi-hpp";
+import { effectiveQty, missingSewingSeriesMessage } from "@/lib/produksi-hpp";
 import type { RecipeLine } from "@/lib/produksi-resep";
 
 export type ScheduleStatus = "draft" | "disetujui" | "berjalan" | "selesai" | "batal";
@@ -132,6 +132,8 @@ export function computeScheduleRequirements(
     if (materialLines.length === 0) {
       warnings.add(`Resep ${recipe.product_category} v${recipe.version} belum punya baris bahan produksi.`);
     }
+    const sewingWarning = missingSewingSeriesMessage(recipe.lines, target.series);
+    if (sewingWarning) warnings.add(sewingWarning);
 
     const byComponent = new Map<string, RequirementSnapshotRow>();
 

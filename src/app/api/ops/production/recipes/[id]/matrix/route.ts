@@ -5,6 +5,11 @@ import { computeHpp } from "@/lib/produksi-hpp";
 import { loadRecipeForHpp } from "@/lib/produksi-recipe-server";
 import { SERIES_ORDER } from "@/lib/ops-order";
 
+const seriesRank = (value: string) => {
+  const index = SERIES_ORDER.findIndex((item) => item.toLowerCase() === value.toLowerCase());
+  return index < 0 ? SERIES_ORDER.length : index;
+};
+
 /**
  * Matriks HPP: semua kombinasi Jenis Kain × Series (atau hanya Jenis Kain
  * kalau resep tidak memakai filter series).
@@ -35,8 +40,17 @@ export async function GET(
       .select("id, name")
       .order("name", { ascending: true });
     const fabricList = fabrics || [];
-    const usesSeries = loaded.lines.some((line) => Boolean(line.filter_series));
-    const seriesList = usesSeries ? [...SERIES_ORDER] : [""];
+    // Filter series resep dipakai APA ADANYA. Matriks hanya menampilkan series
+    // yang benar-benar punya baris resep/biaya, tanpa memetakan ke series induk.
+    const recipeSeries = Array.from(
+      new Set(
+        loaded.lines
+          .map((line) => String(line.filter_series || "").trim())
+          .filter(Boolean),
+      ),
+    ).sort((a, b) => seriesRank(a) - seriesRank(b) || a.localeCompare(b, "id"));
+    const usesSeries = recipeSeries.length > 0;
+    const seriesList = usesSeries ? recipeSeries : [""];
 
     const rows: Record<string, unknown>[] = [];
     for (const fabric of fabricList) {
@@ -59,6 +73,9 @@ export async function GET(
           diff_without:
             Math.round((result.totals.safe_without_optional - result.totals.real_without_optional) * 100) / 100,
           warnings: result.warnings.length,
+          warnings_detail: result.warnings.map(
+            (warning) => warning.message || `${warning.name} — ${warning.reason}`,
+          ),
         });
       }
     }
@@ -68,7 +85,7 @@ export async function GET(
       size,
       color,
       fabrics: fabricList,
-      series: usesSeries ? [...SERIES_ORDER] : [],
+      series: usesSeries ? recipeSeries : [],
       rows,
       recipe: {
         id: loaded.recipe.id,

@@ -54,7 +54,28 @@ export type HppWarning = {
   component_id?: string | null;
   code?: string;
   reason: string;
+  /** Pesan siap tampil (dipakai kalkulator & matriks). */
+  message?: string;
 };
+
+export const SEWING_COST_GROUP = "Biaya Jahit";
+
+/** Pesan kelengkapan Biaya Jahit untuk series yang dipilih. */
+export function missingSewingSeriesMessage(
+  lines: RecipeLine[],
+  series?: string | null,
+): string | null {
+  const selected = String(series || "").trim();
+  if (!selected) return null;
+  const sewing = (lines || []).filter(
+    (line) => line.line_type === "biaya" && norm(line.group_label) === norm(SEWING_COST_GROUP),
+  );
+  const matched = sewing.some(
+    (line) => !String(line.filter_series || "").trim() || norm(line.filter_series) === norm(selected),
+  );
+  if (matched) return null;
+  return `HPP belum lengkap: Biaya Jahit untuk series ${selected} belum diisi`;
+}
 
 export type HppResult = {
   selection: HppSelection;
@@ -229,6 +250,15 @@ export function computeHpp(
       totalRealWithout += costReal;
       totalSafeWithout += costSafe;
     }
+  }
+
+  const sewingWarning = missingSewingSeriesMessage(lines, selection.series);
+  if (sewingWarning) {
+    warnings.push({
+      name: SEWING_COST_GROUP,
+      reason: `untuk series ${String(selection.series || "").trim()} belum diisi`,
+      message: sewingWarning,
+    });
   }
 
   const ordered = HPP_GROUP_ORDER.map((key) => groups.get(key))

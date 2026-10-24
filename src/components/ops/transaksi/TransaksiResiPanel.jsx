@@ -73,7 +73,6 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
   const [manualBusy, setManualBusy] = useState(false);
   const [packagingPreview, setPackagingPreview] = useState(null);
   const [packagingQty, setPackagingQty] = useState({});
-  const [useCover, setUseCover] = useState(false);
   const [packagingLoading, setPackagingLoading] = useState(false);
   const [packagingWarning, setPackagingWarning] = useState(false);
   const [manualError, setManualError] = useState("");
@@ -119,7 +118,6 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
     try {
       const data = await base44.entities.Transaction.packaging(order.order_number);
       setPackagingPreview(data);
-      setUseCover(Boolean(data?.use_cover_hanger));
       setPackagingQty(
         Object.fromEntries(
           (data?.items || []).map((item) => [item.component_id, String(item.qty)]),
@@ -135,9 +133,7 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
   const getPackagingPayload = () => {
     if (!packagingPreview || packagingPreview.already_packaged) return undefined;
     return {
-      use_cover_hanger: useCover,
       items: (packagingPreview.items || [])
-        .filter((item) => useCover || item.kind !== "cover_hanger")
         .map((item) => ({
           component_id: item.component_id,
           qty: Number(packagingQty[item.component_id] ?? item.qty),
@@ -311,12 +307,6 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
         ) : null}
       </div>
 
-      {packagingPreview?.cover_product_in_order ? (
-        <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
-          Pesanan sudah memuat produk Cover &amp; Hanger. Tambahan Cover &amp; Hanger untuk produk lain dimatikan agar stok dan HPP tidak dobel.
-        </p>
-      ) : null}
-
       {packagingLoading ? (
         <p className="mt-2 text-[11px] font-semibold text-slate-400">Memuat paket kemasan…</p>
       ) : !packagingPreview ? (
@@ -329,23 +319,8 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
         </p>
       ) : (
         <>
-          {packagingPreview.has_cover_hanger && !packagingPreview.already_packaged ? (
-            <label className="mt-2 flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-2 dark:bg-slate-800/60">
-              <input
-                type="checkbox"
-                checked={useCover}
-                onChange={(event) => setUseCover(event.target.checked)}
-                className="h-4 w-4 accent-slate-900 dark:accent-white"
-              />
-              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
-                Pakai Cover &amp; Hanger
-              </span>
-            </label>
-          ) : null}
-
           <div className="mt-2 space-y-1.5">
             {(packagingPreview.items || [])
-              .filter((item) => useCover || item.kind !== "cover_hanger")
               .map((item) => {
                 const qty = Number(packagingQty[item.component_id] ?? item.qty) || 0;
                 const shortage = item.stock != null && qty > Number(item.stock);

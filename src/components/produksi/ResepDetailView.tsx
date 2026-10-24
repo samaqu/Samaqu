@@ -1113,7 +1113,7 @@ type CalcResult = {
     lines: { id?: string; name: string; detail: string; cost_real: number; cost_safe: number; warning: string }[];
   }[];
   totals: { real: number; safe: number; real_without_optional: number; safe_without_optional: number; diff: number };
-  warnings: { name: string; reason: string; code?: string }[];
+  warnings: { name: string; reason: string; code?: string; message?: string }[];
   has_warning: boolean;
   skipped_lines: number;
 };
@@ -1240,7 +1240,7 @@ function KalkulatorTab({ recipeId, options }: { recipeId: string; options: Optio
           <p className="text-sm font-bold text-amber-800 dark:text-amber-200">HPP belum lengkap</p>
           <ul className="mt-1 space-y-0.5 text-xs text-amber-700 dark:text-amber-200/80">
             {result.warnings.map((warning, index) => (
-              <li key={index}>• {warning.code ? `${warning.code} · ` : ""}{warning.name} — {warning.reason}</li>
+              <li key={index}>• {warning.message || `${warning.code ? `${warning.code} · ` : ""}${warning.name} — ${warning.reason}`}</li>
             ))}
           </ul>
         </div>
@@ -1307,6 +1307,7 @@ type MatrixResponse = {
     diff_include: number;
     diff_without: number;
     warnings: number;
+    warnings_detail?: string[];
   }[];
 };
 
@@ -1389,7 +1390,14 @@ function MatriksTab({ recipeId, options }: { recipeId: string; options: Options 
                     <tr key={`${row.fabric_id}-${row.series}`} className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-blue-50/30 dark:bg-[#1a1d28]"} border-b border-gray-100 dark:border-slate-800/50`}>
                       <td className="px-2 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug break-words">
                         {row.fabric_name}
-                        {row.warnings > 0 ? <span className="ml-1 text-amber-500" title="Ada komponen belum punya harga">⚠</span> : null}
+                        {row.warnings > 0 ? (
+                          <span className="ml-1 text-amber-500" title={row.warnings_detail?.join("; ") || "Ada komponen belum punya harga"}>⚠</span>
+                        ) : null}
+                        {row.warnings_detail?.length ? (
+                          <p className="mt-1 text-[9px] font-semibold leading-snug text-amber-600 dark:text-amber-400">
+                            {row.warnings_detail.join("; ")}
+                          </p>
+                        ) : null}
                       </td>
                       {data.uses_series ? <td className="px-2 py-2.5 text-xs text-slate-600 dark:text-slate-300 leading-snug break-words">{row.series || "—"}</td> : null}
                       <td className="px-2 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">Rp {formatRupiah(row.real_include)}</td>

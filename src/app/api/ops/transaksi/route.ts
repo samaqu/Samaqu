@@ -297,7 +297,7 @@ export async function GET(req: NextRequest) {
   if (hppVisible) {
     const { data: hppItems } = await admin
       .from("production_order_hpp_items")
-      .select("order_id, product_id, product_name, color, size, quantity, hpp_unit, hpp_total, source")
+      .select("order_id, product_id, product_name, color, size, quantity, hpp_unit, hpp_total, source, hpp_warning")
       .in("order_id", orderIds);
     for (const row of hppItems || []) {
       const key = String(row.order_id);
@@ -429,6 +429,7 @@ export async function GET(req: NextRequest) {
                   hpp_unit: item.hpp_unit == null ? null : Number(item.hpp_unit) || 0,
                   hpp_total: item.hpp_total == null ? null : Number(item.hpp_total) || 0,
                   source: item.source,
+                  hpp_warning: item.hpp_warning || null,
                 })),
               };
             })(),

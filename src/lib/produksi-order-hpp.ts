@@ -5,7 +5,6 @@ import {
   type ScheduleTargetInput,
 } from "@/lib/produksi-jadwal";
 import { loadRecipeMap, loadScheduleComponents } from "@/lib/produksi-jadwal-server";
-import { isCoverHangerKategori } from "@/lib/item-label";
 
 const norm = (value: unknown) => String(value ?? "").trim().toLowerCase();
 const round2 = (value: number) => Math.round((Number(value) || 0) * 100) / 100;
@@ -60,34 +59,19 @@ export async function snapshotOrderHpp(admin: SupabaseClient, orderId: string): 
   if (items.length === 0) return;
 
   const productIds = Array.from(new Set(items.map((item) => item.product_id)));
-  const [{ data: products }, { data: variants }] = await Promise.all([
-    admin.from("products").select("id, category, series, jenis_kain_id").in("id", productIds),
-    admin.from("product_variants").select("product_id, color, size, base_product_id, base_size").in("product_id", productIds),
-  ]);
+  const { data: products } = await admin
+    .from("products")
+    .select("id, category, series, jenis_kain_id")
+    .in("id", productIds);
   const productById = new Map((products || []).map((row: any) => [String(row.id), row]));
-  const variantByKey = new Map(
-    (variants || []).map((row: any) => [
-      `${row.product_id}|${norm(row.color)}|${norm(row.size)}`,
-      row,
-    ]),
-  );
 
-  const resolved = items.map((item) => {
-    const variant = variantByKey.get(`${item.product_id}|${norm(item.color)}|${norm(item.size)}`);
-    return {
-      item,
-      baseProductId: String(variant?.base_product_id || item.product_id),
-      baseSize: String(variant?.base_size || item.size).toUpperCase(),
-      product: productById.get(item.product_id),
-    };
-  });
-
-  const baseIds = Array.from(new Set(resolved.map((row) => row.baseProductId)));
-  const { data: finishedHppRows } = baseIds.length
+  // HPP dicari pada PRODUK SERIES yang benar-benar dibeli, bukan produk induk
+  // tempat stok menumpang. Stok tetap mengikuti `base_product_id` di jalur stok.
+  const { data: finishedHppRows } = productIds.length
     ? await admin
         .from("production_finished_hpp")
         .select("product_id, color, size, hpp_avg")
-        .in("product_id", baseIds)
+        .in("product_id", productIds)
     : { data: [] as any[] };
   const finishedByKey = new Map(
     (finishedHppRows || []).map((row: any) => [
@@ -97,7 +81,7 @@ export async function snapshotOrderHpp(admin: SupabaseClient, orderId: string): 
   );
 
   const categories = Array.from(
-    new Set(resolved.map((row) => String(row.product?.category || "")).filter(Boolean)),
+    new Set(items.map((item) => String(productById.get(item.product_id)?.category || "")).filter(Boolean)),
   );
   const [recipeMap, components] = await Promise.all([
     loadRecipeMap(admin, categories),
@@ -105,11 +89,15 @@ export async function snapshotOrderHpp(admin: SupabaseClient, orderId: string): 
   ]);
 
   let hppGoods = 0;
-  const snapshotItems = resolved.map(({ item, baseProductId, baseSize, product }) => {
+  const snapshotItems = items.map((item) => {
+    const product = productById.get(item.product_id);
     const category = String(product?.category || "");
-    const actual = finishedByKey.get(`${baseProductId}|${norm(item.color)}|${norm(baseSize)}`);
+    const actual = finishedByKey.get(
+      `${item.product_id}|${norm(item.color)}|${norm(item.size)}`,
+    );
     let hppUnit: number | null = actual != null ? round2(actual) : null;
     let source: "aktual" | "standar" | "none" = actual != null ? "aktual" : "none";
+    let hppWarning: string | null = null;
 
     if (hppUnit == null && category && recipeMap.has(category)) {
       const sizeKey = String(item.size || "").toUpperCase();
@@ -133,6 +121,7 @@ export async function snapshotOrderHpp(admin: SupabaseClient, orderId: string): 
         hppUnit = round2(standard.total / item.quantity);
         source = "standar";
       }
+      hppWarning = standard.warnings[0] || null;
     }
 
     const hppTotal = hppUnit != null ? round2(hppUnit * item.quantity) : null;
@@ -148,6 +137,7 @@ export async function snapshotOrderHpp(admin: SupabaseClient, orderId: string): 
       hpp_unit: hppUnit,
       hpp_total: hppTotal,
       source,
+      hpp_warning: hppWarning,
     };
   });
 
@@ -171,14 +161,7 @@ export async function snapshotOrderHpp(admin: SupabaseClient, orderId: string): 
 export async function computeOrderPackaging(
   admin: SupabaseClient,
   orderId: string,
-  useCoverOverride?: boolean | null,
-  includeAllCover = false,
-): Promise<{
-  items: PackagingLine[];
-  has_cover_hanger: boolean;
-  use_cover_hanger: boolean;
-  cover_product_in_order: boolean;
-}> {
+): Promise<{ items: PackagingLine[] }> {
   const { data: itemRows } = await admin
     .from("order_items")
     .select("id, product_id, product_name, color, size, quantity")
@@ -194,9 +177,7 @@ export async function computeOrderPackaging(
     }))
     .filter((row) => row.product_id && row.size && row.quantity > 0);
 
-  if (items.length === 0) {
-    return { items: [], has_cover_hanger: false, use_cover_hanger: false, cover_product_in_order: false };
-  }
+  if (items.length === 0) return { items: [] };
 
   const productIds = Array.from(new Set(items.map((item) => item.product_id)));
   const [{ data: products }, components] = await Promise.all([
@@ -210,10 +191,6 @@ export async function computeOrderPackaging(
   const recipeMap = await loadRecipeMap(admin, categories);
 
   const packaging = new Map<string, PackagingLine>();
-  let hasCover = false;
-  const coverProductInOrder = items.some((item) =>
-    isCoverHangerKategori(productById.get(item.product_id)?.category),
-  );
 
   for (const item of items) {
     const product = productById.get(item.product_id);
@@ -235,13 +212,11 @@ export async function computeOrderPackaging(
 
     for (const line of recipe.lines) {
       if (!line.component_id) continue;
-      const isPackaging = line.group_code === "packaging_pesanan";
-      const isCoverLine =
-        line.group_code === "tambahan_opsional" &&
-        /cover|hanger/i.test(String(line.name || ""));
-      if (!isPackaging && !isCoverLine) continue;
+      // Cover & Hanger adalah produk dengan stok sendiri. Kelompok
+      // `tambahan_opsional` hanya untuk estimasi kalkulator/matriks, tidak
+      // pernah dipotong sebagai komponen kemasan pesanan.
+      if (line.group_code !== "packaging_pesanan") continue;
       if (!lineMatchesTarget(line, target, sizeKey)) continue;
-      if (isCoverLine) hasCover = true;
 
       const component = components.get(String(line.component_id));
       if (!component) continue;
@@ -261,24 +236,13 @@ export async function computeOrderPackaging(
           qty,
           stock: Number(component.stock) || 0,
           real_price: Number(component.real_price) || 0,
-          kind: isCoverLine ? "cover_hanger" : "packaging",
+          kind: "packaging",
         });
       }
     }
   }
 
-  // Kalau pesanan sudah memuat produk Cover & Hanger, tambahan Cover/Hanger
-  // untuk produk lain default mati supaya stok/HPP tidak dobel.
-  const useCover =
-    useCoverOverride == null ? hasCover && !coverProductInOrder : Boolean(useCoverOverride);
-  return {
-    items: Array.from(packaging.values()).filter(
-      (row) => includeAllCover || row.kind !== "cover_hanger" || useCover,
-    ),
-    has_cover_hanger: hasCover,
-    use_cover_hanger: useCover,
-    cover_product_in_order: coverProductInOrder,
-  };
+  return { items: Array.from(packaging.values()) };
 }
 
 export function packagingItemsForRpc(
