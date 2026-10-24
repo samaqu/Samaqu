@@ -39,6 +39,7 @@ type Options = {
   sizes: string[];
   colors: string[];
   fabrics: { id: string; name: string }[];
+  kain_categories?: string[];
 };
 
 type TargetRow = {
@@ -152,7 +153,8 @@ export default function JadwalFormDrawer({
     for (let i = 0; i < meaningful.length; i++) {
       const row = meaningful[i];
       if (!row.category) return setError(`Baris ${i + 1}: pilih kategori produk.`);
-      if (!row.fabric_type_id) return setError(`Baris ${i + 1}: pilih jenis kain.`);
+      const needsFabric = (options?.kain_categories || []).includes(row.category);
+      if (needsFabric && !row.fabric_type_id) return setError(`Baris ${i + 1}: pilih jenis kain.`);
       if (rowTotal(row) <= 0) return setError(`Baris ${i + 1}: isi jumlah target per ukuran.`);
     }
 
@@ -260,7 +262,9 @@ export default function JadwalFormDrawer({
                   </select>
                 </div>
                 <div>
-                  <label className={labelClass}>Jenis kain</label>
+                  <label className={labelClass}>
+                    Jenis kain{(options?.kain_categories || []).includes(row.category) ? "" : " (opsional)"}
+                  </label>
                   <select className={inputClass} value={row.fabric_type_id} onChange={(e) => updateRow(index, { fabric_type_id: e.target.value })}>
                     <option value="">— Pilih —</option>
                     {(options?.fabrics || []).map((fabric) => (

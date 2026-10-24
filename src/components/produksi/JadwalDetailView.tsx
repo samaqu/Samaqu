@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, Copy, Loader2, Pencil, Play, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, Loader2, Pencil, Play, Plus, X } from "lucide-react";
 import { formatQty, formatRupiah } from "@/lib/produksi";
 import { produksiFetch } from "@/lib/produksi-api";
 import {
@@ -10,8 +10,10 @@ import {
   scheduleStatusMeta,
   type ScheduleStatus,
 } from "@/lib/produksi-jadwal";
+import type { TargetCostLine } from "@/lib/produksi-finished";
 import { useProduksiAccess } from "./useAccess";
 import JadwalFormDrawer, { type JadwalInitial } from "./JadwalFormDrawer";
+import PenerimaanDrawer, { type ReceiptResult, type ReceiptTarget } from "./PenerimaanDrawer";
 import {
   AccessGate,
   Badge,
@@ -39,6 +41,9 @@ type Schedule = {
   total_pcs: number;
   approved_at?: string | null;
   started_at?: string | null;
+  completed_at?: string | null;
+  completed_by?: string | null;
+  closing_notes?: string | null;
   cancelled_at?: string | null;
 };
 
@@ -51,6 +56,69 @@ type Target = {
   series: string;
   size_qtys: Record<string, number>;
   total_pcs: number;
+  cost_lines: TargetCostLine[];
+};
+
+type ReceiptItem = {
+  id: string;
+  target_id: string;
+  size: string;
+  qty_lolos: number;
+  qty_rework: number;
+  qty_reject: number;
+  rework_to_lolos: number;
+  rework_to_reject: number;
+  reject_reason?: string | null;
+  notes?: string | null;
+};
+
+type Receipt = {
+  id: string;
+  receipt_number: string;
+  received_date: string;
+  notes?: string | null;
+  total_lolos: number;
+  total_rework: number;
+  total_reject: number;
+  rework_to_lolos: number;
+  rework_to_reject: number;
+  material_cost: number;
+  non_material_cost: number;
+  total_cost: number;
+  hpp_per_pcs: number;
+  hpp_standard: number;
+  items: ReceiptItem[];
+  costs: { id: string; name: string; group_label?: string | null; amount: number }[];
+};
+
+type UsageRow = {
+  component_id: string;
+  component_code: string;
+  component_name: string;
+  unit_use: string;
+  issued_qty: number;
+  returned_qty: number;
+  standard_qty: number;
+  default_return_qty: number;
+  actual_qty: number;
+  difference: number;
+  unit_price: number;
+};
+
+type Summary = {
+  target_pcs: number;
+  lolos: number;
+  rework: number;
+  reject: number;
+  percent_lolos: number;
+  percent_reject: number;
+  material_cost: number;
+  non_material_cost: number;
+  total_cost: number;
+  hpp_actual: number;
+  hpp_standard: number;
+  hpp_difference: number;
+  standard_cost: number;
 };
 
 type Requirement = {
@@ -75,11 +143,19 @@ type DetailResponse = {
   warnings: string[];
   cost_estimate: { material: number; non_material: number; total: number };
   recipes_used: { recipe_id: string; version: number; category: string }[];
+  receipts: Receipt[];
+  results: ReceiptResult[];
+  outstanding_rework: number;
+  usage: UsageRow[];
+  summary: Summary;
   total_pcs: number;
   can_edit: boolean;
   can_approve: boolean;
   can_start: boolean;
   can_cancel: boolean;
+  can_receive: boolean;
+  can_issue: boolean;
+  can_complete: boolean;
 };
 
 export default function JadwalDetailView({ id }: { id: string }) {
@@ -94,8 +170,15 @@ export default function JadwalDetailView({ id }: { id: string }) {
   const [approveOpen, setApproveOpen] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [issueOpen, setIssueOpen] = useState(false);
+  const [completeOpen, setCompleteOpen] = useState(false);
   const [startItems, setStartItems] = useState<Record<string, string>>({});
   const [cancelItems, setCancelItems] = useState<Record<string, string>>({});
+  const [issueComponentId, setIssueComponentId] = useState("");
+  const [issueQty, setIssueQty] = useState("");
+  const [completeItems, setCompleteItems] = useState<Record<string, string>>({});
+  const [completeNotes, setCompleteNotes] = useState("");
   const [notes, setNotes] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -130,6 +213,20 @@ export default function JadwalDetailView({ id }: { id: string }) {
     setCancelItems(Object.fromEntries(data.requirements.map((row) => [row.component_id, ""])));
   }, [cancelOpen, data]);
 
+  useEffect(() => {
+    if (!issueOpen || !data) return;
+    setIssueComponentId((current) => current || data.requirements[0]?.component_id || "");
+    setIssueQty("");
+  }, [issueOpen, data]);
+
+  useEffect(() => {
+    if (!completeOpen || !data) return;
+    setCompleteItems(
+      Object.fromEntries(data.usage.map((row) => [row.component_id, String(row.default_return_qty || 0)])),
+    );
+    setCompleteNotes(data.item.closing_notes || "");
+  }, [completeOpen, data]);
+
   const shortage = useMemo(
     () => (data?.requirements || []).filter((row) => !row.sufficient),
     [data],
@@ -148,6 +245,8 @@ export default function JadwalDetailView({ id }: { id: string }) {
       setApproveOpen(false);
       setStartOpen(false);
       setCancelOpen(false);
+      setIssueOpen(false);
+      setCompleteOpen(false);
       await load();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Gagal memproses jadwal.");
@@ -185,6 +284,32 @@ export default function JadwalDetailView({ id }: { id: string }) {
   }));
   const startInsufficient = startRows.filter((row) => row.qty > row.stock + 0.0001);
   const startValid = startRows.some((row) => row.qty > 0) && startInsufficient.length === 0;
+
+  const targetById = new Map((data?.targets || []).map((target) => [target.id, target]));
+  const issueRow = data?.requirements.find((row) => row.component_id === issueComponentId);
+  const issueInvalid = !issueRow || (Number(issueQty) || 0) <= 0 || (Number(issueQty) || 0) > issueRow.stock + 0.0001;
+  const completeRows = (data?.usage || []).map((row) => ({
+    ...row,
+    qty: Number(completeItems[row.component_id]) || 0,
+  }));
+  const completeInvalid = completeRows.some((row) => row.qty < 0 || row.qty > row.issued_qty + 0.0001);
+
+  async function submitIssue() {
+    if (!issueRow || issueInvalid) return;
+    await runAction("issue", {
+      items: [{ component_id: issueRow.component_id, qty: Number(issueQty) }],
+    });
+  }
+
+  async function submitComplete() {
+    if (completeInvalid) return;
+    await runAction("complete", {
+      items: completeRows
+        .filter((row) => row.qty > 0)
+        .map((row) => ({ component_id: row.component_id, qty: row.qty })),
+      notes: completeNotes,
+    });
+  }
 
   const initialForm: JadwalInitial | null = data
     ? {
@@ -239,19 +364,35 @@ export default function JadwalDetailView({ id }: { id: string }) {
                       <Play size={15} /> Mulai Produksi
                     </button>
                   ) : null}
+                  {data.can_receive ? (
+                    <button className={btnPrimary} onClick={() => setReceiptOpen(true)}>
+                      <Plus size={15} /> Terima Hasil
+                    </button>
+                  ) : null}
+                  {data.can_issue ? (
+                    <button className={btnSecondary} onClick={() => setIssueOpen(true)}>
+                      <Plus size={15} /> Bahan Tambahan
+                    </button>
+                  ) : null}
+                  {data.item.status === "berjalan" ? (
+                    <button
+                      className={data.can_complete ? btnPrimary : btnSecondary}
+                      disabled={!data.can_complete}
+                      title={
+                        data.can_complete
+                          ? "Tutup produksi dan retur sisa bahan."
+                          : `Selesaikan ${data.outstanding_rework} pcs rework terlebih dahulu.`
+                      }
+                      onClick={() => setCompleteOpen(true)}
+                    >
+                      <Check size={15} /> Selesai
+                    </button>
+                  ) : null}
                   {data.can_cancel ? (
                     <button className={btnSecondary} onClick={() => setCancelOpen(true)}>
                       <X size={15} /> Batal
                     </button>
                   ) : null}
-                  <button
-                    type="button"
-                    disabled
-                    title="Selesai akan aktif di Fase 4 (QC & barang jadi)."
-                    className={`${btnSecondary} opacity-50 cursor-not-allowed`}
-                  >
-                    Selesai · Segera
-                  </button>
                 </div>
               }
             />
@@ -273,6 +414,38 @@ export default function JadwalDetailView({ id }: { id: string }) {
                 hint="Harga komponen saat ini"
               />
             </div>
+
+            {["berjalan", "selesai"].includes(data.item.status) ? (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <StatCard
+                  label="Lolos QC"
+                  value={`${formatQty(data.summary.lolos)} pcs`}
+                  hint={`${data.summary.percent_lolos}% dari hasil`}
+                  tone="positive"
+                />
+                <StatCard
+                  label="Rework tersisa"
+                  value={`${formatQty(data.summary.rework)} pcs`}
+                  hint={data.summary.rework > 0 ? "Belum masuk stok" : "Semua rework selesai"}
+                  tone={data.summary.rework > 0 ? "warning" : "muted"}
+                />
+                <StatCard
+                  label="Reject"
+                  value={`${formatQty(data.summary.reject)} pcs`}
+                  hint={`${data.summary.percent_reject}% dari hasil`}
+                  tone={data.summary.reject > 0 ? "danger" : "muted"}
+                />
+                <StatCard
+                  label="HPP aktual"
+                  value={data.summary.lolos > 0 ? `Rp ${formatRupiah(data.summary.hpp_actual)}` : "—"}
+                  hint={
+                    data.summary.lolos > 0
+                      ? `Standar Rp ${formatRupiah(data.summary.hpp_standard)} · ${data.summary.hpp_difference > 0 ? "+" : ""}Rp ${formatRupiah(data.summary.hpp_difference)}`
+                      : "Belum ada lolos QC"
+                  }
+                />
+              </div>
+            ) : null}
 
             {data.warnings.length > 0 ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-900/20">
@@ -313,6 +486,89 @@ export default function JadwalDetailView({ id }: { id: string }) {
                 ))}
               </div>
             </div>
+
+            {data.results.length > 0 ? (
+              <div className={`${cardClass} overflow-hidden`}>
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">Target vs hasil QC</p>
+                  <p className="text-[11px] text-slate-400">Rework yang masih berjalan belum masuk stok.</p>
+                </div>
+                <div className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                  {data.results.map((row) => {
+                    const target = targetById.get(row.target_id);
+                    return (
+                      <div key={`${row.target_id}-${row.size}`} className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 dark:text-white">
+                            {target?.category || row.target_id}
+                            {target?.series ? ` · ${target.series}` : ""}
+                            {target?.color ? ` · ${target.color}` : ""}
+                            <span className="ml-1.5 text-slate-400">· {row.size}</span>
+                          </p>
+                          <p className="text-[10px] text-slate-400">Target {formatQty(row.target_qty)} pcs</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold tabular-nums">
+                          <span className="rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">L {formatQty(row.lolos)}</span>
+                          <span className="rounded-lg bg-amber-50 px-2 py-1 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">R {formatQty(row.rework)}</span>
+                          <span className="rounded-lg bg-red-50 px-2 py-1 text-red-700 dark:bg-red-900/30 dark:text-red-300">J {formatQty(row.reject)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {data.receipts.length > 0 ? (
+              <div className={`${cardClass} overflow-hidden`}>
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">Riwayat penerimaan</p>
+                  <p className="text-[11px] text-slate-400">Append-only. Koreksi dilakukan lewat penerimaan berikutnya.</p>
+                </div>
+                <div className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                  {data.receipts.map((receipt) => (
+                    <div key={receipt.id} className="px-4 py-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-slate-900 dark:text-white">{receipt.receipt_number}</p>
+                          <p className="text-[10px] text-slate-400">
+                            {formatScheduleDate(receipt.received_date)}
+                            {receipt.notes ? ` · ${receipt.notes}` : ""}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold tabular-nums">
+                          <span className="rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">L {formatQty(receipt.total_lolos)}</span>
+                          <span className="rounded-lg bg-amber-50 px-2 py-1 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">R {formatQty(receipt.total_rework)}</span>
+                          <span className="rounded-lg bg-red-50 px-2 py-1 text-red-700 dark:bg-red-900/30 dark:text-red-300">J {formatQty(receipt.total_reject)}</span>
+                          <span className="rounded-lg bg-slate-100 px-2 py-1 text-slate-600 dark:bg-slate-800 dark:text-slate-300">HPP Rp {formatRupiah(receipt.hpp_per_pcs)}</span>
+                          <span className="rounded-lg bg-slate-100 px-2 py-1 text-slate-500 dark:bg-slate-800 dark:text-slate-400">Std Rp {formatRupiah(receipt.hpp_standard)}</span>
+                        </div>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        {receipt.items.map((item) => {
+                          const target = targetById.get(item.target_id);
+                          return (
+                            <div key={item.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-[10.5px]">
+                              <span className="text-slate-500 dark:text-slate-400">
+                                {target?.category || item.target_id}
+                                {target?.series ? ` · ${target.series}` : ""}
+                                {target?.color ? ` · ${target.color}` : ""} · {item.size}
+                              </span>
+                              <span className="font-bold text-slate-700 dark:text-slate-200 tabular-nums">
+                                L {item.qty_lolos} · R {item.qty_rework} · J {item.qty_reject}
+                                {item.rework_to_lolos > 0 ? ` · R→L ${item.rework_to_lolos}` : ""}
+                                {item.rework_to_reject > 0 ? ` · R→J ${item.rework_to_reject}` : ""}
+                                {item.reject_reason ? ` · ${item.reject_reason}` : ""}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             <div className={`${cardClass} overflow-hidden`}>
               <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
@@ -399,6 +655,77 @@ export default function JadwalDetailView({ id }: { id: string }) {
               )}
             </div>
 
+            {data.usage.length > 0 ? (
+              <div className={`${cardClass} overflow-hidden`}>
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">Pemakaian bahan aktual vs standar</p>
+                  <p className="text-[11px] text-slate-400">
+                    {data.item.status === "selesai"
+                      ? "Aktual = dikeluarkan − retur sisa bahan."
+                      : "Aktual sementara = bahan yang sudah dikeluarkan; retur dihitung saat Selesai."}
+                  </p>
+                </div>
+
+                <div className="hidden md:block">
+                  <table className="w-full border-collapse table-fixed">
+                    <colgroup>
+                      <col className="w-[32%]" />
+                      <col className="w-[17%]" />
+                      <col className="w-[17%]" />
+                      <col className="w-[17%]" />
+                      <col className="w-[17%]" />
+                    </colgroup>
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700">
+                        {["Komponen", "Dikeluarkan", "Standar", "Aktual", "Selisih"].map((head, index) => (
+                          <th key={head} className={`px-3 py-2.5 ${index > 0 ? "text-right" : "text-left"} text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400`}>{head}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                      {data.usage.map((row) => (
+                        <tr key={row.component_id}>
+                          <td className="px-3 py-2.5 min-w-0">
+                            <p className="text-[11px] font-mono text-slate-400 truncate">{row.component_code}</p>
+                            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{row.component_name}</p>
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-xs text-slate-600 dark:text-slate-300 tabular-nums whitespace-nowrap">{formatQty(row.issued_qty)} <span className="text-[10px] text-slate-400">{row.unit_use}</span></td>
+                          <td className="px-3 py-2.5 text-right text-xs text-slate-600 dark:text-slate-300 tabular-nums whitespace-nowrap">{formatQty(row.standard_qty)}</td>
+                          <td className="px-3 py-2.5 text-right text-xs font-bold text-slate-900 dark:text-white tabular-nums whitespace-nowrap">{formatQty(row.actual_qty)}</td>
+                          <td className={`px-3 py-2.5 text-right text-xs font-bold tabular-nums whitespace-nowrap ${row.difference > 0.0001 ? "text-red-600 dark:text-red-400" : row.difference < -0.0001 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
+                            {row.difference > 0 ? "Boros " : row.difference < 0 ? "Hemat " : ""}
+                            {formatQty(Math.abs(row.difference))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/70">
+                  {data.usage.map((row) => (
+                    <div key={row.component_id} className="p-3">
+                      <p className="text-[11px] font-mono text-slate-400 truncate">{row.component_code}</p>
+                      <p className="text-xs font-bold text-slate-900 dark:text-white">{row.component_name}</p>
+                      <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+                        <span className="text-slate-400">Dikeluarkan</span>
+                        <span className="text-right text-slate-700 dark:text-slate-200">{formatQty(row.issued_qty)} {row.unit_use}</span>
+                        <span className="text-slate-400">Standar</span>
+                        <span className="text-right text-slate-700 dark:text-slate-200">{formatQty(row.standard_qty)}</span>
+                        <span className="text-slate-400">Aktual</span>
+                        <span className="text-right font-bold text-slate-800 dark:text-slate-100">{formatQty(row.actual_qty)}</span>
+                        <span className="text-slate-400">Selisih</span>
+                        <span className={`text-right font-bold ${row.difference > 0.0001 ? "text-red-600" : row.difference < -0.0001 ? "text-emerald-600" : "text-slate-400"}`}>
+                          {row.difference > 0 ? "Boros " : row.difference < 0 ? "Hemat " : ""}
+                          {formatQty(Math.abs(row.difference))}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className={`${cardClass} p-4`}>
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-bold text-slate-900 dark:text-white">Estimasi biaya produksi</p>
@@ -419,6 +746,39 @@ export default function JadwalDetailView({ id }: { id: string }) {
                 </div>
               </div>
             </div>
+
+            {data.receipts.length > 0 ? (
+              <div className={`${cardClass} p-4`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">Biaya aktual produksi</p>
+                    <p className="text-[11px] text-slate-400">Packaging Pesanan & Tambahan Opsional tidak dihitung.</p>
+                  </div>
+                  <Badge tone={data.summary.hpp_difference > 0 ? "red" : "green"}>
+                    {data.summary.hpp_difference > 0 ? "Di atas standar" : data.summary.hpp_difference < 0 ? "Di bawah standar" : "Sesuai standar"}
+                  </Badge>
+                </div>
+                <div className="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Bahan aktual</p>
+                    <p className="mt-1 text-base font-black text-slate-900 dark:text-white tabular-nums">Rp {formatRupiah(data.summary.material_cost)}</p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Non-bahan</p>
+                    <p className="mt-1 text-base font-black text-slate-900 dark:text-white tabular-nums">Rp {formatRupiah(data.summary.non_material_cost)}</p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total biaya</p>
+                    <p className="mt-1 text-base font-black text-slate-900 dark:text-white tabular-nums">Rp {formatRupiah(data.summary.total_cost)}</p>
+                  </div>
+                  <div className="rounded-xl bg-[#1e3a5f] p-3 text-white">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-white/70">HPP aktual / pcs</p>
+                    <p className="mt-1 text-base font-black tabular-nums">Rp {formatRupiah(data.summary.hpp_actual)}</p>
+                    <p className="text-[10px] text-white/70">Standar Rp {formatRupiah(data.summary.hpp_standard)}</p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             <div className={`${cardClass} p-4`}>
               <div className="flex items-center justify-between gap-2">
@@ -578,6 +938,158 @@ export default function JadwalDetailView({ id }: { id: string }) {
                   Jadwal akan dibatalkan. Jika status Disetujui, reservasi bahan otomatis dilepas. Stok fisik tidak berubah.
                 </p>
               )}
+            </Drawer>
+
+            <PenerimaanDrawer
+              open={receiptOpen}
+              scheduleId={data.item.id}
+              targets={data.targets}
+              results={data.results}
+              onClose={() => setReceiptOpen(false)}
+              onSaved={async () => {
+                setReceiptOpen(false);
+                await load();
+              }}
+            />
+
+            <Drawer
+              open={issueOpen}
+              onClose={() => setIssueOpen(false)}
+              title="Keluarkan Bahan Tambahan"
+              subtitle="Dicatat sebagai Keluar ke Produksi dengan nomor WO. Stok tidak boleh minus."
+              footer={
+                <div className="flex justify-end gap-2">
+                  <button className={btnSecondary} onClick={() => setIssueOpen(false)} disabled={busy}>Batal</button>
+                  <button className={btnPrimary} onClick={submitIssue} disabled={busy || issueInvalid}>
+                    {busy ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Keluarkan
+                  </button>
+                </div>
+              }
+            >
+              <div className="space-y-3">
+                <ErrorBox message={actionError} />
+                <div>
+                  <label className={labelClass}>Komponen</label>
+                  <select
+                    className={inputClass}
+                    value={issueComponentId}
+                    onChange={(e) => setIssueComponentId(e.target.value)}
+                  >
+                    <option value="">— Pilih komponen kebutuhan —</option>
+                    {data.requirements.map((row) => (
+                      <option key={row.component_id} value={row.component_id}>
+                        {row.component_code} · {row.component_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Jumlah {issueRow?.unit_use ? `(${issueRow.unit_use})` : ""}</label>
+                  <input
+                    className={inputClass}
+                    inputMode="decimal"
+                    value={issueQty}
+                    onChange={(e) => setIssueQty(e.target.value)}
+                    placeholder="0"
+                  />
+                  {issueRow ? (
+                    <p className={`mt-1 text-[11px] font-semibold ${issueInvalid && issueQty ? "text-red-600" : "text-slate-400"}`}>
+                      Stok fisik {formatQty(issueRow.stock)} {issueRow.unit_use} · kebutuhan jadwal {formatQty(issueRow.required_qty)}
+                    </p>
+                  ) : null}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Bahan tambahan tidak mengubah kebutuhan standar. Pemakaian aktual tetap dihitung saat menutup jadwal.
+                </p>
+              </div>
+            </Drawer>
+
+            <Drawer
+              open={completeOpen}
+              onClose={() => setCompleteOpen(false)}
+              wide
+              title="Selesaikan Produksi"
+              subtitle="Isi bahan yang dikembalikan. Pemakaian aktual = dikeluarkan − retur."
+              footer={
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[11px] text-slate-400">
+                    {data.outstanding_rework > 0
+                      ? `${data.outstanding_rework} pcs rework belum selesai.`
+                      : "Jadwal akan terkunci setelah Selesai."}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button className={btnSecondary} onClick={() => setCompleteOpen(false)} disabled={busy}>Batal</button>
+                    <button
+                      className={btnPrimary}
+                      onClick={submitComplete}
+                      disabled={busy || completeInvalid || data.outstanding_rework > 0}
+                    >
+                      {busy ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Selesai & Kunci
+                    </button>
+                  </div>
+                </div>
+              }
+            >
+              <div className="space-y-3">
+                <ErrorBox message={actionError} />
+                {data.outstanding_rework > 0 ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-200">
+                    Masih ada {data.outstanding_rework} pcs rework. Selesaikan menjadi Lolos atau Reject lewat Terima Hasil sebelum menutup jadwal.
+                  </div>
+                ) : null}
+
+                <div className="space-y-2">
+                  {data.usage
+                    .filter((row) => row.issued_qty > 0 || row.standard_qty > 0)
+                    .map((row) => {
+                      const qty = Number(completeItems[row.component_id]) || 0;
+                      const actual = Math.max(0, row.issued_qty - qty);
+                      const difference = actual - row.standard_qty;
+                      return (
+                        <div key={row.component_id} className={`${cardClass} p-3`}>
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-mono text-slate-400 truncate">{row.component_code}</p>
+                              <p className="text-xs font-bold text-slate-900 dark:text-white">{row.component_name}</p>
+                              <p className="mt-0.5 text-[10px] text-slate-400">
+                                Dikeluarkan {formatQty(row.issued_qty)} {row.unit_use} · standar {formatQty(row.standard_qty)}
+                              </p>
+                            </div>
+                            <div className="w-32">
+                              <label className={labelClass}>Retur ({row.unit_use})</label>
+                              <input
+                                className={`${inputClass} text-right`}
+                                inputMode="decimal"
+                                value={completeItems[row.component_id] ?? ""}
+                                onChange={(e) =>
+                                  setCompleteItems((current) => ({ ...current, [row.component_id]: e.target.value }))
+                                }
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10.5px]">
+                            <span className="text-slate-400">Default retur <b className="text-slate-700 dark:text-slate-200">{formatQty(row.default_return_qty)}</b></span>
+                            <span className="text-slate-400">Aktual <b className="text-slate-700 dark:text-slate-200">{formatQty(actual)}</b></span>
+                            <span className={difference > 0.0001 ? "font-bold text-red-600" : difference < -0.0001 ? "font-bold text-emerald-600" : "text-slate-400"}>
+                              {difference > 0 ? "Boros " : difference < 0 ? "Hemat " : "Sesuai "}
+                              {formatQty(Math.abs(difference))}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                <div>
+                  <label className={labelClass}>Catatan penutupan</label>
+                  <textarea
+                    className={`${inputClass} min-h-[72px]`}
+                    value={completeNotes}
+                    onChange={(e) => setCompleteNotes(e.target.value)}
+                    placeholder="Opsional"
+                  />
+                </div>
+              </div>
             </Drawer>
           </>
         )}

@@ -13,6 +13,13 @@ import {
   loadScheduleComponents,
   mapTargets,
 } from "@/lib/produksi-jadwal-server";
+import { computeStandardCost, costLinesForTarget } from "@/lib/produksi-finished";
+import {
+  loadReceiptBundle,
+  outstandingReworkMap,
+  processedByTargetSize,
+  receiptTotals,
+} from "@/lib/produksi-finished-server";
 
 /** Detail jadwal + aksi status (approve/mulai/cancel/catatan). */
 
@@ -103,6 +110,137 @@ export async function GET(
     for (const recipe of computed.recipes) recipesUsed.set(recipe.recipe_id, recipe);
   }
 
+  // ── Fase 4: penerimaan, rework, HPP aktual & pemakaian bahan ──
+  const bundle = await loadReceiptBundle(admin, id);
+  const outstanding = outstandingReworkMap(bundle.items);
+  const processedMap = processedByTargetSize(bundle.items);
+  const receiptSummary = receiptTotals(bundle.receipts);
+
+  const { data: usageMovements } = await admin
+    .from("production_stock_movements")
+    .select("component_id, type, qty, unit_price")
+    .eq("ref_type", "production_schedule")
+    .eq("ref_id", id)
+    .in("type", ["keluar_produksi", "retur_sisa_bahan"]);
+
+  const issuedMap = new Map<string, number>();
+  const returnedMap = new Map<string, number>();
+  let issuedCostTotal = 0;
+  let returnedCostTotal = 0;
+  for (const movement of usageMovements || []) {
+    const componentId = String(movement.component_id);
+    const qty = Math.abs(Number(movement.qty) || 0);
+    const value = qty * (Number(movement.unit_price) || 0);
+    if (movement.type === "keluar_produksi") {
+      issuedMap.set(componentId, (issuedMap.get(componentId) || 0) + qty);
+      issuedCostTotal += value;
+    } else {
+      returnedMap.set(componentId, (returnedMap.get(componentId) || 0) + qty);
+      returnedCostTotal += value;
+    }
+  }
+
+  const processedTargets = targets.map((target) => ({
+    ...target,
+    size_qtys: Object.fromEntries(
+      Object.keys(target.size_qtys || {}).map((size) => [
+        size,
+        processedMap.get(`${target.id}|${size}`) || 0,
+      ]),
+    ),
+  }));
+  const standardUsage = computeScheduleRequirements(processedTargets, recipeMap, components);
+  const standardByComponent = new Map(
+    groupRequirements(standardUsage.rows).map((row) => [row.component_id, row.required_qty]),
+  );
+  const standardCost = computeStandardCost(targets, processedMap, recipeMap, components);
+
+  const usageIds = new Set<string>([
+    ...requirements.map((row) => row.component_id),
+    ...issuedMap.keys(),
+    ...returnedMap.keys(),
+  ]);
+  const usage = Array.from(usageIds).map((componentId) => {
+    const component = components.get(componentId);
+    const issued = issuedMap.get(componentId) || 0;
+    const returned = returnedMap.get(componentId) || 0;
+    const actualQty = Math.max(0, Math.round((issued - returned) * 10000) / 10000);
+    const standardQty = standardByComponent.get(componentId) || 0;
+    const defaultReturn = Math.max(0, Math.round((issued - standardQty) * 10000) / 10000);
+    return {
+      component_id: componentId,
+      component_code: component?.code || "",
+      component_name: component?.name || "",
+      unit_use: component?.unit_use || "",
+      issued_qty: issued,
+      returned_qty: returned,
+      standard_qty: standardQty,
+      default_return_qty: defaultReturn,
+      actual_qty: actualQty,
+      difference: Math.round((actualQty - standardQty) * 10000) / 10000,
+      unit_price: component?.real_price || 0,
+    };
+  });
+
+  const totalOutstandingRework = Array.from(outstanding.values()).reduce((sum, qty) => sum + qty, 0);
+  const totalLolos = receiptSummary.lolos + receiptSummary.resolvedLolos;
+  const totalReject = receiptSummary.reject + receiptSummary.resolvedReject;
+  const totalResult = totalLolos + totalOutstandingRework + totalReject;
+  // Setelah Selesai, biaya bahan memakai pemakaian aktual (dikeluarkan − retur).
+  // Sebelumnya, penerimaan memakai alokasi biaya yang sudah dikeluarkan.
+  const completed = schedule.status === "selesai";
+  const finalMaterialCost = Math.max(0, issuedCostTotal - returnedCostTotal);
+  const summaryMaterialCost = completed ? finalMaterialCost : receiptSummary.material;
+  const summaryTotalCost = completed
+    ? summaryMaterialCost + receiptSummary.nonMaterial
+    : receiptSummary.totalCost;
+  const hppActual = totalLolos > 0 ? summaryTotalCost / totalLolos : 0;
+  const hppStandard = totalLolos > 0 ? standardCost.total / totalLolos : 0;
+
+  const resultMap = new Map<string, { lolos: number; reject: number }>();
+  for (const item of bundle.items) {
+    const key = `${item.target_id}|${item.size}`;
+    const current = resultMap.get(key) || { lolos: 0, reject: 0 };
+    current.lolos += (Number(item.qty_lolos) || 0) + (Number(item.rework_to_lolos) || 0);
+    current.reject += (Number(item.qty_reject) || 0) + (Number(item.rework_to_reject) || 0);
+    resultMap.set(key, current);
+  }
+  const results = targetRows.flatMap((target: any) =>
+    Object.entries(target.size_qtys || {})
+      .filter(([, qty]) => Number(qty) > 0)
+      .map(([size, targetQty]) => {
+        const key = `${target.id}|${size}`;
+        const row = resultMap.get(key) || { lolos: 0, reject: 0 };
+        return {
+          target_id: target.id,
+          category: target.category,
+          size,
+          target_qty: Number(targetQty) || 0,
+          lolos: row.lolos,
+          rework: outstanding.get(key) || 0,
+          reject: row.reject,
+        };
+      }),
+  );
+
+  const receiptItemsByReceipt = new Map<string, any[]>();
+  for (const item of bundle.items) {
+    const list = receiptItemsByReceipt.get(item.receipt_id) || [];
+    list.push(item);
+    receiptItemsByReceipt.set(item.receipt_id, list);
+  }
+  const receiptCostsByReceipt = new Map<string, any[]>();
+  for (const cost of bundle.costs) {
+    const list = receiptCostsByReceipt.get(cost.receipt_id) || [];
+    list.push(cost);
+    receiptCostsByReceipt.set(cost.receipt_id, list);
+  }
+  const receipts = bundle.receipts.map((receipt) => ({
+    ...receipt,
+    items: receiptItemsByReceipt.get(receipt.id) || [],
+    costs: receiptCostsByReceipt.get(receipt.id) || [],
+  }));
+
   return NextResponse.json({
     item: schedule,
     targets: targetRows.map((row: any) => ({
@@ -114,6 +252,10 @@ export async function GET(
       series: row.series || "",
       size_qtys: row.size_qtys || {},
       total_pcs: Number(row.total_pcs) || 0,
+      cost_lines: costLinesForTarget(
+        { category: row.category, fabric_type_id: row.fabric_type_id, color: row.color, series: row.series, size_qtys: {} },
+        recipeMap.get(String(row.category || "")),
+      ),
     })),
     requirements,
     warnings: Array.from(warnings),
@@ -122,12 +264,34 @@ export async function GET(
       non_material: nonMaterialCost,
       total: Math.round((materialCost + nonMaterialCost) * 100) / 100,
     },
+    receipts,
+    results,
+    outstanding_rework: totalOutstandingRework,
+    usage,
+    summary: {
+      target_pcs: totalPcs,
+      lolos: totalLolos,
+      rework: totalOutstandingRework,
+      reject: totalReject,
+      percent_lolos: totalResult > 0 ? Math.round((totalLolos / totalResult) * 1000) / 10 : 0,
+      percent_reject: totalResult > 0 ? Math.round((totalReject / totalResult) * 1000) / 10 : 0,
+      material_cost: summaryMaterialCost,
+      non_material_cost: receiptSummary.nonMaterial,
+      total_cost: summaryTotalCost,
+      hpp_actual: Math.round(hppActual * 100) / 100,
+      hpp_standard: Math.round(hppStandard * 100) / 100,
+      hpp_difference: Math.round((hppActual - hppStandard) * 100) / 100,
+      standard_cost: standardCost.total,
+    },
     recipes_used: Array.from(recipesUsed.values()),
     total_pcs: totalPcs,
     can_edit: ["draft", "disetujui"].includes(schedule.status),
     can_approve: schedule.status === "draft",
     can_start: schedule.status === "disetujui",
-    can_cancel: ["draft", "disetujui", "berjalan"].includes(schedule.status),
+    can_cancel: ["draft", "disetujui", "berjalan"].includes(schedule.status) && bundle.receipts.length === 0,
+    can_receive: schedule.status === "berjalan",
+    can_issue: schedule.status === "berjalan",
+    can_complete: schedule.status === "berjalan" && totalOutstandingRework === 0,
   });
 }
 
@@ -179,6 +343,42 @@ export async function PATCH(
       const { data, error } = await admin.rpc("production_start_schedule", {
         p_id: id,
         p_items: items,
+        p_actor: access.email,
+      });
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ result: data });
+    }
+
+    if (action === "issue") {
+      if (schedule.status !== "berjalan") {
+        return NextResponse.json({ error: "Hanya jadwal Berjalan yang bisa menambah bahan." }, { status: 400 });
+      }
+      const items = (Array.isArray(body?.items) ? body.items : [])
+        .map((item: any) => ({ component_id: String(item?.component_id || ""), qty: Number(item?.qty) || 0 }))
+        .filter((item: any) => item.component_id && item.qty > 0);
+      if (items.length === 0) {
+        return NextResponse.json({ error: "Pilih komponen dan jumlah lebih dari 0." }, { status: 400 });
+      }
+      const { data, error } = await admin.rpc("production_issue_schedule_materials", {
+        p_schedule_id: id,
+        p_items: items,
+        p_actor: access.email,
+      });
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ result: data });
+    }
+
+    if (action === "complete") {
+      if (schedule.status !== "berjalan") {
+        return NextResponse.json({ error: "Hanya jadwal Berjalan yang bisa ditutup." }, { status: 400 });
+      }
+      const items = (Array.isArray(body?.items) ? body.items : [])
+        .map((item: any) => ({ component_id: String(item?.component_id || ""), qty: Number(item?.qty) || 0 }))
+        .filter((item: any) => item.component_id && item.qty > 0);
+      const { data, error } = await admin.rpc("production_complete_schedule", {
+        p_schedule_id: id,
+        p_items: items,
+        p_notes: String(body?.notes || "").trim() || null,
         p_actor: access.email,
       });
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });

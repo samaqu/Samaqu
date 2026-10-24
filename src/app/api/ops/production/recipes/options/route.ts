@@ -20,6 +20,8 @@ export async function GET(req: NextRequest) {
     { data: variants },
     { data: savedGroups },
     { data: usedGroups },
+    { data: activeRecipes },
+    { data: kainLines },
   ] = await Promise.all([
     admin.from("jenis_kain").select("id, name").order("name", { ascending: true }),
     admin.from("products").select("category, series, colors"),
@@ -30,7 +32,24 @@ export async function GET(req: NextRequest) {
       .select("group_label")
       .eq("line_type", "biaya")
       .not("group_label", "is", null),
+    admin.from("production_recipes").select("id, product_category").eq("is_active", true),
+    admin
+      .from("production_recipe_lines")
+      .select("recipe_id, line_type, group_code")
+      .eq("line_type", "bahan")
+      .eq("group_code", "kain"),
   ]);
+
+  const categoryByRecipe = new Map(
+    (activeRecipes || []).map((recipe: any) => [String(recipe.id), String(recipe.product_category || "")]),
+  );
+  const kainCategories = Array.from(
+    new Set(
+      (kainLines || [])
+        .map((line: any) => categoryByRecipe.get(String(line.recipe_id)) || "")
+        .filter(Boolean),
+    ),
+  );
 
   const categories = [...CATEGORY_ORDER];
   const seriesSet = new Set(SERIES_ORDER);
@@ -73,5 +92,6 @@ export async function GET(req: NextRequest) {
     colors: Array.from(colorSet).sort((a, b) => a.localeCompare(b, "id")),
     fabrics: fabrics || [],
     cost_groups: costGroups,
+    kain_categories: kainCategories,
   });
 }
