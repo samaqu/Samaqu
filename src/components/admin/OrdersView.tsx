@@ -20,7 +20,9 @@ import {
 } from "@/lib/order-flow";
 import { ORDER_SOURCE_LABEL, SALE_STATUSES, orderRevenue, orderSourceKey, orderSourceLabel, saleCount } from "@/lib/transaksi";
 import StageIcon from "@/components/ops/transaksi/StageIcon";
-import AnimatedNumber from "@/components/AnimatedNumber";
+// Animasi angka kartu KPI memakai komponen yang SAMA dengan kartu metrik dashboard admin
+// (`CountUp`) supaya geraknya konsisten: angka naik dari 0 saat data masuk.
+import CountUp from "@/components/admin/CountUp";
 import "@/app/ops/ops-transaksi.css";
 
 /** Field yang dipakai daftar; `Order` di halaman admin memenuhinya. */
@@ -72,6 +74,11 @@ function jam(iso: string) {
 
 function rupiah(n: number) {
   return "Rp " + Math.round(Number(n) || 0).toLocaleString("id-ID");
+}
+
+/** Angka bulat tanpa pemisah ribuan — pemformat yang sama dengan `count` di DashboardView. */
+function angka(n: number) {
+  return String(Math.round(n));
 }
 
 /** "Kain X · Series · Warna · Ukuran" — bagian yang sama dengan kolom Produk di ops. */
@@ -215,22 +222,22 @@ export default function OrdersView({
       <section className="ks">
         <div className="card k">
           <small>Total transaksi</small>
-          <b><AnimatedNumber value={loading ? 0 : kpis.total} /></b>
+          <b><CountUp value={loading ? 0 : kpis.total} format={angka} /></b>
           <i>{loading ? periodCaption : ordersNote}</i>
         </div>
         <div className="card k">
           <small>Omset bulan ini</small>
-          <b><AnimatedNumber value={loading ? 0 : kpis.revenue} format={(n) => rupiah(n)} /></b>
+          <b><CountUp value={loading ? 0 : kpis.revenue} format={rupiah} /></b>
           <i>Tidak termasuk dibatalkan</i>
         </div>
         <div className="card k">
           <small>Belum bayar</small>
-          <b style={{ color: "#c76f00" }}><AnimatedNumber value={loading ? 0 : kpis.unpaid} /></b>
+          <b style={{ color: "#c76f00" }}><CountUp value={loading ? 0 : kpis.unpaid} format={angka} /></b>
           <i>Perlu follow-up</i>
         </div>
         <div className="card k">
           <small>Perlu diproses</small>
-          <b style={{ color: "#2e64c9" }}><AnimatedNumber value={loading ? 0 : kpis.toProcess} /></b>
+          <b style={{ color: "#2e64c9" }}><CountUp value={loading ? 0 : kpis.toProcess} format={angka} /></b>
           <i>Packing + siap kirim</i>
         </div>
       </section>
