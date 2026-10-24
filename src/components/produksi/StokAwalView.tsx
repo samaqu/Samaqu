@@ -223,30 +223,37 @@ export default function StokAwalView() {
           <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
             <p className="text-sm font-bold text-slate-900 dark:text-white">Riwayat stok awal</p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse min-w-[820px]">
+          <div>
+            <table className="w-full border-collapse table-fixed">
+              <colgroup>
+                <col className="w-[13%]" />
+                <col className="w-[25%]" />
+                <col className="w-[16%]" />
+                <col className="w-[14%]" />
+                <col className="w-[14%]" />
+                <col className="w-[18%]" />
+              </colgroup>
               <thead>
                 <tr className="bg-[#1e3a5f]">
-                  {["Tanggal", "Komponen", "Jumlah", "Harga satuan", "Nilai", "User", "Catatan"].map((h) => (
-                    <th key={h} className="px-3 py-2.5 text-left text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  {["Tanggal", "Komponen", "Jumlah", "Harga satuan", "Nilai", "Catatan"].map((h) => (
+                    <th key={h} className="px-2 py-2.5 text-left text-[11px] font-bold text-white uppercase tracking-wide leading-tight">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7}><Spinner /></td></tr>
+                  <tr><td colSpan={6}><Spinner /></td></tr>
                 ) : items.length === 0 ? (
-                  <tr><td colSpan={7}><EmptyState title="Belum ada stok awal" description="Isi formulir di atas untuk mencatat stok awal pertama." /></td></tr>
+                  <tr><td colSpan={6}><EmptyState title="Belum ada stok awal" description="Isi formulir di atas untuk mencatat stok awal pertama." /></td></tr>
                 ) : (
                   items.map((row, index) => (
                     <tr key={row.id} className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-blue-50/30 dark:bg-[#1a1d28]"} border-b border-gray-100 dark:border-slate-800/50`}>
-                      <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatDate(row.movement_date)}</td>
-                      <td className="px-3 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">{row.component_code} · {row.component_name}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap"><Badge tone="green">+{formatQty(row.qty)} {row.unit_use}</Badge></td>
-                      <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(row.unit_price)}</td>
-                      <td className="px-3 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">Rp {formatRupiah(row.value)}</td>
-                      <td className="px-3 py-2.5 text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{row.actor || "—"}</td>
-                      <td className="px-3 py-2.5 text-[11px] text-slate-500 dark:text-slate-400 min-w-[180px]">{row.notes || "—"}</td>
+                      <td className="px-2 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatDate(row.movement_date)}</td>
+                      <td className="px-2 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug break-words">{row.component_code} · {row.component_name}</td>
+                      <td className="px-2 py-2.5 whitespace-nowrap"><Badge tone="green">+{formatQty(row.qty)} {row.unit_use}</Badge></td>
+                      <td className="px-2 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(row.unit_price)}</td>
+                      <td className="px-2 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">Rp {formatRupiah(row.value)}</td>
+                      <td className="px-2 py-2.5 text-[10px] text-slate-500 dark:text-slate-400 leading-snug break-words">{row.notes || "—"}</td>
                     </tr>
                   ))
                 )}
