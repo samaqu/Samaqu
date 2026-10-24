@@ -44,6 +44,12 @@ type Schedule = {
   completed_at?: string | null;
   completed_by?: string | null;
   closing_notes?: string | null;
+  estimated_hpp?: number | null;
+  final_hpp?: number | null;
+  final_material_cost?: number | null;
+  final_non_material_cost?: number | null;
+  final_total_cost?: number | null;
+  final_lolos?: number | null;
   cancelled_at?: string | null;
 };
 
@@ -116,9 +122,23 @@ type Summary = {
   non_material_cost: number;
   total_cost: number;
   hpp_actual: number;
+  hpp_estimated: number;
+  hpp_final: number | null;
   hpp_standard: number;
   hpp_difference: number;
   standard_cost: number;
+};
+
+type FinishedHppRow = {
+  product_id: string;
+  product_name: string;
+  color: string;
+  size: string;
+  qty: number;
+  hpp_schedule: number;
+  hpp_avg: number;
+  qty_received: number;
+  is_final: boolean;
 };
 
 type Requirement = {
@@ -144,6 +164,7 @@ type DetailResponse = {
   cost_estimate: { material: number; non_material: number; total: number };
   recipes_used: { recipe_id: string; version: number; category: string }[];
   receipts: Receipt[];
+  finished_hpp: FinishedHppRow[];
   results: ReceiptResult[];
   outstanding_rework: number;
   usage: UsageRow[];
@@ -436,11 +457,17 @@ export default function JadwalDetailView({ id }: { id: string }) {
                   tone={data.summary.reject > 0 ? "danger" : "muted"}
                 />
                 <StatCard
-                  label="HPP aktual"
-                  value={data.summary.lolos > 0 ? `Rp ${formatRupiah(data.summary.hpp_actual)}` : "—"}
+                  label={data.item.status === "selesai" ? "HPP final" : "HPP estimasi"}
+                  value={
+                    data.summary.lolos > 0
+                      ? `Rp ${formatRupiah(data.summary.hpp_final ?? data.summary.hpp_actual)}`
+                      : "—"
+                  }
                   hint={
                     data.summary.lolos > 0
-                      ? `Standar Rp ${formatRupiah(data.summary.hpp_standard)} · ${data.summary.hpp_difference > 0 ? "+" : ""}Rp ${formatRupiah(data.summary.hpp_difference)}`
+                      ? data.item.status === "selesai"
+                        ? `Estimasi Rp ${formatRupiah(data.summary.hpp_estimated)} · Standar Rp ${formatRupiah(data.summary.hpp_standard)}`
+                        : `Standar Rp ${formatRupiah(data.summary.hpp_standard)} · ${data.summary.hpp_difference > 0 ? "+" : ""}Rp ${formatRupiah(data.summary.hpp_difference)}`
                       : "Belum ada lolos QC"
                   }
                 />
@@ -563,6 +590,65 @@ export default function JadwalDetailView({ id }: { id: string }) {
                             </div>
                           );
                         })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {data.finished_hpp.length > 0 ? (
+              <div className={`${cardClass} overflow-hidden`}>
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">HPP rata-rata produksi per varian</p>
+                  <p className="text-[11px] text-slate-400">
+                    Rata-rata dari seluruh produksi. Kontribusi jadwal memakai {data.item.status === "selesai" ? "HPP final" : "HPP estimasi"}.
+                  </p>
+                </div>
+
+                <div className="hidden md:block">
+                  <table className="w-full border-collapse table-fixed">
+                    <colgroup>
+                      <col className="w-[34%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[23%]" />
+                      <col className="w-[23%]" />
+                    </colgroup>
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700">
+                        {["Produk", "Ukuran", "Qty", "HPP rata-rata produksi", "Kontribusi jadwal"].map((head, index) => (
+                          <th key={head} className={`px-3 py-2.5 ${index > 0 ? "text-right" : "text-left"} text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400`}>{head}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                      {data.finished_hpp.map((row) => (
+                        <tr key={`${row.product_id}|${row.color}|${row.size}`}>
+                          <td className="px-3 py-2.5 min-w-0">
+                            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{row.product_name}</p>
+                            <p className="text-[10px] text-slate-400 truncate">{row.color !== "default" ? row.color : "—"}</p>
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-xs text-slate-600 dark:text-slate-300">{row.size}</td>
+                          <td className="px-3 py-2.5 text-right text-xs font-bold text-slate-900 dark:text-white tabular-nums">{formatQty(row.qty)}</td>
+                          <td className="px-3 py-2.5 text-right text-xs font-black text-slate-900 dark:text-white tabular-nums">Rp {formatRupiah(row.hpp_avg)}</td>
+                          <td className="px-3 py-2.5 text-right text-xs font-bold text-slate-700 dark:text-slate-200 tabular-nums">Rp {formatRupiah(row.hpp_schedule)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/70">
+                  {data.finished_hpp.map((row) => (
+                    <div key={`${row.product_id}|${row.color}|${row.size}`} className="p-3">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white">{row.product_name}</p>
+                      <p className="text-[10px] text-slate-400">{row.color !== "default" ? `${row.color} · ` : ""}{row.size} · {formatQty(row.qty)} pcs</p>
+                      <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+                        <span className="text-slate-400">HPP rata-rata produksi</span>
+                        <span className="text-right font-bold text-slate-800 dark:text-slate-100">Rp {formatRupiah(row.hpp_avg)}</span>
+                        <span className="text-slate-400">Kontribusi jadwal</span>
+                        <span className="text-right font-bold text-slate-700 dark:text-slate-200">Rp {formatRupiah(row.hpp_schedule)}</span>
                       </div>
                     </div>
                   ))}
@@ -772,9 +858,17 @@ export default function JadwalDetailView({ id }: { id: string }) {
                     <p className="mt-1 text-base font-black text-slate-900 dark:text-white tabular-nums">Rp {formatRupiah(data.summary.total_cost)}</p>
                   </div>
                   <div className="rounded-xl bg-[#1e3a5f] p-3 text-white">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-white/70">HPP aktual / pcs</p>
-                    <p className="mt-1 text-base font-black tabular-nums">Rp {formatRupiah(data.summary.hpp_actual)}</p>
-                    <p className="text-[10px] text-white/70">Standar Rp {formatRupiah(data.summary.hpp_standard)}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-white/70">
+                      {data.item.status === "selesai" ? "HPP final / pcs" : "HPP estimasi / pcs"}
+                    </p>
+                    <p className="mt-1 text-base font-black tabular-nums">
+                      Rp {formatRupiah(data.summary.hpp_final ?? data.summary.hpp_actual)}
+                    </p>
+                    <p className="text-[10px] text-white/70">
+                      {data.item.status === "selesai"
+                        ? `Estimasi Rp ${formatRupiah(data.summary.hpp_estimated)}`
+                        : `Standar Rp ${formatRupiah(data.summary.hpp_standard)}`}
+                    </p>
                   </div>
                 </div>
               </div>

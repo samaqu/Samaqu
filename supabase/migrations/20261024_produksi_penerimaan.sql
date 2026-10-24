@@ -9,7 +9,13 @@
 alter table production_schedules
   add column if not exists completed_at timestamptz,
   add column if not exists completed_by text,
-  add column if not exists closing_notes text;
+  add column if not exists closing_notes text,
+  add column if not exists estimated_hpp numeric(14, 2),
+  add column if not exists final_hpp numeric(14, 2),
+  add column if not exists final_material_cost numeric(14, 2),
+  add column if not exists final_non_material_cost numeric(14, 2),
+  add column if not exists final_total_cost numeric(14, 2),
+  add column if not exists final_lolos integer;
 
 create sequence if not exists production_receipt_seq start 1;
 
@@ -82,6 +88,58 @@ create table if not exists production_finished_hpp (
   updated_at timestamptz not null default now(),
   unique (product_id, color, size)
 );
+
+-- Kontribusi HPP per jadwal. Saat Selesai, nilai estimasi diganti final,
+-- lalu production_finished_hpp dihitung ulang dari kontribusi ini.
+create table if not exists production_schedule_hpp_contributions (
+  id uuid primary key default gen_random_uuid(),
+  schedule_id uuid not null references production_schedules (id) on delete cascade,
+  receipt_id uuid not null references production_receipts (id) on delete restrict,
+  product_id text not null,
+  color text not null default 'default',
+  size text not null,
+  qty numeric(14, 4) not null check (qty > 0),
+  hpp_value numeric(14, 2) not null default 0,
+  is_final boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_production_hpp_contrib_schedule
+  on production_schedule_hpp_contributions (schedule_id);
+create index if not exists idx_production_hpp_contrib_variant
+  on production_schedule_hpp_contributions (product_id, color, size);
+
+-- Hitung ulang rata-rata HPP produksi untuk satu varian dari seluruh kontribusi.
+create or replace function production_refresh_finished_hpp(
+  p_product_id text,
+  p_color text,
+  p_size text
+) returns void
+language plpgsql as $$
+declare
+  v_qty numeric;
+  v_value numeric;
+begin
+  select coalesce(sum(qty), 0), coalesce(sum(qty * hpp_value), 0)
+    into v_qty, v_value
+    from production_schedule_hpp_contributions
+   where product_id = p_product_id
+     and color = p_color
+     and size = p_size;
+
+  if v_qty > 0 then
+    insert into production_finished_hpp (product_id, color, size, qty_received, hpp_avg, updated_at)
+    values (p_product_id, p_color, p_size, v_qty, round(v_value / v_qty, 2), now())
+    on conflict (product_id, color, size) do update set
+      qty_received = excluded.qty_received,
+      hpp_avg = excluded.hpp_avg,
+      updated_at = now();
+  else
+    delete from production_finished_hpp
+     where product_id = p_product_id and color = p_color and size = p_size;
+  end if;
+end $$;
 
 -- Append-only untuk data penerimaan.
 create or replace function production_guard_receipt() returns trigger
@@ -195,6 +253,7 @@ declare
   v_new_hpp numeric;
   v_qty numeric;
   v_hpp_price numeric;
+  v_key record;
   v_sort int := 0;
 begin
   select * into v_schedule from production_schedules where id = p_schedule_id for update;
@@ -313,7 +372,7 @@ begin
     );
   end if;
 
-  -- HPP rata-rata per varian (basis stok setelah resolusi sharing).
+  -- Kontribusi HPP estimasi per varian (basis stok setelah resolusi sharing).
   for v_hpp in select * from jsonb_array_elements(coalesce(p_payload->'hpp_items', '[]'::jsonb)) loop
     v_qty := coalesce((v_hpp->>'qty')::numeric, 0);
     if v_qty <= 0 then continue; end if;
@@ -330,29 +389,20 @@ begin
     v_base_product := coalesce(v_base_product, v_hpp->>'product_id');
     v_base_size := upper(coalesce(v_base_size, v_hpp->>'size'));
 
-    select qty_received, hpp_avg into v_old_qty, v_old_hpp
-      from production_finished_hpp
-     where product_id = v_base_product
-       and color = coalesce(v_hpp->>'color', 'default')
-       and size = v_base_size
-     for update;
+    insert into production_schedule_hpp_contributions (
+      schedule_id, receipt_id, product_id, color, size, qty, hpp_value, is_final
+    ) values (
+      p_schedule_id, v_receipt.id, v_base_product,
+      coalesce(v_hpp->>'color', 'default'), v_base_size, v_qty, round(v_hpp_price, 2), false
+    );
+  end loop;
 
-    if v_old_qty is null then
-      v_old_qty := 0;
-      v_old_hpp := v_hpp_price;
-    end if;
-
-    v_new_qty := v_old_qty + v_qty;
-    v_new_hpp := case when v_new_qty > 0
-      then (v_old_qty * v_old_hpp + v_qty * v_hpp_price) / v_new_qty
-      else v_hpp_price end;
-
-    insert into production_finished_hpp (product_id, color, size, qty_received, hpp_avg, updated_at)
-    values (v_base_product, coalesce(v_hpp->>'color', 'default'), v_base_size, v_new_qty, round(v_new_hpp, 2), now())
-    on conflict (product_id, color, size) do update set
-      qty_received = excluded.qty_received,
-      hpp_avg = excluded.hpp_avg,
-      updated_at = now();
+  for v_key in
+    select distinct product_id, color, size
+      from production_schedule_hpp_contributions
+     where receipt_id = v_receipt.id
+  loop
+    perform production_refresh_finished_hpp(v_key.product_id, v_key.color, v_key.size);
   end loop;
 
   return jsonb_build_object(
@@ -381,6 +431,14 @@ declare
   v_returned numeric;
   v_outstanding numeric;
   v_issue_price numeric;
+  v_final_material numeric;
+  v_final_non_material numeric;
+  v_final_total numeric;
+  v_final_lolos numeric;
+  v_estimated_total numeric;
+  v_estimated_hpp numeric;
+  v_final_hpp numeric;
+  v_key record;
   v_count int := 0;
 begin
   select * into v_row from production_schedules where id = p_schedule_id for update;
@@ -451,33 +509,91 @@ begin
     end loop;
   end if;
 
+  -- Biaya bahan final = pemakaian aktual (keluar − retur) x harga saat keluar.
+  select coalesce(sum(
+    case when type = 'keluar_produksi' then (-qty) * unit_price
+         else -qty * unit_price end
+  ), 0)
+    into v_final_material
+    from production_stock_movements
+   where ref_type = 'production_schedule' and ref_id = p_schedule_id
+     and type in ('keluar_produksi', 'retur_sisa_bahan');
+  v_final_material := greatest(0, round(v_final_material, 2));
+
+  select coalesce(sum(non_material_cost), 0),
+         coalesce(sum(total_cost), 0),
+         coalesce(sum(total_lolos + rework_to_lolos), 0)
+    into v_final_non_material, v_estimated_total, v_final_lolos
+    from production_receipts
+   where schedule_id = p_schedule_id;
+
+  v_estimated_hpp := case when v_final_lolos > 0 then v_estimated_total / v_final_lolos else 0 end;
+  v_final_total := round(v_final_material + v_final_non_material, 2);
+  v_final_hpp := case when v_final_lolos > 0 then v_final_total / v_final_lolos else 0 end;
+
+  -- Ganti kontribusi estimasi jadwal ini dengan HPP final, lalu hitung ulang
+  -- rata-rata produksi per varian dari seluruh kontribusi.
+  update production_schedule_hpp_contributions
+     set hpp_value = round(v_final_hpp, 2),
+         is_final = true,
+         updated_at = now()
+   where schedule_id = p_schedule_id;
+
+  for v_key in
+    select distinct product_id, color, size
+      from production_schedule_hpp_contributions
+     where schedule_id = p_schedule_id
+  loop
+    perform production_refresh_finished_hpp(v_key.product_id, v_key.color, v_key.size);
+  end loop;
+
   update production_schedules set
     status = 'selesai',
     completed_at = now(),
     completed_by = nullif(p_actor, ''),
     closing_notes = nullif(btrim(coalesce(p_notes, '')), ''),
+    estimated_hpp = round(v_estimated_hpp, 2),
+    final_hpp = round(v_final_hpp, 2),
+    final_material_cost = v_final_material,
+    final_non_material_cost = round(v_final_non_material, 2),
+    final_total_cost = v_final_total,
+    final_lolos = v_final_lolos::int,
     updated_at = now()
   where id = p_schedule_id;
 
-  return jsonb_build_object('status', 'selesai', 'returned', v_count);
+  return jsonb_build_object(
+    'status', 'selesai',
+    'returned', v_count,
+    'estimated_hpp', round(v_estimated_hpp, 2),
+    'final_hpp', round(v_final_hpp, 2),
+    'final_material_cost', v_final_material,
+    'final_non_material_cost', round(v_final_non_material, 2),
+    'final_total_cost', v_final_total,
+    'final_lolos', v_final_lolos::int
+  );
 end $$;
 
 alter table production_receipts enable row level security;
 alter table production_receipt_items enable row level security;
 alter table production_receipt_costs enable row level security;
 alter table production_finished_hpp enable row level security;
+alter table production_schedule_hpp_contributions enable row level security;
 
 revoke all on function production_issue_schedule_materials(uuid, jsonb, text) from public;
 revoke all on function production_save_receipt(uuid, jsonb, text) from public;
 revoke all on function production_complete_schedule(uuid, jsonb, text, text) from public;
+revoke all on function production_refresh_finished_hpp(text, text, text) from public;
 
 grant execute on function production_issue_schedule_materials(uuid, jsonb, text) to service_role;
 grant execute on function production_save_receipt(uuid, jsonb, text) to service_role;
 grant execute on function production_complete_schedule(uuid, jsonb, text, text) to service_role;
+grant execute on function production_refresh_finished_hpp(text, text, text) to service_role;
 
 comment on table production_receipts is
   'Penerimaan hasil produksi (append-only). Menyimpan total QC, biaya, HPP aktual & standar.';
 comment on table production_receipt_items is
   'Rincian hasil per target/ukuran: lolos, rework, reject, resolusi rework.';
 comment on table production_finished_hpp is
-  'HPP rata-rata tertimbang per varian (basis stok sharing) dari penerimaan.';
+  'HPP rata-rata produksi per varian (basis stok sharing), dihitung dari kontribusi jadwal.';
+comment on table production_schedule_hpp_contributions is
+  'Kontribusi HPP per jadwal/varian. Estimasi diganti final saat jadwal Selesai.';

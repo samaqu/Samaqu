@@ -42,6 +42,30 @@ export type ReceiptItemInput = {
   rework_to_reject: number;
 };
 
+export type ProductCombination = {
+  category: string;
+  fabric_type_id: string | null;
+  series: string;
+};
+
+/**
+ * Jumlah produk untuk kombinasi kategori + jenis kain + series.
+ * Dipakai untuk menentukan apakah warna target wajib diisi.
+ */
+export function countMatchingProducts(
+  category: string,
+  fabricTypeId: string | null | undefined,
+  series: string | null | undefined,
+  products: ProductCombination[],
+): number {
+  return (products || []).filter((product) => {
+    if (norm(product.category) !== norm(category)) return false;
+    if (fabricTypeId && String(product.fabric_type_id || "") !== String(fabricTypeId)) return false;
+    if (series && norm(product.series) !== norm(series)) return false;
+    return true;
+  }).length;
+}
+
 export type ResolvedStockRow = {
   product_id: string;
   product_name: string;
@@ -95,7 +119,7 @@ export function resolveTargetVariant(
   if (candidates.length > 1) {
     return {
       ok: false,
-      error: `Target ${target.category}${target.series ? ` · ${target.series}` : ""}${target.color ? ` · ${target.color}` : ""} cocok dengan ${candidates.length} produk. Pilih warna/series lebih spesifik.`,
+      error: `Warna target wajib diisi karena kombinasi ${target.category}${target.series ? ` · ${target.series}` : ""} cocok dengan ${candidates.length} produk.`,
     };
   }
 

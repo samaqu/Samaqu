@@ -13,7 +13,7 @@ import {
   loadScheduleComponents,
   mapTargets,
 } from "@/lib/produksi-jadwal-server";
-import { computeStandardCost, costLinesForTarget } from "@/lib/produksi-finished";
+import { computeStandardCost, costLinesForTarget, countMatchingProducts } from "@/lib/produksi-finished";
 import {
   loadReceiptBundle,
   outstandingReworkMap,
@@ -190,11 +190,20 @@ export async function GET(
   // Sebelumnya, penerimaan memakai alokasi biaya yang sudah dikeluarkan.
   const completed = schedule.status === "selesai";
   const finalMaterialCost = Math.max(0, issuedCostTotal - returnedCostTotal);
-  const summaryMaterialCost = completed ? finalMaterialCost : receiptSummary.material;
-  const summaryTotalCost = completed
-    ? summaryMaterialCost + receiptSummary.nonMaterial
-    : receiptSummary.totalCost;
-  const hppActual = totalLolos > 0 ? summaryTotalCost / totalLolos : 0;
+  const summaryMaterialCost = completed && schedule.final_material_cost != null
+    ? Number(schedule.final_material_cost)
+    : completed
+      ? finalMaterialCost
+      : receiptSummary.material;
+  const summaryTotalCost = completed && schedule.final_total_cost != null
+    ? Number(schedule.final_total_cost)
+    : completed
+      ? summaryMaterialCost + receiptSummary.nonMaterial
+      : receiptSummary.totalCost;
+  const calculatedHppActual = totalLolos > 0 ? summaryTotalCost / totalLolos : 0;
+  const storedFinalHpp = completed && schedule.final_hpp != null ? Number(schedule.final_hpp) : null;
+  const storedEstimatedHpp = completed && schedule.estimated_hpp != null ? Number(schedule.estimated_hpp) : null;
+  const hppActual = storedFinalHpp != null ? storedFinalHpp : calculatedHppActual;
   const hppStandard = totalLolos > 0 ? standardCost.total / totalLolos : 0;
 
   const resultMap = new Map<string, { lolos: number; reject: number }>();
@@ -241,6 +250,67 @@ export async function GET(
     costs: receiptCostsByReceipt.get(receipt.id) || [],
   }));
 
+  const { data: hppContributionRows } = await admin
+    .from("production_schedule_hpp_contributions")
+    .select("product_id, color, size, qty, hpp_value, is_final")
+    .eq("schedule_id", id);
+  const hppProductIds = Array.from(
+    new Set((hppContributionRows || []).map((row: any) => String(row.product_id))),
+  );
+  const [{ data: hppProducts }, { data: hppGlobalRows }] = hppProductIds.length > 0
+    ? await Promise.all([
+        admin.from("products").select("id, name").in("id", hppProductIds),
+        admin
+          .from("production_finished_hpp")
+          .select("product_id, color, size, qty_received, hpp_avg")
+          .in("product_id", hppProductIds),
+      ])
+    : [{ data: [] as any[] }, { data: [] as any[] }];
+  const productNameById = new Map((hppProducts || []).map((row: any) => [String(row.id), String(row.name || "")]));
+  const globalHppByKey = new Map(
+    (hppGlobalRows || []).map((row: any) => [
+      `${row.product_id}|${row.color}|${row.size}`,
+      row,
+    ]),
+  );
+  const contributionMap = new Map<
+    string,
+    { product_id: string; color: string; size: string; qty: number; value: number; final: boolean }
+  >();
+  for (const row of hppContributionRows || []) {
+    const key = `${row.product_id}|${row.color}|${row.size}`;
+    const qty = Number(row.qty) || 0;
+    const current = contributionMap.get(key) || {
+      product_id: String(row.product_id),
+      color: String(row.color || "default"),
+      size: String(row.size || ""),
+      qty: 0,
+      value: 0,
+      final: false,
+    };
+    current.qty += qty;
+    current.value += qty * (Number(row.hpp_value) || 0);
+    current.final = current.final || Boolean(row.is_final);
+    contributionMap.set(key, current);
+  }
+  const finishedHpp = Array.from(contributionMap.values())
+    .map((row) => {
+      const key = `${row.product_id}|${row.color}|${row.size}`;
+      const global = globalHppByKey.get(key);
+      return {
+        product_id: row.product_id,
+        product_name: productNameById.get(row.product_id) || row.product_id,
+        color: row.color,
+        size: row.size,
+        qty: Math.round(row.qty * 10000) / 10000,
+        hpp_schedule: row.qty > 0 ? Math.round((row.value / row.qty) * 100) / 100 : 0,
+        hpp_avg: global ? Number(global.hpp_avg) || 0 : 0,
+        qty_received: global ? Number(global.qty_received) || 0 : 0,
+        is_final: row.final,
+      };
+    })
+    .sort((a, b) => a.product_name.localeCompare(b.product_name, "id") || a.size.localeCompare(b.size));
+
   return NextResponse.json({
     item: schedule,
     targets: targetRows.map((row: any) => ({
@@ -265,6 +335,7 @@ export async function GET(
       total: Math.round((materialCost + nonMaterialCost) * 100) / 100,
     },
     receipts,
+    finished_hpp: finishedHpp,
     results,
     outstanding_rework: totalOutstandingRework,
     usage,
@@ -279,6 +350,8 @@ export async function GET(
       non_material_cost: receiptSummary.nonMaterial,
       total_cost: summaryTotalCost,
       hpp_actual: Math.round(hppActual * 100) / 100,
+      hpp_estimated: Math.round((storedEstimatedHpp ?? calculatedHppActual) * 100) / 100,
+      hpp_final: storedFinalHpp != null ? Math.round(storedFinalHpp * 100) / 100 : null,
       hpp_standard: Math.round(hppStandard * 100) / 100,
       hpp_difference: Math.round((hppActual - hppStandard) * 100) / 100,
       standard_cost: standardCost.total,
@@ -316,10 +389,32 @@ export async function PATCH(
         return NextResponse.json({ error: "Hanya jadwal Draft yang bisa disetujui." }, { status: 400 });
       }
       const targets = mapTargets(await loadTargetRows(admin, id));
-      const [components, recipeMap] = await Promise.all([
+      const [components, recipeMap, { data: productRows }] = await Promise.all([
         loadScheduleComponents(admin),
         loadRecipeMap(admin, targets.map((target) => target.category)),
+        admin.from("products").select("category, jenis_kain_id, series"),
       ]);
+      const productCombinations = (productRows || []).map((row: any) => ({
+        category: String(row.category || ""),
+        fabric_type_id: row.jenis_kain_id || null,
+        series: String(row.series || ""),
+      }));
+      for (const target of targets) {
+        const count = countMatchingProducts(
+          target.category,
+          target.fabric_type_id,
+          target.series,
+          productCombinations,
+        );
+        if (count > 1 && !target.color) {
+          return NextResponse.json(
+            {
+              error: `Warna wajib diisi untuk ${target.category}${target.series ? ` · ${target.series}` : ""} karena kombinasi ini cocok dengan ${count} produk.`,
+            },
+            { status: 400 },
+          );
+        }
+      }
       const computed = computeScheduleRequirements(targets, recipeMap, components);
       const { data, error } = await admin.rpc("production_approve_schedule", {
         p_id: id,

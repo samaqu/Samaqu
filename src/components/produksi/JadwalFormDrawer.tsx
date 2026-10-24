@@ -5,6 +5,7 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import { CATEGORY_ORDER } from "@/lib/ops-order";
 import { formatQty, todayInput } from "@/lib/produksi";
 import { produksiFetch } from "@/lib/produksi-api";
+import { countMatchingProducts, type ProductCombination } from "@/lib/produksi-finished";
 import {
   Drawer,
   ErrorBox,
@@ -40,6 +41,7 @@ type Options = {
   colors: string[];
   fabrics: { id: string; name: string }[];
   kain_categories?: string[];
+  product_combinations?: ProductCombination[];
 };
 
 type TargetRow = {
@@ -90,6 +92,9 @@ export default function JadwalFormDrawer({
   const [rows, setRows] = useState<TargetRow[]>([emptyRow()]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const productCombinations = options?.product_combinations || [];
+  const needsColor = (row: TargetRow) =>
+    countMatchingProducts(row.category, row.fabric_type_id, row.series, productCombinations) > 1;
 
   useEffect(() => {
     if (!open) return;
@@ -156,6 +161,10 @@ export default function JadwalFormDrawer({
       if (!row.category) return setError(`Baris ${i + 1}: pilih kategori produk.`);
       const needsFabric = (options?.kain_categories || []).includes(row.category);
       if (needsFabric && !row.fabric_type_id) return setError(`Baris ${i + 1}: pilih jenis kain.`);
+      if (needsColor(row) && !row.color) {
+        const count = countMatchingProducts(row.category, row.fabric_type_id, row.series, productCombinations);
+        return setError(`Baris ${i + 1}: warna wajib diisi karena kombinasi ini cocok dengan ${count} produk.`);
+      }
       if (rowTotal(row) <= 0) return setError(`Baris ${i + 1}: isi jumlah target per ukuran.`);
     }
 
@@ -274,11 +283,16 @@ export default function JadwalFormDrawer({
                   </select>
                 </div>
                 <div>
-                  <label className={labelClass}>Warna</label>
+                  <label className={labelClass}>{needsColor(row) ? "Warna (wajib)" : "Warna"}</label>
                   <select className={inputClass} value={row.color} onChange={(e) => updateRow(index, { color: e.target.value })}>
-                    <option value="">Semua</option>
+                    <option value="">{needsColor(row) ? "— Pilih —" : "Semua"}</option>
                     {(options?.colors || []).map((color) => <option key={color} value={color}>{color}</option>)}
                   </select>
+                  {needsColor(row) ? (
+                    <p className="mt-1 text-[9px] font-semibold text-amber-600 dark:text-amber-400">
+                      Kombinasi ini cocok dengan {countMatchingProducts(row.category, row.fabric_type_id, row.series, productCombinations)} produk.
+                    </p>
+                  ) : null}
                 </div>
                 <div>
                   <label className={labelClass}>Series</label>

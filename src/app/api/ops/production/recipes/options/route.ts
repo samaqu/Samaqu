@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     { data: kainLines },
   ] = await Promise.all([
     admin.from("jenis_kain").select("id, name").order("name", { ascending: true }),
-    admin.from("products").select("category, series, colors"),
+    admin.from("products").select("category, series, colors, jenis_kain_id"),
     admin.from("product_variants").select("size, color"),
     admin.from("production_cost_groups").select("name").order("name", { ascending: true }),
     admin
@@ -93,5 +93,10 @@ export async function GET(req: NextRequest) {
     fabrics: fabrics || [],
     cost_groups: costGroups,
     kain_categories: kainCategories,
+    product_combinations: (products || []).map((product: any) => ({
+      category: String(product.category || ""),
+      fabric_type_id: product.jenis_kain_id || null,
+      series: String(product.series || ""),
+    })),
   });
 }

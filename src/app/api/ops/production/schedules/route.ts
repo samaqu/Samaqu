@@ -13,6 +13,7 @@ import {
   loadScheduleComponents,
   mapTargets,
 } from "@/lib/produksi-jadwal-server";
+import { countMatchingProducts, type ProductCombination } from "@/lib/produksi-finished";
 
 /**
  * Daftar jadwal produksi + buat/ubah Draft.
@@ -181,6 +182,31 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = getSupabaseAdmin();
+    const { data: productRows } = await admin
+      .from("products")
+      .select("category, jenis_kain_id, series");
+    const productCombinations: ProductCombination[] = (productRows || []).map((row: any) => ({
+      category: String(row.category || ""),
+      fabric_type_id: row.jenis_kain_id || null,
+      series: String(row.series || ""),
+    }));
+    for (const target of targets) {
+      const count = countMatchingProducts(
+        target.category,
+        target.fabric_type_id,
+        target.series,
+        productCombinations,
+      );
+      if (count > 1 && !target.color) {
+        return NextResponse.json(
+          {
+            error: `Warna wajib diisi untuk ${target.category}${target.series ? ` · ${target.series}` : ""} karena kombinasi ini cocok dengan ${count} produk.`,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     const { data, error } = await admin.rpc("production_save_schedule", {
       p_id: body?.id ? String(body.id) : null,
       p_header: {
