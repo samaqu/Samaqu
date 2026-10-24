@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Plus, X } from "lucide-react";
+import {
+  Calendar,
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  RotateCcw,
+  SlidersHorizontal,
+} from "lucide-react";
 import { produksiFetch } from "@/lib/produksi-api";
 import {
   SCHEDULE_STATUS_OPTIONS,
@@ -22,7 +29,6 @@ import {
   StatCard,
   btnPrimary,
   cardClass,
-  inputClass,
 } from "./ui";
 
 type ScheduleItem = {
@@ -106,25 +112,57 @@ export default function JadwalView() {
           <StatCard label="Bahan kurang" value={String(summary.kurang)} hint="Jadwal aktif" tone="danger" />
         </div>
 
-        <div className={`${cardClass} p-3 flex flex-wrap items-center gap-2`}>
-          <select className={`${inputClass} w-auto min-w-[170px]`} value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">Semua status</option>
-            {SCHEDULE_STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-          <input type="date" className={`${inputClass} w-auto`} value={start} onChange={(e) => setStart(e.target.value)} aria-label="Dari tanggal" />
-          <span className="text-xs font-bold text-slate-400">s/d</span>
-          <input type="date" className={`${inputClass} w-auto`} value={end} onChange={(e) => setEnd(e.target.value)} aria-label="Sampai tanggal" />
-          {(status || start || end) ? (
-            <button
-              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-              onClick={() => { setStatus(""); setStart(""); setEnd(""); }}
-              aria-label="Reset filter"
-            >
-              <X size={16} />
-            </button>
-          ) : null}
+        <div className={`${cardClass} px-2.5 py-2`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 pl-1 pr-0.5 text-slate-400">
+              <SlidersHorizontal size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Filter</span>
+            </div>
+
+            <div className="relative w-full sm:w-auto">
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="h-9 w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 pl-3 pr-8 text-[12px] font-bold text-slate-700 outline-none transition-colors focus:border-blue-400 focus:ring-2 focus:ring-blue-100 sm:w-[150px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:ring-blue-900/30"
+                aria-label="Filter status"
+              >
+                <option value="">Semua status</option>
+                {SCHEDULE_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            </div>
+
+            <div className="flex h-9 w-full items-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 sm:w-auto dark:border-slate-700 dark:bg-slate-900">
+              <Calendar size={14} className="ml-2.5 shrink-0 text-slate-400" />
+              <input
+                type="date"
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+                aria-label="Dari tanggal"
+                className="h-9 min-w-0 flex-1 border-0 bg-transparent px-2 text-[12px] font-semibold text-slate-700 outline-none sm:w-[118px] sm:flex-none dark:text-slate-200"
+              />
+              <span className="shrink-0 text-[10px] font-bold text-slate-300 dark:text-slate-600">→</span>
+              <input
+                type="date"
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
+                aria-label="Sampai tanggal"
+                className="h-9 min-w-0 flex-1 border-0 bg-transparent px-2 text-[12px] font-semibold text-slate-700 outline-none sm:w-[118px] sm:flex-none dark:text-slate-200"
+              />
+            </div>
+
+            {(status || start || end) ? (
+              <button
+                type="button"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-bold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                onClick={() => { setStatus(""); setStart(""); setEnd(""); }}
+              >
+                <RotateCcw size={13} /> Reset
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className={`${cardClass} overflow-hidden`}>
