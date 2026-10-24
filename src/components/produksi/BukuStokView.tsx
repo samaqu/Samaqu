@@ -226,44 +226,40 @@ export default function BukuStokView() {
             <colgroup>
               {access.role === "owner" ? (
                 <>
-                  <col className="w-[12%]" />
-                  <col className="w-[29%]" />
-                  <col className="w-[15%]" />
-                  <col className="w-[14%]" />
                   <col className="w-[13%]" />
-                  <col className="w-[12%]" />
+                  <col className="w-[31%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[21%]" />
                   <col className="w-[5%]" />
                 </>
               ) : (
                 <>
-                  <col className="w-[14%]" />
-                  <col className="w-[45%]" />
-                  <col className="w-[18%]" />
-                  <col className="w-[18%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[50%]" />
+                  <col className="w-[17%]" />
+                  <col className="w-[13%]" />
                   <col className="w-[5%]" />
                 </>
               )}
             </colgroup>
             <thead>
               <tr className="bg-[#1e3a5f]">
-                <th className="px-2.5 py-2.5 text-left text-[10px] font-bold text-white uppercase tracking-wider leading-tight">Tanggal</th>
-                <th className="px-2.5 py-2.5 text-left text-[10px] font-bold text-white uppercase tracking-wider leading-tight">Komponen</th>
-                <th className="px-2.5 py-2.5 text-left text-[10px] font-bold text-white uppercase tracking-wider leading-tight">Jenis</th>
-                <th className="px-2.5 py-2.5 text-right text-[10px] font-bold text-white uppercase tracking-wider leading-tight">Jumlah</th>
+                <th className="px-3 py-3 text-left text-[11px] font-bold text-white uppercase tracking-wider leading-tight">Tanggal</th>
+                <th className="px-3 py-3 text-left text-[11px] font-bold text-white uppercase tracking-wider leading-tight">Komponen</th>
+                <th className="px-3 py-3 text-left text-[11px] font-bold text-white uppercase tracking-wider leading-tight">Jenis</th>
+                <th className="px-3 py-3 text-right text-[11px] font-bold text-white uppercase tracking-wider leading-tight">Jumlah</th>
                 {access.role === "owner" ? (
-                  <>
-                    <th className="px-2.5 py-2.5 text-right text-[10px] font-bold text-white uppercase tracking-wider leading-tight">Harga satuan</th>
-                    <th className="px-2.5 py-2.5 text-right text-[10px] font-bold text-white uppercase tracking-wider leading-tight">Nilai</th>
-                  </>
+                  <th className="px-3 py-3 text-right text-[11px] font-bold text-white uppercase tracking-wider leading-tight">Nilai</th>
                 ) : null}
-                <th className="px-1 py-2.5" aria-label="Detail" />
+                <th className="px-1 py-3" aria-label="Detail" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
               {loading ? (
-                <tr><td colSpan={access.role === "owner" ? 7 : 5}><Spinner /></td></tr>
+                <tr><td colSpan={access.role === "owner" ? 6 : 5}><Spinner /></td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan={access.role === "owner" ? 7 : 5}><EmptyState title="Belum ada pergerakan" description="Stok awal atau pembelian akan muncul di sini." /></td></tr>
+                <tr><td colSpan={access.role === "owner" ? 6 : 5}><EmptyState title="Belum ada pergerakan" description="Stok awal atau pembelian akan muncul di sini." /></td></tr>
               ) : (
                 items.map((row, index) => (
                   <tr
@@ -280,40 +276,37 @@ export default function BukuStokView() {
                     }}
                     className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-slate-50/60 dark:bg-[#1a1d28]"} hover:bg-blue-50/50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500`}
                   >
-                    <td className="px-2.5 py-2.5 align-middle text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap tabular-nums">
+                    <td className="px-3 py-3 align-middle text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap tabular-nums">
                       {formatDate(row.movement_date)}
                     </td>
-                    <td className="px-2.5 py-2.5 align-middle min-w-0">
-                      <span className="block text-[10px] font-mono font-semibold tracking-wide text-slate-400 dark:text-slate-500 truncate">
+                    <td className="px-3 py-3 align-middle min-w-0">
+                      <span className="block text-[11px] font-mono font-semibold tracking-wide text-slate-400 dark:text-slate-500 truncate">
                         {row.component_code}
                       </span>
-                      <span className="block text-xs font-bold text-slate-900 dark:text-white truncate" title={row.component_name}>
+                      <span className="block text-[13px] font-bold text-slate-900 dark:text-white truncate" title={row.component_name}>
                         {row.component_name}
                       </span>
                     </td>
-                    <td className="px-2.5 py-2.5 align-middle">
+                    <td className="px-3 py-3 align-middle">
                       <Badge tone={row.type === "opname" || row.type === "penyesuaian" ? "blue" : row.qty > 0 ? "green" : "red"}>
                         {movementLabel(row.type)}
                       </Badge>
                     </td>
-                    <td className="px-2.5 py-2.5 align-middle text-right whitespace-nowrap tabular-nums">
-                      <span className={`text-xs font-bold ${row.qty > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                    <td className="px-3 py-3 align-middle text-right whitespace-nowrap tabular-nums">
+                      <span className={`text-[13px] font-bold ${row.qty > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                         {row.qty > 0 ? "+" : "−"}{formatQty(Math.abs(row.qty))}
                       </span>
-                      <span className="ml-1 text-[10px] font-semibold text-slate-400">{row.unit_use}</span>
+                      <span className="ml-1 text-[11px] font-semibold text-slate-400">{row.unit_use}</span>
                     </td>
                     {access.role === "owner" ? (
-                      <>
-                        <td className="px-2.5 py-2.5 align-middle text-right whitespace-nowrap tabular-nums">
-                          <span className="text-[10px] text-slate-400">Rp</span>{" "}
-                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{formatRupiah(row.unit_price)}</span>
-                        </td>
-                        <td className="px-2.5 py-2.5 align-middle text-right text-xs font-black text-slate-900 dark:text-white whitespace-nowrap tabular-nums">
-                          Rp {formatRupiah(row.value)}
-                        </td>
-                      </>
+                      <td className="px-3 py-3 align-middle text-right whitespace-nowrap tabular-nums">
+                        <span className="text-[13px] font-black text-slate-900 dark:text-white">Rp {formatRupiah(row.value)}</span>
+                        <span className="block text-[11px] text-slate-400">
+                          @ Rp {formatRupiah(row.unit_price)} / {row.unit_use}
+                        </span>
+                      </td>
                     ) : null}
-                    <td className="px-1 py-2.5 align-middle text-center text-slate-300 dark:text-slate-600">
+                    <td className="px-1 py-3 align-middle text-center text-slate-300 dark:text-slate-600">
                       <ChevronRight size={15} />
                     </td>
                   </tr>

@@ -228,12 +228,10 @@ export default function StokAwalView() {
           <div>
             <table className="w-full border-collapse table-fixed">
               <colgroup>
-                <col className="w-[12%]" />
-                <col className="w-[34%]" />
-                <col className="w-[13%]" />
-                <col className="w-[14%]" />
                 <col className="w-[15%]" />
-                <col className="w-[12%]" />
+                <col className="w-[44%]" />
+                <col className="w-[15%]" />
+                <col className="w-[26%]" />
               </colgroup>
               <thead>
                 <tr className="bg-[#1e3a5f]">
@@ -241,13 +239,11 @@ export default function StokAwalView() {
                     { label: "Tanggal", align: "text-left" },
                     { label: "Komponen", align: "text-left" },
                     { label: "Jumlah", align: "text-right" },
-                    { label: "Harga satuan", align: "text-right" },
                     { label: "Nilai", align: "text-right" },
-                    { label: "Catatan", align: "text-left" },
                   ].map((head) => (
                     <th
                       key={head.label}
-                      className={`px-2.5 py-2.5 ${head.align} text-[10px] font-bold text-white uppercase tracking-wider leading-tight`}
+                      className={`px-3 py-3 ${head.align} text-[11px] font-bold text-white uppercase tracking-wider leading-tight`}
                     >
                       {head.label}
                     </th>
@@ -256,40 +252,39 @@ export default function StokAwalView() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
                 {loading ? (
-                  <tr><td colSpan={6}><Spinner /></td></tr>
+                  <tr><td colSpan={4}><Spinner /></td></tr>
                 ) : items.length === 0 ? (
-                  <tr><td colSpan={6}><EmptyState title="Belum ada stok awal" description="Isi formulir di atas untuk mencatat stok awal pertama." /></td></tr>
+                  <tr><td colSpan={4}><EmptyState title="Belum ada stok awal" description="Isi formulir di atas untuk mencatat stok awal pertama." /></td></tr>
                 ) : (
                   items.map((row, index) => (
                     <tr
                       key={row.id}
                       className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-slate-50/60 dark:bg-[#1a1d28]"} hover:bg-blue-50/50 dark:hover:bg-slate-800/60 transition-colors`}
                     >
-                      <td className="px-2.5 py-2.5 align-middle text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap tabular-nums">
+                      <td className="px-3 py-3 align-middle text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap tabular-nums">
                         {formatDate(row.movement_date)}
                       </td>
-                      <td className="px-2.5 py-2.5 align-middle min-w-0">
-                        <span className="block text-[10px] font-mono font-semibold tracking-wide text-slate-400 dark:text-slate-500 truncate">
+                      <td className="px-3 py-3 align-middle min-w-0">
+                        <span className="block text-[11px] font-mono font-semibold tracking-wide text-slate-400 dark:text-slate-500 truncate">
                           {row.component_code}
                         </span>
-                        <span className="block text-xs font-bold text-slate-900 dark:text-white truncate" title={row.component_name}>
+                        <span className="block text-[13px] font-bold text-slate-900 dark:text-white truncate" title={row.component_name}>
                           {row.component_name}
                         </span>
+                        {row.notes && row.notes !== "Stok awal" ? (
+                          <span className="block text-[11px] text-slate-400 dark:text-slate-500 truncate" title={row.notes}>
+                            {row.notes}
+                          </span>
+                        ) : null}
                       </td>
-                      <td className="px-2.5 py-2.5 align-middle text-right whitespace-nowrap tabular-nums">
-                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">+{formatQty(row.qty)}</span>
-                        <span className="ml-1 text-[10px] font-semibold text-slate-400">{row.unit_use}</span>
+                      <td className="px-3 py-3 align-middle text-right whitespace-nowrap tabular-nums">
+                        <span className="text-[13px] font-bold text-emerald-600 dark:text-emerald-400">+{formatQty(row.qty)}</span>
+                        <span className="ml-1 text-[11px] font-semibold text-slate-400">{row.unit_use}</span>
                       </td>
-                      <td className="px-2.5 py-2.5 align-middle text-right whitespace-nowrap tabular-nums">
-                        <span className="text-[10px] text-slate-400">Rp</span>{" "}
-                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{formatRupiah(row.unit_price)}</span>
-                      </td>
-                      <td className="px-2.5 py-2.5 align-middle text-right whitespace-nowrap tabular-nums">
-                        <span className="text-xs font-black text-slate-900 dark:text-white">Rp {formatRupiah(row.value)}</span>
-                      </td>
-                      <td className="px-2.5 py-2.5 align-middle min-w-0">
-                        <span className="block truncate text-[10px] text-slate-400 dark:text-slate-500" title={row.notes || ""}>
-                          {row.notes || "—"}
+                      <td className="px-3 py-3 align-middle text-right whitespace-nowrap tabular-nums">
+                        <span className="text-[13px] font-black text-slate-900 dark:text-white">Rp {formatRupiah(row.value)}</span>
+                        <span className="block text-[11px] text-slate-400">
+                          {formatRupiah(row.qty)} {row.unit_use} × Rp {formatRupiah(row.unit_price)}
                         </span>
                       </td>
                     </tr>
@@ -299,13 +294,12 @@ export default function StokAwalView() {
               {!loading && items.length > 0 ? (
                 <tfoot>
                   <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
-                    <td colSpan={4} className="px-2.5 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <td colSpan={3} className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-400">
                       Total {items.length} baris
                     </td>
-                    <td className="px-2.5 py-2.5 text-right text-xs font-black text-slate-900 dark:text-white whitespace-nowrap tabular-nums">
+                    <td className="px-3 py-3 text-right text-[13px] font-black text-slate-900 dark:text-white whitespace-nowrap tabular-nums">
                       Rp {formatRupiah(historyValue)}
                     </td>
-                    <td />
                   </tr>
                 </tfoot>
               ) : null}
