@@ -51,6 +51,7 @@ type Movement = {
   movement_date: string;
   type: string;
   qty: number;
+  unit_use?: string;
   unit_price?: number;
   value?: number;
   running_balance: number;
@@ -185,32 +186,56 @@ export default function KomponenDetailView({ id }: { id: string }) {
                 <p className="text-sm font-bold text-slate-900 dark:text-white">Buku stok</p>
                 <p className="text-[11px] text-slate-400">Append-only — koreksi lewat transaksi baru</p>
               </div>
-              <div className="overflow-x-auto">
-                <table className={`w-full border-collapse ${access.role === "owner" ? "min-w-[980px]" : "min-w-[720px]"}`}>
+              <div>
+                <table className="w-full border-collapse table-fixed">
+                  <colgroup>
+                    {access.role === "owner" ? (
+                      <>
+                        <col className="w-[15%]" />
+                        <col className="w-[35%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[18%]" />
+                      </>
+                    ) : (
+                      <>
+                        <col className="w-[18%]" />
+                        <col className="w-[48%]" />
+                        <col className="w-[18%]" />
+                        <col className="w-[16%]" />
+                      </>
+                    )}
+                  </colgroup>
                   <thead>
                     <tr className="bg-[#1e3a5f]">
-                      {["Tanggal", "Jenis", "Masuk", "Keluar", ...(access.role === "owner" ? ["Harga satuan"] : []), "Saldo", "Referensi", "User", "Catatan"].map((h) => (
-                        <th key={h} className="px-3 py-2.5 text-left text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap">{h}</th>
+                      {["Tanggal", "Jenis", "Jumlah", ...(access.role === "owner" ? ["Harga satuan"] : []), "Saldo"].map((h, index) => (
+                        <th key={h} className={`px-3 py-3 ${index >= 2 ? "text-right" : "text-left"} text-[11px] font-bold text-white uppercase tracking-wider leading-tight`}>{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
                     {movements.length === 0 ? (
-                      <tr><td colSpan={9}><EmptyState title="Belum ada pergerakan stok" description="Tambahkan lewat Stok Awal atau Pembelian Bahan." /></td></tr>
+                      <tr><td colSpan={access.role === "owner" ? 5 : 4}><EmptyState title="Belum ada pergerakan stok" description="Tambahkan lewat Stok Awal atau Pembelian Bahan." /></td></tr>
                     ) : (
                       movements.map((row, index) => (
-                        <tr key={row.id} className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-blue-50/30 dark:bg-[#1a1d28]"} border-b border-gray-100 dark:border-slate-800/50`}>
-                          <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatDate(row.movement_date)}</td>
-                          <td className="px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap">{movementLabel(row.type)}</td>
-                          <td className="px-3 py-2.5 text-xs font-bold text-emerald-600 whitespace-nowrap">{row.qty > 0 ? `+${formatQty(row.qty)}` : "—"}</td>
-                          <td className="px-3 py-2.5 text-xs font-bold text-red-600 whitespace-nowrap">{row.qty < 0 ? `−${formatQty(Math.abs(row.qty))}` : "—"}</td>
+                        <tr key={row.id} className={index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-slate-50/60 dark:bg-[#1a1d28]"}>
+                          <td className="px-3 py-3 align-middle text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap tabular-nums">{formatDate(row.movement_date)}</td>
+                          <td className="px-3 py-3 align-middle min-w-0">
+                            <span className="block text-[13px] font-bold text-slate-800 dark:text-slate-100 truncate">{movementLabel(row.type)}</span>
+                            {row.notes ? (
+                              <span className="block text-[11px] text-slate-400 dark:text-slate-500 truncate" title={row.notes}>{row.notes}</span>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-3 align-middle text-right whitespace-nowrap tabular-nums">
+                            <span className={`text-[13px] font-bold ${row.qty > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                              {row.qty > 0 ? "+" : "−"}{formatQty(Math.abs(row.qty))}
+                            </span>
+                            <span className="ml-1 text-[11px] font-semibold text-slate-400">{row.unit_use || item.unit_use}</span>
+                          </td>
                           {access.role === "owner" ? (
-                            <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(row.unit_price)}</td>
+                            <td className="px-3 py-3 align-middle text-right text-xs font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap tabular-nums">Rp {formatRupiah(row.unit_price)}</td>
                           ) : null}
-                          <td className="px-3 py-2.5 text-xs font-black text-slate-900 dark:text-white whitespace-nowrap">{formatQty(row.running_balance)}</td>
-                          <td className="px-3 py-2.5 text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{row.ref_type || "—"}</td>
-                          <td className="px-3 py-2.5 text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{row.actor || "—"}</td>
-                          <td className="px-3 py-2.5 text-[11px] text-slate-500 dark:text-slate-400 min-w-[200px]">{row.notes || "—"}</td>
+                          <td className="px-3 py-3 align-middle text-right text-[13px] font-black text-slate-900 dark:text-white whitespace-nowrap tabular-nums">{formatQty(row.running_balance)}</td>
                         </tr>
                       ))
                     )}
@@ -224,25 +249,37 @@ export default function KomponenDetailView({ id }: { id: string }) {
                 <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
                   <p className="text-sm font-bold text-slate-900 dark:text-white">Riwayat pembelian</p>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse min-w-[820px]">
+                <div>
+                  <table className="w-full border-collapse table-fixed">
+                    <colgroup>
+                      <col className="w-[13%]" />
+                      <col className="w-[22%]" />
+                      <col className="w-[19%]" />
+                      <col className="w-[16%]" />
+                      <col className="w-[30%]" />
+                    </colgroup>
                     <thead>
                       <tr className="bg-[#1e3a5f]">
-                        {["Tanggal", "No. Pembelian", "Supplier", "Qty beli", "Harga beli", "Ongkir alokasi", "Harga akhir / satuan pakai"].map((h) => (
-                          <th key={h} className="px-3 py-2.5 text-left text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap">{h}</th>
-                        ))}
+                        <th className="px-3 py-3 text-left text-[11px] font-bold text-white uppercase tracking-wider leading-tight">Tanggal</th>
+                        <th className="px-3 py-3 text-left text-[11px] font-bold text-white uppercase tracking-wider leading-tight">No. Pembelian</th>
+                        <th className="px-3 py-3 text-left text-[11px] font-bold text-white uppercase tracking-wider leading-tight">Supplier</th>
+                        <th className="px-3 py-3 text-right text-[11px] font-bold text-white uppercase tracking-wider leading-tight">Qty beli</th>
+                        <th className="px-3 py-3 text-right text-[11px] font-bold text-white uppercase tracking-wider leading-tight">Harga akhir</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
                       {purchases.map((row, index) => (
-                        <tr key={row.id} className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-blue-50/30 dark:bg-[#1a1d28]"} border-b border-gray-100 dark:border-slate-800/50`}>
-                          <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatDate(row.purchase_date)}</td>
-                          <td className="px-3 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">{row.purchase_number}</td>
-                          <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{row.supplier || "—"}</td>
-                          <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatQty(row.qty_buy)} {row.unit_buy}</td>
-                          <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(row.price_buy)}</td>
-                          <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(row.allocated_cost)}</td>
-                          <td className="px-3 py-2.5 text-xs font-bold text-slate-900 dark:text-white whitespace-nowrap">Rp {formatRupiah(row.final_unit_price)} / {item.unit_use}</td>
+                        <tr key={row.id} className={index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-slate-50/60 dark:bg-[#1a1d28]"}>
+                          <td className="px-3 py-3 align-middle text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap tabular-nums">{formatDate(row.purchase_date)}</td>
+                          <td className="px-3 py-3 align-middle text-[13px] font-black text-slate-900 dark:text-white whitespace-nowrap">{row.purchase_number}</td>
+                          <td className="px-3 py-3 align-middle text-xs font-semibold text-slate-600 dark:text-slate-300 truncate" title={row.supplier}>{row.supplier || "—"}</td>
+                          <td className="px-3 py-3 align-middle text-right text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap tabular-nums">{formatQty(row.qty_buy)} {row.unit_buy}</td>
+                          <td className="px-3 py-3 align-middle text-right whitespace-nowrap tabular-nums">
+                            <span className="text-[13px] font-black text-slate-900 dark:text-white">Rp {formatRupiah(row.final_unit_price)}</span>
+                            <span className="block text-[10px] text-slate-400">
+                              Beli Rp {formatRupiah(row.price_buy)} · Ongkir Rp {formatRupiah(row.allocated_cost)}
+                            </span>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

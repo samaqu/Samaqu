@@ -425,9 +425,25 @@ export default function KomponenView() {
                           <span className="text-xs font-bold text-slate-900 dark:text-white truncate" title={row.name}>{row.name}</span>
                           {!row.is_active ? <Badge tone="slate">Nonaktif</Badge> : null}
                         </span>
-                        <span className="block text-[10px] text-slate-400 dark:text-slate-500 truncate">
-                          {categoryLabel(row.category)}{row.fabric_type_name ? ` · ${row.fabric_type_name}` : ""}
-                        </span>
+                        {(() => {
+                          // Kain: jangan ulang "Kain" kalau nama sudah memuatnya
+                          // (mis. "Kain A-02" + jenis kain "A-02").
+                          if (row.category === "kain") {
+                            const fabric = String(row.fabric_type_name || "").trim();
+                            if (!fabric) return null;
+                            if (row.name.toLowerCase().includes(fabric.toLowerCase())) return null;
+                            return (
+                              <span className="block text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                                Jenis kain {fabric}
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="block text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                              {categoryLabel(row.category)}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-2.5 py-2.5 align-middle text-right whitespace-nowrap tabular-nums">
                         <span className="text-xs font-bold text-slate-900 dark:text-white">{formatQty(row.stock)}</span>
