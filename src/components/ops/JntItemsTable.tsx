@@ -105,9 +105,11 @@ export default function JntItemsTable({ items }: { items: JntInvoiceItem[] }) {
       <div className="mt-2 overflow-x-auto xl:mt-4">
         <table className="w-full min-w-[760px] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              <th className="py-2 pr-2">No. Resi</th>
-              <th className="py-2 pr-2">Tgl Kirim</th>
+            {/* align-top di baris: td/th mewarisi vertical-align-nya, jadi baris pertama
+                semua kolom sejajar walau ada sel yang isinya dua baris (badge/no. pesanan). */}
+            <tr className="border-b border-slate-200 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 align-top">
+              <th className="w-[1%] py-2 pr-2 whitespace-nowrap">No. Resi</th>
+              <th className="w-[1%] py-2 pr-2 whitespace-nowrap">Tgl Kirim</th>
               <th className="py-2 pr-2">Tujuan</th>
               <th className="py-2 pr-2">Layanan</th>
               <th className="py-2 pr-2 text-right">Berat</th>
@@ -122,14 +124,16 @@ export default function JntItemsTable({ items }: { items: JntInvoiceItem[] }) {
             {rows.map((item) => {
               const selisih = item.order_number ? Number(item.shipping_cost || 0) - Number(item.net_cost || 0) : null;
               return (
-                <tr key={normalizeAwb(item.awb_no)} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70">
+                <tr key={normalizeAwb(item.awb_no)} className="border-b border-slate-100 last:border-0 align-top hover:bg-slate-50/70">
                   <td className="py-2 pr-2 whitespace-nowrap font-mono text-xs text-slate-800">
                     {item.awb_no}
+                    {/* Badge di baris kedua: kalau sebaris dengan resi, kolom ini melebar
+                        sebanyak lebar badge (2 resi "Tanpa Diskon" → semua baris jadi longgar). */}
                     {!item.has_discount && (
                       <motion.span
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700"
+                        className="mt-1 flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700"
                       >
                         <AlertTriangle size={10} /> Tanpa Diskon
                       </motion.span>

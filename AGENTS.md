@@ -1616,6 +1616,26 @@ bisa digeser mendatar (petunjuk "Geser tabel ke samping…", `xl:hidden`). **Jan
 `min-width`-nya lagi atau menghapus pembungkus `overflow-x-auto` tanpa mengukur ulang di 1280 px
 (uji: 1280 → 0 px geser, 1024 → 198 px, 375 → 567 px).
 
+**Revisi 2026-10-24 (pemilik: "no resi sama tgl terlalu banyak space kosong, semua tulisan bikin
+sejajar").** Dua kolom pertama dipatok selebar isinya (`w-[1%]` + `whitespace-nowrap` di `th`
+No. Resi & Tgl Kirim) dan badge **"Tanpa Diskon" dipindah ke baris kedua** di bawah nomor resi
+(`mt-1 flex w-fit`, dulu `ml-2 inline-flex` sebaris) — badge yang cuma dipakai 2 resi
+(`JO0329572178`, `JO0329677967`) itulah yang melebarkan kolom No. Resi untuk SEMUA baris. Seluruh
+baris juga `align-top` (`td`/`th` mewarisi `vertical-align` dari `<tr>`, jadi semua baris kode baru
+ikut tanpa menyetel tiap sel); sebelumnya sel memakai `vertical-align` bawaan sehingga sel 2 baris
+(badge / nomor pesanan di bawah ongkir) membuat baris pertama tiap kolom tidak sebaris.
+Hasil ukur (iframe same-origin di preview, sesi admin diputar ulang, 2026-10-24): lebar kolom
+`No. Resi 110 · Tgl Kirim 77 · Tujuan 159 · Layanan 64 · Berat 46 · Biaya Kirim 80 · Diskon 76 ·
+Net Dibukukan 105 · Ongkir Customer 128 · Selisih 65` px → tabel **911 px = lebar pembungkus**
+(0 px geser) di 1280 px, `vertical-align` semua sel `top` dan garis atas teks pertama tiap sel
+dalam satu baris berbeda ≤1 px, 125 baris, tanpa scroll samping di 1280/1024/375 px, 0 error
+console. **Jangan** mengembalikan badge itu sebaris dengan nomor resi atau menghapus `align-top`.
+Catatan tool: trik **`<iframe src="/ops/ongkir-jnt">`** (same-origin, lalu baca
+`frame.contentDocument` / `frame.contentWindow.getComputedStyle` — pakai `contentDocument.createRange()`
+untuk mengukur baris teks) juga bekerja untuk route `/ops/*`; `navigate()` tetap gagal di sana dan
+sesi admin putaran preview 2026-10-24 bisa membuka halaman ini beserta 125 barisnya, jadi catatan
+2026-10-23 yang menyebut `/ops/*` selalu menampilkan login tidak lagi berlaku.
+
 **Idempotensi & pratinjau.** Bulan tagihan setiap baris diambil dari tanggal pengirimannya (satu
 file boleh memuat dua bulan; invoice baris dibuat otomatis per bulan). Upload ulang file yang sama →
 `new: 0`, `existing: 125`, `failed: 0`, tidak ada baris ganda. Kalau tabelnya belum ada, upload
