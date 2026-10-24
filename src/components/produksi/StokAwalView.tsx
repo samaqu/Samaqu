@@ -228,22 +228,26 @@ export default function StokAwalView() {
           <div>
             <table className="w-full border-collapse table-fixed">
               <colgroup>
-                <col className="w-[15%]" />
-                <col className="w-[44%]" />
-                <col className="w-[15%]" />
-                <col className="w-[26%]" />
+                <col className="w-[13%]" />
+                <col className="w-[17%]" />
+                <col className="w-[30%]" />
+                <col className="w-[13%]" />
+                <col className="w-[13%]" />
+                <col className="w-[14%]" />
               </colgroup>
               <thead>
-                <tr className="bg-[#1e3a5f]">
+                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700">
                   {[
                     { label: "Tanggal", align: "text-left" },
+                    { label: "Kode", align: "text-left" },
                     { label: "Komponen", align: "text-left" },
                     { label: "Jumlah", align: "text-right" },
+                    { label: "Harga", align: "text-right" },
                     { label: "Nilai", align: "text-right" },
                   ].map((head) => (
                     <th
                       key={head.label}
-                      className={`px-3 py-3 ${head.align} text-[11px] font-bold text-white uppercase tracking-wider leading-tight`}
+                      className={`px-3.5 py-3 ${head.align} text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider leading-tight`}
                     >
                       {head.label}
                     </th>
@@ -252,40 +256,30 @@ export default function StokAwalView() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
                 {loading ? (
-                  <tr><td colSpan={4}><Spinner /></td></tr>
+                  <tr><td colSpan={6}><Spinner /></td></tr>
                 ) : items.length === 0 ? (
-                  <tr><td colSpan={4}><EmptyState title="Belum ada stok awal" description="Isi formulir di atas untuk mencatat stok awal pertama." /></td></tr>
+                  <tr><td colSpan={6}><EmptyState title="Belum ada stok awal" description="Isi formulir di atas untuk mencatat stok awal pertama." /></td></tr>
                 ) : (
-                  items.map((row, index) => (
-                    <tr
-                      key={row.id}
-                      className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-slate-50/60 dark:bg-[#1a1d28]"} hover:bg-blue-50/50 dark:hover:bg-slate-800/60 transition-colors`}
-                    >
-                      <td className="px-3 py-3 align-middle text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap tabular-nums">
+                  items.map((row) => (
+                    <tr key={row.id} className="bg-white dark:bg-[#16171d] hover:bg-blue-50/60 dark:hover:bg-slate-800/60 transition-colors">
+                      <td className="px-3.5 py-3.5 align-middle text-[13px] text-slate-500 dark:text-slate-400 whitespace-nowrap tabular-nums">
                         {formatDate(row.movement_date)}
                       </td>
-                      <td className="px-3 py-3 align-middle min-w-0">
-                        <span className="block text-[11px] font-mono font-semibold tracking-wide text-slate-400 dark:text-slate-500 truncate">
-                          {row.component_code}
-                        </span>
-                        <span className="block text-[13px] font-bold text-slate-900 dark:text-white truncate" title={row.component_name}>
-                          {row.component_name}
-                        </span>
-                        {row.notes && row.notes !== "Stok awal" ? (
-                          <span className="block text-[11px] text-slate-400 dark:text-slate-500 truncate" title={row.notes}>
-                            {row.notes}
-                          </span>
-                        ) : null}
+                      <td className="px-3.5 py-3.5 align-middle text-[12px] font-mono font-semibold text-slate-500 dark:text-slate-400 truncate" title={row.component_code}>
+                        {row.component_code}
                       </td>
-                      <td className="px-3 py-3 align-middle text-right whitespace-nowrap tabular-nums">
+                      <td className="px-3.5 py-3.5 align-middle text-[13px] font-bold text-slate-900 dark:text-white truncate" title={row.component_name}>
+                        {row.component_name}
+                      </td>
+                      <td className="px-3.5 py-3.5 align-middle text-right whitespace-nowrap tabular-nums">
                         <span className="text-[13px] font-bold text-emerald-600 dark:text-emerald-400">+{formatQty(row.qty)}</span>
                         <span className="ml-1 text-[11px] font-semibold text-slate-400">{row.unit_use}</span>
                       </td>
-                      <td className="px-3 py-3 align-middle text-right whitespace-nowrap tabular-nums">
-                        <span className="text-[13px] font-black text-slate-900 dark:text-white">Rp {formatRupiah(row.value)}</span>
-                        <span className="block text-[11px] text-slate-400">
-                          {formatRupiah(row.qty)} {row.unit_use} × Rp {formatRupiah(row.unit_price)}
-                        </span>
+                      <td className="px-3.5 py-3.5 align-middle text-right text-[13px] font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap tabular-nums">
+                        Rp {formatRupiah(row.unit_price)}
+                      </td>
+                      <td className="px-3.5 py-3.5 align-middle text-right text-[13px] font-black text-slate-900 dark:text-white whitespace-nowrap tabular-nums">
+                        Rp {formatRupiah(row.value)}
                       </td>
                     </tr>
                   ))
@@ -294,10 +288,10 @@ export default function StokAwalView() {
               {!loading && items.length > 0 ? (
                 <tfoot>
                   <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
-                    <td colSpan={3} className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <td colSpan={5} className="px-3.5 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-400">
                       Total {items.length} baris
                     </td>
-                    <td className="px-3 py-3 text-right text-[13px] font-black text-slate-900 dark:text-white whitespace-nowrap tabular-nums">
+                    <td className="px-3.5 py-3 text-right text-[13px] font-black text-slate-900 dark:text-white whitespace-nowrap tabular-nums">
                       Rp {formatRupiah(historyValue)}
                     </td>
                   </tr>
