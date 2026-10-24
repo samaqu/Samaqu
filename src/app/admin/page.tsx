@@ -227,6 +227,15 @@ function KeptPanel({ active, children }: { active: boolean; children: ReactNode 
   );
 }
 
+/**
+ * Role yang boleh membuka dashboard admin website.
+ * `owner` ditambahkan karena akun pemilik memakai role itu untuk menu Produksi;
+ * sebelumnya pengecekan hanya menerima `admin` sehingga pemilik ikut ditolak.
+ */
+function hasAdminPanelAccess(role: string | null): boolean {
+  return role === "admin" || role === "owner";
+}
+
 function AdminPageInner() {
   // ALL hooks must be declared BEFORE any early returns
   const [user, setUser] = useState<User | null>(null);
@@ -371,7 +380,7 @@ function AdminPageInner() {
   }, []);
 
   useEffect(() => {
-    if (!user || role !== "admin") return;
+    if (!user || !hasAdminPanelAccess(role)) return;
     let mounted = true;
     async function fetchData() {
       try {
@@ -422,7 +431,7 @@ function AdminPageInner() {
   // "vs bulan lalu" butuh omzet per bulan: dulu grafiknya memakai 50 pesanan terbaru, jadi
   // bulan-bulan lama tampak Rp 0 walaupun penjualannya ada.
   useEffect(() => {
-    if (!user || role !== "admin") return;
+    if (!user || !hasAdminPanelAccess(role)) return;
     let mounted = true;
     async function fetchDashMonth() {
       setDashLoading(true);
@@ -700,7 +709,7 @@ function AdminPageInner() {
     );
   }
 
-  if (user && role !== "admin") {
+  if (user && !hasAdminPanelAccess(role)) {
     return (
       <section className="min-h-screen flex items-center justify-center" style={{ background: "#f8f9fb" }}>
         <div className="text-center px-6 max-w-sm">
@@ -914,7 +923,7 @@ function AdminPageInner() {
                   </div>
                   <div className="hidden sm:block leading-tight text-left">
                     <p className="text-sm font-semibold" style={{ color: "var(--espresso)" }}>{user.email?.split("@")[0] || "Admin"}</p>
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>{role === "admin" ? "Admin" : "User"}</p>
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>{role === "owner" ? "Owner" : role === "admin" ? "Admin" : "User"}</p>
                   </div>
                 </button>
                 {profileOpen && (
