@@ -361,36 +361,42 @@ export default function KomponenView() {
               {access.role === "owner" ? (
                 <>
                   <col className="w-[13%]" />
-                  <col className="w-[32%]" />
-                  <col className="w-[16%]" />
-                  <col className="w-[14%]" />
+                  <col className="w-[36%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[13%]" />
                   <col className="w-[13%]" />
                   <col className="w-[9%]" />
-                  <col className="w-[3%]" />
+                  <col className="w-[4%]" />
                 </>
               ) : (
                 <>
                   <col className="w-[16%]" />
-                  <col className="w-[50%]" />
-                  <col className="w-[20%]" />
-                  <col className="w-[11%]" />
-                  <col className="w-[3%]" />
+                  <col className="w-[56%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[4%]" />
                 </>
               )}
             </colgroup>
             <thead>
-              <tr className="bg-[#1e3a5f]">
-                <th className="px-2.5 py-3 text-left text-[10px] font-bold text-white uppercase tracking-wider leading-tight border-r border-[#2d4a6f]">Kode</th>
-                <th className="px-2.5 py-3 text-left text-[10px] font-bold text-white uppercase tracking-wider leading-tight border-r border-[#2d4a6f]">Komponen</th>
-                <th className="px-2.5 py-3 text-right text-[10px] font-bold text-white uppercase tracking-wider leading-tight border-r border-[#2d4a6f]">Stok</th>
-                {access.role === "owner" ? (
-                  <>
-                    <th className="px-2.5 py-3 text-right text-[10px] font-bold text-white uppercase tracking-wider leading-tight border-r border-[#2d4a6f]">Harga Real</th>
-                    <th className="px-2.5 py-3 text-right text-[10px] font-bold text-white uppercase tracking-wider leading-tight border-r border-[#2d4a6f]">Harga Aman</th>
-                  </>
-                ) : null}
-                <th className="px-2.5 py-3 text-left text-[10px] font-bold text-white uppercase tracking-wider leading-tight">Status</th>
-                <th className="px-1 py-3 border-l border-[#2d4a6f]" aria-label="Detail" />
+              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700">
+                {[
+                  { label: "Kode", align: "text-left" },
+                  { label: "Komponen", align: "text-left" },
+                  { label: "Stok", align: "text-right" },
+                  ...(access.role === "owner"
+                    ? [
+                        { label: "Harga Real", align: "text-right" },
+                        { label: "Harga Aman", align: "text-right" },
+                      ]
+                    : []),
+                  { label: "Status", align: "text-left" },
+                ].map((head) => (
+                  <th key={head.label} className={`px-3.5 py-3 ${head.align} text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider leading-tight`}>
+                    {head.label}
+                  </th>
+                ))}
+                <th className="px-1 py-3" aria-label="Detail" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
@@ -399,9 +405,8 @@ export default function KomponenView() {
               ) : items.length === 0 ? (
                 <tr><td colSpan={access.role === "owner" ? 7 : 5}><EmptyState title="Belum ada komponen" description="Tambahkan komponen pertama atau tempel data dari Excel." /></td></tr>
               ) : (
-                items.map((row, index) => {
+                items.map((row) => {
                   const statusKey = stockStatus(row.stock, row.min_stock);
-                  const gap = Number(row.price_gap) || 0;
                   return (
                     <tr
                       key={row.id}
@@ -415,60 +420,35 @@ export default function KomponenView() {
                           openDetail(row);
                         }
                       }}
-                      className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-slate-50/60 dark:bg-[#1a1d28]"} hover:bg-blue-50/50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500`}
+                      className="bg-white dark:bg-[#16171d] hover:bg-blue-50/60 dark:hover:bg-slate-800/60 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
                     >
-                      <td className="px-2.5 py-2.5 align-middle text-[11px] font-mono font-bold text-slate-600 dark:text-slate-300 truncate" title={row.code}>
+                      <td className="px-3.5 py-3.5 align-middle text-[12px] font-mono font-semibold text-slate-500 dark:text-slate-400 truncate" title={row.code}>
                         {row.code}
                       </td>
-                      <td className="px-2.5 py-2.5 align-middle min-w-0">
-                        <span className="flex items-center gap-1.5 min-w-0">
-                          <span className="text-xs font-bold text-slate-900 dark:text-white truncate" title={row.name}>{row.name}</span>
+                      <td className="px-3.5 py-3.5 align-middle min-w-0">
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span className="text-[13px] font-bold text-slate-900 dark:text-white truncate" title={row.name}>{row.name}</span>
                           {!row.is_active ? <Badge tone="slate">Nonaktif</Badge> : null}
                         </span>
-                        {(() => {
-                          // Kain: jangan ulang "Kain" kalau nama sudah memuatnya
-                          // (mis. "Kain A-02" + jenis kain "A-02").
-                          if (row.category === "kain") {
-                            const fabric = String(row.fabric_type_name || "").trim();
-                            if (!fabric) return null;
-                            if (row.name.toLowerCase().includes(fabric.toLowerCase())) return null;
-                            return (
-                              <span className="block text-[10px] text-slate-400 dark:text-slate-500 truncate">
-                                Jenis kain {fabric}
-                              </span>
-                            );
-                          }
-                          return (
-                            <span className="block text-[10px] text-slate-400 dark:text-slate-500 truncate">
-                              {categoryLabel(row.category)}
-                            </span>
-                          );
-                        })()}
                       </td>
-                      <td className="px-2.5 py-2.5 align-middle text-right whitespace-nowrap tabular-nums">
-                        <span className="text-xs font-bold text-slate-900 dark:text-white">{formatQty(row.stock)}</span>
-                        <span className="ml-1 text-[10px] font-semibold text-slate-400">{row.unit_use}</span>
-                        <span className="block text-[10px] text-slate-400">min {formatQty(row.min_stock)}</span>
+                      <td className="px-3.5 py-3.5 align-middle text-right whitespace-nowrap tabular-nums">
+                        <span className="text-[13px] font-bold text-slate-900 dark:text-white">{formatQty(row.stock)}</span>
+                        <span className="ml-1 text-[11px] font-semibold text-slate-400">{row.unit_use}</span>
                       </td>
                       {access.role === "owner" ? (
                         <>
-                          <td className="px-2.5 py-2.5 align-middle text-right whitespace-nowrap tabular-nums">
-                            <span className="text-[10px] text-slate-400">Rp</span>{" "}
-                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{formatRupiah(row.real_price)}</span>
+                          <td className="px-3.5 py-3.5 align-middle text-right text-[13px] font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap tabular-nums">
+                            Rp {formatRupiah(row.real_price)}
                           </td>
-                          <td className="px-2.5 py-2.5 align-middle text-right whitespace-nowrap tabular-nums">
-                            <span className="text-[10px] text-slate-400">Rp</span>{" "}
-                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{formatRupiah(row.safe_price)}</span>
-                            <span className={`block text-[10px] font-bold ${gap < 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                              {gap < 0 ? "−" : "+"}Rp {formatRupiah(Math.abs(gap))}
-                            </span>
+                          <td className="px-3.5 py-3.5 align-middle text-right text-[13px] font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap tabular-nums">
+                            Rp {formatRupiah(row.safe_price)}
                           </td>
                         </>
                       ) : null}
-                      <td className="px-2.5 py-2.5 align-middle">
+                      <td className="px-3.5 py-3.5 align-middle">
                         <Badge tone={statusTone[statusKey]}>{STOCK_STATUS_LABEL[statusKey]}</Badge>
                       </td>
-                      <td className="px-1 py-2.5 align-middle text-center text-slate-300 dark:text-slate-600">
+                      <td className="px-1 py-3.5 align-middle text-center text-slate-300 dark:text-slate-600">
                         <ChevronRight size={15} />
                       </td>
                     </tr>
