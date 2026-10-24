@@ -407,12 +407,21 @@ function IsiResep({
             </div>
           ) : null}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[1040px]">
+        <div>
+          <table className="w-full border-collapse table-fixed">
+            <colgroup>
+              <col className="w-[27%]" />
+              <col className="w-[13%]" />
+              <col className="w-[13%]" />
+              <col className="w-[8%]" />
+              <col className="w-[20%]" />
+              <col className="w-[11%]" />
+              <col className="w-[8%]" />
+            </colgroup>
             <thead>
               <tr className="bg-[#1e3a5f]">
                 {["Komponen", "Kelompok", "Qty / pcs", "Susut", "Filter", "Status", ""].map((h) => (
-                  <th key={h} className="px-3 py-2.5 text-left text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  <th key={h} className="px-2 py-2.5 text-left text-[11px] font-bold text-white uppercase tracking-wide leading-tight">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -426,11 +435,11 @@ function IsiResep({
                   const unused = Number(line.qty_per_pcs) <= 0 && !hasSizeOverride;
                   return (
                     <tr key={line.id || index} className="border-b border-gray-100 dark:border-slate-800/50">
-                      <td className="px-3 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                      <td className="px-2 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug break-words">
                         {line.component_code ? `${line.component_code} · ` : ""}{line.name}
                       </td>
-                      <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{bahanGroupLabel(line.group_code)}</td>
-                      <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                      <td className="px-2 py-2.5 text-[11px] text-slate-600 dark:text-slate-300 leading-snug break-words">{bahanGroupLabel(line.group_code)}</td>
+                      <td className="px-2 py-2.5 text-xs text-slate-600 dark:text-slate-300">
                         {formatQty(line.qty_per_pcs)} {line.unit_use || ""}
                         {Object.keys(line.size_qty || {}).length > 0 ? (
                           <span className="block text-[10px] text-slate-400">
@@ -438,12 +447,12 @@ function IsiResep({
                           </span>
                         ) : null}
                       </td>
-                      <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatQty(line.waste_percent)}%</td>
-                      <td className="px-3 py-2.5 text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{filterSummary(line, fabricName)}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">
+                      <td className="px-2 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatQty(line.waste_percent)}%</td>
+                      <td className="px-2 py-2.5 text-[10px] text-slate-500 dark:text-slate-400 leading-snug break-words">{filterSummary(line, fabricName)}</td>
+                      <td className="px-2 py-2.5">
                         {unused ? <Badge tone="slate">Tidak dipakai</Badge> : <Badge tone="green">Dipakai</Badge>}
                       </td>
-                      <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                      <td className="px-2 py-2.5 text-right">
                         {!readOnly ? (
                           <div className="inline-flex items-center gap-1">
                             <button className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => onEdit(index)} aria-label="Edit baris">
@@ -482,12 +491,20 @@ function IsiResep({
             </div>
           ) : null}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[960px]">
+        <div>
+          <table className="w-full border-collapse table-fixed">
+            <colgroup>
+              <col className="w-[28%]" />
+              <col className="w-[16%]" />
+              <col className="w-[13%]" />
+              <col className="w-[13%]" />
+              <col className="w-[22%]" />
+              <col className="w-[8%]" />
+            </colgroup>
             <thead>
               <tr className="bg-[#1e3a5f]">
                 {["Nama biaya", "Kelompok", "Real / pcs", "Aman / pcs", "Filter", ""].map((h) => (
-                  <th key={h} className="px-3 py-2.5 text-left text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  <th key={h} className="px-2 py-2.5 text-left text-[11px] font-bold text-white uppercase tracking-wide leading-tight">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -499,12 +516,12 @@ function IsiResep({
                   const index = lines.indexOf(line);
                   return (
                     <tr key={line.id || index} className="border-b border-gray-100 dark:border-slate-800/50">
-                      <td className="px-3 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">{line.name}</td>
-                      <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{line.group_label || "—"}</td>
-                      <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(line.real_price)}</td>
-                      <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(line.safe_price)}</td>
-                      <td className="px-3 py-2.5 text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{filterSummary(line, fabricName)}</td>
-                      <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                      <td className="px-2 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug break-words">{line.name}</td>
+                      <td className="px-2 py-2.5 text-[11px] text-slate-600 dark:text-slate-300 leading-snug break-words">{line.group_label || "—"}</td>
+                      <td className="px-2 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(line.real_price)}</td>
+                      <td className="px-2 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(line.safe_price)}</td>
+                      <td className="px-2 py-2.5 text-[10px] text-slate-500 dark:text-slate-400 leading-snug break-words">{filterSummary(line, fabricName)}</td>
+                      <td className="px-2 py-2.5 text-right">
                         {!readOnly ? (
                           <div className="inline-flex items-center gap-1">
                             <button className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => onEdit(index)} aria-label="Edit baris">
@@ -961,15 +978,15 @@ function ImportDrawer({
         {rows.length > 0 ? (
           <div className={`${cardClass} overflow-hidden`}>
             <div className="max-h-[320px] overflow-auto no-scrollbar">
-              <table className="w-full border-collapse min-w-[760px]">
+              <table className="w-full border-collapse table-fixed">
                 <thead className="sticky top-0">
                   <tr className="bg-[#1e3a5f]">
                     {mode === "biaya"
                       ? ["#", "Nama", "Real", "Aman", "Kelompok", "Filter", "Status"].map((h) => (
-                          <th key={h} className="px-2.5 py-2 text-left text-[11px] font-bold text-white uppercase whitespace-nowrap">{h}</th>
+                          <th key={h} className="px-2 py-2 text-left text-[10px] font-bold text-white uppercase leading-tight">{h}</th>
                         ))
                       : ["#", "Komponen", "Qty", "Kelompok", "Filter", "Susut", "Status"].map((h) => (
-                          <th key={h} className="px-2.5 py-2 text-left text-[11px] font-bold text-white uppercase whitespace-nowrap">{h}</th>
+                          <th key={h} className="px-2 py-2 text-left text-[10px] font-bold text-white uppercase leading-tight">{h}</th>
                         ))}
                   </tr>
                 </thead>
@@ -983,7 +1000,7 @@ function ImportDrawer({
                           <td className="px-2.5 py-2 text-xs text-slate-600 dark:text-slate-300">{formatRupiah(row.safe_price)}</td>
                           <td className="px-2.5 py-2 text-xs text-slate-600 dark:text-slate-300">{row.group_label || "—"}</td>
                           <td className="px-2.5 py-2 text-[11px] text-slate-500">{[row.filter_series, row.filter_size].filter(Boolean).join(" · ") || "Semua"}</td>
-                          <td className="px-2.5 py-2 text-[11px] font-bold">
+                          <td className="px-2 py-2 text-[10px] font-bold leading-snug break-words">
                             {row.errors.length ? <span className="text-red-600 dark:text-red-300">{row.errors.join("; ")}</span> : <span className="text-emerald-600">OK</span>}
                           </td>
                         </tr>
@@ -998,7 +1015,7 @@ function ImportDrawer({
                             {[row.filter_fabric_type_id ? "kain" : "", row.filter_series, row.filter_size].filter(Boolean).join(" · ") || "Semua"}
                           </td>
                           <td className="px-2.5 py-2 text-xs text-slate-600 dark:text-slate-300">{formatQty(row.waste_percent)}%</td>
-                          <td className="px-2.5 py-2 text-[11px] font-bold">
+                          <td className="px-2 py-2 text-[10px] font-bold leading-snug break-words">
                             {row.errors.length ? <span className="text-red-600 dark:text-red-300">{row.errors.join("; ")}</span> : <span className="text-emerald-600">OK</span>}
                           </td>
                         </tr>
@@ -1168,23 +1185,23 @@ function KalkulatorTab({ recipeId, options }: { recipeId: string; options: Optio
                 <span>Aman Rp {formatRupiah(group.safe)}</span>
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse min-w-[640px]">
+            <div>
+              <table className="w-full border-collapse table-fixed">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800/60">
                     {["Baris", "Perhitungan", "Real", "Aman", "Catatan"].map((h) => (
-                      <th key={h} className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">{h}</th>
+                      <th key={h} className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 leading-tight">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {group.lines.map((line, index) => (
                     <tr key={`${line.id || line.name}-${index}`} className="border-b border-gray-100 dark:border-slate-800/50 last:border-0">
-                      <td className="px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-100">{line.name}</td>
-                      <td className="px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">{line.detail}</td>
-                      <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-200 whitespace-nowrap">Rp {formatRupiah(line.cost_real)}</td>
-                      <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-200 whitespace-nowrap">Rp {formatRupiah(line.cost_safe)}</td>
-                      <td className="px-3 py-2 text-[11px] text-amber-600 dark:text-amber-300">{line.warning || ""}</td>
+                      <td className="px-2 py-2 text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug break-words">{line.name}</td>
+                      <td className="px-2 py-2 text-[11px] text-slate-500 dark:text-slate-400 leading-snug break-words">{line.detail}</td>
+                      <td className="px-2 py-2 text-xs text-slate-700 dark:text-slate-200 whitespace-nowrap">Rp {formatRupiah(line.cost_real)}</td>
+                      <td className="px-2 py-2 text-xs text-slate-700 dark:text-slate-200 whitespace-nowrap">Rp {formatRupiah(line.cost_safe)}</td>
+                      <td className="px-2 py-2 text-[10px] text-amber-600 dark:text-amber-300 leading-snug break-words">{line.warning || ""}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1270,8 +1287,8 @@ function MatriksTab({ recipeId, options }: { recipeId: string; options: Options 
         <div className={cardClass}><EmptyState title="Matriks belum tersedia" /></div>
       ) : (
         <div className={`${cardClass} overflow-hidden`}>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse min-w-[980px]">
+          <div>
+            <table className="w-full border-collapse table-fixed">
               <thead>
                 <tr className="bg-[#1e3a5f]">
                   {[
@@ -1283,7 +1300,7 @@ function MatriksTab({ recipeId, options }: { recipeId: string; options: Options 
                     "HPP Aman (Tanpa)",
                     "Selisih Aman − Real",
                   ].map((h) => (
-                    <th key={h} className="px-3 py-2.5 text-left text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    <th key={h} className="px-2 py-2.5 text-left text-[10px] font-bold text-white uppercase tracking-wide leading-tight">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -1293,16 +1310,16 @@ function MatriksTab({ recipeId, options }: { recipeId: string; options: Options 
                 ) : (
                   data.rows.map((row, index) => (
                     <tr key={`${row.fabric_id}-${row.series}`} className={`${index % 2 === 0 ? "bg-white dark:bg-[#16171d]" : "bg-blue-50/30 dark:bg-[#1a1d28]"} border-b border-gray-100 dark:border-slate-800/50`}>
-                      <td className="px-3 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                      <td className="px-2 py-2.5 text-xs font-bold text-slate-800 dark:text-slate-100 leading-snug break-words">
                         {row.fabric_name}
-                        {row.warnings > 0 ? <span className="ml-2 text-amber-500" title="Ada komponen belum punya harga">⚠</span> : null}
+                        {row.warnings > 0 ? <span className="ml-1 text-amber-500" title="Ada komponen belum punya harga">⚠</span> : null}
                       </td>
-                      {data.uses_series ? <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{row.series || "—"}</td> : null}
-                      <td className="px-3 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">Rp {formatRupiah(row.real_include)}</td>
-                      <td className="px-3 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">Rp {formatRupiah(row.safe_include)}</td>
-                      <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(row.real_without)}</td>
-                      <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(row.safe_without)}</td>
-                      <td className={`px-3 py-2.5 text-xs font-bold whitespace-nowrap ${row.diff_include < 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                      {data.uses_series ? <td className="px-2 py-2.5 text-xs text-slate-600 dark:text-slate-300 leading-snug break-words">{row.series || "—"}</td> : null}
+                      <td className="px-2 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">Rp {formatRupiah(row.real_include)}</td>
+                      <td className="px-2 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">Rp {formatRupiah(row.safe_include)}</td>
+                      <td className="px-2 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(row.real_without)}</td>
+                      <td className="px-2 py-2.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">Rp {formatRupiah(row.safe_without)}</td>
+                      <td className={`px-2 py-2.5 text-xs font-bold whitespace-nowrap ${row.diff_include < 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                         {row.diff_include < 0 ? "−" : "+"}Rp {formatRupiah(Math.abs(row.diff_include))}
                       </td>
                     </tr>
