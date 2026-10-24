@@ -144,6 +144,7 @@ export default function JadwalFormDrawer({
 
   function save() {
     setError("");
+    if (!options) return setError("Pilihan kategori dan kain belum selesai dimuat. Coba tutup lalu buka lagi form ini.");
     if (!form.start_date) return setError("Tanggal mulai wajib diisi.");
     if (form.target_date && form.target_date < form.start_date) {
       return setError("Target selesai tidak boleh sebelum tanggal mulai.");
