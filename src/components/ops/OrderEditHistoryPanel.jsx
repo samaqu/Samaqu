@@ -13,6 +13,11 @@ function itemsLabel(items) {
     .join(", ");
 }
 
+function editedTimeParts(iso) {
+  const [date = "-", time = ""] = formatTanggalJamID(iso).split(" · ");
+  return { date, time };
+}
+
 function itemQty(items) {
   return (items || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
 }
@@ -124,16 +129,16 @@ export default function OrderEditHistoryPanel() {
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full table-fixed border-collapse">
             <colgroup>
-              <col style={{ width: "17%" }} />
-              <col style={{ width: "24%" }} />
-              <col style={{ width: "29%" }} />
+              <col style={{ width: "19%" }} />
+              <col style={{ width: "23%" }} />
+              <col style={{ width: "28%" }} />
               <col style={{ width: "12%" }} />
               <col style={{ width: "10%" }} />
               <col style={{ width: "8%" }} />
             </colgroup>
             <thead>
               <tr className="border-b border-[#e2e8f0] bg-[#f8fafc] dark:border-slate-700 dark:bg-slate-800/60">
-                {["Waktu", "Order / Customer", "Perubahan", "Total", "Berat", "Aksi"].map((head) => (
+                {["Tanggal & Jam", "Order / Customer", "Perubahan", "Total", "Berat", "Aksi"].map((head) => (
                   <th key={head} className="px-3.5 py-3 text-left font-inter text-[11px] font-bold uppercase tracking-[.06em] text-slate-500 dark:text-slate-300">
                     {head}
                   </th>
@@ -155,7 +160,10 @@ export default function OrderEditHistoryPanel() {
                     className="cursor-pointer border-b border-[#e2e8f0] transition-colors hover:bg-[#eff6ff] dark:border-slate-800/60 dark:hover:bg-slate-800/70"
                   >
                     <td className="px-3.5 py-2.5 align-middle text-[12px] font-semibold text-slate-600 dark:text-slate-300">
-                      {formatTanggalJamID(item.edited_at)}
+                      <span className="block whitespace-nowrap">{editedTimeParts(item.edited_at).date}</span>
+                      <span className="block whitespace-nowrap text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+                        {editedTimeParts(item.edited_at).time || "-"}
+                      </span>
                     </td>
                     <td className="px-3.5 py-2.5 align-middle">
                       <p className="text-[13px] font-bold text-slate-900 dark:text-white">{item.order_number}</p>
