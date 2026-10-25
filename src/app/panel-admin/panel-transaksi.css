@@ -310,7 +310,7 @@
 
 /* Layar sempit: tabel jadi kartu per transaksi — tidak ada scroll mendatar. */
 @media (max-width: 720px) {
-  .panel-tx .tw { overflow: visible; }
+  .panel-tx .tw { overflow: visible; background: transparent; }
   .panel-tx table,
   .panel-tx thead,
   .panel-tx tbody,
@@ -318,24 +318,99 @@
   .panel-tx td { display: block; width: 100%; }
   .panel-tx colgroup,
   .panel-tx thead { display: none; }
-  .panel-tx tbody tr {
-    display: grid; grid-template-columns: 1fr 1fr;
-    gap: 10px 14px; padding: 14px;
-    border-bottom: 1px solid #f1e6ea;
+
+  .panel-tx tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
   }
-  .panel-tx tbody tr:last-child { border-bottom: 0; }
+  .panel-tx tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "no status"
+      "cust cust"
+      "product product"
+      "total hpp"
+      "resi resi";
+    gap: 10px 12px;
+    padding: 13px;
+    border: 1px solid #f1e6ea;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 8px 20px -18px rgba(60, 20, 40, 0.55);
+  }
+  .panel-tx tbody tr:last-child { border-bottom: 1px solid #f1e6ea; }
   .panel-tx td { padding: 0; border: 0; }
   .panel-tx td,
   .panel-tx td small { white-space: normal !important; }
-  .panel-tx .id { white-space: normal; overflow-wrap: anywhere; }
+
   .panel-tx td:before {
-    content: attr(data-label); display: block; margin-bottom: 2px;
-    font-size: 10px; font-weight: 700; letter-spacing: .06em;
-    text-transform: uppercase; color: #8a7d83;
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 3px;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: #a2949b;
   }
-  .panel-tx td:nth-child(1),
-  .panel-tx td:nth-child(2),
-  .panel-tx td:nth-child(3) { grid-column: 1 / -1; }
+  .panel-tx td:first-child:before,
+  .panel-tx td:nth-last-child(2):before { display: none; }
+
+  .panel-tx td:first-child { grid-area: no; min-width: 0; }
+  .panel-tx td:first-child .id { font-size: 12.5px; white-space: normal; overflow-wrap: anywhere; }
+  .panel-tx td:first-child small { margin-top: 2px; font-size: 10.5px; }
+  .panel-tx td:nth-last-child(2) { grid-area: status; align-self: start; text-align: right; }
+  .panel-tx td:nth-last-child(2) .bd { font-size: 10.5px; padding: 4px 9px; }
+
+  .panel-tx td:nth-child(2) {
+    grid-area: cust;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #fdf8fa;
+  }
+  .panel-tx td:nth-child(2) b { display: block; font-size: 13.5px; }
+  .panel-tx td:nth-child(2) small { margin-top: 2px; font-size: 11.5px; }
+
+  .panel-tx td:nth-child(3) {
+    grid-area: product;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #fdf8fa;
+    border-left: 3px solid #f3c7d6;
+  }
+  .panel-tx td:nth-child(3) > span { display: block; font-size: 13px; line-height: 1.35; }
+  .panel-tx td:nth-child(3) small { margin-top: 3px; font-size: 11.5px; line-height: 1.4; }
+
+  .panel-tx td:nth-child(4),
+  .panel-tx tbody tr:has(td:nth-child(8)) td:nth-child(5) {
+    align-self: end;
+    padding-top: 9px;
+    border-top: 1px dashed #f1e6ea;
+    text-align: left !important;
+    font-size: 13.5px;
+  }
+  .panel-tx td:nth-child(4) { grid-area: total; }
+  .panel-tx tbody tr:has(td:nth-child(8)) td:nth-child(5) { grid-area: hpp; text-align: right !important; }
+  .panel-tx tbody tr:has(td:nth-child(8)) td:nth-child(5):before { text-align: right; }
+  .panel-tx td:nth-child(4) small { text-align: left !important; font-size: 11px; }
+  .panel-tx tbody tr:has(td:nth-child(8)) td:nth-child(5) small { text-align: right !important; font-size: 10.5px; }
+
+  .panel-tx tbody tr:not(:has(td:nth-child(8))) td:nth-child(4) { grid-column: 1 / -1; }
+
+  .panel-tx td:nth-last-child(3) {
+    grid-area: resi;
+    padding-top: 9px;
+    border-top: 1px solid #f6eef1;
+  }
+  .panel-tx td:nth-last-child(3):before { margin-bottom: 4px; }
+  .panel-tx .resi-no { font-size: 12px; overflow: visible; text-overflow: clip; }
+  .panel-tx td:nth-last-child(3) small { font-size: 11px; font-weight: 600; }
+
   .panel-tx td.chev { display: none; }
   .panel-tx td.mono { text-align: left !important; }
   .panel-tx td.mono small { text-align: left !important; }

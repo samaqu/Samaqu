@@ -155,6 +155,26 @@ export default function PanelShell({ children }: { children: ReactNode }) {
    * tampilan tidak berkedip saat halaman dibuka dengan keadaan terlipat.
    */
   const [collapsed, setCollapsed] = useState(false);
+  /** Drawer menu khusus mobile (<=900px). Desktop tidak memakai state ini. */
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileNavOpen) return undefined;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileNavOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [mobileNavOpen]);
 
   // Halaman Transaksi memakai halaman ops yang sama → butuh React Query + Toaster (keduanya di
   // OpsShell). Client dibuat per-instance supaya tidak dibagi antar-request saat SSR.
@@ -365,7 +385,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <div className={appClass}>
-      <aside className={styles.side}>
+      <aside className={`${styles.side}${mobileNavOpen ? ` ${styles.sideOpen}` : ""}`}>
         <div className={styles.brand}>
           <div className={styles.logo}>S</div>
           <div className={styles.brandText}>
@@ -393,6 +413,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
                     key={item.label}
                     href={item.href}
                     title={item.label}
+                    onClick={() => setMobileNavOpen(false)}
                     className={activeItem?.href === item.href ? styles.on : undefined}
                   >
                     <NavIcon name={item.icon} />
@@ -411,8 +432,36 @@ export default function PanelShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
+      {mobileNavOpen ? (
+        <button
+          type="button"
+          className={styles.navScrim}
+          onClick={() => setMobileNavOpen(false)}
+          aria-label="Tutup menu"
+        />
+      ) : null}
+
       <main className={`${styles.main}${pathname.startsWith("/panel-admin/assistant") ? ` ${styles.mainFill}` : ""}`}>
         <div className={styles.top}>
+          <button
+            type="button"
+            className={styles.mobileMenuBtn}
+            onClick={() => setMobileNavOpen((open) => !open)}
+            aria-label={mobileNavOpen ? "Tutup menu" : "Buka menu"}
+            aria-expanded={mobileNavOpen}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              {mobileNavOpen ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
+            </svg>
+          </button>
           <button
             type="button"
             className={styles.collapseBtn}
