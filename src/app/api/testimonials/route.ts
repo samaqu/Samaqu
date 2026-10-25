@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from("testimonials")
       .select("*")
+      .eq("status", "published")
       .order("created_at", { ascending: false })
       .limit(limit);
 

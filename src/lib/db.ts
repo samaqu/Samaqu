@@ -321,6 +321,7 @@ export async function getTestimonials(category?: string, type?: string) {
   let query = supabase
     .from("testimonials")
     .select("*")
+    .eq("status", "published")
     .order("created_at", { ascending: false });
 
   if (category && category !== "all") {
