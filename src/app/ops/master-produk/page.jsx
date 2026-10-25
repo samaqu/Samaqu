@@ -135,6 +135,18 @@ function findLiveVariant(variants, productId, color, size) {
   );
 }
 
+/** Jam WIB dari ISO/created_at — dipakai kolom Tanggal & Jam di tabel stok. */
+function formatJamWIB(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Jakarta",
+  });
+}
+
 /** SKU varian terkini lewat relasi; fallback ke SKU tersimpan/produk. */
 function displayVariantSku(variants, product, productId, color, size, storedSku) {
   const variant = findLiveVariant(variants, productId, color, size);
@@ -1993,7 +2005,7 @@ export default function MasterProduk() {
                           <thead>
                             <tr className="bg-[#f8fafc] dark:bg-slate-800/60 border-b border-[#e2e8f0] dark:border-slate-700">
                               <th className="px-3.5 py-3 text-left font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em] whitespace-nowrap">
-                                Tanggal
+                                Tanggal &amp; Jam
                               </th>
                               <th className="px-3.5 py-3 text-left font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em]">
                                 Produk
@@ -2029,6 +2041,7 @@ export default function MasterProduk() {
                                   >
                                     <td className="px-3.5 py-2.5 align-middle font-inter text-[13px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap">
                                       {format(new Date(si.date), 'dd MMM yyyy')}
+                                      {formatJamWIB(si.created_at) ? ` · ${formatJamWIB(si.created_at)}` : ""}
                                     </td>
                                     <td className="px-3.5 py-2.5 align-middle font-inter text-[13px] leading-snug font-semibold text-gray-900 dark:text-white overflow-hidden">
                                       <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
@@ -2120,7 +2133,7 @@ export default function MasterProduk() {
                     </colgroup>
                     <thead>
                       <tr className="bg-[#f8fafc] dark:bg-slate-800/60 border-b border-[#e2e8f0] dark:border-slate-700">
-                        <th className="px-3.5 py-3 text-left font-inter text-[11px] font-bold uppercase tracking-[.06em] text-slate-500 dark:text-slate-300 whitespace-nowrap">Tanggal</th>
+                        <th className="px-3.5 py-3 text-left font-inter text-[11px] font-bold uppercase tracking-[.06em] text-slate-500 dark:text-slate-300 whitespace-nowrap">Tanggal &amp; Jam</th>
                         <th className="px-3.5 py-3 text-left font-inter text-[11px] font-bold uppercase tracking-[.06em] text-slate-500 dark:text-slate-300">Produk</th>
                         <th className="px-3.5 py-3 text-center font-inter text-[11px] font-bold uppercase tracking-[.06em] text-slate-500 dark:text-slate-300">Qty</th>
                         <th className="px-3.5 py-3 text-right font-inter text-[11px] font-bold uppercase tracking-[.06em] text-slate-500 dark:text-slate-300 whitespace-nowrap">Total</th>
@@ -2147,6 +2160,7 @@ export default function MasterProduk() {
                             >
                               <td className="px-3.5 py-2.5 align-middle font-inter text-[13px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap">
                                 {format(new Date(t.date), "dd MMM yyyy")}
+                                {formatJamWIB(t.created_date) ? ` · ${formatJamWIB(t.created_date)}` : ""}
                               </td>
                               <td className="px-3.5 py-2.5 align-middle font-inter text-[13px] leading-snug font-semibold text-gray-900 dark:text-white overflow-hidden">
                                 <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
