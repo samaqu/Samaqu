@@ -28,6 +28,8 @@ import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
 
 export default function TransaksiDetailDrawer({ open, order, variant = "ops", onClose, onEdit, onCancel, onDelete, onResiCreated }) {
   const isPanel = variant === "panel";
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [statusError, setStatusError] = useState("");
   const status = order ? STATUS_STYLES[order.status] : null;
   const source = order ? SOURCE_STYLES[order.source_key || order.source] : null;
 
@@ -47,6 +49,36 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
     return sum + grams * (Number(item?.quantity) || 1);
   }, 0);
   const totalWeight = Number(order?.weight) > 0 ? Number(order.weight) : totalItemWeight;
+
+  async function changeStatus(next) {
+    if (!order || statusBusy || next === order.status) return;
+    if (next === "dibatalkan") {
+      onCancel?.(order);
+      return;
+    }
+    setStatusBusy(true);
+    setStatusError("");
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const res = await fetch("/api/admin/orders", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token || ""}`,
+        },
+        body: JSON.stringify({ orderNumber: order.order_number, status: next }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || "Gagal memperbarui status");
+      await onResiCreated?.({ status: next, updated_at: new Date().toISOString() });
+    } catch (error) {
+      setStatusError(error instanceof Error ? error.message : "Gagal memperbarui status");
+    } finally {
+      setStatusBusy(false);
+    }
+  }
   // Akses ke dialog "Cetak Resi" milik TransaksiResiPanel (panel admin: tombolnya di footer).
   const resiPanelRef = useRef(null);
 
@@ -153,6 +185,8 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
   // ── Tampilan PANEL (ala mockup) ──
   if (isPanel && order) {
     const stage = orderStage(order);
+    const panelWa = waNumber(order.customer_whatsapp || "");
+    const canHubungiPanel = /^628[1-9][0-9]{6,10}$/.test(panelWa);
     const panelKey =
       { belum_bayar: "bayar", belum_dipacking: "packing", sudah_dipacking: "siap", dikirim: "kirim", selesai: "selesai", dibatalkan: "batal" }[stage] || "batal";
     const banner =
@@ -537,6 +571,45 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                 </span>
               </div>
 
+              {order.status !== "dibatalkan" ? (
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                    Atur Status Pesanan
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { value: "pending", label: "Belum Bayar" },
+                      { value: "diproses", label: "Lunas" },
+                      { value: "selesai", label: "Selesai" },
+                      { value: "dibatalkan", label: "Batalkan" },
+                    ].map((option) => {
+                      const active = order.status === option.value;
+                      const danger = option.value === "dibatalkan";
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          disabled={statusBusy || active}
+                          onClick={() => changeStatus(option.value)}
+                          className={`rounded-xl border px-3 py-2 text-xs font-bold transition-colors disabled:opacity-50 ${
+                            active
+                              ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900"
+                              : danger
+                                ? "border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20"
+                                : "border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {statusError ? (
+                    <p className="mt-2 text-[11px] font-semibold text-red-600 dark:text-red-400">{statusError}</p>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div className="rounded-2xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
                 <Row label="Pelanggan" value={order.customer_name} />
                 <Row label="Nomor HP" value={order.customer_whatsapp || "-"} />
@@ -745,7 +818,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
 
             </div>
 
-            {(order.can_edit || order.can_cancel) && (
+            {(order.can_edit || order.can_cancel || canHubungiPanel) && (
               <div className="shrink-0 flex gap-2 px-5 py-3.5 border-t border-slate-200 dark:border-slate-800">
                 {order.can_edit && (
                   <button
@@ -753,6 +826,15 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-all"
                   >
                     <Pencil size={16} /> Ubah
+                  </button>
+                )}
+                {canHubungiPanel && (
+                  <button
+                    type="button"
+                    onClick={() => window.open(`https://wa.me/${panelWa}`, "_blank", "noopener,noreferrer")}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+                  >
+                    Hubungi
                   </button>
                 )}
                 {order.can_cancel && (
