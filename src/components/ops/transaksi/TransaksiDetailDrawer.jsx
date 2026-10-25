@@ -215,13 +215,14 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
       <AnimatePresence>
         {open && order && (
           <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="ov" onClick={onClose} />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="ov" style={{ zIndex: 9998 }} onClick={onClose} />
             <motion.aside
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "tween", duration: 0.22 }}
               className="dr"
+              style={{ zIndex: 9999 }}
               role="dialog"
               aria-label="Detail Transaksi"
             >
