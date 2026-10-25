@@ -786,15 +786,16 @@ function PersediaanTab({
       {showPrices ? (
         <TableCard
           title="Persediaan Barang Jadi"
-          note="HPP memakai rata-rata produksi per varian. Varian tanpa HPP ditandai."
+          note="HPP memakai rata-rata produksi per varian. Stok sharing dinilai rata-rata tertimbang HPP semua series di pool (perkiraan)."
           count={finished.length}
           onCsv={() =>
             downloadCsv(
               "persediaan-barang-jadi.csv",
-              ["Produk", "Series", "Warna", "Ukuran", "Stok", "HPP Rata-rata", "Nilai", "Status HPP"],
+              ["Produk", "Series", "Warna", "Ukuran", "Stok", "HPP Rata-rata", "Nilai", "Status HPP", "Catatan"],
               finished.map((row: any) => [
                 row.product_name, row.series, row.color, row.size, row.stock, row.hpp_avg, row.value,
                 row.missing_hpp ? "Belum ada HPP" : "Ada",
+                row.missing_hpp ? "belum ada HPP" : row.estimated ? `perkiraan (stok gabungan series: ${(row.pool_series || []).join(", ")})` : "",
               ]),
             )
           }
@@ -817,12 +818,22 @@ function PersediaanTab({
               ) : finished.map((row: any) => (
                 <tr key={`${row.product_id}|${row.color}|${row.size}`}>
                   <td className={tdClass}>{row.product_name}</td>
-                  <td className={`${tdClass} text-[11px] text-slate-400`}>{row.series}</td>
+                  <td className={`${tdClass} text-[11px] text-slate-400`}>
+                    {row.series}
+                    {row.estimated && (row.pool_series || []).length > 1 ? (
+                      <span className="block text-[10px] text-slate-400">gabungan: {(row.pool_series || []).join(", ")}</span>
+                    ) : null}
+                  </td>
                   <td className={tdClass}>{row.color} · {row.size}</td>
                   <td className={tdNum}>{qty(row.stock)}</td>
-                  <td className={tdNum}>{row.missing_hpp ? "-" : rp(row.hpp_avg)}</td>
+                  <td className={tdNum}>
+                    {row.missing_hpp ? "-" : rp(row.hpp_avg)}
+                    {!row.missing_hpp && row.estimated ? (
+                      <span className="block text-[10px] font-normal text-amber-600">perkiraan (stok gabungan series)</span>
+                    ) : null}
+                  </td>
                   <td className={tdNum}>{row.missing_hpp ? "-" : rp(row.value)}</td>
-                  <td className={tdClass}><Badge tone={row.missing_hpp ? "amber" : "green"}>{row.missing_hpp ? "Belum ada HPP" : "Ada"}</Badge></td>
+                  <td className={tdClass}><Badge tone={row.missing_hpp ? "amber" : "green"}>{row.missing_hpp ? "Belum ada HPP" : row.estimated ? "Perkiraan" : "Ada"}</Badge></td>
                 </tr>
               ))}
             </tbody>
@@ -859,12 +870,12 @@ function HppTab({ data, scheduleId, setScheduleId }: { data: any; scheduleId: st
 
       <TableCard
         title="HPP Standar vs Aktual"
-        note="Standar = HPP Aman dari resep aktif; aktual = rata-rata produksi."
+        note="Standar tanpa Packaging Pesanan & Tambahan Opsional. Efisiensi = Standar Real − Aktual; sisa buffer = Standar Aman − Aktual."
         count={variants.length}
         onCsv={() => downloadCsv(
           "hpp-standar-aktual.csv",
-          ["Produk", "Series", "Warna", "Ukuran", "Qty", "Aktual", "Standar", "Selisih", "Selisih %", "Catatan"],
-          variants.map((row: any) => [row.product_name, row.series, row.color, row.size, row.qty_received, row.actual, row.standard ?? "", row.diff ?? "", row.pct ?? "", row.warning || ""]),
+          ["Produk", "Series", "Warna", "Ukuran", "Qty", "Aktual", "Standar Real", "Standar Aman", "Efisiensi", "Sisa Buffer", "Catatan"],
+          variants.map((row: any) => [row.product_name, row.series, row.color, row.size, row.qty_received, row.actual, row.standard_real ?? "", row.standard_safe ?? "", row.efficiency ?? "", row.buffer ?? "", row.warning || ""]),
         )}
       >
         <table className="w-full border-collapse">
@@ -875,15 +886,16 @@ function HppTab({ data, scheduleId, setScheduleId }: { data: any; scheduleId: st
               <th className={thClass}>Varian</th>
               <th className={`${thClass} text-right`}>Qty</th>
               <th className={`${thClass} text-right`}>Aktual</th>
-              <th className={`${thClass} text-right`}>Standar</th>
-              <th className={`${thClass} text-right`}>Selisih</th>
-              <th className={`${thClass} text-right`}>%</th>
+              <th className={`${thClass} text-right`}>Standar Real</th>
+              <th className={`${thClass} text-right`}>Standar Aman</th>
+              <th className={`${thClass} text-right`}>Efisiensi</th>
+              <th className={`${thClass} text-right`}>Sisa Buffer</th>
               <th className={thClass}>Catatan</th>
             </tr>
           </thead>
           <tbody>
             {variants.length === 0 ? (
-              <tr><td colSpan={9} className={tdClass}><EmptyState title="Belum ada HPP produksi." /></td></tr>
+              <tr><td colSpan={10} className={tdClass}><EmptyState title="Belum ada HPP produksi." /></td></tr>
             ) : variants.map((row: any) => (
               <tr key={`${row.product_id}|${row.color}|${row.size}`}>
                 <td className={tdClass}>{row.product_name}</td>
@@ -891,9 +903,10 @@ function HppTab({ data, scheduleId, setScheduleId }: { data: any; scheduleId: st
                 <td className={tdClass}>{row.color} · {row.size}</td>
                 <td className={tdNum}>{qty(row.qty_received)}</td>
                 <td className={tdNum}>{rp(row.actual)}</td>
-                <td className={tdNum}>{row.standard == null ? "-" : rp(row.standard)}</td>
-                <td className={`${tdNum} ${Number(row.diff) > 0 ? "text-red-600" : "text-emerald-600"}`}>{row.diff == null ? "-" : rp(row.diff)}</td>
-                <td className={tdNum}>{row.pct == null ? "-" : pct(row.pct)}</td>
+                <td className={tdNum}>{row.standard_real == null ? "-" : rp(row.standard_real)}</td>
+                <td className={tdNum}>{row.standard_safe == null ? "-" : rp(row.standard_safe)}</td>
+                <td className={`${tdNum} ${Number(row.efficiency) > 0 ? "text-emerald-600" : Number(row.efficiency) < 0 ? "text-red-600" : ""}`}>{row.efficiency == null ? "-" : rp(row.efficiency)}</td>
+                <td className={`${tdNum} ${Number(row.buffer) < 0 ? "text-red-600" : ""}`}>{row.buffer == null ? "-" : rp(row.buffer)}</td>
                 <td className={`${tdClass} text-[11px] text-amber-600`}>{row.warning || "-"}</td>
               </tr>
             ))}
@@ -1025,27 +1038,40 @@ function LabaTab({ data }: { data: any }) {
         Ini <b>laba kotor</b> sebelum fee marketplace, ongkir, dan iklan. Pesanan tanpa snapshot HPP tidak dihitung.
       </div>
 
-      <TableCard title="Laba per Produk" note="HPP per produk belum termasuk biaya kemasan (biaya order-level)." count={byProduct.length} onCsv={() => downloadCsv(
+      <TableCard title="Laba per Produk" note="Biaya kemasan pesanan dibagi proporsional terhadap nilai penjualan item, jadi total produk = Ringkasan." count={byProduct.length} onCsv={() => downloadCsv(
         "laba-per-produk.csv",
-        ["Produk", "Series", "Qty", "Pendapatan", "HPP", "Laba Kotor", "Margin %"],
-        byProduct.map((row: any) => [row.name, row.series, row.qty, row.revenue, row.hpp, row.profit, row.margin]),
+        ["Produk", "Series", "Qty", "Pendapatan", "HPP Barang", "Kemasan", "HPP", "Laba Kotor", "Margin %"],
+        byProduct.map((row: any) => [row.name, row.series, row.qty, row.revenue, row.hpp_goods, row.packaging, row.hpp, row.profit, row.margin]),
       )}>
         <table className="w-full border-collapse">
-          <thead><tr><th className={thClass}>Produk</th><th className={thClass}>Series</th><th className={`${thClass} text-right`}>Qty</th><th className={`${thClass} text-right`}>Pendapatan</th><th className={`${thClass} text-right`}>HPP</th><th className={`${thClass} text-right`}>Laba</th><th className={`${thClass} text-right`}>Margin</th></tr></thead>
+          <thead><tr><th className={thClass}>Produk</th><th className={thClass}>Series</th><th className={`${thClass} text-right`}>Qty</th><th className={`${thClass} text-right`}>Pendapatan</th><th className={`${thClass} text-right`}>HPP Barang</th><th className={`${thClass} text-right`}>Kemasan</th><th className={`${thClass} text-right`}>Laba</th><th className={`${thClass} text-right`}>Margin</th></tr></thead>
           <tbody>
             {byProduct.length === 0 ? (
-              <tr><td colSpan={7} className={tdClass}><EmptyState title="Belum ada pesanan dengan snapshot HPP." /></td></tr>
+              <tr><td colSpan={8} className={tdClass}><EmptyState title="Belum ada pesanan dengan snapshot HPP." /></td></tr>
             ) : byProduct.map((row: any) => (
               <tr key={row.key}>
                 <td className={tdClass}>{row.name}</td>
                 <td className={`${tdClass} text-[11px] text-slate-400`}>{row.series}</td>
                 <td className={tdNum}>{qty(row.qty)}</td>
                 <td className={tdNum}>{rp(row.revenue)}</td>
-                <td className={tdNum}>{rp(row.hpp)}</td>
+                <td className={tdNum}>{rp(row.hpp_goods)}</td>
+                <td className={tdNum}>{rp(row.packaging)}</td>
                 <td className={`${tdNum} ${row.profit >= 0 ? "text-emerald-600" : "text-red-600"}`}>{rp(row.profit)}</td>
                 <td className={tdNum}>{pct(row.margin)}</td>
               </tr>
             ))}
+            {byProduct.length > 0 ? (
+              <tr className="border-t-2 border-slate-200 font-bold dark:border-slate-700">
+                <td className={tdClass}>Total</td>
+                <td className={tdClass} />
+                <td className={tdNum}>{qty(byProduct.reduce((sum: number, row: any) => sum + Number(row.qty || 0), 0))}</td>
+                <td className={tdNum}>{rp(byProduct.reduce((sum: number, row: any) => sum + Number(row.revenue || 0), 0))}</td>
+                <td className={tdNum}>{rp(byProduct.reduce((sum: number, row: any) => sum + Number(row.hpp_goods || 0), 0))}</td>
+                <td className={tdNum}>{rp(byProduct.reduce((sum: number, row: any) => sum + Number(row.packaging || 0), 0))}</td>
+                <td className={tdNum}>{rp(byProduct.reduce((sum: number, row: any) => sum + Number(row.profit || 0), 0))}</td>
+                <td className={tdNum}>{pct(summary.margin)}</td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </TableCard>

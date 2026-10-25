@@ -154,6 +154,175 @@ function finishedHppKey(productId: unknown, color: unknown, size: unknown): stri
   return `${String(productId || "")}|${norm(color)}|${norm(size)}`;
 }
 
+/** Kelompok yang dibebankan per pesanan, bukan per produk saat membandingkan standar. */
+const ORDER_LEVEL_GROUPS = new Set(["packaging_pesanan", "tambahan_opsional"]);
+
+/** Standar Real & Aman tanpa Packaging Pesanan dan Tambahan Opsional. */
+function standardTotals(hpp: { groups: { key: string; real: number; safe: number }[] }) {
+  let real = 0;
+  let safe = 0;
+  for (const group of hpp.groups || []) {
+    if (ORDER_LEVEL_GROUPS.has(String(group.key))) continue;
+    real += num(group.real);
+    safe += num(group.safe);
+  }
+  return { real: round2(real), safe: round2(safe) };
+}
+
+/**
+ * Bagi `total` proporsional terhadap `weights`. Sisa pembulatan masuk ke baris
+ * terakhir supaya jumlah hasil selalu sama dengan `total`.
+ */
+function allocateProportional(total: number, weights: number[]): number[] {
+  if (weights.length === 0) return [];
+  const sum = weights.reduce((acc, value) => acc + value, 0);
+  if (!(sum > 0)) {
+    const out = weights.map(() => 0);
+    out[out.length - 1] = round2(total);
+    return out;
+  }
+  const out: number[] = [];
+  let used = 0;
+  weights.forEach((weight, index) => {
+    if (index === weights.length - 1) {
+      out.push(round2(total - used));
+      return;
+    }
+    const share = round2((total * weight) / sum);
+    out.push(share);
+    used += share;
+  });
+  return out;
+}
+
+/**
+ * Nilai persediaan barang jadi dengan aturan stok sharing.
+ *
+ * Produk turunan (`product_variants.base_product_id`) tidak memegang stoknya
+ * sendiri. Stok produk induk dinilai memakai rata-rata tertimbang HPP semua
+ * series yang menumpang di pool, dengan bobot qty hasil produksi per series.
+ */
+async function buildFinishedInventory(admin: SupabaseClient, hppRows: any[]) {
+  const [variants, links, products] = await Promise.all([
+    allRows((from, to) =>
+      admin
+        .from("product_variants")
+        .select("id, product_id, color, size, stock, base_product_id")
+        .gt("stock", 0)
+        .order("id")
+        .range(from, to),
+    ),
+    allRows((from, to) =>
+      admin
+        .from("product_variants")
+        .select("id, product_id, base_product_id")
+        .not("base_product_id", "is", null)
+        .order("id")
+        .range(from, to),
+    ),
+    allRows((from, to) =>
+      admin.from("products").select("id, name, series, category").order("id").range(from, to),
+    ),
+  ]);
+
+  const productById = new Map<string, any>((products || []).map((row: any) => [String(row.id), row]));
+  const stats = new Map<string, { qty: number; value: number; hpps: number[] }>();
+  for (const row of hppRows || []) {
+    const id = String(row.product_id || "");
+    if (!id) continue;
+    const qty = num(row.qty_received);
+    const hpp = num(row.hpp_avg);
+    const entry = stats.get(id) || { qty: 0, value: 0, hpps: [] };
+    entry.qty += qty;
+    if (hpp > 0) {
+      entry.value += qty * hpp;
+      entry.hpps.push(hpp);
+    }
+    stats.set(id, entry);
+  }
+
+  const childrenByBase = new Map<string, string[]>();
+  for (const row of links || []) {
+    const base = String(row.base_product_id || "");
+    const child = String(row.product_id || "");
+    if (!base || !child || base === child) continue;
+    const list = childrenByBase.get(base) || [];
+    if (!list.includes(child)) list.push(child);
+    childrenByBase.set(base, list);
+  }
+
+  const seriesOf = (id: string) => String(productById.get(id)?.series || "-");
+  const weightedPoolHpp = (base: string, kids: string[]): number | null => {
+    let qty = 0;
+    let value = 0;
+    for (const id of [base, ...kids]) {
+      const entry = stats.get(id);
+      if (!entry) continue;
+      qty += entry.qty;
+      value += entry.value;
+    }
+    if (qty > 0 && value > 0) return round2(value / qty);
+    const averages: number[] = [];
+    for (const id of [base, ...kids]) {
+      const entry = stats.get(id);
+      if (!entry || entry.hpps.length === 0) continue;
+      averages.push(entry.hpps.reduce((sum, hpp) => sum + hpp, 0) / entry.hpps.length);
+    }
+    if (averages.length === 0) return null;
+    return round2(averages.reduce((sum, hpp) => sum + hpp, 0) / averages.length);
+  };
+
+  const perVariant = new Map<string, number>();
+  for (const row of hppRows || []) {
+    perVariant.set(finishedHppKey(row.product_id, row.color, row.size), num(row.hpp_avg));
+  }
+
+  const rows: any[] = [];
+  let totalValue = 0;
+  let missing = 0;
+  for (const row of variants) {
+    // Stok produk turunan hidup di produk induk — jangan dihitung dua kali.
+    if (row.base_product_id) continue;
+    const productId = String(row.product_id || "");
+    const product = productById.get(productId);
+    const kids = childrenByBase.get(productId) || [];
+    const estimated = kids.length > 0;
+    const variantHpp = perVariant.get(finishedHppKey(productId, row.color, row.size));
+    const hpp = estimated
+      ? weightedPoolHpp(productId, kids)
+      : variantHpp && variantHpp > 0
+        ? variantHpp
+        : null;
+    const stock = num(row.stock);
+    const isMissing = !(Number(hpp) > 0);
+    if (isMissing) missing += 1;
+    else totalValue += stock * Number(hpp);
+    rows.push({
+      product_id: productId,
+      product_name: String(product?.name || productId || ""),
+      series: String(product?.series || "-"),
+      category: String(product?.category || "-"),
+      color: String(row.color || "default"),
+      size: String(row.size || ""),
+      stock: round4(stock),
+      hpp_avg: isMissing ? null : Number(hpp),
+      value: isMissing ? 0 : round2(stock * Number(hpp)),
+      missing_hpp: isMissing,
+      estimated,
+      pool_series: estimated ? [productId, ...kids].map(seriesOf) : [],
+    });
+  }
+  rows.sort((a, b) => b.value - a.value || a.product_name.localeCompare(b.product_name, "id"));
+
+  return {
+    rows,
+    totals: {
+      finished_value: round2(totalValue),
+      finished_missing_count: missing,
+    },
+  };
+}
+
 export async function getReportOptions(admin: SupabaseClient) {
   const [fabrics, seriesRows] = await Promise.all([
     allRows((from, to) =>
@@ -176,16 +345,8 @@ export async function getReportOptions(admin: SupabaseClient) {
 export async function getSummaryReport(admin: SupabaseClient, start: string, end: string) {
   const { from, to } = rangeBounds(start, end);
 
-  const [components, variants, finishedHpp, running, receipts, orders] = await Promise.all([
+  const [components, finishedHpp, running, receipts, orders] = await Promise.all([
     loadComponentRows(admin),
-    allRows((pageFrom, pageTo) =>
-      admin
-        .from("product_variants")
-        .select("id, product_id, color, size, stock")
-        .gt("stock", 0)
-        .order("id")
-        .range(pageFrom, pageTo),
-    ),
     loadFinishedHpp(admin),
     admin
       .from("production_schedules")
@@ -213,11 +374,6 @@ export async function getSummaryReport(admin: SupabaseClient, start: string, end
     ),
   ]);
 
-  const hppMap = new Map<string, number>();
-  for (const row of finishedHpp || []) {
-    hppMap.set(finishedHppKey(row.product_id, row.color, row.size), num(row.hpp_avg));
-  }
-
   let componentValue = 0;
   let lowComponents = 0;
   for (const row of components) {
@@ -227,14 +383,9 @@ export async function getSummaryReport(admin: SupabaseClient, start: string, end
     if (stock <= minStock) lowComponents += 1;
   }
 
-  let finishedValue = 0;
-  let finishedMissing = 0;
-  for (const row of variants) {
-    const stock = num(row.stock);
-    const hpp = hppMap.get(finishedHppKey(row.product_id, row.color, row.size));
-    if (hpp && hpp > 0) finishedValue += stock * hpp;
-    else finishedMissing += 1;
-  }
+  const finishedInventory = await buildFinishedInventory(admin, finishedHpp);
+  const finishedValue = finishedInventory.totals.finished_value;
+  const finishedMissing = finishedInventory.totals.finished_missing_count;
 
   const orderIds = orders.map((row: any) => String(row.id));
   const orderHpp = orderIds.length
@@ -458,43 +609,10 @@ export async function getInventoryReport(
   let finishedValue = 0;
   let finishedMissing = 0;
   if (showPrices) {
-    const [variants, hppRows] = await Promise.all([
-      allRows((from, to) =>
-        admin
-          .from("product_variants")
-          .select("id, product_id, color, size, stock")
-          .gt("stock", 0)
-          .order("id")
-          .range(from, to),
-      ),
-      loadFinishedHpp(admin),
-    ]);
-    const productIds = Array.from(new Set(variants.map((row: any) => String(row.product_id || ""))));
-    const products = await allRowsIn(admin, "products", "id, name, series, category", "id", productIds);
-    const productById = new Map<string, any>((products || []).map((row: any) => [String(row.id), row]));
-    const hppMap = new Map<string, number>();
-    for (const row of hppRows) hppMap.set(finishedHppKey(row.product_id, row.color, row.size), num(row.hpp_avg));
-
-    finished = variants.map((row: any) => {
-      const product = productById.get(String(row.product_id));
-      const stock = num(row.stock);
-      const hpp = hppMap.get(finishedHppKey(row.product_id, row.color, row.size));
-      const missing = !(Number(hpp) > 0);
-      if (missing) finishedMissing += 1;
-      else finishedValue += stock * Number(hpp);
-      return {
-        product_id: String(row.product_id || ""),
-        product_name: String(product?.name || row.product_id || ""),
-        series: String(product?.series || "-"),
-        category: String(product?.category || "-"),
-        color: String(row.color || "default"),
-        size: String(row.size || ""),
-        stock: round4(stock),
-        hpp_avg: missing ? null : Number(hpp),
-        value: missing ? 0 : round2(stock * Number(hpp)),
-        missing_hpp: missing,
-      };
-    }).sort((a, b) => b.value - a.value || a.product_name.localeCompare(b.product_name, "id"));
+    const inventory = await buildFinishedInventory(admin, await loadFinishedHpp(admin));
+    finished = inventory.rows;
+    finishedValue = inventory.totals.finished_value;
+    finishedMissing = inventory.totals.finished_missing_count;
   }
 
   return {
@@ -572,9 +690,13 @@ export async function getHppReport(
         })
       : null;
     const actual = num(row.hpp_avg);
-    const standard = hpp ? round2(hpp.totals.safe) : null;
-    const diff = standard != null ? round2(actual - standard) : null;
-    const pct = standard && standard > 0 ? round2(((actual - standard) / standard) * 100) : null;
+    const standard = hpp ? standardTotals(hpp) : null;
+    const standardReal = standard ? standard.real : null;
+    const standardSafe = standard ? standard.safe : null;
+    // Positif = aktual lebih hemat dari Standar Real.
+    const efficiency = standardReal != null ? round2(standardReal - actual) : null;
+    // Positif = aktual masih di bawah Standar Aman (buffer tersisa).
+    const buffer = standardSafe != null ? round2(standardSafe - actual) : null;
     return {
       product_id: String(row.product_id || ""),
       product_name: String(product?.name || row.product_id || ""),
@@ -584,9 +706,10 @@ export async function getHppReport(
       size: String(row.size || ""),
       qty_received: round4(num(row.qty_received)),
       actual,
-      standard,
-      diff,
-      pct,
+      standard_real: standardReal,
+      standard_safe: standardSafe,
+      efficiency,
+      buffer,
       warning: hpp?.warnings?.[0]?.message || (recipe ? null : "Resep aktif belum ada"),
     };
   }).sort((a, b) => a.product_name.localeCompare(b.product_name, "id") || a.size.localeCompare(b.size));
@@ -883,14 +1006,21 @@ export async function getOrderProfitReport(admin: SupabaseClient, start: string,
     byPlatform.set(platformKey, platform);
 
     const orderItems = itemsByOrder.get(String(order.id)) || [];
-    const lineTotal = orderItems.reduce((sum: number, row: any) => sum + num(row.price) * num(row.quantity), 0);
-    const discount = num(order.discount);
-    for (const row of orderItems) {
-      const rowTotal = num(row.price) * num(row.quantity);
-      const allocatedDiscount = lineTotal > 0 ? (discount * rowTotal) / lineTotal : 0;
-      const rowRevenue = Math.max(0, round2(rowTotal - allocatedDiscount));
-      const snapshot = hppItemByLine.get(String(row.id));
-      const rowHpp = num(snapshot?.hpp_total);
+    const rawTotals = orderItems.map((row: any) => num(row.price) * num(row.quantity));
+    // Pendapatan per item selalu dijumlahkan tepat ke pendapatan pesanan, jadi
+    // total seluruh produk sama dengan angka di Ringkasan.
+    const rowRevenues = allocateProportional(orderRev, rawTotals);
+    const revenueWeights = rowRevenues.slice();
+    const rowSnapshotHpp = orderItems.map((row: any) => num(hppItemByLine.get(String(row.id))?.hpp_total));
+    const snapshotHppSum = rowSnapshotHpp.reduce((sum: number, value: number) => sum + value, 0);
+    // Pakai total_hpp − kemasan supaya jumlah HPP per produk tepat sama dengan Ringkasan.
+    const goodsHppTotal = num(header.total_hpp) - num(header.packaging_cost);
+    const hppResidual = allocateProportional(goodsHppTotal - snapshotHppSum, revenueWeights);
+    // Kemasan tingkat pesanan dibagi proporsional terhadap nilai penjualan item.
+    const rowPackaging = allocateProportional(num(header.packaging_cost), revenueWeights);
+
+    const addRow = (row: any, rowRevenue: number, rowGoodsHpp: number, rowPackagingCost: number) => {
+      const rowHpp = round2(rowGoodsHpp + rowPackagingCost);
       const product = productById.get(String(row.product_id));
       const productKey = String(row.product_id || row.product_name || "unknown");
       const series = String(row.series || product?.series || "-");
@@ -900,21 +1030,55 @@ export async function getOrderProfitReport(admin: SupabaseClient, start: string,
         series,
         qty: 0,
         revenue: 0,
+        hpp_goods: 0,
+        packaging: 0,
         hpp: 0,
         profit: 0,
       };
       productEntry.qty += num(row.quantity);
       productEntry.revenue += rowRevenue;
+      productEntry.hpp_goods += rowGoodsHpp;
+      productEntry.packaging += rowPackagingCost;
       productEntry.hpp += rowHpp;
       productEntry.profit += rowRevenue - rowHpp;
       byProduct.set(productKey, productEntry);
 
-      const seriesEntry = bySeries.get(series) || { key: series, label: series, qty: 0, revenue: 0, hpp: 0, profit: 0 };
+      const seriesEntry = bySeries.get(series) || {
+        key: series,
+        label: series,
+        qty: 0,
+        revenue: 0,
+        hpp_goods: 0,
+        packaging: 0,
+        hpp: 0,
+        profit: 0,
+      };
       seriesEntry.qty += num(row.quantity);
       seriesEntry.revenue += rowRevenue;
+      seriesEntry.hpp_goods += rowGoodsHpp;
+      seriesEntry.packaging += rowPackagingCost;
       seriesEntry.hpp += rowHpp;
       seriesEntry.profit += rowRevenue - rowHpp;
       bySeries.set(series, seriesEntry);
+    };
+
+    if (orderItems.length === 0) {
+      // Pesanan tanpa rincian item tetap masuk supaya total produk = Ringkasan.
+      addRow(
+        { product_name: "Tanpa rincian item", series: "-", quantity: 0 },
+        orderRev,
+        goodsHppTotal,
+        num(header.packaging_cost),
+      );
+    } else {
+      orderItems.forEach((row: any, index: number) => {
+        addRow(
+          row,
+          rowRevenues[index],
+          rowSnapshotHpp[index] + hppResidual[index],
+          rowPackaging[index],
+        );
+      });
     }
   }
 
