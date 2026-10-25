@@ -129,7 +129,7 @@ function TestimonialCard({ t, onImageClick }: { t: Testimoni; onImageClick: (url
           <div className="min-w-0 flex-1">
             <p className="truncate text-[12px] font-bold" style={{ color: "#000" }}>{displayName}</p>
             <p className="truncate text-[10.5px]" style={{ color: "rgba(0,0,0,.45)" }}>
-              {[t.product_name || t.cat, t.series_name, date].filter(Boolean).join(" Â· ")}
+              {[t.product_name || t.cat, t.series_name, date].filter(Boolean).join(" · ")}
             </p>
           </div>
           {t.product_name || t.cat ? (
@@ -283,7 +283,7 @@ export default function TestimoniPage() {
                   <div className="flex gap-0.5">{Array.from({ length: 5 }, (_, i) => <Star key={i} size={14} fill={i < Math.round(stats.avg) ? "#ffffff" : "none"} stroke="#ffffff" />)}</div>
                 </div>
                 <p className="mt-4 flex items-baseline gap-1.5" style={{ color: "#ffffff" }}>
-                  <span className="text-[2.6rem] font-extrabold leading-none">{stats.total > 0 ? stats.avg.toFixed(1) : "â€”"}</span>
+                  <span className="text-[2.6rem] font-extrabold leading-none">{stats.total > 0 ? stats.avg.toFixed(1) : "—"}</span>
                   <span className="text-sm font-semibold" style={{ color: "rgba(255,255,255,.45)" }}>/ 5</span>
                 </p>
                 <p className="mt-2 text-[12px] font-ui" style={{ color: "rgba(255,255,255,.6)" }}>
