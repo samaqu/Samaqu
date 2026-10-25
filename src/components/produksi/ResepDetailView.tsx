@@ -24,6 +24,7 @@ import {
   EmptyState,
   ErrorBox,
   PageHead,
+  RupiahInput,
   Spinner,
   StatCard,
   btnPrimary,
@@ -861,11 +862,11 @@ function LineDrawer({
             </div>
             <div>
               <label className={labelClass}>Real / pcs</label>
-              <input className={inputClass} inputMode="decimal" value={form.real_price} onChange={(e) => setForm({ ...form, real_price: e.target.value })} />
+              <RupiahInput value={form.real_price} onValueChange={(value) => setForm({ ...form, real_price: value })} />
             </div>
             <div>
               <label className={labelClass}>Aman / pcs</label>
-              <input className={inputClass} inputMode="decimal" value={form.safe_price} onChange={(e) => setForm({ ...form, safe_price: e.target.value })} />
+              <RupiahInput value={form.safe_price} onValueChange={(value) => setForm({ ...form, safe_price: value })} />
             </div>
           </div>
         )}

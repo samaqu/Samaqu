@@ -31,6 +31,7 @@ import {
   FilterSearch,
   FilterSelect,
   PageHead,
+  RupiahInput,
   Spinner,
   StatCard,
   btnPrimary,
@@ -909,7 +910,7 @@ export default function KomponenView() {
               </div>
               <div>
                 <label className={labelClass}>Harga Aman (Rp / {form.unit_use})</label>
-                <input className={inputClass} inputMode="decimal" value={form.safe_price} onChange={(e) => setForm({ ...form, safe_price: e.target.value })} />
+                <RupiahInput value={form.safe_price} onValueChange={(value) => setForm({ ...form, safe_price: value })} />
                 <p className="mt-1 text-[11px] text-slate-400">Patokan HPP standar. Tidak berubah otomatis.</p>
               </div>
             </div>

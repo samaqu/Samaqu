@@ -15,6 +15,7 @@ import {
   FilterDateRange,
   FilterSearch,
   PageHead,
+  RupiahInput,
   Spinner,
   StatCard,
   btnPrimary,
@@ -65,9 +66,6 @@ type Purchase = {
 };
 
 const emptyRow = () => ({ component_id: "", qty_buy: "", price_buy: "" });
-
-const moneyDigits = (value: string) => value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-const moneyInputValue = (value: string) => (value ? formatRupiah(value) : "");
 
 export default function PembelianView() {
   const access = useProduksiAccess();
@@ -605,12 +603,10 @@ export default function PembelianView() {
 
             <div className="max-w-[280px]">
               <label className={labelClass}>Ongkir / biaya tambahan (total pembelian)</label>
-              <input
+              <RupiahInput
                 className={`${inputClass} text-right tabular-nums`}
-                inputMode="numeric"
-                value={moneyInputValue(form.additional_cost)}
-                onChange={(e) => setForm({ ...form, additional_cost: moneyDigits(e.target.value) })}
-                placeholder="0"
+                value={form.additional_cost}
+                onValueChange={(value) => setForm({ ...form, additional_cost: value })}
               />
               <p className="mt-1 text-[11px] text-slate-400">
                 Dibagi proporsional ke semua baris, lalu ditambahkan ke harga per satuan pakai.
@@ -656,12 +652,10 @@ export default function PembelianView() {
                       </div>
                       <div>
                         <label className={labelClass}>Harga per {component?.unit_buy || "satuan beli"}</label>
-                        <input
+                        <RupiahInput
                           className={`${inputClass} text-right tabular-nums`}
-                          inputMode="numeric"
-                          value={moneyInputValue(row.price_buy)}
-                          onChange={(e) => updateRow(index, { price_buy: moneyDigits(e.target.value) })}
-                          placeholder="0"
+                          value={row.price_buy}
+                          onValueChange={(value) => updateRow(index, { price_buy: value })}
                         />
                       </div>
                     </div>

@@ -8,6 +8,7 @@ import type { TargetCostLine } from "@/lib/produksi-finished";
 import {
   Drawer,
   ErrorBox,
+  RupiahInput,
   btnPrimary,
   btnSecondary,
   cardClass,
@@ -132,8 +133,9 @@ export default function PenerimaanDrawer({
     return rows;
   }, [targets, items]);
 
-  const suggestedCosts = useMemo(() => {
+  const suggested = useMemo(() => {
     const grouped = new Map<string, CostState>();
+    const basis = new Map<string, { amount: number; qty: number }>();
     for (const { target, size, item, processed } of processedRows) {
       if (processed <= 0) continue;
       for (const line of target.cost_lines || []) {
@@ -145,15 +147,21 @@ export default function PenerimaanDrawer({
         const existing = grouped.get(groupKey);
         if (existing) existing.amount = String(Number(existing.amount) + amount);
         else grouped.set(groupKey, { name: line.name, group_label: group, amount: String(amount), source: "recipe" });
+        const current = basis.get(groupKey) || { amount: 0, qty: 0 };
+        current.amount += amount;
+        current.qty += processed;
+        basis.set(groupKey, current);
       }
     }
-    return Array.from(grouped.values());
+    return { costs: Array.from(grouped.values()), basis };
   }, [processedRows]);
 
   useEffect(() => {
     if (!open || costsTouched) return;
-    setCosts(suggestedCosts);
-  }, [open, costsTouched, suggestedCosts]);
+    setCosts(suggested.costs);
+  }, [open, costsTouched, suggested]);
+
+  const costBasis = suggested.basis;
 
   const totalProcessed = processedRows.reduce((sum, row) => sum + row.processed, 0);
   const totalLolos = processedRows.reduce(
@@ -384,7 +392,17 @@ export default function PenerimaanDrawer({
             {costs.length === 0 ? (
               <p className="text-xs text-slate-400">Belum ada biaya. Isi hasil QC atau tambah biaya manual.</p>
             ) : (
-              costs.map((cost, index) => (
+              costs.map((cost, index) => {
+                const basis = costBasis.get(`${cost.name}|${cost.group_label}`);
+                const edited = cost.source === "recipe" && (!basis || Math.abs((Number(cost.amount) || 0) - basis.amount) > 0.005);
+                const basisLabel = cost.source !== "recipe"
+                  ? ""
+                  : edited
+                    ? "diubah manual"
+                    : basis && basis.qty > 0
+                      ? `Rp ${formatRupiah(basis.amount / basis.qty)} x ${formatQty(basis.qty)} pcs`
+                      : "";
+                return (
                 <div key={`${cost.name}-${index}`} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_140px_40px] gap-2 items-end">
                   <div>
                     <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Nama biaya</label>
@@ -396,6 +414,11 @@ export default function PenerimaanDrawer({
                         setCosts((current) => current.map((row, i) => (i === index ? { ...row, name: e.target.value } : row)));
                       }}
                     />
+                    {basisLabel ? (
+                      <p className={`mt-1 text-[10px] ${edited ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`}>
+                        {basisLabel}
+                      </p>
+                    ) : null}
                   </div>
                   <div>
                     <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Kelompok</label>
@@ -410,13 +433,12 @@ export default function PenerimaanDrawer({
                   </div>
                   <div>
                     <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Jumlah Rp</label>
-                    <input
+                    <RupiahInput
                       className={`${inputClass} text-right`}
-                      inputMode="decimal"
                       value={cost.amount}
-                      onChange={(e) => {
+                      onValueChange={(value) => {
                         setCostsTouched(true);
-                        setCosts((current) => current.map((row, i) => (i === index ? { ...row, amount: e.target.value } : row)));
+                        setCosts((current) => current.map((row, i) => (i === index ? { ...row, amount: value } : row)));
                       }}
                     />
                   </div>
@@ -432,7 +454,8 @@ export default function PenerimaanDrawer({
                     <Trash2 size={14} />
                   </button>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

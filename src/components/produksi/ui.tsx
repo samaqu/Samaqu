@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type InputHTMLAttributes, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -19,6 +19,86 @@ export const inputClass =
   "w-full px-3 py-2 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 text-sm font-semibold text-slate-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed";
 export const labelClass =
   "text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1";
+
+/** Angka mentah (tanpa titik/Rp) dari teks input rupiah. */
+export function parseRupiahInput(value: string): string {
+  const cleaned = String(value ?? "").replace(/[^\d,]/g, "").replace(",", ".");
+  if (!cleaned) return "";
+  const [intPart, ...rest] = cleaned.split(".");
+  const decPart = rest.join("").slice(0, 4);
+  const int = intPart.replace(/^0+(?=\d)/, "");
+  return `${int}${rest.length ? `.${decPart}` : ""}`;
+}
+
+/** Tampilan input rupiah: "Rp 6.000" / "Rp 6.000,5". */
+export function formatRupiahInput(value: string): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const normalized = raw.replace(",", ".");
+  const [intRaw, ...rest] = normalized.split(".");
+  const int = (intRaw.replace(/\D/g, "") || "0").replace(/^0+(?=\d)/, "");
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const dec = rest.join("").replace(/\D/g, "").slice(0, 4);
+  return `Rp ${grouped}${rest.length ? `,${dec}` : ""}`;
+}
+
+/**
+ * Input nominal rupiah berformat saat mengetik. Nilai yang dikirim ke pemanggil
+ * tetap angka mentah (contoh "6000"), bukan teks berformat.
+ */
+export function RupiahInput({
+  value,
+  onValueChange,
+  className = inputClass,
+  placeholder = "0",
+  ...rest
+}: {
+  value: string;
+  onValueChange: (value: string) => void;
+  className?: string;
+  placeholder?: string;
+} & Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "inputMode">) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const caretRef = useRef<number | null>(null);
+  const display = formatRupiahInput(value);
+
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    const target = caretRef.current;
+    if (!el || target == null) return;
+    caretRef.current = null;
+    const text = el.value;
+    let seen = 0;
+    let pos = text.startsWith("Rp ") ? 3 : 0;
+    if (target > 0) {
+      pos = text.length;
+      for (let i = 0; i < text.length; i += 1) {
+        if (/[\d,]/.test(text[i])) {
+          seen += 1;
+          if (seen === target) { pos = i + 1; break; }
+        }
+      }
+    }
+    el.setSelectionRange(pos, pos);
+  }, [value]);
+
+  return (
+    <input
+      {...rest}
+      ref={inputRef}
+      className={className}
+      inputMode="decimal"
+      value={display}
+      placeholder={placeholder}
+      onChange={(event) => {
+        const el = event.target;
+        const caret = el.selectionStart ?? el.value.length;
+        caretRef.current = (el.value.slice(0, caret).match(/[\d,]/g) || []).length;
+        onValueChange(parseRupiahInput(el.value));
+      }}
+    />
+  );
+}
 export const btnPrimary =
   "inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#1e3a5f] text-white text-sm font-bold shadow-sm hover:bg-[#16304f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap";
 export const btnSecondary =

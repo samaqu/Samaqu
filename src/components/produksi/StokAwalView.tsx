@@ -11,6 +11,7 @@ import {
   EmptyState,
   ErrorBox,
   PageHead,
+  RupiahInput,
   Spinner,
   StatCard,
   btnPrimary,
@@ -189,7 +190,10 @@ export default function StokAwalView() {
                   </div>
                   <div>
                     {index === 0 ? <label className={labelClass}>Harga / {component?.unit_use || "satuan"}</label> : null}
-                    <input className={inputClass} inputMode="decimal" value={row.unit_price} onChange={(e) => setRows((current) => current.map((r, i) => i === index ? { ...r, unit_price: e.target.value } : r))} placeholder="0" />
+                    <RupiahInput
+                      value={row.unit_price}
+                      onValueChange={(value) => setRows((current) => current.map((r, i) => i === index ? { ...r, unit_price: value } : r))}
+                    />
                   </div>
                   <button
                     type="button"
