@@ -20,6 +20,7 @@ import { useSafeLocale } from "@/lib/safe-i18n";
 const AKUN_SEGMENT_LABEL: Record<string, string> = {
   akun: "Dashboard",
   pesanan: "Pesanan Saya",
+  ulasan: "Ulasan Saya",
   wishlist: "Wishlist",
   profil: "Informasi Profil",
   alamat: "Alamat Pengiriman",

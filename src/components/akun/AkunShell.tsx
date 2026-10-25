@@ -21,6 +21,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { href: "/akun", label: "Dashboard", group: null, icon: "M4 11 12 4l8 7M6 10v10h12V10", match: ["/akun"] },
   { href: "/akun/pesanan", label: "Pesanan Saya", group: "Pesanan", icon: "M3 8.5 12 4l9 4.5-9 4.5-9-4.5ZM3 8.5v7L12 20l9-4.5v-7", match: ["/akun/pesanan"] },
+  { href: "/akun/ulasan", label: "Ulasan Saya", group: "Pesanan", icon: "M12 3l2.6 5.4 5.9.9-4.3 4.2 1 5.9-5.2-2.8-5.2 2.8 1-5.9L3.5 9.3l5.9-.9Z", match: ["/akun/ulasan"] },
   { href: "/akun/wishlist", label: "Wishlist", group: "Akses Cepat", icon: "M12 20s-7-4.35-7-9a4 4 0 0 1 7-2.65A4 4 0 0 1 19 11c0 4.65-7 9-7 9Z", match: ["/akun/wishlist"] },
   { href: "/akun/panduan-ukuran", label: "Panduan Ukuran", group: "Akses Cepat", icon: "M3 14 14 3l7 7L10 21zM7.5 12.5 9 14M10.5 9.5 12 11", match: ["/akun/panduan-ukuran"] },
   { href: "/akun/profil", label: "Informasi Profil", group: "Data Saya", icon: "M12 8a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM4.5 20a7.5 7.5 0 0 1 15 0", match: ["/akun/profil"] },

@@ -12,7 +12,7 @@ import {
   type MyReview,
 } from "@/lib/ulasan-client";
 
-type OrderItem = {
+export type OrderItem = {
   id: string;
   product_id?: string | null;
   product_name?: string | null;
@@ -175,7 +175,7 @@ export default function UlasanPesananSection({
       </section>
 
       {activeItem ? (
-        <ReviewModal
+        <ReviewFormModal
           item={activeItem}
           existing={byItem.get(activeItem.id)}
           onClose={() => setActiveItem(null)}
@@ -192,7 +192,7 @@ export default function UlasanPesananSection({
   );
 }
 
-function ReviewModal({
+export function ReviewFormModal({
   item,
   existing,
   onClose,

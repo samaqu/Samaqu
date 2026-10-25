@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getCustomerOrders } from "@/lib/customer-auth";
+import { getMyReviews } from "@/lib/ulasan-client";
 import { useAkunCustomer } from "@/components/akun/AkunContext";
 import { resolveItemPhotos } from "@/lib/order-photo";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
@@ -14,6 +15,7 @@ import { statusInfo, tglID, rupiah } from "@/lib/akun-format";
 import { orderStatusKey } from "@/lib/order-flow";
 
 interface OrderItem {
+  id: string;
   product_id?: string | null;
   product_name: string;
   color: string;
@@ -49,6 +51,7 @@ export default function PesananPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("semua");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [reviewPending, setReviewPending] = useState(0);
   const { customer, ready } = useAkunCustomer();
 
   useEffect(() => {
@@ -62,7 +65,10 @@ export default function PesananPage() {
     async function init() {
       try {
         if (!alive) return;
-        const o = await getCustomerOrders(customerId);
+        const [o, myReviews] = await Promise.all([
+          getCustomerOrders(customerId),
+          getMyReviews(),
+        ]);
         const list = (o as Order[]) || [];
         // Foto item: snapshot di baris pesanan dipakai lebih dulu; query katalog hanya untuk
         // item yang fotonya memang kosong.
@@ -71,6 +77,14 @@ export default function PesananPage() {
         );
         const lookup = missing.length ? await loadOrderPhotoLookup(itemProductIds(missing)) : null;
         if (!alive) return;
+        const reviewed = new Set(
+          (myReviews || []).map((review) => review.order_item_id).filter(Boolean) as string[],
+        );
+        const pendingCount = list
+          .filter((order) => orderStatusKey(order) === "selesai")
+          .flatMap((order) => order.order_items || [])
+          .filter((item) => item.id && !reviewed.has(item.id)).length;
+        setReviewPending(pendingCount);
         setOrders(list.map((order) => ({ ...order, order_items: resolveItemPhotos(order.order_items || [], lookup) })));
       } catch (error) {
         console.error("[akun/pesanan] gagal memuat pesanan:", error);
@@ -92,6 +106,24 @@ export default function PesananPage() {
   return (
     <>
       <AkunHeader title="Pesanan Saya" back="/akun" />
+
+      {reviewPending > 0 ? (
+        <Link
+          href={to("/akun/ulasan")}
+          className="mb-3 flex items-center gap-3 rounded-2xl bg-black px-4 py-3 text-white transition active:scale-[.99]"
+        >
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3l2.6 5.4 5.9.9-4.3 4.2 1 5.9-5.2-2.8-5.2 2.8 1-5.9L3.5 9.3l5.9-.9Z" />
+            </svg>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-extrabold">{reviewPending} item menunggu ulasan</span>
+            <span className="mt-0.5 block text-[11px] text-white/60">Beri nilai pesanan yang sudah Selesai</span>
+          </span>
+          <span className="shrink-0 text-[11px] font-bold text-white/80">Beri Ulasan</span>
+        </Link>
+      ) : null}
 
       {/* Baris tab dibuat wrap (pola sama seperti tab tahap di admin) supaya lima tab tetap
           muat utuh & rapih di layar sempit tanpa scroll samping. */}

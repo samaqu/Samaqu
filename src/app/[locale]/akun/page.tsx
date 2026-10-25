@@ -315,10 +315,11 @@ export default function DashboardAkunPage() {
                 {[
                   { href: "/akun/wishlist", title: "Wishlist", sub: "Koleksi favorit", icon: <path d="M12 20s-7-4.35-7-9a4 4 0 0 1 7-2.65A4 4 0 0 1 19 11c0 4.65-7 9-7 9Z" /> },
                   { href: "/akun/pesanan", title: "Pesanan Saya", sub: "Lacak status", icon: <><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></> },
+                  { href: "/akun/ulasan", title: "Ulasan Saya", sub: "Beri nilai pesanan", full: true, icon: <path d="M12 3l2.6 5.4 5.9.9-4.3 4.2 1 5.9-5.2-2.8-5.2 2.8 1-5.9L3.5 9.3l5.9-.9Z" /> },
                   { href: "/akun/panduan-ukuran", title: "Panduan Ukuran", sub: "Cari size pas", icon: <><path d="M3 14 14 3l7 7L10 21z" /><path d="M7.5 12.5 9 14M10.5 9.5 12 11M13.5 6.5 15 8" /></> },
                   { href: "/akun/bantuan", title: "Hubungi Admin", sub: "Chat tim admin", icon: <><path d="M21 12a8 8 0 1 1-3.2-6.4" /><path d="M8 11h8M8 15h5" /></> },
                 ].map((it) => (
-                  <Link key={it.href} href={to(it.href)} className="akun-card p-3.5 min-h-[112px] flex flex-col gap-3 transition hover:shadow-lg active:scale-[.99]">
+                  <Link key={it.href} href={to(it.href)} className={`akun-card p-3.5 min-h-[112px] flex flex-col gap-3 transition hover:shadow-lg active:scale-[.99] ${"full" in it && it.full ? "col-span-2" : ""}`}>
                     <span className="flex items-center justify-between gap-2">
                       <span className="shrink-0 w-9 h-9 rounded-[12px] grid place-items-center" style={{ background: "#e3ede9" }}>
                         <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="none" stroke="#000000" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{it.icon}</svg>
