@@ -8,6 +8,7 @@ import { useNavigate } from "@/lib/ops-router";
 import { formatWeightExact } from "@/lib/shipping-weight";
 import { resolveColorName } from "@/lib/sku";
 import StockMovementsPanel from "@/components/ops/StockMovementsPanel";
+import StockInDetailDrawer from "@/components/ops/StockInDetailDrawer";
 import {
   Package,
   TrendingUp,
@@ -628,6 +629,7 @@ export default function MasterProduk() {
   const pageUrl = usePageUrl();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('produk');
+  const [stockInDetail, setStockInDetail] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'descending' });
@@ -971,6 +973,7 @@ export default function MasterProduk() {
       setShowDeleteModal(false);
       setProductToDelete(null);
       setDeleteType(null);
+      setStockInDetail(null);
       toast({
         title: "🗑️ Data barang masuk dihapus",
         description: "Data barang masuk telah dihapus dari daftar",
@@ -1965,37 +1968,21 @@ export default function MasterProduk() {
                       <div className="overflow-x-auto">
                         <table className="w-full border-collapse table-fixed">
                           <colgroup>
-                            <col style={{ width: "10%" }} />
-                            <col style={{ width: "14%" }} />
-                            <col style={{ width: "24%" }} />
-                            <col style={{ width: "10%" }} />
-                            <col style={{ width: "7%" }} />
-                            <col style={{ width: "7%" }} />
-                            <col style={{ width: "22%" }} />
-                            <col style={{ width: "6%" }} />
+                            <col style={{ width: "18%" }} />
+                            <col style={{ width: "50%" }} />
+                            <col style={{ width: "12%" }} />
+                            <col style={{ width: "20%" }} />
                           </colgroup>
                           <thead>
                             <tr className="bg-[#f8fafc] dark:bg-slate-800/60 border-b border-[#e2e8f0] dark:border-slate-700">
                               <th className="px-3.5 py-3 text-left font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em] whitespace-nowrap">
                                 Tanggal
                               </th>
-                              <th className="px-3.5 py-3 text-left font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em] whitespace-nowrap">
-                                SKU
-                              </th>
                               <th className="px-3.5 py-3 text-left font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em]">
-                                Nama Produk
-                              </th>
-                              <th className="px-3.5 py-3 text-center font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em]">
-                                Warna
-                              </th>
-                              <th className="px-3.5 py-3 text-center font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em]">
-                                Ukuran
+                                Produk
                               </th>
                               <th className="px-3.5 py-3 text-center font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em]">
                                 Qty
-                              </th>
-                              <th className="px-3.5 py-3 text-left font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em]">
-                                Catatan
                               </th>
                               <th className="px-3.5 py-3 text-center font-inter text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-[.06em]">
                                 Aksi
@@ -2005,62 +1992,65 @@ export default function MasterProduk() {
                           <tbody>
                             {manualStockIns.length === 0 ? (
                               <tr>
-                                <td colSpan={8} className="px-6 py-12 text-center font-inter text-sm text-gray-400 dark:text-slate-500">
+                                <td colSpan={4} className="px-6 py-12 text-center font-inter text-sm text-gray-400 dark:text-slate-500">
                                   Belum ada data barang masuk
                                 </td>
                               </tr>
                             ) : (
                               manualStockIns.map((si) => {
                                 const product = products.find(p => p.id === si.product_id);
+                                const source = si.source || "manual";
+                                const sourceText =
+                                  source === "tukar_size" ? "tukar size" : source === "return" ? "retur" : source === "batal" ? "pembatalan" : "manual";
+                                const sku = displayVariantSku(variants, product, si.product_id, si.variant_color, si.variant_size, si.sku);
+                                const colorLabel = displayVariantColor(si.variant_color, product);
                                 return (
-                                  <tr key={si.id} className="hover:bg-[#eff6ff] dark:hover:bg-slate-800/70 transition-colors border-b border-[#e2e8f0] dark:border-slate-800/60">
+                                  <tr
+                                    key={si.id}
+                                    onClick={() => setStockInDetail({ item: si, product, sku, colorLabel })}
+                                    className="cursor-pointer hover:bg-[#eff6ff] dark:hover:bg-slate-800/70 transition-colors border-b border-[#e2e8f0] dark:border-slate-800/60"
+                                  >
                                     <td className="px-3.5 py-2.5 align-top font-inter text-[13px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap">
-                                      {format(new Date(si.date), 'dd MMM yyyy')}
-                                    </td>
-                                    <td className="px-3.5 py-2.5 align-top font-mono text-[12px] leading-snug font-semibold text-gray-700 dark:text-slate-200 break-words">
-                                      {displayVariantSku(variants, product, si.product_id, si.variant_color, si.variant_size, si.sku)}
+                                      <span className="block">{format(new Date(si.date), 'dd MMM yyyy')}</span>
+                                      <span className="mt-0.5 block text-[11px] font-semibold text-gray-400 dark:text-slate-500">{sourceText}</span>
                                     </td>
                                     <td className="px-3.5 py-2.5 align-top font-inter text-[13px] leading-snug font-semibold text-gray-900 dark:text-white break-words">
                                       <span className="block">{product?.name || si.product_name || '-'}</span>
-                                      {(product?.series || si.series) ? (
-                                        <span className="block text-[11px] font-medium text-gray-500 dark:text-slate-400 mt-0.5">
-                                          {product?.series || si.series}
-                                        </span>
-                                      ) : null}
-                                    </td>
-                                    <td className="px-3.5 py-2.5 text-center align-top font-inter text-[12px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap">
-                                      {displayVariantColor(si.variant_color, product)}
-                                    </td>
-                                    <td className="px-3.5 py-2.5 text-center align-top font-inter text-[12px] font-semibold text-gray-700 dark:text-slate-200 whitespace-nowrap">
-                                      {si.variant_size || '-'}
+                                      <span className="mt-0.5 block text-[11px] font-medium text-gray-500 dark:text-slate-400">
+                                        {[product?.series || si.series, colorLabel, si.variant_size].filter(Boolean).join(" · ")}
+                                      </span>
+                                      <span className="mt-0.5 block font-mono text-[10px] font-semibold text-gray-400 dark:text-slate-500">
+                                        {sku}
+                                      </span>
                                     </td>
                                     <td className="px-3.5 py-2.5 text-center align-top">
                                       <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 text-[12px] font-bold">
                                         +{si.qty}
                                       </span>
                                     </td>
-                                    <td className="px-3.5 py-2.5 align-top font-inter text-[12px] leading-snug text-gray-500 dark:text-slate-400">
-                                      <span className="block max-w-[220px] truncate" title={si.notes || undefined}>
-                                        {si.notes || '-'}
-                                      </span>
-                                    </td>
                                     <td className="px-3.5 py-2.5 text-center align-top">
-                                      {['batal', 'tukar_size', 'return'].includes(si.source) ? (
-                                        <span
-                                          className="text-[11px] font-semibold text-gray-400 dark:text-slate-500"
-                                          title="Baris otomatis dari retur/pembatalan — stok sudah diterapkan, tidak dihapus dari sini"
-                                        >
-                                          {si.source === 'tukar_size' ? 'tukar size' : si.source === 'return' ? 'retur' : 'auto'}
-                                        </span>
-                                      ) : (
-                                        <button
-                                          onClick={() => handleDeleteClick(si, 'stockin')}
-                                          className="w-7 h-7 inline-flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
-                                          title="Hapus"
-                                        >
-                                          <Trash2 size={14} />
-                                        </button>
-                                      )}
+                                      <div className="flex items-center justify-center gap-1">
+                                        {['batal', 'tukar_size', 'return'].includes(si.source) ? (
+                                          <span
+                                            className="text-[11px] font-semibold text-gray-400 dark:text-slate-500"
+                                            title="Baris otomatis dari retur/pembatalan — stok sudah diterapkan, tidak dihapus dari sini"
+                                          >
+                                            {sourceText}
+                                          </span>
+                                        ) : (
+                                          <button
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              handleDeleteClick(si, 'stockin');
+                                            }}
+                                            className="w-7 h-7 inline-flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                                            title="Hapus"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        )}
+                                        <Eye size={14} className="text-slate-400 dark:text-slate-500" />
+                                      </div>
                                     </td>
                                   </tr>
                                 );
@@ -2229,6 +2219,19 @@ export default function MasterProduk() {
         stockIns={stockIns}
         transactions={transactions}
         variants={variants}
+      />
+
+      <StockInDetailDrawer
+        open={!!stockInDetail}
+        item={stockInDetail?.item || null}
+        product={stockInDetail?.product || null}
+        sku={stockInDetail?.sku || ""}
+        colorLabel={stockInDetail?.colorLabel || ""}
+        onClose={() => setStockInDetail(null)}
+        onDelete={(item) => {
+          setStockInDetail(null);
+          handleDeleteClick(item, 'stockin');
+        }}
       />
 
       <ImportProductModal
