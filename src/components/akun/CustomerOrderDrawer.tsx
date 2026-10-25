@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import OrderDetailPanel from "@/components/ops/transaksi/OrderDetailPanel";
+import UlasanPesananSection from "@/components/akun/UlasanPesananSection";
 import { formatTrackingTime, sortHistoryDesc, trackingRow, trackingSummary } from "@/lib/jnt/track-status";
 import { orderSourceLabel } from "@/lib/transaksi";
 
@@ -144,6 +145,12 @@ export default function CustomerOrderDrawer({
             latestTracking={latestTracking}
             trackingState="done"
           />
+
+          {String(order.status || "").toLowerCase() === "selesai" ? (
+            <div className="mt-4">
+              <UlasanPesananSection items={order.order_items || []} compact />
+            </div>
+          ) : null}
 
           {trackOpen ? (
             <section className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">

@@ -51,7 +51,13 @@ function Stars({ value, size = 12 }: { value: number; size?: number }) {
   );
 }
 
-export default function UlasanPesananSection({ items }: { items: OrderItem[] }) {
+export default function UlasanPesananSection({
+  items,
+  compact = false,
+}: {
+  items: OrderItem[];
+  compact?: boolean;
+}) {
   const locale = useSafeLocale();
   const [reviews, setReviews] = useState<MyReview[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,7 +87,7 @@ export default function UlasanPesananSection({ items }: { items: OrderItem[] }) 
 
   return (
     <>
-      <section className="border-t border-slate-200 px-5 py-4">
+      <section className={compact ? "border-t border-slate-200 pt-4" : "border-t border-slate-200 px-5 py-4"}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-sm font-extrabold text-slate-900">Ulasan Produk</h2>
