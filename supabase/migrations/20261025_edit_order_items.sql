@@ -68,8 +68,14 @@ declare
   v_item_ids uuid[] := '{}';
   v_item_id uuid;
   v_idx int;
-  v_old_addon_key text;
-  v_new_addon_key text;
+  v_old_addon_count int;
+  v_new_addon_count int;
+  v_old_addon_qty int;
+  v_new_addon_qty int;
+  v_old_addon_total numeric;
+  v_new_addon_total numeric;
+  v_old_addon_variants text;
+  v_new_addon_variants text;
   v_old_hpp production_order_hpp;
   v_packaging_cost numeric := 0;
   v_packaging_status text := 'belum';
@@ -115,27 +121,34 @@ begin
     raise exception 'Berat item baru melebihi berat pesanan lama. Kurangi qty/berat atau gunakan batal lalu buat order baru.';
   end if;
 
-  -- Baris add-on Open Order tidak boleh berubah (qty, harga, warna, ukuran).
+  -- Baris add-on Open Order tidak boleh berubah (jumlah, qty, total, warna/ukuran).
   if v_group = 'open_order' and coalesce(p_addon_product_id, '') <> '' then
-    select string_agg(
-             coalesce(color, '') || '|' || coalesce(size, '') || '|' ||
-             quantity::text || '|' || price::text,
-             ',' order by coalesce(color, ''), coalesce(size, ''), price, quantity
+    select count(*)::int,
+           coalesce(sum(quantity), 0)::int,
+           coalesce(sum(price * quantity), 0),
+           string_agg(
+             coalesce(color, '') || '|' || coalesce(size, ''),
+             ',' order by coalesce(color, ''), coalesce(size, '')
            )
-      into v_old_addon_key
+      into v_old_addon_count, v_old_addon_qty, v_old_addon_total, v_old_addon_variants
       from order_items
      where order_id = p_order_id and product_id = p_addon_product_id;
 
-    select string_agg(
-             coalesce(x->>'color', '') || '|' || coalesce(x->>'size', '') || '|' ||
-             coalesce(x->>'quantity', '0') || '|' || coalesce(x->>'price', '0'),
-             ',' order by coalesce(x->>'color', ''), coalesce(x->>'size', ''), coalesce(x->>'price', '0'), coalesce(x->>'quantity', '0')
+    select count(*)::int,
+           coalesce(sum((x->>'quantity')::int), 0)::int,
+           coalesce(sum((x->>'quantity')::numeric * (x->>'price')::numeric), 0),
+           string_agg(
+             coalesce(x->>'color', '') || '|' || coalesce(x->>'size', ''),
+             ',' order by coalesce(x->>'color', ''), coalesce(x->>'size', '')
            )
-      into v_new_addon_key
+      into v_new_addon_count, v_new_addon_qty, v_new_addon_total, v_new_addon_variants
       from jsonb_array_elements(p_items) x
      where x->>'product_id' = p_addon_product_id;
 
-    if coalesce(v_old_addon_key, '') <> coalesce(v_new_addon_key, '') then
+    if v_old_addon_count <> v_new_addon_count
+       or v_old_addon_qty <> v_new_addon_qty
+       or round(v_old_addon_total, 2) <> round(v_new_addon_total, 2)
+       or coalesce(v_old_addon_variants, '') <> coalesce(v_new_addon_variants, '') then
       raise exception 'Baris Extra Cover & Hanger tidak boleh diubah.';
     end if;
   end if;
