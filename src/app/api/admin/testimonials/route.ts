@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
   let query = admin
     .from("testimonials")
     .select("id, customer_name, type, category, rating, verified, content, image_url, video_url, caption, product_id, series_name, user_id, order_id, order_item_id, status, source, admin_note, created_at, updated_at")
+    .eq("source", "customer")
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -31,9 +32,9 @@ export async function GET(req: NextRequest) {
 
   const [itemsRes, pendingRes, publishedRes, rejectedRes] = await Promise.all([
     query,
-    admin.from("testimonials").select("id", { count: "exact", head: true }).eq("status", "pending"),
-    admin.from("testimonials").select("id", { count: "exact", head: true }).eq("status", "published"),
-    admin.from("testimonials").select("id", { count: "exact", head: true }).eq("status", "rejected"),
+    admin.from("testimonials").select("id", { count: "exact", head: true }).eq("source", "customer").eq("status", "pending"),
+    admin.from("testimonials").select("id", { count: "exact", head: true }).eq("source", "customer").eq("status", "published"),
+    admin.from("testimonials").select("id", { count: "exact", head: true }).eq("source", "customer").eq("status", "rejected"),
   ]);
 
   if (itemsRes.error) return NextResponse.json({ error: itemsRes.error.message }, { status: 500 });

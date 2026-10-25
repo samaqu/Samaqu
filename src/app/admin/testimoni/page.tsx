@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/AdminToast";
 import ConfirmModal from "@/components/ConfirmModal";
 import AdminShell from "@/components/AdminShell";
+import UlasanModerationPanel from "@/components/admin/UlasanModerationPanel";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 
 const CATEGORIES = ["Thobe", "Kandora", "Koko", "Vest", "Kabak", "Cover & Hanger"] as const;
@@ -119,7 +120,7 @@ export default function AdminTestimoniPage() {
   async function loadData() {
     setLoading(true);
     const [testimonialsRes, productsRes] = await Promise.all([
-      supabase.from("testimonials").select("*").order("created_at", { ascending: false }),
+      supabase.from("testimonials").select("*").eq("source", "admin").order("created_at", { ascending: false }),
       supabase.from("products").select("id, name, category, series, jenis_kain_id").order("name"),
     ]);
     if (testimonialsRes.data) {
@@ -257,12 +258,14 @@ export default function AdminTestimoniPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl italic" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--espresso)" }}>Ulasan Pelanggan</h1>
-            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>{testimonials.length} testimoni</p>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>{testimonials.length} testimoni kurasi</p>
           </div>
           <button onClick={openAdd} className="flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl text-white" style={{ background: "var(--gold)" }}>
             <Plus size={16} strokeWidth={2} /> Tambah
           </button>
         </div>
+
+        <UlasanModerationPanel />
 
         <div className="space-y-3">
           {testimonials.map((t) => (

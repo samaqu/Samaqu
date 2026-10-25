@@ -70,7 +70,11 @@ function TestimonialCard({ t, onImageClick }: { t: Testimoni; onImageClick: (url
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-sm font-semibold truncate" style={{ color: "#000000" }}>{t.name}</p>
-            {t.verified && <CheckCircle size={12} style={{ color: "#000000" }} />}
+            {t.verified && (
+              <span title="Pembelian terverifikasi" aria-label="Pembelian terverifikasi" className="inline-flex">
+                <CheckCircle size={12} style={{ color: "#000000" }} />
+              </span>
+            )}
           </div>
           <div className="flex gap-0.5 mt-0.5">
             {Array.from({ length: 5 }, (_, i) => (

@@ -107,7 +107,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { label: "Beranda", href: "/panel-admin", icon: "home" },
       { label: "Transaksi", href: "/panel-admin/transaksi", icon: "card" },
       { label: "Return", href: "/panel-admin/retur", icon: "return" },
-      { label: "Ulasan Pelanggan", href: "/panel-admin/ulasan", icon: "star", soon: true },
+      { label: "Ulasan Pelanggan", href: "/panel-admin/ulasan", icon: "star" },
     ],
   },
   {
