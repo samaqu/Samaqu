@@ -11,6 +11,7 @@ import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { useSafeLocale } from "@/lib/safe-i18n";
 import { orderSourceLabel } from "@/lib/transaksi";
 import OrderDetailPanel from "@/components/ops/transaksi/OrderDetailPanel";
+import UlasanPesananSection from "@/components/akun/UlasanPesananSection";
 import "@/app/panel-admin/panel-transaksi.css";
 import "@/app/panel-admin/panel-mono.css";
 
@@ -147,6 +148,10 @@ export default function DetailPesananPage() {
               trackingState="done"
             />
           </div>
+
+          {String(order.status || "").toLowerCase() === "selesai" ? (
+            <UlasanPesananSection items={order.order_items || []} />
+          ) : null}
 
           <footer className="flex flex-wrap gap-2 border-t border-slate-200 px-5 py-4">
             <Link

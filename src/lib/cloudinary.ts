@@ -229,16 +229,23 @@ export async function validateMediaFile(file: File): Promise<void> {
  * Env yang dibutuhkan:
  *   NEXT_PUBLIC_CLOUDINARY_CLOUD, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
  */
-export async function uploadToCloudinary(file: File, opts: { scope?: UploadScope } = {}): Promise<string> {
+export async function uploadToCloudinary(
+  file: File,
+  opts: { scope?: UploadScope; token?: string } = {},
+): Promise<string> {
   const scope: UploadScope = opts.scope ?? "product";
   const isVideo = file.type.startsWith("video/");
   const resourceType: "image" | "video" = isVideo ? "video" : "image";
 
   // 1) Minta signature + parameter transformation dari server. `scope` menentukan akun
-  //    Cloudinary: "product" (utama) atau "chat" (akun terpisah bila env CHAT_* diisi).
+  //    Cloudinary: "product" (utama), "chat", atau "review" (akun terpisah bila env diisi).
+  //    Scope review wajib membawa token customer.
   const signRes = await fetch("/api/cloudinary/sign", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}),
+    },
     body: JSON.stringify({ resourceType, scope }),
   });
   if (!signRes.ok) {

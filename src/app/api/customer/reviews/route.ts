@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
     .select("id, status")
     .eq("order_item_id", orderItemId)
     .maybeSingle();
-  if (existing) {
+  if (existing && existing.status !== "rejected") {
     return NextResponse.json(
       { error: "Item ini sudah pernah diulas." },
       { status: 409 },
@@ -134,27 +134,32 @@ export async function POST(req: NextRequest) {
 
   const displayName = maskCustomerName(customer.name || order.customer_name || user.email);
 
-  const { data: review, error } = await admin
-    .from("testimonials")
-    .insert({
-      customer_name: displayName,
-      type: imageUrl ? "image" : "text",
-      category: String(product?.category || ""),
-      rating,
-      verified: true,
-      content,
-      image_url: imageUrl || null,
-      video_url: null,
-      caption: null,
-      product_id: item.product_id || product?.id || null,
-      series_name: item.series || product?.series || null,
-      user_id: user.id,
-      order_id: order.id,
-      order_item_id: item.id,
-      status: "pending",
-      source: "customer",
-      updated_at: new Date().toISOString(),
-    })
+  const payload = {
+    customer_name: displayName,
+    type: imageUrl ? "image" : "text",
+    category: String(product?.category || ""),
+    rating,
+    verified: true,
+    content,
+    image_url: imageUrl || null,
+    video_url: null,
+    caption: null,
+    product_id: item.product_id || product?.id || null,
+    series_name: item.series || product?.series || null,
+    user_id: user.id,
+    order_id: order.id,
+    order_item_id: item.id,
+    status: "pending",
+    source: "customer",
+    admin_note: null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const write = existing
+    ? admin.from("testimonials").update(payload).eq("id", existing.id)
+    : admin.from("testimonials").insert(payload);
+
+  const { data: review, error } = await write
     .select("id, status, created_at")
     .maybeSingle();
 
@@ -165,5 +170,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ review }, { status: 201 });
+  return NextResponse.json({ review }, { status: existing ? 200 : 201 });
 }
