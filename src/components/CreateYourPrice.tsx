@@ -34,7 +34,7 @@ export default function CreateYourPrice() {
       <div
         className="absolute inset-0 opacity-25"
         style={{
-          backgroundImage: "url(/images/c8a0800b-b9bb-4b53-bd5e-00f26a500219.png)",
+          backgroundImage: "url(/images/c8a0800b-b9bb-4b53-bd5e-00f26a500219.webp)",
           backgroundSize: "cover",
           backgroundPosition: "60% 50%",
           filter: "grayscale(1)",

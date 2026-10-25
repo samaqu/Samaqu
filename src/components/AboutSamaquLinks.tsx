@@ -3,13 +3,13 @@ import Image from "next/image";
 import { useSafeTranslations } from "@/lib/safe-i18n";
 
 const LINK_KEYS = [
-  { titleKey: "item1Title", subKey: "item1Sub", href: "/testimoni", shot: "/images/a200b6ee-90f6-46cb-a882-c85bc6cdb479.png",
+  { titleKey: "item1Title", subKey: "item1Sub", href: "/testimoni", shot: "/images/a200b6ee-90f6-46cb-a882-c85bc6cdb479.webp",
     icon: (<svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z" /></svg>) },
-  { titleKey: "item2Title", subKey: "item2Sub", href: "/tentang-kami", shot: "/images/d245df95-d2d3-4ee7-8a3c-630bce4f42ed.png",
+  { titleKey: "item2Title", subKey: "item2Sub", href: "/tentang-kami", shot: "/images/d245df95-d2d3-4ee7-8a3c-630bce4f42ed.webp",
     icon: (<svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0" /><path d="M16 11a3 3 0 1 0-1-5.8" /><path d="M18 20a5 5 0 0 0-3-4.6" /></svg>) },
-  { titleKey: "item3Title", subKey: "item3Sub", href: "/panduan-ukuran", shot: "/images/2fee48f0-e1f1-4e08-aa00-d5d70b78893b.png",
+  { titleKey: "item3Title", subKey: "item3Sub", href: "/panduan-ukuran", shot: "/images/2fee48f0-e1f1-4e08-aa00-d5d70b78893b.webp",
     icon: (<svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>) },
-  { titleKey: "item4Title", subKey: "item4Sub", href: "/faq", shot: "/images/eda1a6ee-5630-4c24-9a57-d17fce8f798d.png",
+  { titleKey: "item4Title", subKey: "item4Sub", href: "/faq", shot: "/images/eda1a6ee-5630-4c24-9a57-d17fce8f798d.webp",
     icon: (<svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3 2.4V14" /><circle cx="12" cy="17" r=".8" fill="currentColor" stroke="none" /></svg>) },
 ];
 
@@ -20,9 +20,10 @@ export default function AboutSamaquLinks() {
     <section className="relative overflow-hidden" style={{ background: "#F3F3F3" }}>
       {/* Fabric backdrop */}
       <Image
-        src="/images/daa1981f-297f-4fa3-aebe-e68d9b0e8ea8.png"
+        src="/images/daa1981f-297f-4fa3-aebe-e68d9b0e8ea8.webp"
         alt=""
         fill
+        sizes="100vw"
         className="object-cover hidden lg:block"
         style={{ objectPosition: "72% 30%" }}
       />
@@ -84,6 +85,7 @@ export default function AboutSamaquLinks() {
                 src={link.shot}
                 alt=""
                 fill
+                sizes="(min-width: 768px) 768px, 100vw"
                 className="shot object-cover object-right-center"
               />
               <span className="veil" />
