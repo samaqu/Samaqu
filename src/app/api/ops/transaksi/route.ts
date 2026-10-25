@@ -425,7 +425,7 @@ export async function GET(req: NextRequest) {
   let query = admin
     .from("orders")
     .select(
-      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel, items_edited_at, items_edited_after_resi",
+      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -441,6 +441,24 @@ export async function GET(req: NextRequest) {
   if (list.length === 0) return NextResponse.json({ items: [] });
 
   const orderIds = list.map((order: any) => String(order.id));
+
+  // Kolom ini baru dibuat oleh migrasi 20261025_edit_order_items.sql. Dibaca terpisah
+  // supaya halaman Transaksi tetap jalan walau migrasi belum dijalankan.
+  const editedAfterResi = new Map<string, boolean>();
+  try {
+    const { data: editFlags, error: editFlagsError } = await admin
+      .from("orders")
+      .select("id, items_edited_after_resi")
+      .in("id", orderIds);
+    if (!editFlagsError) {
+      for (const row of editFlags || []) {
+        editedAfterResi.set(String((row as any).id), Boolean((row as any).items_edited_after_resi));
+      }
+    }
+  } catch {
+    // Migrasi belum dijalankan — fitur edit tetap terkunci sampai migrasi selesai.
+  }
+
   const { data: hppHeaders } = await admin
     .from("production_order_hpp")
     .select("order_id, hpp_goods, packaging_cost, total_hpp, packaging_status, packaging_warning, packaged_at, returned_at")
@@ -595,8 +613,8 @@ export async function GET(req: NextRequest) {
       edit_reason: orderEditGuard(order).reason,
       edit_warning: orderEditGuard(order).warning,
       weight: order.weight == null ? null : Number(order.weight) || 0,
-      items_edited_at: order.items_edited_at || null,
-      items_edited_after_resi: Boolean(order.items_edited_after_resi),
+      items_edited_at: null,
+      items_edited_after_resi: editedAfterResi.get(String(order.id)) || false,
       can_cancel: status === "pending" || status === "diproses",
     };
   });
