@@ -187,6 +187,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
     const stage = orderStage(order);
     const panelWa = waNumber(order.customer_whatsapp || "");
     const canHubungiPanel = /^628[1-9][0-9]{6,10}$/.test(panelWa);
+    const canDeletePanel = Boolean(onDelete) && (!order.awb_no || order.status === "dibatalkan") && order.source !== "website";
     const panelKey =
       { belum_bayar: "bayar", belum_dipacking: "packing", sudah_dipacking: "siap", dikirim: "kirim", selesai: "selesai", dibatalkan: "batal" }[stage] || "batal";
     const banner =
@@ -818,8 +819,17 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
 
             </div>
 
-            {(order.can_edit || order.can_cancel || canHubungiPanel) && (
-              <div className="shrink-0 flex gap-2 px-5 py-3.5 border-t border-slate-200 dark:border-slate-800">
+            {(order.can_edit || order.can_cancel || canHubungiPanel || canDeletePanel) && (
+              <div className="shrink-0 flex flex-wrap gap-2 px-5 py-3.5 border-t border-slate-200 dark:border-slate-800">
+                {canDeletePanel && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(order)}
+                    className="flex-1 min-w-[calc(50%-0.25rem)] flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 font-bold rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                  >
+                    <Trash2 size={16} /> Hapus
+                  </button>
+                )}
                 {order.can_edit && (
                   <button
                     onClick={() => onEdit(order)}
