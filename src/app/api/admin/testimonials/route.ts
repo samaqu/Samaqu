@@ -39,8 +39,19 @@ export async function GET(req: NextRequest) {
 
   if (itemsRes.error) return NextResponse.json({ error: itemsRes.error.message }, { status: 500 });
 
+  const items = itemsRes.data || [];
+  const productIds = Array.from(new Set(items.map((row: any) => String(row.product_id || "")).filter(Boolean)));
+  const productNames = new Map<string, string>();
+  if (productIds.length > 0) {
+    const { data: products } = await admin.from("products").select("id, name").in("id", productIds);
+    for (const product of products || []) productNames.set(String(product.id), String(product.name || ""));
+  }
+
   return NextResponse.json({
-    items: itemsRes.data || [],
+    items: items.map((row: any) => ({
+      ...row,
+      product_name: row.product_id ? productNames.get(String(row.product_id)) || null : null,
+    })),
     counts: {
       pending: pendingRes.count || 0,
       published: publishedRes.count || 0,

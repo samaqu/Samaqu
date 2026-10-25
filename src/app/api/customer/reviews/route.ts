@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
     ? await admin.from("products").select("id, name, category, series").eq("id", item.product_id).maybeSingle()
     : { data: null } as any;
 
-  const displayName = maskCustomerName(customer.name || order.customer_name || user.email);
+  const displayName = maskCustomerName(customer.name || order.customer_name || "");
 
   const payload = {
     customer_name: displayName,

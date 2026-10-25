@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabase";
 type ModerationItem = {
   id: string;
   customer_name: string;
+  product_name: string | null;
   category: string | null;
   series_name: string | null;
   rating: number;
@@ -212,6 +213,11 @@ export default function UlasanModerationPanel() {
                         {item.customer_name}
                       </p>
                       {item.verified ? <CheckCircle size={12} style={{ color: "var(--gold, #b08d57)" }} /> : null}
+                      {item.product_name ? (
+                        <span className="max-w-[220px] truncate rounded-full px-2 py-0.5 text-[10px]" style={{ background: "#f4f4f5", color: "var(--espresso, #1f1b16)" }}>
+                          {item.product_name}
+                        </span>
+                      ) : null}
                       {item.category ? (
                         <span className="rounded-full px-2 py-0.5 text-[10px]" style={{ background: "#f4f4f5", color: "var(--gold, #b08d57)" }}>
                           {item.category}
