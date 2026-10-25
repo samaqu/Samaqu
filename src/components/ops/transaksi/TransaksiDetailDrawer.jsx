@@ -41,6 +41,12 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
     : channelLabel || "-";
 
   const awb = order?.awb_no || "";
+  const totalItemWeight = (order?.items || []).reduce((sum, item) => {
+    const grams = Number(item?.weight?.grams) || 0;
+    if (!grams || item?.weight?.source === "missing") return sum;
+    return sum + grams * (Number(item?.quantity) || 1);
+  }, 0);
+  const totalWeight = Number(order?.weight) > 0 ? Number(order.weight) : totalItemWeight;
   // Akses ke dialog "Cetak Resi" milik TransaksiResiPanel (panel admin: tombolnya di footer).
   const resiPanelRef = useRef(null);
 
@@ -236,6 +242,10 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                     <b>
                       <span className="bd s-siap">{serviceTag}</span>
                     </b>
+                  </div>
+                  <div className="kv">
+                    <span>Berat kirim</span>
+                    <b>{totalWeight > 0 ? formatWeightExact(totalWeight) : "-"}</b>
                   </div>
                   {/* Panel resi (nomor + salin + buat resi) — komponen bersama. Tombol cetak
                       dipindah ke footer drawer lewat ref supaya berdampingan dengan "Ubah". */}
@@ -519,6 +529,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                 <Row label="Nomor HP" value={order.customer_whatsapp || "-"} />
                 <Row label="Waktu dicatat" value={formatTanggalJamID(order.created_at)} />
                 <Row label="No. Order" value={order.order_number} mono />
+                <Row label="Berat kirim" value={totalWeight > 0 ? formatWeightExact(totalWeight) : "-"} />
                 <Row label="Metode pembayaran" value={paymentDetail} />
                 <Row
                   label="Waktu pembayaran"
