@@ -445,6 +445,7 @@ export async function GET(req: NextRequest) {
   // Kolom ini baru dibuat oleh migrasi 20261025_edit_order_items.sql. Dibaca terpisah
   // supaya halaman Transaksi tetap jalan walau migrasi belum dijalankan.
   const editedAfterResi = new Map<string, boolean>();
+  let editReady = true;
   try {
     const { data: editFlags, error: editFlagsError } = await admin
       .from("orders")
@@ -454,9 +455,12 @@ export async function GET(req: NextRequest) {
       for (const row of editFlags || []) {
         editedAfterResi.set(String((row as any).id), Boolean((row as any).items_edited_after_resi));
       }
+    } else {
+      editReady = false;
     }
   } catch {
     // Migrasi belum dijalankan — flag dianggap false, halaman tetap tampil normal.
+    editReady = false;
   }
 
   const { data: hppHeaders } = await admin
@@ -529,6 +533,7 @@ export async function GET(req: NextRequest) {
     const status = String(order.status || "");
     const key = sourceKey(order.source);
     const resolvedKey = orderSourceKey(order);
+    const editGuard = orderEditGuard(order);
     return {
       id: order.id,
       order_number: order.order_number,
@@ -609,9 +614,11 @@ export async function GET(req: NextRequest) {
         : {}),
       // Guard edit item dipakai server & UI. Website/Open Order sekarang boleh diedit
       // selama stoknya tercatat, status belum dikirim, dan pengiriman belum berjalan.
-      can_edit: orderEditGuard(order).canEdit,
-      edit_reason: orderEditGuard(order).reason,
-      edit_warning: orderEditGuard(order).warning,
+      can_edit: editReady && editGuard.canEdit,
+      edit_reason: editReady
+        ? editGuard.reason
+        : "Migrasi edit item belum dijalankan. Jalankan supabase/migrations/20261025_edit_order_items.sql dulu.",
+      edit_warning: editGuard.warning,
       weight: order.weight == null ? null : Number(order.weight) || 0,
       items_edited_at: null,
       items_edited_after_resi: editedAfterResi.get(String(order.id)) || false,
