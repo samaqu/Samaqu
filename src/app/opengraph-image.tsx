@@ -1,11 +1,17 @@
 import { ImageResponse } from "next/og";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 export const alt = "SAMAQU — Busana Muslim Pria Premium";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+export const runtime = "nodejs";
 
-/** Kartu share/OG monokrom (dipakai otomatis oleh semua route). */
-export default function OpengraphImage() {
+/** Kartu share/OG: logo SAMAQU asli, tanpa teks tambahan. */
+export default async function OpengraphImage() {
+  const logo = await readFile(join(process.cwd(), "public", "bio", "samaqu-logo.png"));
+  const logoSrc = `data:image/png;base64,${logo.toString("base64")}`;
+
   return new ImageResponse(
     (
       <div
@@ -13,23 +19,13 @@ export default function OpengraphImage() {
           width: "100%",
           height: "100%",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "#000000",
-          color: "#ffffff",
-          fontFamily: "sans-serif",
+          background: "#ffffff",
         }}
       >
-        <div style={{ fontSize: 28, letterSpacing: 14, textTransform: "uppercase", color: "#a0a1ac" }}>
-          Premium Muslim Menswear
-        </div>
-        <div style={{ fontSize: 160, fontWeight: 700, letterSpacing: 8, marginTop: 10, lineHeight: 1 }}>
-          SAMAQU
-        </div>
-        <div style={{ fontSize: 38, marginTop: 24, color: "#d9d9d9" }}>
-          Thobe · Kandora · Koko · Vest · Kabak
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logoSrc} width={880} height={148} alt="" />
       </div>
     ),
     { ...size },
