@@ -315,7 +315,7 @@ export default function Leads() {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full table-fixed text-sm">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-900 text-left">
@@ -381,6 +381,65 @@ export default function Leads() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile: kartu per lead, bukan tabel sempit. Desktop tetap tabel di atas. */}
+          <div className="space-y-2.5 bg-slate-50/70 p-3 dark:bg-slate-950/20 md:hidden">
+            {visibleLeads.map((lead, idx) => (
+              <motion.div
+                key={lead.id}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(idx * 0.02, 0.3) }}
+                className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-[0_8px_20px_-18px_rgba(15,23,42,0.55)] dark:border-slate-800 dark:bg-[#1a1d28]"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                      {formatDateID(lead.tanggal)} · {lead.jam || "-"}
+                    </p>
+                    <p className="mt-0.5 truncate text-base font-extrabold text-slate-900 dark:text-white">
+                      {lead.kontak}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-bold ${SUMBER_STYLES[lead.sumber] || "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
+                    {lead.sumber}
+                  </span>
+                </div>
+
+                <div className="mt-2.5 flex items-center justify-between gap-2">
+                  {lead.status === "closing" ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-green-100 px-2.5 py-1 text-xs font-bold text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                      <CheckCircle2 size={12} /> Closing
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                      <Clock size={12} /> Belum Closing
+                    </span>
+                  )}
+                  <span className="shrink-0 text-sm font-extrabold text-slate-900 dark:text-white">
+                    {lead.status === "closing" && lead.nominal ? `Rp ${formatRupiah(lead.nominal)}` : "—"}
+                  </span>
+                </div>
+
+                <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => { setEditing(lead); setFormOpen(true); }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    <Pencil size={14} /> Ubah
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(lead)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 px-3 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20"
+                  >
+                    <Trash2 size={14} /> Hapus
+                  </button>
+                </div>
+              </motion.div>
+            ))}
           </div>
         )}
       </div>
