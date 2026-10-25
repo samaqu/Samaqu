@@ -1997,8 +1997,8 @@ export default function MasterProduk() {
                       <div className="overflow-x-auto">
                         <table className="w-full border-collapse table-fixed">
                           <colgroup>
-                            <col style={{ width: "16%" }} />
-                            <col style={{ width: "58%" }} />
+                            <col style={{ width: "18%" }} />
+                            <col style={{ width: "56%" }} />
                             <col style={{ width: "8%" }} />
                             <col style={{ width: "18%" }} />
                           </colgroup>
@@ -2039,12 +2039,12 @@ export default function MasterProduk() {
                                     onClick={() => setStockInDetail({ item: si, product, sku, colorLabel })}
                                     className="cursor-pointer hover:bg-[#eff6ff] dark:hover:bg-slate-800/70 transition-colors border-b border-[#e2e8f0] dark:border-slate-800/60"
                                   >
-                                    <td className="px-3.5 py-2.5 align-middle font-inter text-[13px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap">
+                                    <td className="px-3.5 py-2.5 pr-5 align-middle font-inter text-[13px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap border-r border-slate-100 dark:border-slate-800">
                                       {format(new Date(si.date), 'dd MMM yyyy')}
                                       {formatJamWIB(si.created_at) ? ` · ${formatJamWIB(si.created_at)}` : ""}
                                     </td>
-                                    <td className="px-3.5 py-2.5 align-middle font-inter text-[13px] leading-snug font-semibold text-gray-900 dark:text-white overflow-hidden">
-                                      <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
+                                    <td className="px-3.5 pl-4 py-2.5 align-middle font-inter text-[13px] leading-snug font-semibold text-gray-900 dark:text-white overflow-hidden">
+                                      <div className="flex min-w-0 items-center gap-2.5 whitespace-nowrap">
                                         <span className="truncate">{product?.name || si.product_name || '-'}</span>
                                         <span className="truncate text-[11px] font-medium text-gray-500 dark:text-slate-400">
                                           {[product?.series || si.series, colorLabel, si.variant_size].filter(Boolean).join(" · ")}
@@ -2125,8 +2125,8 @@ export default function MasterProduk() {
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse table-fixed">
                     <colgroup>
-                      <col style={{ width: "14%" }} />
-                      <col style={{ width: "52%" }} />
+                      <col style={{ width: "18%" }} />
+                      <col style={{ width: "48%" }} />
                       <col style={{ width: "8%" }} />
                       <col style={{ width: "16%" }} />
                       <col style={{ width: "10%" }} />
@@ -2158,12 +2158,12 @@ export default function MasterProduk() {
                               onClick={() => setStockOutDetail({ item: t, product, sku, colorLabel })}
                               className="cursor-pointer hover:bg-[#eff6ff] dark:hover:bg-slate-800/70 transition-colors border-b border-[#e2e8f0] dark:border-slate-800/60"
                             >
-                              <td className="px-3.5 py-2.5 align-middle font-inter text-[13px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap">
+                              <td className="px-3.5 py-2.5 pr-5 align-middle font-inter text-[13px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap border-r border-slate-100 dark:border-slate-800">
                                 {format(new Date(t.date), "dd MMM yyyy")}
                                 {formatJamWIB(t.created_date) ? ` · ${formatJamWIB(t.created_date)}` : ""}
                               </td>
-                              <td className="px-3.5 py-2.5 align-middle font-inter text-[13px] leading-snug font-semibold text-gray-900 dark:text-white overflow-hidden">
-                                <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
+                              <td className="px-3.5 pl-4 py-2.5 align-middle font-inter text-[13px] leading-snug font-semibold text-gray-900 dark:text-white overflow-hidden">
+                                <div className="flex min-w-0 items-center gap-2.5 whitespace-nowrap">
                                   <span className="truncate">{product?.name || t.product_name || "-"}</span>
                                   <span className="truncate text-[11px] font-medium text-gray-500 dark:text-slate-400">
                                     {[t.order_id, t.series || product?.series, colorLabel, t.variant_size].filter(Boolean).join(" · ")}
