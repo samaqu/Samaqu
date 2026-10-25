@@ -1968,10 +1968,10 @@ export default function MasterProduk() {
                       <div className="overflow-x-auto">
                         <table className="w-full border-collapse table-fixed">
                           <colgroup>
+                            <col style={{ width: "16%" }} />
+                            <col style={{ width: "58%" }} />
+                            <col style={{ width: "8%" }} />
                             <col style={{ width: "18%" }} />
-                            <col style={{ width: "50%" }} />
-                            <col style={{ width: "12%" }} />
-                            <col style={{ width: "20%" }} />
                           </colgroup>
                           <thead>
                             <tr className="bg-[#f8fafc] dark:bg-slate-800/60 border-b border-[#e2e8f0] dark:border-slate-700">
@@ -2010,25 +2010,23 @@ export default function MasterProduk() {
                                     onClick={() => setStockInDetail({ item: si, product, sku, colorLabel })}
                                     className="cursor-pointer hover:bg-[#eff6ff] dark:hover:bg-slate-800/70 transition-colors border-b border-[#e2e8f0] dark:border-slate-800/60"
                                   >
-                                    <td className="px-3.5 py-2.5 align-top font-inter text-[13px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap">
-                                      <span className="block">{format(new Date(si.date), 'dd MMM yyyy')}</span>
-                                      <span className="mt-0.5 block text-[11px] font-semibold text-gray-400 dark:text-slate-500">{sourceText}</span>
+                                    <td className="px-3.5 py-2.5 align-middle font-inter text-[13px] leading-snug text-gray-600 dark:text-slate-300 whitespace-nowrap">
+                                      {format(new Date(si.date), 'dd MMM yyyy')}
                                     </td>
-                                    <td className="px-3.5 py-2.5 align-top font-inter text-[13px] leading-snug font-semibold text-gray-900 dark:text-white break-words">
-                                      <span className="block">{product?.name || si.product_name || '-'}</span>
-                                      <span className="mt-0.5 block text-[11px] font-medium text-gray-500 dark:text-slate-400">
-                                        {[product?.series || si.series, colorLabel, si.variant_size].filter(Boolean).join(" · ")}
-                                      </span>
-                                      <span className="mt-0.5 block font-mono text-[10px] font-semibold text-gray-400 dark:text-slate-500">
-                                        {sku}
-                                      </span>
+                                    <td className="px-3.5 py-2.5 align-middle font-inter text-[13px] leading-snug font-semibold text-gray-900 dark:text-white overflow-hidden">
+                                      <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
+                                        <span className="truncate">{product?.name || si.product_name || '-'}</span>
+                                        <span className="truncate text-[11px] font-medium text-gray-500 dark:text-slate-400">
+                                          {[product?.series || si.series, colorLabel, si.variant_size].filter(Boolean).join(" · ")}
+                                        </span>
+                                      </div>
                                     </td>
-                                    <td className="px-3.5 py-2.5 text-center align-top">
+                                    <td className="px-3.5 py-2.5 text-center align-middle">
                                       <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 text-[12px] font-bold">
                                         +{si.qty}
                                       </span>
                                     </td>
-                                    <td className="px-3.5 py-2.5 text-center align-top">
+                                    <td className="px-3.5 py-2.5 text-center align-middle">
                                       <div className="flex items-center justify-center gap-1">
                                         {['batal', 'tukar_size', 'return'].includes(si.source) ? (
                                           <span

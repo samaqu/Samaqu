@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Archive, Clock3, Trash2, X } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import { formatRupiah, formatTanggalJamID } from "@/components/ops/transaksi/transaksi-format";
 
 const SOURCE_LABEL = {
@@ -56,6 +58,53 @@ export default function StockInDetailDrawer({
   const source = sourceKey(item?.source);
   const auto = ["batal", "tukar_size", "return"].includes(source);
   const totalValue = (Number(item?.qty) || 0) * (Number(item?.cost_per_unit) || 0);
+  const orderNumber = useMemo(() => {
+    const match = String(item?.notes || "").match(/\b(?:OPS|SMQ|CYO)-[0-9]{8}-[0-9]+\b/i);
+    return match ? match[0].toUpperCase() : "";
+  }, [item?.notes]);
+  const [order, setOrder] = useState(null);
+  const [orderLoading, setOrderLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || !orderNumber) {
+      setOrder(null);
+      setOrderLoading(false);
+      return undefined;
+    }
+    let alive = true;
+    setOrderLoading(true);
+    (async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const res = await fetch(`/api/ops/orders?order_number=${encodeURIComponent(orderNumber)}`, {
+          headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+        });
+        const json = await res.json().catch(() => null);
+        if (alive) setOrder(res.ok ? json?.order || null : null);
+      } catch {
+        if (alive) setOrder(null);
+      } finally {
+        if (alive) setOrderLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [open, orderNumber]);
+
+  const orderAddress = order
+    ? [
+        order.shipping_address,
+        order.shipping_kecamatan,
+        order.shipping_city,
+        order.shipping_province,
+        order.shipping_postal_code,
+      ]
+        .filter(Boolean)
+        .join(", ")
+    : "";
 
   return (
     <AnimatePresence>
@@ -135,6 +184,36 @@ export default function StockInDetailDrawer({
                   <DetailRow label="Total nilai" value={`Rp ${formatRupiah(totalValue)}`} strong />
                 </div>
               </section>
+
+              {orderNumber ? (
+                <section>
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Pesanan terkait</p>
+                  <div className="rounded-2xl border border-slate-200 px-4 dark:border-slate-800">
+                    <DetailRow label="No. Order" value={orderNumber} />
+                    {orderLoading ? (
+                      <p className="py-3 text-xs font-semibold text-slate-500 dark:text-slate-400">Memuat data pesanan…</p>
+                    ) : order ? (
+                      <>
+                        <DetailRow label="Nama customer" value={order.customer_name} />
+                        <DetailRow label="WhatsApp" value={order.customer_whatsapp} />
+                        <DetailRow label="Alamat" value={orderAddress || "-"} />
+                        <DetailRow
+                          label="Status"
+                          value={
+                            order.status === "dibatalkan"
+                              ? `Dibatalkan${order.cancelled_at ? ` · ${formatTanggalJamID(order.cancelled_at)}` : ""}`
+                              : order.status || "-"
+                          }
+                        />
+                      </>
+                    ) : (
+                      <p className="py-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        Data pesanan tidak ditemukan.
+                      </p>
+                    )}
+                  </div>
+                </section>
+              ) : null}
 
               <section>
                 <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Catatan</p>
