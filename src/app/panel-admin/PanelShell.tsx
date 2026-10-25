@@ -45,7 +45,7 @@ const THEME_SWATCH_CLASS: Record<PanelTheme, string> = {
 };
 const themeLabel = (id: PanelTheme) => THEMES.find((option) => option.id === id)?.label ?? "Berry";
 
-type IconName = "home" | "card" | "box" | "users" | "spark" | "return";
+type IconName = "home" | "card" | "box" | "users" | "spark" | "return" | "star";
 
 function NavIcon({ name }: { name: IconName }) {
   switch (name) {
@@ -89,6 +89,12 @@ function NavIcon({ name }: { name: IconName }) {
           <path d="M3 4v5h5" />
         </svg>
       );
+    case "star":
+      return (
+        <svg viewBox="0 0 24 24">
+          <path d="M12 3l2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />
+        </svg>
+      );
   }
 }
 
@@ -101,6 +107,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { label: "Beranda", href: "/panel-admin", icon: "home" },
       { label: "Transaksi", href: "/panel-admin/transaksi", icon: "card" },
       { label: "Return", href: "/panel-admin/retur", icon: "return" },
+      { label: "Ulasan Pelanggan", href: "/panel-admin/ulasan", icon: "star", soon: true },
     ],
   },
   {

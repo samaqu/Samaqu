@@ -256,7 +256,7 @@ export default function AdminTestimoniPage() {
       <div className="max-w-5xl mx-auto px-5 lg:px-8 py-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl italic" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--espresso)" }}>Testimoni Pelanggan</h1>
+            <h1 className="text-2xl italic" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--espresso)" }}>Ulasan Pelanggan</h1>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>{testimonials.length} testimoni</p>
           </div>
           <button onClick={openAdd} className="flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl text-white" style={{ background: "var(--gold)" }}>

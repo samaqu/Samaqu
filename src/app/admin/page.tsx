@@ -119,6 +119,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { label: "Dashboard", icon: LayoutDashboard, panel: "dashboard" },
       { label: "Order Management", icon: ShoppingBag, panel: "orders", badge: true },
       { label: "Open Order", icon: Shirt, href: "/admin/open-order" },
+      { label: "Ulasan Pelanggan", icon: Star, href: "/admin/testimoni" },
       { label: "Produk", icon: Package, panel: "products" },
       { label: "Pelanggan", icon: Users, panel: "customers" },
       { label: "Live Chat", icon: MessageCircle, panel: "chats" },
@@ -131,7 +132,6 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { label: "Biolink", icon: FileText, href: "/admin/biolink" },
       { label: "Foto Carousel", icon: Image, href: "/admin/bio-carousel" },
       { label: "Kelola Foto Instagram", icon: Camera, href: "/admin/instagram" },
-      { label: "Testimoni", icon: Star, href: "/admin/testimoni" },
       { label: "Panduan Ukuran", icon: Ruler, href: "/admin/ukuran-produk" },
       { label: "Halaman Garansi & Retur", icon: FileText, href: "/admin/garansi-retur-page" },
     ],
@@ -462,6 +462,47 @@ function AdminPageInner() {
     fetchDashMonth();
     return () => { mounted = false; };
   }, [user, role, bulanValue]);
+
+  // Status pesanan juga berubah dari cron tracking J&T tanpa interaksi halaman ini.
+  // Polling menjaga daftar Order Management (dan drawer yang terbuka) tetap sinkron.
+  useEffect(() => {
+    if (!user || !hasAdminPanelAccess(role)) return;
+    let alive = true;
+    async function refreshDashOrders() {
+      try {
+        const { startISO, endISO } = monthRangeWIB(bulanValue);
+        const headers = await authHeaders();
+        const res = await fetch(
+          `/api/ops/orders?from=${encodeURIComponent(startISO)}&to=${encodeURIComponent(endISO)}&limit=1000`,
+          { headers },
+        );
+        const json = await res.json().catch(() => ({}));
+        if (alive && Array.isArray(json?.orders)) setDashOrders(json.orders as Order[]);
+      } catch {
+        // Diamkan; polling berikutnya mencoba lagi.
+      }
+    }
+    const timer = setInterval(refreshDashOrders, 60_000);
+    const onFocus = () => {
+      if (document.visibilityState !== "hidden") refreshDashOrders();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [user, role, bulanValue]);
+
+  // Drawer detail yang sedang terbuka ikut memakai objek pesanan terbaru.
+  useEffect(() => {
+    setSelectedOrder((prev) => {
+      if (!prev) return prev;
+      return dashOrders.find((o) => o.id === prev.id) || prev;
+    });
+  }, [dashOrders]);
 
   // Debounce product search (200ms)
   useEffect(() => {
