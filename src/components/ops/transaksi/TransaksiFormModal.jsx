@@ -319,27 +319,49 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
    * `variantSortKey` — sama dengan Daftar Produk & Laporan Stok (varian Thobe menyimpan
    * warna `default`, jadi warnanya diambil dari nama produk).
    */
-  const dataset = useMemo(
-    () =>
-      (variants || []).map((variant) => ({
-        product_id: variant.product_id,
-        product_name: variant.product_name,
-        category: variant.category || "",
-        kain: variant.jenis_kain_name || "",
-        warna: variantSortKey(variant).warna,
-        series: variant.series_name || "",
-        color: String(variant.color || "").trim() || "default",
-        price: Number(variant.price) || 0,
-        // HPP produk — hanya untuk peringatan kalau harga manual di bawah HPP.
-        hpp: Number(variant.hpp) || 0,
-        sizes: variant.stock_efektif || variant.stock || {},
-        // Berat per ukuran + berat produk (gram) — dari API varian yang sama dengan ongkir/resi.
-        weights: variant.weights || {},
-        product_weight: Number(variant.product_weight) || 0,
-        linkedTo: variant.base_series_name || variant.base_product_name || null,
-      })),
-    [variants],
-  );
+  const dataset = useMemo(() => {
+    const rows = (variants || []).map((variant) => ({
+      product_id: variant.product_id,
+      product_name: variant.product_name,
+      category: variant.category || "",
+      kain: variant.jenis_kain_name || "",
+      warna: variantSortKey(variant).warna,
+      series: variant.series_name || "",
+      color: String(variant.color || "").trim() || "default",
+      price: Number(variant.price) || 0,
+      // HPP produk — hanya untuk peringatan kalau harga manual di bawah HPP.
+      hpp: Number(variant.hpp) || 0,
+      sizes: variant.stock_efektif || variant.stock || {},
+      // Berat per ukuran + berat produk (gram) — dari API varian yang sama dengan ongkir/resi.
+      weights: variant.weights || {},
+      product_weight: Number(variant.product_weight) || 0,
+      linkedTo: variant.base_series_name || variant.base_product_name || null,
+    }));
+
+    // Add-on Open Order bukan baris `products` biasa. Saat mengedit pesanan yang
+    // memuatnya, tambahkan entri sintetis supaya baris lama tidak kosong lalu ikut
+    // terhapus (selisih Rp 35.000). Baris ini tetap tidak boleh diubah.
+    const hasAddon = (initialData?.items || []).some((item) => item?.product_id === OPEN_ORDER_ADDON.id);
+    if (!isEdit || !hasAddon) return rows;
+    return [
+      ...rows,
+      {
+        product_id: OPEN_ORDER_ADDON.id,
+        product_name: OPEN_ORDER_ADDON.name,
+        category: "Cover & Hanger",
+        kain: "",
+        warna: OPEN_ORDER_ADDON.name,
+        series: "",
+        color: OPEN_ORDER_ADDON.name,
+        price: OPEN_ORDER_ADDON.price,
+        hpp: 0,
+        sizes: { "ALL SIZE": 1 },
+        weights: {},
+        product_weight: 0,
+        linkedTo: null,
+      },
+    ];
+  }, [variants, isEdit, initialData]);
 
   /* ── Nilai awal: transaksi baru (waktu sekarang) atau yang sedang diubah ── */
   useEffect(() => {
@@ -490,6 +512,26 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     if (!initialData) return;
 
     const rows = (initialData.items || []).map((item) => {
+      // Add-on Open Order: jangan cari lewat katalog biasa — entri sintetisnya ada di
+      // `dataset`, dan ukurannya penanda "ALL SIZE", bukan ukuran produk.
+      if (item.product_id === OPEN_ORDER_ADDON.id) {
+        const addon = dataset.find((entry) => entry.product_id === OPEN_ORDER_ADDON.id);
+        return {
+          ...emptyRow(),
+          product: OPEN_ORDER_ADDON.name,
+          category: addon?.category || "Cover & Hanger",
+          kain: "",
+          warna: addon?.warna || OPEN_ORDER_ADDON.name,
+          series: "",
+          variant: `${addon?.color || OPEN_ORDER_ADDON.name}||${paketSize(addon)}`,
+          price: String(Number(item.price) || OPEN_ORDER_ADDON.price),
+          priceManual: false,
+          quantity: Number(item.quantity) || 1,
+          editing: false,
+          source_item_id: item.id || "",
+        };
+      }
+
       const groups = dataset.filter((entry) => entry.product_id === item.product_id);
       const group = groups.find((entry) => entry.color === (item.color || "default")) || groups[0];
       if (!group) {
@@ -746,6 +788,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     return {
       product,
       paket,
+      isAddon: product?.product_id === OPEN_ORDER_ADDON.id,
       options,
       chosen,
       quantity,
@@ -2279,44 +2322,58 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                 Rp {formatRupiah(info.subtotal)}
                                 {row.priceManual ? ` · harga manual Rp ${formatRupiah(info.unitPrice)}/pcs` : ""}
-                                {` · stok ${info.chosen.stock}`}
-                                {info.chosen.linkedTo ? ` · stok mengikuti ${info.chosen.linkedTo}` : ""}
-                                {" · "}
-                                {/* Berat per produk — ditampilkan di list supaya admin tahu tanpa buka detail. */}
-                                <span
-                                  className={
-                                    weightMissing || info.unitWeight.source === "product"
-                                      ? "font-bold text-amber-600 dark:text-amber-400"
-                                      : "font-semibold text-slate-600 dark:text-slate-300"
-                                  }
-                                >
-                                  Berat {weightMissing ? "belum diisi" : formatWeightExact(info.unitWeight.grams)}
-                                  {info.unitWeight.source === "product" ? " (fallback)" : ""}
-                                </span>
+                                {!info.isAddon ? (
+                                  <>
+                                    {` · stok ${info.chosen.stock}`}
+                                    {info.chosen.linkedTo ? ` · stok mengikuti ${info.chosen.linkedTo}` : ""}
+                                    {" · "}
+                                    {/* Berat per produk — ditampilkan di list supaya admin tahu tanpa buka detail. */}
+                                    <span
+                                      className={
+                                        weightMissing || info.unitWeight.source === "product"
+                                          ? "font-bold text-amber-600 dark:text-amber-400"
+                                          : "font-semibold text-slate-600 dark:text-slate-300"
+                                      }
+                                    >
+                                      Berat {weightMissing ? "belum diisi" : formatWeightExact(info.unitWeight.grams)}
+                                      {info.unitWeight.source === "product" ? " (fallback)" : ""}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="font-bold text-slate-500 dark:text-slate-400"> · add-on tetap</span>
+                                )}
                               </p>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => openRow(index)}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
-                              >
-                                <Pencil size={13} /> Ubah
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => removeRow(index)}
-                                className="p-2 rounded-lg text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 transition-colors"
-                                aria-label="Hapus produk"
-                              >
-                                <Trash2 size={15} />
-                              </button>
+                              {info.isAddon ? (
+                                <span className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                                  Add-on terkunci
+                                </span>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => openRow(index)}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+                                  >
+                                    <Pencil size={13} /> Ubah
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeRow(index)}
+                                    className="p-2 rounded-lg text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 transition-colors"
+                                    aria-label="Hapus produk"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
 
                           {/* Mode Ubah: qty, ukuran, dan harga bisa langsung diubah dari daftar
                               tanpa membuka ulang pemilih produk. "Ubah" tetap untuk ganti produk. */}
-                          {isEdit && (
+                          {isEdit && !info.isAddon && (
                             <div className="flex flex-wrap items-end gap-x-3 gap-y-2 border-t border-slate-100 dark:border-slate-800 pt-2">
                               <div>
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Ukuran</span>
