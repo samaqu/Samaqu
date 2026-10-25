@@ -315,6 +315,7 @@ export default function Leads() {
             )}
           </div>
         ) : (
+          <>
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full table-fixed text-sm">
               <thead>
@@ -441,6 +442,7 @@ export default function Leads() {
               </motion.div>
             ))}
           </div>
+          </>
         )}
       </div>
 
