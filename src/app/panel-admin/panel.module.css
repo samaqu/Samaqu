@@ -1634,3 +1634,11 @@ svg.heart { width: 14px; height: 14px; fill: #e46a92; stroke: none; color: #e46a
   .navItem > span,
   .footText { transition: none !important; }
 }
+
+/* Override terakhir: aturan dasar di atas ditulis setelah media query, jadi dua
+   properti ini harus ditegaskan lagi supaya tombol menu & scrim benar-benar muncul
+   di mobile. Desktop tetap menyembunyikannya. */
+@media (max-width: 900px) {
+  .mobileMenuBtn { display: grid; }
+  .navScrim { display: block; }
+}

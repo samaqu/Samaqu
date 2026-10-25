@@ -538,22 +538,22 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
             role="dialog"
             aria-label="Detail transaksi"
           >
-            <div className="flex items-start justify-between gap-3 px-5 py-3.5 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center">
+            <div className="flex shrink-0 items-start justify-between gap-3 px-5 py-3.5 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="w-10 h-10 shrink-0 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center">
                   <Receipt size={19} className="text-slate-700 dark:text-slate-200" />
                 </div>
-                <div>
-                  <h3 className="font-heading font-bold text-slate-900 dark:text-white">Detail Transaksi</h3>
-                  <p className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400">
-                    {order.order_number}
+                <div className="min-w-0">
+                  <h3 className="font-heading font-bold text-slate-900 dark:text-white truncate">Detail Transaksi</h3>
+                  <p className="inline-flex min-w-0 items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400">
+                    <span className="truncate">{order.order_number}</span>
                     <CopyButton value={order.order_number} label="nomor pesanan" />
                   </p>
                 </div>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="shrink-0 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
                 aria-label="Tutup"
               >
                 <X size={18} className="text-slate-500 dark:text-slate-400" />
