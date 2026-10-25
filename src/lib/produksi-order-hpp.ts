@@ -30,34 +30,7 @@ export type PackagingLine = {
   kind: "packaging" | "cover_hanger";
 };
 
-/**
- * Snapshot HPP barang jadi per baris order. Dipanggil sekali saat order dibuat.
- * Sumber: production_finished_hpp (aktual) → fallback HPP standar resep → none.
- */
-export async function snapshotOrderHpp(admin: SupabaseClient, orderId: string): Promise<void> {
-  const { data: existing } = await admin
-    .from("production_order_hpp")
-    .select("order_id")
-    .eq("order_id", orderId)
-    .maybeSingle();
-  if (existing) return;
-
-  const { data: itemRows } = await admin
-    .from("order_items")
-    .select("id, product_id, product_name, color, size, quantity")
-    .eq("order_id", orderId);
-  const items: OrderItemRow[] = (itemRows || [])
-    .map((row: any) => ({
-      id: String(row.id),
-      product_id: String(row.product_id || ""),
-      product_name: String(row.product_name || ""),
-      color: String(row.color || "default"),
-      size: String(row.size || "").toUpperCase(),
-      quantity: Number(row.quantity) || 0,
-    }))
-    .filter((row) => row.product_id && row.size && row.quantity > 0);
-  if (items.length === 0) return;
-
+async function computeHppRows(admin: SupabaseClient, items: OrderItemRow[]) {
   const productIds = Array.from(new Set(items.map((item) => item.product_id)));
   const { data: products } = await admin
     .from("products")
@@ -89,12 +62,10 @@ export async function snapshotOrderHpp(admin: SupabaseClient, orderId: string): 
   ]);
 
   let hppGoods = 0;
-  const snapshotItems = items.map((item) => {
+  const rows = items.map((item) => {
     const product = productById.get(item.product_id);
     const category = String(product?.category || "");
-    const actual = finishedByKey.get(
-      `${item.product_id}|${norm(item.color)}|${norm(item.size)}`,
-    );
+    const actual = finishedByKey.get(`${item.product_id}|${norm(item.color)}|${norm(item.size)}`);
     let hppUnit: number | null = actual != null ? round2(actual) : null;
     let source: "aktual" | "standar" | "none" = actual != null ? "aktual" : "none";
     let hppWarning: string | null = null;
@@ -127,7 +98,6 @@ export async function snapshotOrderHpp(admin: SupabaseClient, orderId: string): 
     const hppTotal = hppUnit != null ? round2(hppUnit * item.quantity) : null;
     if (hppTotal != null) hppGoods += hppTotal;
     return {
-      order_id: orderId,
       order_item_id: item.id,
       product_id: item.product_id,
       product_name: item.product_name,
@@ -141,20 +111,94 @@ export async function snapshotOrderHpp(admin: SupabaseClient, orderId: string): 
     };
   });
 
+  return { hppGoods: round2(hppGoods), rows };
+}
+
+function orderItemRows(rows: any[]): OrderItemRow[] {
+  return (rows || [])
+    .map((row: any) => ({
+      id: String(row.id),
+      product_id: String(row.product_id || ""),
+      product_name: String(row.product_name || ""),
+      color: String(row.color || "default"),
+      size: String(row.size || "").toUpperCase(),
+      quantity: Number(row.quantity) || 0,
+    }))
+    .filter((row) => row.product_id && row.size && row.quantity > 0);
+}
+
+/**
+ * Snapshot HPP barang jadi per baris order. Dipanggil sekali saat order dibuat.
+ * Sumber: production_finished_hpp (aktual) → fallback HPP standar resep → none.
+ */
+export async function snapshotOrderHpp(admin: SupabaseClient, orderId: string): Promise<void> {
+  const { data: existing } = await admin
+    .from("production_order_hpp")
+    .select("order_id")
+    .eq("order_id", orderId)
+    .maybeSingle();
+  if (existing) return;
+
+  const { data: itemRows } = await admin
+    .from("order_items")
+    .select("id, product_id, product_name, color, size, quantity")
+    .eq("order_id", orderId);
+  const items = orderItemRows(itemRows || []);
+  if (items.length === 0) return;
+
+  const { hppGoods, rows } = await computeHppRows(admin, items);
+  const snapshotItems = rows.map((row) => ({ order_id: orderId, ...row }));
+
   const { error: itemError } = await admin.from("production_order_hpp_items").insert(snapshotItems);
   if (itemError) throw new Error(itemError.message);
 
   const { error: headerError } = await admin.from("production_order_hpp").insert({
     order_id: orderId,
-    hpp_goods: round2(hppGoods),
+    hpp_goods: hppGoods,
     packaging_cost: 0,
-    total_hpp: round2(hppGoods),
+    total_hpp: hppGoods,
     packaging_status: "belum",
   });
   if (headerError) {
     await admin.from("production_order_hpp_items").delete().eq("order_id", orderId);
     throw new Error(headerError.message);
   }
+}
+
+/**
+ * Hitung snapshot HPP untuk daftar item BARU (belum punya id `order_items`).
+ * Dipakai fitur edit item: hasilnya dikirim ke RPC bersama item baru, supaya
+ * order_items + snapshot HPP ditulis dalam satu transaksi database.
+ *
+ * `line_index` adalah posisi item di payload RPC (0-based) — RPC memakai ini untuk
+ * memasangkan snapshot dengan `order_items.id` yang baru dibuat.
+ */
+export async function computeOrderHppForItems(
+  admin: SupabaseClient,
+  items: { line_index: number; product_id: string; product_name: string; color: string | null; size: string | null; quantity: number }[],
+): Promise<{ hpp_goods: number; items: any[] }> {
+  const source = items
+    .map((item) => ({
+      id: String(item.line_index),
+      product_id: String(item.product_id || ""),
+      product_name: String(item.product_name || ""),
+      color: String(item.color || "default"),
+      size: String(item.size || "").toUpperCase(),
+      quantity: Number(item.quantity) || 0,
+    }))
+    .filter((row) => row.product_id && row.size && row.quantity > 0);
+
+  if (source.length === 0) return { hpp_goods: 0, items: [] };
+
+  const { hppGoods, rows } = await computeHppRows(admin, source);
+  return {
+    hpp_goods: hppGoods,
+    items: rows.map((row) => ({
+      ...row,
+      line_index: Number(row.order_item_id),
+      order_item_id: undefined,
+    })),
+  };
 }
 
 /** Hitung paket kemasan default dari resep aktif untuk satu order. */

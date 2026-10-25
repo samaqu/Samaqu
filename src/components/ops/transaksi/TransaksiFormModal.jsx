@@ -470,7 +470,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       const groups = dataset.filter((entry) => entry.product_id === item.product_id);
       const group = groups.find((entry) => entry.color === (item.color || "default")) || groups[0];
       if (!group) {
-        return { ...emptyRow(), variant: `${item.color || "default"}||${String(item.size).toUpperCase()}`, quantity: item.quantity };
+        return { ...emptyRow(), variant: `${item.color || "default"}||${String(item.size).toUpperCase()}`, quantity: item.quantity, source_item_id: item.id || "" };
       }
       const manual = recordedManualPrice(item.price, group.price);
       return {
@@ -486,6 +486,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         priceManual: manual !== null,
         quantity: item.quantity,
         editing: false,
+        // Baris lama yang diganti: server menyalin harga/CYP dari id ini.
+        source_item_id: item.id || "",
       };
     });
     setItems(rows.length > 0 ? rows : [emptyRow()]);
@@ -767,6 +769,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       color: paket ? product.color : variantColor || "default",
       size: paket ? paketSize(product) : variantSize,
       quantity: Number(row.quantity) || 0,
+      source_item_id: row.source_item_id || "",
     };
   };
 
@@ -788,6 +791,18 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     changeParts.push(`Total Rp ${formatRupiah(originalTotal)} jadi Rp ${formatRupiah(total)}`);
   }
   const changeSummary = isEdit ? changeParts.join(" · ") : "";
+
+  // Website & Open Order: sumber tidak boleh diubah dari form ini; total wajib sama.
+  const managedSource = isEdit && (initialData?.source_key === "website" || initialData?.source_key === "open_order");
+  const lockedSourceLabel = managedSource ? initialData?.source_label || "Website" : "";
+  const oldWeight = Number(initialData?.weight) || 0;
+  const totalChanged = managedSource && Math.round(total) !== Math.round(originalTotal);
+  const weightOver = oldWeight > 0 && weightSummary.grams > oldWeight;
+  const editBlockedReason = totalChanged
+    ? `Total berubah (Rp ${formatRupiah(originalTotal)} → Rp ${formatRupiah(total)}). Untuk website/Open Order, gunakan batal lalu buat order baru.`
+    : weightOver
+      ? `Berat item baru ${formatWeightExact(weightSummary.grams)} melebihi berat lama ${formatWeightExact(oldWeight)}. Kurangi qty/berat.`
+      : "";
 
   /** Penanda "Ongkir mungkin berubah, cek ulang" — nilai ongkir yang sudah diisi tidak diubah. */
   const ongkirStale =
@@ -1343,7 +1358,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       queryClient.invalidateQueries({ queryKey: ["transaksi"] });
       toast({
         title: isEdit ? "✅ Transaksi diperbarui" : "✅ Transaksi tercatat",
-        description: `No. Order ${result?.order_number ?? ""}`,
+        description: [result?.order_number ? `No. Order ${result.order_number}` : "", result?.warning || ""]
+          .filter(Boolean)
+          .join(" · "),
         variant: "success",
       });
       onSaved?.();
@@ -1368,6 +1385,10 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     if (!form) return;
     setSaveAttempted(true);
     setSaveError("");
+    if (editBlockedReason) {
+      setSaveError(editBlockedReason);
+      return;
+    }
     if (incomplete) {
       if (isEdit) setStep(1);
       setSaveError("Lengkapi dulu produknya (dan periksa baris yang stoknya tidak cukup).");
@@ -2129,12 +2150,16 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                     <label className={labelClass}>
                       Sumber <span className="text-red-500">*</span>
                     </label>
-                    <select value={form.source} onChange={(event) => updateForm({ source: event.target.value })} className={inputClass}>
-                      {MANUAL_SOURCE_KEYS.map((key) => (
-                        <option key={key} value={key}>
-                          {SOURCE_LABEL[key]}
-                        </option>
-                      ))}
+                    <select value={form.source} onChange={(event) => updateForm({ source: event.target.value })} disabled={managedSource} className={inputClass}>
+                      {managedSource ? (
+                        <option value={form.source}>{lockedSourceLabel}</option>
+                      ) : (
+                        MANUAL_SOURCE_KEYS.map((key) => (
+                          <option key={key} value={key}>
+                            {SOURCE_LABEL[key]}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
                   <div>
@@ -3106,7 +3131,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                     <p className="text-xs text-slate-500 dark:text-slate-400">{form.customer_whatsapp || "nomor belum ada"}</p>
                   </div>
                   <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                    {SOURCE_LABEL[form.source]}
+                    {managedSource ? lockedSourceLabel : SOURCE_LABEL[form.source]}
                   </span>
                 </div>
 
@@ -3186,6 +3211,20 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                       </span>
                     </div>
                   ) : null}
+                  {managedSource ? (
+                    <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-[11px] font-semibold text-amber-800 dark:text-amber-300 space-y-0.5">
+                      <p>
+                        Total lama <b>Rp {formatRupiah(originalTotal)}</b> · total baru <b>Rp {formatRupiah(total)}</b>
+                      </p>
+                      <p>
+                        Berat lama <b>{oldWeight > 0 ? formatWeightExact(oldWeight) : "-"}</b> · berat baru{" "}
+                        <b>{weightSummary.grams > 0 ? formatWeightExact(weightSummary.grams) : "-"}</b>
+                      </p>
+                      <p className="font-normal">
+                        Total wajib sama. Berat tidak boleh melebihi berat lama. Perubahan item tidak menyentuh invoice Mayar atau resi J&amp;T.
+                      </p>
+                    </div>
+                  ) : null}
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500 dark:text-slate-400">Subtotal</span>
                     <span className="font-semibold text-slate-900 dark:text-white">Rp {formatRupiah(subtotal)}</span>
@@ -3232,6 +3271,17 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
               ) : null}
 
               {/* Mode Ubah: ringkasan perubahan singkat sebelum menyimpan (hanya tampilan). */}
+              {editBlockedReason ? (
+                <p className="flex items-start gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400 mb-2" role="alert">
+                  <AlertCircle size={13} className="mt-px shrink-0" />
+                  <span>{editBlockedReason}</span>
+                </p>
+              ) : null}
+              {isEdit && initialData?.edit_warning ? (
+                <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 mb-2">
+                  {initialData.edit_warning}
+                </p>
+              ) : null}
               {!savedOrder && changeSummary ? (
                 <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-2">
                   {changeSummary}
@@ -3291,7 +3341,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                     <button
                       type="button"
                       onClick={save}
-                      disabled={mutation.isPending}
+                      disabled={mutation.isPending || Boolean(editBlockedReason)}
                       className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-all"
                     >
                       <Save size={16} />
@@ -3312,7 +3362,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                     <button
                       type="button"
                       onClick={save}
-                      disabled={mutation.isPending}
+                      disabled={mutation.isPending || Boolean(editBlockedReason)}
                       className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 transition-all"
                     >
                       <Save size={16} />

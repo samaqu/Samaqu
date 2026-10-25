@@ -97,6 +97,8 @@ export interface AdminDetailOrder {
   shipping_postal_code?: string | null;
   shipping_notes?: string | null;
   order_items?: AdminDetailItem[];
+  /** Item pernah diubah setelah resi terbit → label internal harus dicetak ulang. */
+  items_edited_after_resi?: boolean | null;
 }
 
 const OD_CSS = `
@@ -632,6 +634,25 @@ export default function OrderDetailContent({
 
       {/* Kontrol admin — bagian yang tidak ada di halaman customer. */}
       <div className="rp-act">
+              {order.items_edited_after_resi && resi ? (
+                <div
+                  role="status"
+                  style={{
+                    marginBottom: 12,
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid #f0c36d",
+                    background: "#fff8e6",
+                    color: "#7a5200",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Item diubah setelah resi terbit. Cetak ulang label dan beri tahu tim packing. Label lama jangan dipakai.
+                  Nomor resi tetap <b>{resi}</b>.
+                </div>
+              ) : null}
               {/* Pesanan yang paketnya sudah dikirim ("Dikirim") tidak lagi menampilkan kontrol
                   ubah status manual: pada tahap itu status pesanan dikabarkan otomatis oleh
                   sinkronisasi tracking J&T, jadi chip manual bisa bertentangan dengannya. */}

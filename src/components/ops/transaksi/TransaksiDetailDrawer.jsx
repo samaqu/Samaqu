@@ -349,6 +349,31 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                 </div>
               </div>
 
+              {order.items_edited_after_resi && awb ? (
+                <div
+                  role="status"
+                  style={{
+                    margin: "0 0 10px",
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid #f0c36d",
+                    background: "#fff8e6",
+                    color: "#7a5200",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Item diubah setelah resi terbit. Cetak ulang label dan beri tahu tim packing. Label lama jangan dipakai.
+                  Nomor resi tetap <b>{awb}</b>.
+                </div>
+              ) : null}
+              {!order.can_edit && order.edit_reason ? (
+                <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 600, color: "#8a7d83", lineHeight: 1.45 }}>
+                  {order.edit_reason}
+                </p>
+              ) : null}
+
               {order.can_edit || order.can_cancel || canDelete || canPrint || isSelesai ? (
                 <div className="df">
                   {canDelete ? (

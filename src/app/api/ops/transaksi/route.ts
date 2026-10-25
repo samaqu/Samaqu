@@ -11,11 +11,14 @@ import { resolveItemPhotos } from "@/lib/order-photo";
 import {
   productWeightMapFromRows,
   resolveLineWeight,
+  sumWeightGramsBySize,
   variantWeightMapFromRows,
   type VariantWeightMap,
   type WeightMap,
 } from "@/lib/shipping-weight";
-import { snapshotOrderHpp } from "@/lib/produksi-order-hpp";
+import { computeOrderHppForItems, snapshotOrderHpp } from "@/lib/produksi-order-hpp";
+import { orderEditGuard, weightEditError } from "@/lib/order-edit";
+import { OPEN_ORDER_ADDON, resolveAddonWeight } from "@/lib/open-order-config";
 
 /**
  * Menu "Transaksi" dashboard internal.
@@ -64,7 +67,15 @@ function newOrderNumber(createdAt: Date) {
   return `OPS-${createdAt.toISOString().slice(0, 10).replace(/-/g, "")}-${String(Math.floor(Math.random() * 900) + 100)}`;
 }
 
-type ItemInput = { product_id?: unknown; color?: unknown; size?: unknown; quantity?: unknown; price?: unknown };
+type ItemInput = {
+  product_id?: unknown;
+  color?: unknown;
+  size?: unknown;
+  quantity?: unknown;
+  price?: unknown;
+  /** id baris lama saat mode Ubah — dipakai menyalin harga/CYP dari baris yang diganti. */
+  source_item_id?: unknown;
+};
 
 type Shipping = {
   address: string;
@@ -135,12 +146,15 @@ type Snapshot = {
   product_name: string;
   series: string | null;
   kain: string | null;
-  color: string;
-  size: string;
+  color: string | null;
+  size: string | null;
   quantity: number;
   price: number;
   /** true = harga baris ini diketik admin (bukan harga katalog). */
   manual_price: boolean;
+  customer_price?: number | null;
+  minimum_price?: number | null;
+  product_image?: string | null;
 };
 
 type Admin = ReturnType<typeof getSupabaseAdmin>;
@@ -222,7 +236,147 @@ async function buildSnapshot(admin: Admin, input: ItemInput[]): Promise<{ items?
   return { items };
 }
 
-/** Potong stok satu per satu (atomik per baris); kembalikan baris yang sudah terpotong untuk rollback. */
+type OldItem = {
+  id: string;
+  product_id: string;
+  product_name: string;
+  series: string | null;
+  kain: string | null;
+  color: string | null;
+  size: string | null;
+  quantity: number;
+  price: number;
+  customer_price: number | null;
+  minimum_price: number | null;
+  product_image: string | null;
+};
+
+/**
+ * Snapshot untuk EDIT item. Beda dengan create:
+ *  - harga default ikut baris LAMA yang diganti (bukan harga katalog sekarang);
+ *  - `customer_price`/`minimum_price` disalin dari baris lama;
+ *  - baris add-on Open Order dinormalisasi ke nilai aslinya (tidak boleh berubah).
+ */
+async function buildEditSnapshot(
+  admin: Admin,
+  input: ItemInput[],
+  oldItems: OldItem[],
+  group: "manual" | "website" | "open_order" | "unknown",
+): Promise<{ items?: Snapshot[]; error?: string }> {
+  const cleaned = input
+    .map((row) => ({
+      product_id: String(row?.product_id || "").trim(),
+      color: String(row?.color || "default").trim() || "default",
+      size: String(row?.size || "").trim().toUpperCase(),
+      quantity: Math.round(Number(row?.quantity) || 0),
+      price: row?.price,
+      source_item_id: String(row?.source_item_id || "").trim(),
+    }))
+    .filter((row) => row.product_id);
+
+  if (cleaned.length === 0) return { error: "Minimal satu produk harus diisi" };
+  for (const row of cleaned) {
+    const openOrderAddon = group === "open_order" && row.product_id === OPEN_ORDER_ADDON.id;
+    if (!openOrderAddon && !row.size) return { error: "Ukuran produk harus dipilih" };
+    if (row.quantity < 1 || row.quantity > 99) return { error: "Jumlah produk harus antara 1 dan 99" };
+  }
+
+  const productIds = [
+    ...new Set(
+      cleaned
+        .map((row) => row.product_id)
+        .filter((id) => !(group === "open_order" && id === OPEN_ORDER_ADDON.id)),
+    ),
+  ];
+  let products: any[] = [];
+  let variants: any[] = [];
+  if (productIds.length > 0) {
+    const [productResult, variantResult] = await Promise.all([
+      admin.from("products").select("id, name, series, price, jenis_kain(name)").in("id", productIds),
+      admin.from("product_variants").select("product_id, color, size").in("product_id", productIds),
+    ]);
+    products = productResult.data || [];
+    variants = variantResult.data || [];
+  }
+
+  const productById = new Map<string, any>((products || []).map((p: any) => [String(p.id), p]));
+  const variantSet = new Set((variants || []).map((v: any) => `${v.product_id}||${v.color}||${String(v.size).toUpperCase()}`));
+  const oldById = new Map(oldItems.map((row) => [String(row.id), row]));
+  const oldByKey = new Map(
+    oldItems.map((row) => [
+      `${row.product_id}||${String(row.color || "default")}||${String(row.size || "").toUpperCase()}`,
+      row,
+    ]),
+  );
+
+  const items: Snapshot[] = [];
+  for (const row of cleaned) {
+    if (group === "open_order" && row.product_id === OPEN_ORDER_ADDON.id) {
+      const old = oldById.get(row.source_item_id) || oldByKey.get(`${row.product_id}||default||`);
+      items.push({
+        product_id: OPEN_ORDER_ADDON.id,
+        product_name: OPEN_ORDER_ADDON.name,
+        series: null,
+        kain: null,
+        color: null,
+        size: null,
+        quantity: 1,
+        price: OPEN_ORDER_ADDON.price,
+        manual_price: false,
+        customer_price: null,
+        minimum_price: null,
+        product_image: old?.product_image ?? null,
+      });
+      continue;
+    }
+
+    const product = productById.get(row.product_id);
+    if (!product) return { error: `Produk tidak ditemukan (${row.product_id})` };
+    if (!variantSet.has(`${row.product_id}||${row.color}||${row.size}`)) {
+      return { error: `Ukuran ${row.size} tidak tersedia untuk ${product.name}` };
+    }
+
+    const old =
+      oldById.get(row.source_item_id) ||
+      oldByKey.get(`${row.product_id}||${row.color}||${row.size}`);
+
+    // Default: harga baris lama yang diganti. Admin boleh mengetik harga baru.
+    let price = old ? Number(old.price) || 0 : Number(product.price) || 0;
+    let manual = false;
+    if (hasManualPrice(row.price)) {
+      const typed = manualPrice(row.price);
+      if (typed === null) {
+        return {
+          error: `Harga manual "${product.name}" tidak valid — isi Rp ${MANUAL_PRICE_MIN} sampai Rp ${MANUAL_PRICE_MAX}`,
+        };
+      }
+      price = typed;
+      manual = true;
+    }
+
+    const minimum = old?.minimum_price == null ? null : Number(old.minimum_price) || 0;
+    if (group === "open_order" && minimum != null && price < minimum) {
+      return { error: `Harga ${product.name} tidak boleh di bawah harga minimum Open Order (Rp ${minimum}).` };
+    }
+
+    items.push({
+      product_id: row.product_id,
+      product_name: product.name,
+      series: product.series ?? null,
+      kain: product.jenis_kain?.name ?? null,
+      color: row.color,
+      size: row.size,
+      quantity: row.quantity,
+      price,
+      manual_price: manual,
+      customer_price: old?.customer_price ?? null,
+      minimum_price: old?.minimum_price ?? null,
+      product_image: old?.product_image ?? null,
+    });
+  }
+
+  return { items };
+}
 async function deductStock(admin: Admin, items: Snapshot[]) {
   const done: Snapshot[] = [];
   for (const item of items) {
@@ -271,7 +425,7 @@ export async function GET(req: NextRequest) {
   let query = admin
     .from("orders")
     .select(
-      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel",
+      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel, items_edited_at, items_edited_after_resi",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -310,7 +464,7 @@ export async function GET(req: NextRequest) {
   const { data: lineItems } = await admin
     .from("order_items")
     .select(
-      "order_id, product_id, product_name, series, kain, color, size, quantity, price, product_image, customer_price, minimum_price",
+      "id, order_id, product_id, product_name, series, kain, color, size, quantity, price, product_image, customer_price, minimum_price",
     )
     .in("order_id", list.map((o) => o.id));
 
@@ -435,9 +589,14 @@ export async function GET(req: NextRequest) {
             })(),
           }
         : {}),
-      // Pesanan website hanya dipantau dari sini (sumbernya read-only); yang boleh
-      // diubah/dibatalkan dari menu ini cuma transaksi yang dicatat manual.
-      can_edit: key !== "website" && status !== "dibatalkan",
+      // Guard edit item dipakai server & UI. Website/Open Order sekarang boleh diedit
+      // selama stoknya tercatat, status belum dikirim, dan pengiriman belum berjalan.
+      can_edit: orderEditGuard(order).canEdit,
+      edit_reason: orderEditGuard(order).reason,
+      edit_warning: orderEditGuard(order).warning,
+      weight: order.weight == null ? null : Number(order.weight) || 0,
+      items_edited_at: order.items_edited_at || null,
+      items_edited_after_resi: Boolean(order.items_edited_after_resi),
       can_cancel: status === "pending" || status === "diproses",
     };
   });
@@ -633,14 +792,12 @@ export async function PATCH(req: NextRequest) {
     const admin = getSupabaseAdmin();
     const { data: order, error } = await admin
       .from("orders")
-      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, customer_name, customer_whatsapp, customer_id")
+      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, customer_name, customer_whatsapp, customer_id, shipping_status, weight, subtotal, total, discount, shipping_cost, paid_at")
       .eq("order_number", orderNumber)
       .maybeSingle();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!order) return bad("Pesanan tidak ditemukan");
-
-    const manual = sourceKey(order.source) !== "website";
 
     if (action === "cancel") {
       // "Dibatalkan sebelum dikirim" — pesanan yang sudah jalan tidak bisa dibatalkan di sini.
@@ -669,158 +826,238 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (action !== "update") return bad("Aksi tidak dikenal");
-    if (!manual) return bad("Pesanan website tidak bisa diubah dari menu Transaksi");
-    if (order.status === "dibatalkan") return bad("Transaksi yang sudah dibatalkan tidak bisa diubah");
 
-    const customerName = String(body?.customer_name || "").trim();
-    const customerWhatsapp = String(body?.customer_whatsapp || "").trim();
-    const source = String(body?.source || "").trim().toLowerCase();
-    const notes = String(body?.notes || "").trim();
-    const shippingCost = Math.max(0, Math.round(Number(body?.shipping_cost) || 0));
-    const discount = Math.max(0, Math.round(Number(body?.discount) || 0));
-    const createdAt = new Date(String(body?.created_at || ""));
+    const guard = orderEditGuard(order);
+    if (!guard.canEdit) return bad(guard.reason);
+    const group = guard.sourceGroup;
+    const isManual = group === "manual";
+
     const inputItems: ItemInput[] = Array.isArray(body?.items) ? body.items : [];
+    if (inputItems.length === 0) return bad("Minimal satu produk harus diisi");
 
-    if (!customerName) return bad("Nama pelanggan wajib diisi");
-    if (!customerWhatsapp) return bad("Nomor HP pelanggan wajib diisi");
-    if (!MANUAL_SOURCE_KEYS.includes(source)) return bad("Sumber transaksi tidak valid");
-    if (Number.isNaN(createdAt.getTime())) return bad("Tanggal/jam transaksi tidak valid");
+    const { data: oldRows, error: oldError } = await admin
+      .from("order_items")
+      .select("id, product_id, product_name, series, kain, color, size, quantity, price, customer_price, minimum_price, product_image")
+      .eq("order_id", order.id);
+    if (oldError) return NextResponse.json({ error: oldError.message }, { status: 500 });
+    const oldItems: OldItem[] = (oldRows || []).map((row: any) => ({
+      id: String(row.id),
+      product_id: String(row.product_id || ""),
+      product_name: String(row.product_name || ""),
+      series: row.series ?? null,
+      kain: row.kain ?? null,
+      color: row.color ?? null,
+      size: row.size ?? null,
+      quantity: Number(row.quantity) || 0,
+      price: Number(row.price) || 0,
+      customer_price: row.customer_price == null ? null : Number(row.customer_price) || 0,
+      minimum_price: row.minimum_price == null ? null : Number(row.minimum_price) || 0,
+      product_image: row.product_image ?? null,
+    }));
+    if (oldItems.length === 0) return bad("Pesanan ini tidak punya item untuk diubah");
 
-    const shippingResult = readShipping(body);
-    if (shippingResult.error || !shippingResult.shipping) return bad(shippingResult.error || "Alamat belum lengkap");
-    const shipping = shippingResult.shipping;
+    // Add-on Open Order tidak boleh berubah: jumlah baris, qty, dan harga harus sama.
+    if (group === "open_order") {
+      const oldAddon = oldItems.filter((row) => row.product_id === OPEN_ORDER_ADDON.id);
+      const newAddon = inputItems.filter((row) => String(row?.product_id || "").trim() === OPEN_ORDER_ADDON.id);
+      if (oldAddon.length !== newAddon.length) return bad("Baris Extra Cover & Hanger tidak boleh ditambah atau dihapus.");
+      for (const row of newAddon) {
+        const qty = Math.round(Number(row?.quantity) || 0);
+        if (qty !== 1) return bad("Baris Extra Cover & Hanger tidak boleh diubah.");
+        if (hasManualPrice(row?.price) && manualPrice(row?.price) !== OPEN_ORDER_ADDON.price) {
+          return bad("Baris Extra Cover & Hanger tidak boleh diubah.");
+        }
+      }
+    }
 
-    const snapshot = await buildSnapshot(admin, inputItems);
+    let customerName = String(order.customer_name || "").trim();
+    let customerWhatsapp = String(order.customer_whatsapp || "").trim();
+    let customerId = order.customer_id || null;
+    let source = String(order.source || "").trim().toLowerCase();
+    let notes = "";
+    let shippingCost = Number(order.shipping_cost) || 0;
+    let discount = Number(order.discount) || 0;
+    let createdAt: Date | null = null;
+    let shipping: Shipping | null = null;
+
+    if (isManual) {
+      customerName = String(body?.customer_name || "").trim();
+      customerWhatsapp = String(body?.customer_whatsapp || "").trim();
+      customerId = String(body?.customer_id || "").trim() || order.customer_id || null;
+      source = String(body?.source || "").trim().toLowerCase();
+      notes = String(body?.notes || "").trim();
+      shippingCost = Math.max(0, Math.round(Number(body?.shipping_cost) || 0));
+      discount = Math.max(0, Math.round(Number(body?.discount) || 0));
+      const parsedCreatedAt = new Date(String(body?.created_at || ""));
+      if (!customerName) return bad("Nama pelanggan wajib diisi");
+      if (!customerWhatsapp) return bad("Nomor HP pelanggan wajib diisi");
+      if (!MANUAL_SOURCE_KEYS.includes(source)) return bad("Sumber transaksi tidak valid");
+      if (Number.isNaN(parsedCreatedAt.getTime())) return bad("Tanggal/jam transaksi tidak valid");
+      createdAt = parsedCreatedAt;
+      const shippingResult = readShipping(body);
+      if (shippingResult.error || !shippingResult.shipping) return bad(shippingResult.error || "Alamat belum lengkap");
+      shipping = shippingResult.shipping;
+    }
+
+    const snapshot = await buildEditSnapshot(admin, inputItems, oldItems, group);
     if (snapshot.error || !snapshot.items) return bad(snapshot.error || "Produk tidak valid");
     const items = snapshot.items;
 
-    const { data: oldRows } = await admin
-      .from("order_items")
-      .select("product_id, color, size, quantity")
-      .eq("order_id", order.id);
+    const allSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const addonTotal =
+      group === "open_order"
+        ? items
+            .filter((item) => item.product_id === OPEN_ORDER_ADDON.id)
+            .reduce((sum, item) => sum + item.price * item.quantity, 0)
+        : 0;
+    const subtotal = group === "open_order" ? allSubtotal - addonTotal : allSubtotal;
 
-    // Selisih per (produk, warna, ukuran): yang bertambah dipotong, yang berkurang dikembalikan.
-    // Baris yang tidak berubah tidak menyentuh stok sama sekali.
-    const keyOf = (productId: string, color: string, size: string) =>
-      `${productId}||${color}||${String(size).toUpperCase()}`;
-    const delta = new Map<string, { product_id: string; color: string; size: string; qty: number }>();
-    for (const row of oldRows || []) {
-      const key = keyOf(row.product_id, row.color || "default", row.size);
-      const entry = delta.get(key) || { product_id: row.product_id, color: row.color || "default", size: String(row.size).toUpperCase(), qty: 0 };
-      entry.qty -= Number(row.quantity) || 0;
-      delta.set(key, entry);
+    let finalDiscount = 0;
+    let total = 0;
+    if (isManual) {
+      finalDiscount = Math.min(discount, subtotal);
+      total = subtotal + addonTotal + shippingCost - finalDiscount;
+    } else if (group === "open_order") {
+      finalDiscount = Number(order.discount) || 0;
+      shippingCost = Number(order.shipping_cost) || 0;
+      total = subtotal + addonTotal + shippingCost;
+    } else {
+      finalDiscount = Number(order.discount) || 0;
+      shippingCost = Number(order.shipping_cost) || 0;
+      total = subtotal + shippingCost - finalDiscount;
     }
-    for (const item of items) {
-      const key = keyOf(item.product_id, item.color, item.size);
-      const entry = delta.get(key) || { product_id: item.product_id, color: item.color, size: item.size, qty: 0 };
-      entry.qty += item.quantity;
-      delta.set(key, entry);
-    }
+    total = Math.round(total);
 
-    const toDeduct = [...delta.values()].filter((d) => d.qty > 0);
-    const toRestore = [...delta.values()].filter((d) => d.qty < 0);
-
-    const deducted = await deductStock(
-      admin,
-      toDeduct.map((d) => ({
-        product_id: d.product_id,
-        product_name: d.product_id,
-        series: null,
-        kain: null,
-        color: d.color,
-        size: d.size,
-        quantity: d.qty,
-        price: 0,
-        manual_price: false,
-      })),
-    );
-    if (!deducted.ok) {
-      await restoreStock(admin, deducted.done);
-      return bad(deducted.message.replace(/^Stok /, "Stok tambahan "));
-    }
-    await restoreStock(
-      admin,
-      toRestore.map((d) => ({
-        product_id: d.product_id,
-        product_name: d.product_id,
-        series: null,
-        kain: null,
-        color: d.color,
-        size: d.size,
-        quantity: Math.abs(d.qty),
-        price: 0,
-        manual_price: false,
-      })),
-    );
-
-    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const finalDiscount = Math.min(discount, subtotal);
-    const total = subtotal - finalDiscount + shippingCost;
-
-    const { error: updateError } = await admin
-      .from("orders")
-      .update({
-        customer_name: customerName,
-        customer_whatsapp: customerWhatsapp,
-        customer_id: String(body?.customer_id || "").trim() || order.customer_id || null,
-        source,
-        shipping_address: shipping.address,
-        shipping_city: shippingCityValue(shipping),
-        shipping_kecamatan: shipping.kecamatan,
-        shipping_province: shipping.province,
-        shipping_postal_code: shipping.postal_code,
-        shipping_notes: notes || null,
-        shipping_cost: shippingCost,
-        ...(String(body?.shipping_method || "").trim() === "J&T HBO" ? { shipping_method: "J&T HBO" } : {}),
-        discount: finalDiscount,
-        subtotal,
-        total,
-        created_at: createdAt.toISOString(),
-        updated_at: createdAt.toISOString(),
-      })
-      .eq("id", order.id);
-    if (updateError) {
-      console.error("[OPS] transaksi PATCH order:", updateError.message);
-      return NextResponse.json({ error: "Gagal memperbarui transaksi" }, { status: 500 });
-    }
-
-    // Ganti daftar item: hapus lama, tulis ulang snapshot baru.
-    const { error: deleteError } = await admin.from("order_items").delete().eq("order_id", order.id);
-    if (deleteError) {
-      console.error("[OPS] transaksi PATCH delete items:", deleteError.message);
-      return NextResponse.json({ error: "Gagal memperbarui produk transaksi" }, { status: 500 });
-    }
-
-    const { error: insertError } = await admin.from("order_items").insert(
-      items.map((item) => ({
-        order_id: order.id,
-        product_id: item.product_id,
-        product_name: item.product_name,
-        series: item.series,
-        kain: item.kain,
-        color: item.color,
-        size: item.size,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-    );
-    if (insertError) {
-      console.error("[OPS] transaksi PATCH insert items:", insertError.message);
-      return NextResponse.json({ error: "Gagal menyimpan produk transaksi" }, { status: 500 });
-    }
-
-    // Alamat baru (kalau admin menambahkannya) ikut masuk buku alamat pelanggan.
-    if (body?.save_address) {
-      await saveCustomerAddress(
-        admin,
-        String(body?.customer_id || "").trim() || order.customer_id || null,
-        customerName,
-        customerWhatsapp,
-        shipping,
+    // Website & Open Order: total tidak boleh berubah, supaya invoice/payment tidak perlu disentuh.
+    if (group !== "manual" && total !== Math.round(Number(order.total) || 0)) {
+      return bad(
+        `Total berubah (Rp ${Math.round(Number(order.total) || 0).toLocaleString("id-ID")} → Rp ${total.toLocaleString("id-ID")}). ` +
+          "Untuk pesanan website/Open Order, gunakan batal lalu buat order baru.",
       );
     }
 
-    return NextResponse.json({ order_number: order.order_number, total });
+    // Berat baru tidak boleh melebihi berat lama.
+    const weightIds = [
+      ...new Set(
+        items
+          .map((item) => item.product_id)
+          .filter((id) => !(group === "open_order" && id === OPEN_ORDER_ADDON.id)),
+      ),
+    ];
+    let productWeights: WeightMap = {};
+    let variantWeights: VariantWeightMap = {};
+    if (weightIds.length > 0) {
+      const [{ data: pRows }, { data: vRows }] = await Promise.all([
+        admin.from("products").select("id, weight").in("id", weightIds),
+        admin.from("product_variants").select("product_id, color, size, weight").in("product_id", weightIds),
+      ]);
+      productWeights = productWeightMapFromRows(pRows as { id?: string | null; weight?: number | null }[]);
+      variantWeights = variantWeightMapFromRows(
+        vRows as { product_id?: string | null; color?: string | null; size?: string | null; weight?: number | null }[],
+      );
+    }
+    const weightResult = sumWeightGramsBySize(
+      items
+        .filter((item) => !(group === "open_order" && item.product_id === OPEN_ORDER_ADDON.id))
+        .map((item) => ({ productId: item.product_id, color: item.color, size: item.size, quantity: item.quantity })),
+      productWeights,
+      variantWeights,
+    );
+    if (weightResult.missingQty > 0) {
+      return bad("Berat sebagian produk belum diisi. Lengkapi berat produk dulu sebelum mengubah item.");
+    }
+    let newWeight = weightResult.grams;
+    if (group === "open_order" && items.some((item) => item.product_id === OPEN_ORDER_ADDON.id)) {
+      const { data: addonSetting } = await admin
+        .from("store_settings")
+        .select("open_order_addon_weight")
+        .eq("id", 1)
+        .maybeSingle();
+      newWeight += resolveAddonWeight(addonSetting?.open_order_addon_weight);
+    }
+    const weightError = weightEditError(order.weight, newWeight);
+    if (weightError) return bad(weightError);
+
+    // Snapshot HPP dihitung SEBELUM RPC, lalu ditulis di transaksi yang sama.
+    const hpp = await computeOrderHppForItems(
+      admin,
+      items.map((item, index) => ({
+        line_index: index,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        color: item.color,
+        size: item.size,
+        quantity: item.quantity,
+      })),
+    );
+
+    const rpcItems = items.map((item) => ({
+      product_id: item.product_id,
+      product_name: item.product_name,
+      series: item.series,
+      kain: item.kain,
+      color: item.color,
+      size: item.size,
+      quantity: item.quantity,
+      price: item.price,
+      customer_price: item.customer_price ?? null,
+      minimum_price: item.minimum_price ?? null,
+      product_image: item.product_image ?? null,
+    }));
+
+    const manualHeader = isManual
+      ? {
+          customer_name: customerName,
+          customer_whatsapp: customerWhatsapp,
+          customer_id: customerId,
+          source,
+          shipping_address: shipping?.address ?? "",
+          shipping_city: shipping ? shippingCityValue(shipping) : "",
+          shipping_kecamatan: shipping?.kecamatan ?? "",
+          shipping_province: shipping?.province ?? "",
+          shipping_postal_code: shipping?.postal_code ?? "",
+          shipping_notes: notes,
+          shipping_cost: shippingCost,
+          shipping_method: String(body?.shipping_method || "").trim() === "J&T HBO" ? "J&T HBO" : "",
+          discount: finalDiscount,
+          created_at: createdAt?.toISOString() ?? "",
+        }
+      : null;
+
+    const { data: rpcResult, error: rpcError } = await admin.rpc("samaqu_edit_order_items", {
+      p_order_id: order.id,
+      p_actor: String((await opsIdentity(req))?.email || "ops"),
+      p_items: rpcItems,
+      p_hpp_items: hpp.items,
+      p_hpp_goods: hpp.hpp_goods,
+      p_new_weight: Math.round(newWeight),
+      p_addon_product_id: group === "open_order" ? OPEN_ORDER_ADDON.id : "",
+      p_header: manualHeader,
+      p_note: order.awb_no ? "Item diubah setelah resi terbit; label internal perlu dicetak ulang." : null,
+    });
+    if (rpcError) {
+      console.error("[OPS] transaksi PATCH rpc:", rpcError.message);
+      return bad(rpcError.message);
+    }
+
+    // Alamat baru (kalau admin menambahkannya) ikut masuk buku alamat pelanggan.
+    if (isManual && body?.save_address) {
+      await saveCustomerAddress(admin, customerId, customerName, customerWhatsapp, shipping!);
+    }
+
+    const warning =
+      isManual && order.paid_at && Math.round(Number(order.total) || 0) !== total
+        ? guard.warning
+        : "";
+
+    return NextResponse.json({
+      order_number: order.order_number,
+      total: Number((rpcResult as any)?.total ?? total),
+      subtotal: Number((rpcResult as any)?.subtotal ?? subtotal),
+      weight: Number((rpcResult as any)?.weight ?? newWeight),
+      items_edited_after_resi: Boolean((rpcResult as any)?.items_edited_after_resi ?? order.awb_no),
+      warning,
+    });
   } catch (e) {
     console.error("[OPS] transaksi PATCH:", e);
     return NextResponse.json({ error: "Gagal menyimpan perubahan" }, { status: 500 });
