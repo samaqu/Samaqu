@@ -17,6 +17,16 @@ import {
 
 const REJECT_REASONS = ["Noda", "Salah ukuran", "Jahitan tidak rapi", "Cacat kain", "Lainnya"];
 
+type QcFieldKey = "lolos" | "rework" | "reject" | "reworkLolos" | "reworkReject";
+
+const QC_FIELDS: { key: QcFieldKey; label: string; needsRework?: boolean }[] = [
+  { key: "lolos", label: "Lolos QC (masuk stok)" },
+  { key: "rework", label: "Rework (perbaiki)" },
+  { key: "reject", label: "Reject (buang)" },
+  { key: "reworkLolos", label: "Rework jadi Lolos", needsRework: true },
+  { key: "reworkReject", label: "Rework jadi Reject", needsRework: true },
+];
+
 export type ReceiptTarget = {
   id: string;
   category: string;
@@ -214,6 +224,10 @@ export default function PenerimaanDrawer({
     }
   }
 
+  function scrollToCosts() {
+    document.getElementById("biaya-non-bahan")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <Drawer
       open={open}
@@ -221,12 +235,27 @@ export default function PenerimaanDrawer({
       wide
       title="Terima Hasil Produksi"
       subtitle="Penerimaan tidak bisa diedit. Koreksi lewat penerimaan berikutnya."
+      hint="Hanya Lolos QC yang masuk stok. Rework dan Reject tidak menambah stok."
       footer={
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-xs text-slate-500 dark:text-slate-400">
-            <span>Diproses: <b className="text-slate-800 dark:text-slate-100">{formatQty(totalProcessed)}</b></span>
-            <span className="ml-3">Masuk stok: <b className="text-slate-800 dark:text-slate-100">{formatQty(totalLolos)}</b></span>
-            <span className="ml-3">Biaya non-bahan: <b className="text-slate-800 dark:text-slate-100">Rp {formatRupiah(nonMaterialTotal)}</b></span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500 dark:text-slate-400">
+            <span>
+              Diproses:{" "}
+              <b className="font-semibold tabular-nums text-slate-600 dark:text-slate-300">
+                {formatQty(totalProcessed)} pcs
+              </b>
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2 py-1 font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+              Masuk stok: <span className="tabular-nums">{formatQty(totalLolos)} pcs</span>
+            </span>
+            <button
+              type="button"
+              onClick={scrollToCosts}
+              title="Lihat rincian biaya non-bahan"
+              className="font-semibold text-[#1e3a5f] underline underline-offset-2 hover:text-[#16304f] dark:text-blue-300"
+            >
+              Biaya non-bahan: Rp {formatRupiah(nonMaterialTotal)}
+            </button>
           </div>
           <div className="flex items-center gap-2">
             <button className={btnSecondary} onClick={onClose} disabled={saving}>Batal</button>
@@ -281,24 +310,32 @@ export default function PenerimaanDrawer({
                         <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">rework tersisa {reworkLeft}</span>
                       </div>
                       <div className="mt-2 grid grid-cols-3 sm:grid-cols-5 gap-2">
-                        {[
-                          { key: "lolos", label: "Lolos QC" },
-                          { key: "rework", label: "Rework" },
-                          { key: "reject", label: "Reject" },
-                          { key: "reworkLolos", label: "Rework→Lolos" },
-                          { key: "reworkReject", label: "Rework→Reject" },
-                        ].map((field) => (
-                          <div key={field.key}>
-                            <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{field.label}</label>
-                            <input
-                              className={`${inputClass} px-2 text-right`}
-                              inputMode="numeric"
-                              placeholder="0"
-                              value={(item as any)[field.key]}
-                              onChange={(e) => updateItem(key, { [field.key]: e.target.value } as any)}
-                            />
-                          </div>
-                        ))}
+                        {QC_FIELDS.map((field) => {
+                          const disabled = Boolean(field.needsRework) && reworkLeft <= 0;
+                          return (
+                            <div
+                              key={field.key}
+                              title={disabled ? "Belum ada rework yang tersisa" : undefined}
+                            >
+                              <label
+                                className={`block mb-1 text-[10px] font-bold uppercase tracking-wide leading-tight ${
+                                  disabled ? "text-slate-400 dark:text-slate-500" : "text-slate-600 dark:text-slate-300"
+                                }`}
+                              >
+                                {field.label}
+                              </label>
+                              <input
+                                className={`${inputClass} px-2 text-right disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:bg-slate-800/70`}
+                                inputMode="numeric"
+                                placeholder="0"
+                                value={(item as any)[field.key]}
+                                disabled={disabled}
+                                title={disabled ? "Belum ada rework yang tersisa" : undefined}
+                                onChange={(e) => updateItem(key, { [field.key]: e.target.value } as any)}
+                              />
+                            </div>
+                          );
+                        })}
                       </div>
                       {rejectActive ? (
                         <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -323,7 +360,7 @@ export default function PenerimaanDrawer({
           );
         })}
 
-        <div className={`${cardClass} overflow-hidden`}>
+        <div id="biaya-non-bahan" className={`${cardClass} overflow-hidden scroll-mt-2`}>
           <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between gap-2">
             <div>
               <p className="text-sm font-bold text-slate-900 dark:text-white">Biaya non-bahan penerimaan</p>

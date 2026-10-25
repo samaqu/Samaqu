@@ -306,6 +306,7 @@ export function Drawer({
   onClose,
   title,
   subtitle,
+  hint,
   children,
   footer,
   wide = false,
@@ -314,6 +315,7 @@ export function Drawer({
   onClose: () => void;
   title: string;
   subtitle?: string;
+  hint?: string;
   children: ReactNode;
   footer?: ReactNode;
   wide?: boolean;
@@ -355,6 +357,9 @@ export function Drawer({
                 <h3 className="font-bold text-lg text-slate-900 dark:text-white">{title}</h3>
                 {subtitle ? (
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>
+                ) : null}
+                {hint ? (
+                  <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 mt-1">{hint}</p>
                 ) : null}
               </div>
               <button
