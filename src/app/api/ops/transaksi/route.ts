@@ -456,7 +456,7 @@ export async function GET(req: NextRequest) {
       }
     }
   } catch {
-    // Migrasi belum dijalankan — fitur edit tetap terkunci sampai migrasi selesai.
+    // Migrasi belum dijalankan — flag dianggap false, halaman tetap tampil normal.
   }
 
   const { data: hppHeaders } = await admin
