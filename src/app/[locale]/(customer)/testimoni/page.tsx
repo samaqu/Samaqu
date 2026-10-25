@@ -28,6 +28,7 @@ interface Testimoni {
   product_name?: string;
   product_category?: string;
   video_url?: string;
+  date: string;
 }
 
 const headerVariants = {
@@ -55,94 +56,95 @@ const FEEL_ITEMS = [
 ];
 
 function TestimonialCard({ t, onImageClick }: { t: Testimoni; onImageClick: (url: string) => void }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl overflow-hidden flex flex-col"
-      style={{ background: "white", border: "1px solid rgba(0,0,0,.08)", boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}
-    >
-      {/* Header: Avatar + Name + Rating */}
-      <div className="px-4 pt-4 pb-3 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-sm font-semibold" style={{ background: "#000000", color: "#ffffff", fontFamily: "Georgia, serif" }}>
-          {getInitials(t.name)}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold truncate" style={{ color: "#000000" }}>{t.name}</p>
-            {t.verified && (
-              <span title="Pembelian terverifikasi" aria-label="Pembelian terverifikasi" className="inline-flex">
-                <CheckCircle size={12} style={{ color: "#000000" }} />
-              </span>
-            )}
-          </div>
-          <div className="flex gap-0.5 mt-0.5">
-            {Array.from({ length: 5 }, (_, i) => (
-              <Star key={i} size={12} fill={i < t.rating ? "#000000" : "none"} stroke="#000000" strokeWidth={1.5} />
-            ))}
-          </div>
-        </div>
-      </div>
+  const hasMedia = Boolean(t.img || t.video_url);
+  const displayName = t.name && t.name !== "Pelanggan" ? t.name : "Pelanggan SAMAQU";
+  const date = t.date
+    ? new Date(t.date).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
+    : "";
 
-      {/* Product Info Badge — always show */}
-      <div className="px-4 pb-3">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {t.product_name ? (
-            <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(0,0,0,.05)", color: "#000000" }}>
-              <Shirt size={10} strokeWidth={2} />
-              {t.product_name}
-            </span>
-          ) : t.cat ? (
-            <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(0,0,0,.05)", color: "#000000" }}>
-              <Shirt size={10} strokeWidth={2} />
-              {t.cat}
+  return (
+    <motion.article
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      className="group flex flex-col overflow-hidden rounded-3xl bg-white"
+      style={{ border: "1px solid rgba(0,0,0,.07)", boxShadow: "0 10px 30px -22px rgba(0,0,0,.35)" }}
+    >
+      {hasMedia ? (
+        <button
+          type="button"
+          onClick={() => onImageClick((t.video_url || t.img)!)}
+          className="relative block w-full overflow-hidden"
+          style={{ background: "#f1f1f1", aspectRatio: "4 / 5" }}
+        >
+          <img
+            src={cloudinaryUrl(t.img || t.video_url || "", { width: 800 })}
+            alt=""
+            loading="lazy"
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+          />
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur">
+            {t.video_url ? <Play size={11} fill="white" stroke="none" /> : <Star size={11} fill="white" stroke="none" />}
+            {t.video_url ? "Video" : "Foto"}
+          </span>
+          {t.video_url ? (
+            <span className="absolute inset-0 grid place-items-center">
+              <span className="grid h-12 w-12 place-items-center rounded-full bg-white/90 shadow-lg">
+                <Play size={20} fill="#000" stroke="none" className="ml-0.5" />
+              </span>
             </span>
           ) : null}
-          {t.series_name && (
-            <span className="text-[11px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(0,0,0,.03)", color: "rgba(0,0,0,.55)" }}>
-              {t.series_name}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Review Text */}
-      <div className="px-4 pb-3 flex-1">
-        <p className="text-[13px] leading-relaxed line-clamp-4" style={{ color: "var(--text-secondary)" }}>
-          {t.text}
-        </p>
-      </div>
-
-      {/* Media */}
-      {(t.img || t.video_url) && (
-        <div className="px-4 pb-4">
-          {t.video_url ? (
-            <button
-              onClick={() => onImageClick(t.video_url!)}
-              className="relative w-full aspect-video rounded-xl overflow-hidden group cursor-pointer"
-              style={{ background: "#e5e5e5" }}
-            >
-              <img src={cloudinaryUrl(t.img || t.video_url, { width: 600 })} alt="" className="w-full h-full object-cover" />
-              <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,.2)" }}>
-                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "#ffffff", boxShadow: "0 4px 12px rgba(0,0,0,.3)" }}>
-                  <Play size={20} fill="#000000" stroke="none" className="ml-0.5" />
-                </div>
-              </div>
-            </button>
-          ) : (
-            <button
-              onClick={() => onImageClick(t.img!)}
-              className="w-full rounded-xl overflow-hidden cursor-pointer"
-            >
-              <img src={cloudinaryUrl(t.img || "", { width: 800 })} alt="" className="w-full h-auto object-cover max-h-48" loading="lazy" />
-            </button>
-          )}
+        </button>
+      ) : (
+        <div className="px-4 pt-5">
+          <Quote size={26} strokeWidth={1.2} style={{ color: "rgba(0,0,0,.12)" }} />
         </div>
       )}
-    </motion.div>
+
+      <div className="flex flex-1 flex-col p-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex gap-0.5">
+            {Array.from({ length: 5 }, (_, i) => (
+              <Star key={i} size={13} fill={i < t.rating ? "#000" : "none"} stroke="#000" strokeWidth={1.3} />
+            ))}
+          </div>
+          {t.verified ? (
+            <span className="inline-flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wide text-emerald-700">
+              <CheckCircle size={11} /> Terverifikasi
+            </span>
+          ) : null}
+        </div>
+
+        <p className="mt-2 line-clamp-5 text-[13px] leading-relaxed" style={{ color: "rgba(0,0,0,.72)" }}>
+          {t.text}
+        </p>
+
+        <div className="mt-auto flex items-center gap-2.5 pt-4">
+          <div
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[11px] font-extrabold"
+            style={{ background: "#000", color: "#fff", fontFamily: "Georgia, serif" }}
+          >
+            {getInitials(displayName)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[12px] font-bold" style={{ color: "#000" }}>{displayName}</p>
+            <p className="truncate text-[10.5px]" style={{ color: "rgba(0,0,0,.45)" }}>
+              {[t.product_name || t.cat, t.series_name, date].filter(Boolean).join(" Â· ")}
+            </p>
+          </div>
+          {t.product_name || t.cat ? (
+            <span
+              className="shrink-0 rounded-full px-2 py-0.5 text-[9.5px] font-bold"
+              style={{ background: "rgba(0,0,0,.05)", color: "rgba(0,0,0,.6)" }}
+            >
+              {t.product_name || t.cat}
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </motion.article>
   );
 }
-
 function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
   const isVideo = url.includes(".mp4") || url.includes("video");
 
@@ -205,6 +207,7 @@ export default function TestimoniPage() {
           product_name: product?.name,
           product_category: product?.category,
           video_url: t.video_url || undefined,
+          date: t.created_at,
         };
       });
       setTestimoniData(mapped);
@@ -224,6 +227,16 @@ export default function TestimoniPage() {
     if (filterCategory === "Semua") return testimoniData;
     return testimoniData.filter((t) => t.cat === filterCategory);
   }, [testimoniData, filterCategory]);
+
+  const stats = useMemo(() => {
+    const total = testimoniData.length;
+    const verifiedCount = testimoniData.filter((row) => row.verified).length;
+    const media = testimoniData.filter((row) => row.img || row.video_url).length;
+    const avg = total
+      ? testimoniData.reduce((sum, row) => sum + (Number(row.rating) || 0), 0) / total
+      : 0;
+    return { total, verifiedCount, media, avg: Math.round(avg * 10) / 10 };
+  }, [testimoniData]);
 
   return (
     <section className="min-h-screen" style={{ background: "#F3F3F3" }}>
@@ -267,23 +280,27 @@ export default function TestimoniPage() {
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="rounded-2xl p-6 sm:p-7" style={{ background: "#000000", border: "1px solid rgba(255,255,255,.14)" }}>
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] tracking-[0.15em] uppercase font-ui font-bold" style={{ color: "rgba(255,255,255,.45)" }}>{t("ratingLabel")}</p>
-                  <div className="flex gap-0.5">{Array.from({ length: 5 }, (_, i) => <Star key={i} size={14} fill="#ffffff" stroke="#ffffff" />)}</div>
+                  <div className="flex gap-0.5">{Array.from({ length: 5 }, (_, i) => <Star key={i} size={14} fill={i < Math.round(stats.avg) ? "#ffffff" : "none"} stroke="#ffffff" />)}</div>
                 </div>
-                <p className="mt-4 text-[0.95rem] leading-relaxed font-ui" style={{ color: "rgba(255,255,255,.85)" }}>
-                  &quot;Bahannya jatuh, jahitannya rapi, dan ukurannya pas sesuai rekomendasi tim. Packing-nya juga aman.&quot;
+                <p className="mt-4 flex items-baseline gap-1.5" style={{ color: "#ffffff" }}>
+                  <span className="text-[2.6rem] font-extrabold leading-none">{stats.total > 0 ? stats.avg.toFixed(1) : "â€”"}</span>
+                  <span className="text-sm font-semibold" style={{ color: "rgba(255,255,255,.45)" }}>/ 5</span>
+                </p>
+                <p className="mt-2 text-[12px] font-ui" style={{ color: "rgba(255,255,255,.6)" }}>
+                  {stats.total} ulasan pelanggan
                 </p>
                 <div className="mt-5 grid grid-cols-3 gap-4 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,.14)" }}>
                   <div>
-                    <p className="text-xl font-extrabold" style={{ color: "#ffffff" }}>100%</p>
-                    <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,.45)" }}>{t("stat1Label")}</p>
+                    <p className="text-xl font-extrabold" style={{ color: "#ffffff" }}>{stats.total}</p>
+                    <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,.45)" }}>Total ulasan</p>
                   </div>
                   <div>
-                    <p className="text-xl font-extrabold" style={{ color: "#ffffff" }}>1–2</p>
-                    <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,.45)" }}>{t("stat2Label")}</p>
+                    <p className="text-xl font-extrabold" style={{ color: "#ffffff" }}>{stats.media}</p>
+                    <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,.45)" }}>Dengan foto</p>
                   </div>
                   <div>
-                    <p className="text-xl font-extrabold" style={{ color: "#ffffff" }}>34</p>
-                    <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,.45)" }}>{t("stat3Label")}</p>
+                    <p className="text-xl font-extrabold" style={{ color: "#ffffff" }}>{stats.verifiedCount}</p>
+                    <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,.45)" }}>Terverifikasi</p>
                   </div>
                 </div>
               </motion.div>
