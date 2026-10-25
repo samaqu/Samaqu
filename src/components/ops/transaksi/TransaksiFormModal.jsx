@@ -39,6 +39,7 @@ import { AlertCircle, Check, Clock, Info, Loader2, Pencil, Plus, RotateCcw, Save
 import { base44 } from "@/lib/ops-api";
 import { MANUAL_PRICE_MAX, MANUAL_PRICE_MIN, MANUAL_SOURCE_KEYS, SOURCE_LABEL, manualPrice } from "@/lib/transaksi";
 import { PAKET_SIZE, isPaketKategori, variantName } from "@/lib/item-label";
+import { OPEN_ORDER_ADDON } from "@/lib/open-order-config";
 import { OPS_STOCK_SIZES } from "@/lib/ops-stock";
 import { categoryRank, seriesRank, variantSortKey } from "@/lib/ops-order";
 import { formatWeightExact } from "@/lib/shipping-weight";
@@ -137,6 +138,28 @@ const sizeRank = (size) => {
 
 export default function TransaksiFormModal({ isOpen, onClose, initialData = null, onSaved, variant = "ops" }) {
   const isEdit = !!initialData;
+
+  /**
+   * Stok yang sudah "dipesan" oleh pesanan ini (sudah dipotong dari stok katalog).
+   * Saat Ubah, qty lama harus dianggap tersedia lagi supaya baris yang tidak berubah
+   * tidak tampil "habis" dan tidak memblokir simpan. Server tetap memakai delta stok.
+   */
+  const reservedByVariant = useMemo(() => {
+    const map = {};
+    if (!isEdit) return map;
+    for (const item of initialData?.items || []) {
+      const productId = String(item?.product_id || "");
+      const size = String(item?.size || "").toUpperCase();
+      if (!productId || !size) continue;
+      const key = `${productId}||${String(item?.color || "default")}||${size}`;
+      map[key] = (map[key] || 0) + (Number(item?.quantity) || 0);
+    }
+    return map;
+  }, [isEdit, initialData]);
+
+  const reservedFor = (productId, color, size) =>
+    Number(reservedByVariant[`${productId}||${color || "default"}||${String(size || "").toUpperCase()}`]) || 0;
+
   // Tema pink hanya untuk panel admin; dashboard ops tetap slate/black.
   const isPanelForm = variant === "panel";
   const { toast } = useToast();
@@ -637,7 +660,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
           series: entry.series,
           product_name: entry.product_name,
           showColor: false,
-          stock: Object.values(entry.sizes || {}).reduce((sum, n) => sum + (Number(n) || 0), 0),
+          stock:
+            Object.values(entry.sizes || {}).reduce((sum, n) => sum + (Number(n) || 0), 0) +
+            reservedFor(entry.product_id, entry.color, paketSize(entry)),
           price: entry.price,
           linkedTo: entry.linkedTo,
         }
@@ -660,7 +685,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
           size,
           color: entry.color,
           showColor: multiColor,
-          stock: Number(entry.sizes?.[size]) || 0,
+          stock: (Number(entry.sizes?.[size]) || 0) + reservedFor(entry.product_id, entry.color, size),
           price: entry.price,
           linkedTo: entry.linkedTo,
         })),
@@ -710,10 +735,11 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       issue = `Harga manual harus bilangan bulat Rp ${formatRupiah(MANUAL_PRICE_MIN)} - Rp ${formatRupiah(MANUAL_PRICE_MAX)}`;
     } else {
       const entry = requested[`${product.product_id}||${chosen?.value}`];
-      if (entry && entry.total > entry.option.stock) {
+      // Add-on Open Order bukan stok varian; barisnya juga tidak boleh diubah.
+      if (product.product_id !== OPEN_ORDER_ADDON.id && entry && entry.total > entry.option.stock) {
         issue = paket
-          ? `Stok paket "${entry.option.color}" tinggal ${entry.option.stock}, diminta ${entry.total}`
-          : `Stok ${entry.option.size} tinggal ${entry.option.stock}, diminta ${entry.total}`;
+          ? `Stok paket "${entry.option.color}" tersedia ${entry.option.stock}, diminta ${entry.total}`
+          : `Stok ${entry.option.size} tersedia ${entry.option.stock}, diminta ${entry.total}`;
       }
     }
     const unitPrice = rowUnitPrice(row, chosen?.price);
@@ -2837,9 +2863,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                   })}
                 </div>
 
-                {/* Aksi baris DI LUAR daftar item dan menempel di bawah area scroll drawer,
-                    jadi "Simpan produk" selalu kelihatan tanpa scroll ke dalam baris. */}
-                <div className="sticky bottom-0 z-10 flex items-center gap-2 bg-white/95 dark:bg-[#1a1d28]/95 backdrop-blur pt-2 pb-1 border-t border-slate-100 dark:border-slate-800">
+                {/* Aksi baris mengikuti alur daftar item (tidak sticky) supaya tidak menutupi
+                    item di layar kecil. */}
+                <div className="flex items-center gap-2 pt-2 pb-1 border-t border-slate-100 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={addRow}
