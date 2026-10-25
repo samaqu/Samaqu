@@ -717,7 +717,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, dataset]);
+  }, [items, dataset, reservedByVariant]);
 
   const rowInfo = items.map((row) => {
     const product = resolveProduct(row);
