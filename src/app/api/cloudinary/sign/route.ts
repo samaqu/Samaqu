@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 
@@ -65,16 +66,29 @@ function signParams(params: SignParams, apiSecret: string): string {
 // (lebih hemat storage/kredit daripada 2400px milik produk).
 const CHAT_IMAGE_TRANSFORMATION = "c_limit,w_1280,q_auto:good";
 
-// Upload chat boleh memakai akun Cloudinary TERPISAH (isolasi storage/kredit dari produk).
-// Kalau env CHAT_CLOUDINARY_* belum diisi, jatuh ke akun utama supaya tetap jalan.
-function resolveScope(scope: "product" | "chat") {
+// Foto ulasan: cukup 1280px, kompresi otomatis. Dipakai akun Cloudinary terpisah
+// lewat env REVIEW_CLOUDINARY_* supaya kuota review tidak bercampur produk/chat.
+const REVIEW_IMAGE_TRANSFORMATION = "c_limit,w_1280,q_auto:good";
+
+// Upload chat dan ulasan boleh memakai akun Cloudinary TERPISAH (isolasi storage/kredit).
+// Kalau env-nya belum diisi, jatuh ke akun utama supaya tetap jalan.
+function resolveScope(scope: "product" | "chat" | "review") {
   if (scope === "chat") {
     return {
       cloudName: process.env.CHAT_CLOUDINARY_CLOUD || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD,
       apiKey: process.env.CHAT_CLOUDINARY_API_KEY || process.env.CLOUDINARY_API_KEY,
       apiSecret: process.env.CHAT_CLOUDINARY_API_SECRET || process.env.CLOUDINARY_API_SECRET,
       folder: "chat" as string | undefined,
-      chat: true,
+      kind: "chat" as const,
+    };
+  }
+  if (scope === "review") {
+    return {
+      cloudName: process.env.REVIEW_CLOUDINARY_CLOUD || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD,
+      apiKey: process.env.REVIEW_CLOUDINARY_API_KEY || process.env.CLOUDINARY_API_KEY,
+      apiSecret: process.env.REVIEW_CLOUDINARY_API_SECRET || process.env.CLOUDINARY_API_SECRET,
+      folder: "reviews" as string | undefined,
+      kind: "review" as const,
     };
   }
   return {
@@ -82,8 +96,27 @@ function resolveScope(scope: "product" | "chat") {
     apiKey: process.env.CLOUDINARY_API_KEY,
     apiSecret: process.env.CLOUDINARY_API_SECRET,
     folder: undefined,
-    chat: false,
+    kind: "product" as const,
   };
+}
+
+/** Ulasan hanya untuk customer yang login (bukan admin, bukan anon). */
+async function isCustomerRequest(request: Request) {
+  const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  if (!token) return false;
+  try {
+    const admin = getSupabaseAdmin();
+    const { data } = await admin.auth.getUser(token);
+    if (!data?.user?.id) return false;
+    const { data: customer } = await admin
+      .from("customers")
+      .select("id")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    return Boolean(customer);
+  } catch {
+    return false;
+  }
 }
 
 export async function POST(request: Request) {
@@ -94,8 +127,16 @@ export async function POST(request: Request) {
     // Body kosong → default
   }
 
-  const scope = body?.scope === "chat" ? "chat" : "product";
-  const { cloudName, apiKey, apiSecret, folder, chat } = resolveScope(scope);
+  const requested = String(body?.scope || "product");
+  const scope: "product" | "chat" | "review" =
+    requested === "chat" ? "chat" : requested === "review" ? "review" : "product";
+
+  // Upload foto ulasan hanya untuk customer yang login.
+  if (scope === "review" && !(await isCustomerRequest(request))) {
+    return NextResponse.json({ error: "Silakan masuk dulu." }, { status: 401 });
+  }
+
+  const { cloudName, apiKey, apiSecret, folder, kind } = resolveScope(scope);
 
   if (!cloudName || !apiKey || !apiSecret) {
     return NextResponse.json(
@@ -119,17 +160,20 @@ export async function POST(request: Request) {
   }
 
   let resourceType: "image" | "video" = "image";
-  if (!chat && body?.resourceType === "video") resourceType = "video";
+  if (kind === "product" && body?.resourceType === "video") resourceType = "video";
 
   const timestamp = Math.floor(Date.now() / 1000);
 
   // Produk: gambar → c_limit,w_2400,q_auto:good; video → c_limit,w_720,q_auto (lihat catatan
-  // VIDEO_* di atas: tarif SD, bukan HD). Chat: selalu gambar, c_limit,w_1280.
-  const transformation = chat
-    ? CHAT_IMAGE_TRANSFORMATION
-    : resourceType === "video"
-      ? VIDEO_TRANSFORMATION
-      : IMAGE_TRANSFORMATION;
+  // VIDEO_* di atas: tarif SD, bukan HD). Chat dan ulasan: gambar 1280px.
+  const transformation =
+    kind === "chat"
+      ? CHAT_IMAGE_TRANSFORMATION
+      : kind === "review"
+        ? REVIEW_IMAGE_TRANSFORMATION
+        : resourceType === "video"
+          ? VIDEO_TRANSFORMATION
+          : IMAGE_TRANSFORMATION;
 
   const signatureParams: SignParams = { timestamp, transformation };
   if (folder) signatureParams.folder = folder;
