@@ -301,6 +301,19 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                                 .join(" · ")}
                         </small>
                         <small>× {item.quantity}</small>
+                        {item.weight ? (
+                          <small>
+                            Berat:{" "}
+                            <b style={{ color: "inherit" }}>
+                              {item.weight.source === "missing" ? "-" : formatWeightExact(item.weight.grams)}
+                            </b>
+                            {item.weight.source !== "variant" ? (
+                              <span style={{ color: "#b45309", fontWeight: 700 }}>
+                                {" "}· {item.weight.source === "product" ? "fallback berat produk" : "berat per ukuran belum diisi"}
+                              </span>
+                            ) : null}
+                          </small>
+                        ) : null}
                       </div>
                       <b className="mono">Rp {formatRupiah(item.price * item.quantity)}</b>
                     </div>

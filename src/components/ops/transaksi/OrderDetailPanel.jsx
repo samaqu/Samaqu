@@ -56,6 +56,12 @@ export default function OrderDetailPanel({
   const banner = BANNER[stage] || ["Pesanan", ""];
   const stepLevel = STEP_LEVEL[stage] ?? 0;
   const awb = order.awb_no || "";
+  const totalItemWeight = (order.items || []).reduce((sum, item) => {
+    const grams = Number(item?.weight?.grams) || 0;
+    if (!grams || item?.weight?.source === "missing") return sum;
+    return sum + grams * (Number(item?.quantity) || 1);
+  }, 0);
+  const totalWeight = Number(order.weight) > 0 ? Number(order.weight) : totalItemWeight;
   const kota = order.kota || order.shipping_city || "";
   const region = [order.shipping_kecamatan, kota, order.shipping_province, order.shipping_postal_code]
     .filter(Boolean)
@@ -131,6 +137,10 @@ export default function OrderDetailPanel({
                 {awb || "-"}
                 <CopyButton value={awb} label="nomor resi" />
               </b>
+            </div>
+            <div className="kv">
+              <span>Berat kirim</span>
+              <b>{totalWeight > 0 ? formatWeightExact(totalWeight) : "-"}</b>
             </div>
             {latestTracking ? (
               <div className="kv" style={{ alignItems: "flex-start" }}>
