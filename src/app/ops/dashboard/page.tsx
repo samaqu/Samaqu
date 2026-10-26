@@ -146,8 +146,9 @@ function TrendChart({ trend }: { trend: TrendHarian[] }) {
   const top = niceTop(max);
   const n = trend.length;
   const activeIdx = n - 1; // hari ini
-  const focusIdx = hover ?? activeIdx;
-  const focus = trend[focusIdx];
+  // Tooltip HANYA saat hover. Tanpa hover tidak ada kartu info yang menutupi grafik.
+  const focusIdx = hover;
+  const focus = focusIdx !== null ? trend[focusIdx] : null;
   const heightOf = (index: number) => (top > 0 ? ((Number(trend[index].omset) || 0) / top) * 100 : 0);
 
   return (
@@ -201,28 +202,30 @@ function TrendChart({ trend }: { trend: TrendHarian[] }) {
             })}
           </div>
 
-          {/* Nilai hari yang disorot; tanpa mouse: hari ini. */}
-          <div
-            className="pointer-events-none absolute z-10 transition-all duration-200"
-            style={{
-              left: `${((focusIdx + 0.5) / n) * 100}%`,
-              bottom: `calc(${heightOf(focusIdx)}% + 10px)`,
-              transform: "translateX(-50%)",
-            }}
-          >
-            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.14)]">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-900" />
-                Penjualan · {focus.label}
+          {/* Nilai hari yang disorot — hanya saat hover. */}
+          {focusIdx !== null && focus ? (
+            <div
+              className="pointer-events-none absolute z-10 transition-all duration-200"
+              style={{
+                left: `${((focusIdx + 0.5) / n) * 100}%`,
+                bottom: `calc(${heightOf(focusIdx)}% + 10px)`,
+                transform: "translateX(-50%)",
+              }}
+            >
+              <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.14)]">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-900" />
+                  Penjualan · {focus.label}
+                </div>
+                <p className="mt-0.5 whitespace-nowrap text-sm font-extrabold text-slate-900">
+                  {rp(focus.omset)}
+                </p>
+                <p className="whitespace-nowrap text-[10px] font-semibold text-slate-400">
+                  {nfmt(focus.pesanan || 0)} pesanan
+                </p>
               </div>
-              <p className="mt-0.5 whitespace-nowrap text-sm font-extrabold text-slate-900">
-                {rp(focus.omset)}
-              </p>
-              <p className="whitespace-nowrap text-[10px] font-semibold text-slate-400">
-                {nfmt(focus.pesanan || 0)} pesanan
-              </p>
             </div>
-          </div>
+          ) : null}
         </div>
       </div>
 

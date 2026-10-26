@@ -69,8 +69,9 @@ export default function MonthlyTrendChart({ data }: { data: MonthlyTrendPoint[] 
   const heightOf = (i: number) => (top > 0 ? ((Number(data[i].revenue) || 0) / top) * 100 : 0);
   /* Batang "bulan aktif" = bulan terakhir jendela, yaitu bulan PERIODE TERPILIH. */
   const activeIdx = n - 1;
-  const focusIdx = hover ?? activeIdx;
-  const focus = data[focusIdx];
+  /* Tooltip HANYA saat hover. Tanpa hover tidak ada kartu info yang menutupi grafik. */
+  const focusIdx = hover;
+  const focus = focusIdx !== null ? data[focusIdx] : null;
 
   return (
     <div
@@ -122,34 +123,36 @@ export default function MonthlyTrendChart({ data }: { data: MonthlyTrendPoint[] 
             })}
           </div>
 
-          {/* Nilai bulan yang disorot — tanpa mouse: bulan periode terpilih */}
-          <div
-            className="absolute z-10 pointer-events-none transition-all duration-200"
-            style={{
-              left: `${((focusIdx + 0.5) / n) * 100}%`,
-              bottom: `calc(${heightOf(focusIdx)}% + 10px)`,
-              transform: "translateX(-50%)",
-            }}
-          >
+          {/* Nilai bulan yang disorot — hanya saat hover. */}
+          {focusIdx !== null && focus ? (
             <div
-              className="rounded-xl px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.14)]"
-              style={{ background: "var(--card)", border: "1px solid var(--bd)" }}
+              className="absolute z-10 pointer-events-none transition-all duration-200"
+              style={{
+                left: `${((focusIdx + 0.5) / n) * 100}%`,
+                bottom: `calc(${heightOf(focusIdx)}% + 10px)`,
+                transform: "translateX(-50%)",
+              }}
             >
               <div
-                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide"
-                style={{ color: "var(--fg3)" }}
+                className="rounded-xl px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.14)]"
+                style={{ background: "var(--card)", border: "1px solid var(--bd)" }}
               >
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: BAR_ACTIVE }} />
-                Pendapatan · {focus.label}
+                <div
+                  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide"
+                  style={{ color: "var(--fg3)" }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: BAR_ACTIVE }} />
+                  Pendapatan · {focus.label}
+                </div>
+                <p className="text-sm font-extrabold whitespace-nowrap mt-0.5" style={{ color: "var(--fg)" }}>
+                  {rp(focus.revenue)}
+                </p>
+                <p className="text-[10px] font-semibold whitespace-nowrap" style={{ color: "var(--fg3)" }}>
+                  {focus.orders} pesanan
+                </p>
               </div>
-              <p className="text-sm font-extrabold whitespace-nowrap mt-0.5" style={{ color: "var(--fg)" }}>
-                {rp(focus.revenue)}
-              </p>
-              <p className="text-[10px] font-semibold whitespace-nowrap" style={{ color: "var(--fg3)" }}>
-                {focus.orders} pesanan
-              </p>
             </div>
-          </div>
+          ) : null}
         </div>
       </div>
 
