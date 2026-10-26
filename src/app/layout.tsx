@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import localFont from "next/font/local";
+import { Analytics } from "@vercel/analytics/next";
 import Providers from "@/components/Providers";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, SITE_CONTACT, OG_IMAGE } from "@/lib/site-config";
 import "./globals.css";
@@ -120,6 +121,7 @@ export default async function RootLayout({
         <Providers>
           {children}
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
