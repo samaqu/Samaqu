@@ -14,6 +14,7 @@ import {
   filterByTab,
   filterCustomers,
   hanyaPesananBatal,
+  pernahBelanja,
   sortCustomers,
   type AccountFilter,
   type CustomerSort,
@@ -177,6 +178,27 @@ export default function CustomerDirectoryView({
 
   // Tab memisahkan pelanggan; hitungannya diambil dari data yang sama dengan yang ditampilkan.
   const tabCounts = useMemo(() => countByTab(customers), [customers]);
+
+  /**
+   * Ringkasan cepat SEBELUM difilter: berapa total, berapa yang punya akun, berapa yang
+   * belum daftar, dan berapa yang sudah/belum pernah belanja. Angkanya dari data yang sama
+   * dengan tab & tabel, jadi tidak mungkin berbeda.
+   */
+  const summary = useMemo(() => {
+    const total = customers.length;
+    const registered = customers.filter((c) => c.registered).length;
+    const buyers = customers.filter(pernahBelanja).length;
+    return {
+      total,
+      registered,
+      guest: total - registered,
+      buyers,
+      nonBuyers: total - buyers,
+    };
+  }, [customers]);
+
+  const shareOf = (value: number) => (summary.total > 0 ? Math.round((value / summary.total) * 100) : 0);
+
   const inTab = useMemo(() => filterByTab(customers, tab), [customers, tab]);
   const cities = useMemo(() => distinctCities(inTab), [inTab]);
 
@@ -197,6 +219,30 @@ export default function CustomerDirectoryView({
 
   return (
     <div className="space-y-4">
+      {/* Ringkasan cepat: total, akun, dan status belanja — dihitung dari data yang sama. */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+        {[
+          { label: "Total pelanggan", value: summary.total, caption: "tercatat" },
+          { label: "Punya akun", value: summary.registered, caption: `${shareOf(summary.registered)}% dari total` },
+          { label: "Belum daftar", value: summary.guest, caption: "dari pesanan" },
+          { label: "Pernah belanja", value: summary.buyers, caption: `${shareOf(summary.buyers)}% dari total` },
+          { label: "Belum belanja", value: summary.nonBuyers, caption: "belum ada transaksi" },
+        ].map((item) => (
+          <div
+            key={item.label}
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-[#1a1d28]"
+          >
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              {item.label}
+            </p>
+            <p className="mt-1 text-xl font-black tabular-nums text-slate-900 dark:text-white">
+              {item.value.toLocaleString("id-ID")}
+            </p>
+            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{item.caption}</p>
+          </div>
+        ))}
+      </div>
+
       {/* Tab: memisahkan pelanggan supaya daftarnya mudah dibaca */}
       <div className="rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-slate-800 dark:bg-[#1a1d28]">
         <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
