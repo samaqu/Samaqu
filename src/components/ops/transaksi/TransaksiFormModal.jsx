@@ -1337,7 +1337,11 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
   };
 
   /* ── Alur bertahap: tiap langkah harus beres dulu sebelum bisa lanjut ── */
-  const step1Ready = Boolean(form?.customer_name?.trim()) && Boolean(form?.customer_whatsapp?.trim()) && !addressIncomplete;
+  // Pesanan website/Open Order: data pelanggan tidak diedit dari sini, jadi langkah ini
+  // dianggap siap (tidak boleh menahan alur karena satu kolom alamat yang kosong).
+  const step1Ready =
+    managedSource ||
+    (Boolean(form?.customer_name?.trim()) && Boolean(form?.customer_whatsapp?.trim()) && !addressIncomplete);
   const stepReady = [step1Ready, !incomplete, true];
   const stepLabels = ["Pelanggan", "Produk", "Pembayaran"];
 
@@ -1543,20 +1547,26 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       setScrollKick((count) => count + 1);
       return;
     }
-    if (!form.customer_name.trim()) {
-      if (isEdit) setStep(0);
-      setScrollKick((count) => count + 1);
-      return setSaveError("Nama pelanggan wajib diisi.");
-    }
-    if (!form.customer_whatsapp.trim()) {
-      if (isEdit) setStep(0);
-      setScrollKick((count) => count + 1);
-      return setSaveError("Nomor HP pelanggan wajib diisi.");
-    }
-    if (addressIncomplete) {
-      if (isEdit) setStep(0);
-      setScrollKick((count) => count + 1);
-      return setSaveError("Alamat pengiriman wajib diisi lengkap.");
+    // Website/Open Order: server TIDAK membaca data pelanggan/alamat dari form ini (yang dipakai
+    // hanya `order_items`). Jadi jangan blokir simpan karena kolom yang tidak dipakai — mis.
+    // `shipping_province` kosong pada pesanan Open Order lama. Validasi lengkap tetap berlaku
+    // untuk transaksi manual dan transaksi baru.
+    if (!managedSource) {
+      if (!form.customer_name.trim()) {
+        if (isEdit) setStep(0);
+        setScrollKick((count) => count + 1);
+        return setSaveError("Nama pelanggan wajib diisi.");
+      }
+      if (!form.customer_whatsapp.trim()) {
+        if (isEdit) setStep(0);
+        setScrollKick((count) => count + 1);
+        return setSaveError("Nomor HP pelanggan wajib diisi.");
+      }
+      if (addressIncomplete) {
+        if (isEdit) setStep(0);
+        setScrollKick((count) => count + 1);
+        return setSaveError("Alamat pengiriman wajib diisi lengkap.");
+      }
     }
     const createdAt = wibToIso(form.date, form.time);
     if (!createdAt) return setSaveError("Tanggal/jam transaksi tidak valid.");
@@ -1776,20 +1786,28 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                         </p>
                       </div>
                       <div className="shrink-0 flex flex-wrap justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setCustomerEditing(true)}
-                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                        >
-                          Ubah pelanggan
-                        </button>
-                        <button
-                          type="button"
-                          onClick={openAddressEditor}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900 dark:bg-white text-[11px] font-bold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
-                        >
-                          <Pencil size={12} /> Ubah alamat
-                        </button>
+                        {!managedSource ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setCustomerEditing(true)}
+                              className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                            >
+                              Ubah pelanggan
+                            </button>
+                            <button
+                              type="button"
+                              onClick={openAddressEditor}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900 dark:bg-white text-[11px] font-bold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors"
+                            >
+                              <Pencil size={12} /> Ubah alamat
+                            </button>
+                          </>
+                        ) : (
+                          <span className="max-w-[190px] text-right text-[10px] font-semibold leading-snug text-slate-400 dark:text-slate-500">
+                            Data pelanggan &amp; alamat mengikuti pesanan asal
+                          </span>
+                        )}
                       </div>
                     </div>
                     <p className="text-sm text-slate-700 dark:text-slate-200 mt-2 leading-relaxed">
@@ -2331,23 +2349,39 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
               {/* Mode Ubah: alamat tetap terlihat & bisa diubah dari langkah yang pertama
                   terbuka, tanpa harus tahu bahwa kolomnya ada di langkah Pelanggan. */}
               {isEdit && (
-                <button
-                  type="button"
-                  onClick={openAddressEditor}
-                  className="w-full flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 px-3.5 py-2.5 text-left hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
-                >
-                  <span className="min-w-0">
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Alamat pengiriman · bisa diubah
+                managedSource ? (
+                  <div className="w-full flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 px-3.5 py-2.5">
+                    <span className="min-w-0">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Alamat pengiriman · mengikuti pesanan asal
+                      </span>
+                      <span className="block text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">
+                        {addressText(form) || "Alamat belum diisi"}
+                      </span>
                     </span>
-                    <span className="block text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">
-                      {addressText(form) || "Alamat belum diisi"}
+                    <span className="shrink-0 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+                      Terkunci
                     </span>
-                  </span>
-                  <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
-                    <Pencil size={13} /> Ubah alamat
-                  </span>
-                </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={openAddressEditor}
+                    className="w-full flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 px-3.5 py-2.5 text-left hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Alamat pengiriman · bisa diubah
+                      </span>
+                      <span className="block text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">
+                        {addressText(form) || "Alamat belum diisi"}
+                      </span>
+                    </span>
+                    <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
+                      <Pencil size={13} /> Ubah alamat
+                    </span>
+                  </button>
+                )
               )}
               {/* Pemilih produk cepat: cari produk → series → ukuran → qty */}
               <section className="space-y-2.5">
