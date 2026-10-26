@@ -69,7 +69,17 @@ export async function GET(req: NextRequest) {
 
   // Rincian lanjutan (halaman, referrer, negara, kota, perangkat, browser, OS, UTM).
   // Kalau migrasi detail belum dijalankan, data inti tetap dikirim + pesan `advancedError`.
-  const DIMENSIONS = ["path", "referrer", "country", "city", "device", "browser", "os", "utm_source"] as const;
+  const DIMENSIONS = [
+    "path",
+    "referrer",
+    "country",
+    "city",
+    "device",
+    "browser",
+    "os",
+    "utm_source",
+    "language",
+  ] as const;
   const breakdownResults = await Promise.all(
     DIMENSIONS.map((dimension) =>
       admin.rpc("samaqu_web_breakdown", {
