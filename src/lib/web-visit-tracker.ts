@@ -51,6 +51,38 @@ function deviceOf(userAgent: string): string {
   return "desktop";
 }
 
+/** Browser dari user-agent. Urutan penting: Edge/Opera/Samsung sebelum Chrome, Chrome sebelum Safari. */
+function browserOf(userAgent: string): string {
+  if (/edg\//i.test(userAgent)) return "Edge";
+  if (/opr\/|opera mini|opera mobi/i.test(userAgent)) return "Opera";
+  if (/samsungbrowser/i.test(userAgent)) return "Samsung Internet";
+  if (/firefox|fxios/i.test(userAgent)) return "Firefox";
+  if (/chrome|crios/i.test(userAgent)) return "Chrome";
+  if (/safari/i.test(userAgent)) return "Safari";
+  return "Lainnya";
+}
+
+/** OS dari user-agent. Android dicek sebelum Linux, iOS sebelum macOS (UA-nya saling mengandung). */
+function osOf(userAgent: string): string {
+  if (/windows/i.test(userAgent)) return "Windows";
+  if (/android/i.test(userAgent)) return "Android";
+  if (/iphone|ipad|ipod/i.test(userAgent)) return "iOS";
+  if (/mac os x|macintosh/i.test(userAgent)) return "macOS";
+  if (/linux/i.test(userAgent)) return "Linux";
+  return "Lainnya";
+}
+
+/** Bahasa utama dari `accept-language` (mis. "id-ID,id;q=0.9" → "id-id"). */
+function languageOf(value: string): string | null {
+  const first = value.split(",")[0]?.split(";")[0]?.trim().toLowerCase();
+  return first ? first.slice(0, 24) : null;
+}
+
+const clean = (value: string | null, max = 80): string | null => {
+  const trimmed = String(value || "").trim();
+  return trimmed ? trimmed.slice(0, max) : null;
+};
+
 /** Catat satu kunjungan bila request ini memang layak dihitung. */
 export function trackVisit(request: NextRequest, event: NextFetchEvent): void {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -94,29 +126,65 @@ export function trackVisit(request: NextRequest, event: NextFetchEvent): void {
   }
 
   const day = wibDay(new Date());
+  const search = request.nextUrl.searchParams;
+
+  // Kota dari Vercel datang dalam bentuk URL-encoded.
+  const cityHeader = headers.get("x-vercel-ip-city");
+  let city: string | null = null;
+  if (cityHeader) {
+    try {
+      city = clean(decodeURIComponent(cityHeader), 60);
+    } catch {
+      city = clean(cityHeader, 60);
+    }
+  }
+
   const row = {
     day,
     path,
     referrer_host: referrerHost,
     country: (headers.get("x-vercel-ip-country") || "").toUpperCase() || null,
+    region: clean(headers.get("x-vercel-ip-country-region"), 40),
+    city,
     device: deviceOf(userAgent),
+    browser: browserOf(userAgent),
+    os: osOf(userAgent),
+    language: languageOf(headers.get("accept-language") || ""),
+    utm_source: clean(search.get("utm_source")),
+    utm_medium: clean(search.get("utm_medium")),
+    utm_campaign: clean(search.get("utm_campaign")),
     visitor_hash: "",
   };
 
   event.waitUntil(
     (async () => {
       try {
-        row.visitor_hash = await sha256Hex(`${secret}|${day}|${ip}|${userAgent}`);
-        await fetch(`${supabaseUrl}/rest/v1/web_visits`, {
-          method: "POST",
-          headers: {
-            apikey: serviceKey,
-            Authorization: `Bearer ${serviceKey}`,
-            "Content-Type": "application/json",
-            Prefer: "return=minimal",
-          },
-          body: JSON.stringify([row]),
-        });
+        const visitorHash = await sha256Hex(`${secret}|${day}|${ip}|${userAgent}`);
+        const post = (body: Record<string, unknown>) =>
+          fetch(`${supabaseUrl}/rest/v1/web_visits`, {
+            method: "POST",
+            headers: {
+              apikey: serviceKey,
+              Authorization: `Bearer ${serviceKey}`,
+              "Content-Type": "application/json",
+              Prefer: "return=minimal",
+            },
+            body: JSON.stringify([body]),
+          });
+
+        const response = await post({ ...row, visitor_hash: visitorHash });
+        if (!response.ok) {
+          // Kolom detail belum ada (migrasi 20261026_web_analytics_detail.sql belum dijalankan):
+          // kunjungan tetap dicatat dengan kolom dasar supaya tidak ada data yang hilang.
+          await post({
+            day: row.day,
+            path: row.path,
+            referrer_host: row.referrer_host,
+            country: row.country,
+            device: row.device,
+            visitor_hash: visitorHash,
+          });
+        }
       } catch {
         // Pencatatan trafik tidak boleh mengganggu halaman.
       }

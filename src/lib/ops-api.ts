@@ -471,6 +471,12 @@ export const base44 = {
           totals: { pageviews: number; visitors: number };
           series: Array<{ day: string; pageviews: number; visitors: number }>;
           top: Array<{ path: string; pageviews: number; visitors: number }>;
+          /** Rincian per dimensi: path, referrer, country, city, device, browser, os, utm_source. */
+          breakdowns: Record<string, Array<{ value: string; pageviews: number; visitors: number }>>;
+          /** Sebaran per jam WIB untuk hari terakhir di rentang. */
+          hourly: Array<{ hour: number; pageviews: number; visitors: number }>;
+          /** Pesan kalau migrasi detail (20261026_web_analytics_detail.sql) belum dijalankan. */
+          advancedError: string | null;
         }>("GET", `${ANALYTICS}?days=${days}`);
       },
     },

@@ -67,6 +67,37 @@ export async function GET(req: NextRequest) {
   const todayRow = series[series.length - 1] || { day: until, pageviews: 0, visitors: 0 };
   const rangeRow = (range.data || [])[0];
 
+  // Rincian lanjutan (halaman, referrer, negara, kota, perangkat, browser, OS, UTM).
+  // Kalau migrasi detail belum dijalankan, data inti tetap dikirim + pesan `advancedError`.
+  const DIMENSIONS = ["path", "referrer", "country", "city", "device", "browser", "os", "utm_source"] as const;
+  const breakdownResults = await Promise.all(
+    DIMENSIONS.map((dimension) =>
+      admin.rpc("samaqu_web_breakdown", {
+        p_since: since,
+        p_until: until,
+        p_dimension: dimension,
+        p_limit: 10,
+      }),
+    ),
+  );
+  const advancedError = breakdownResults.find((result) => result.error)?.error?.message ?? null;
+
+  const breakdowns: Record<string, Array<{ value: string; pageviews: number; visitors: number }>> = {};
+  DIMENSIONS.forEach((dimension, index) => {
+    breakdowns[dimension] = (breakdownResults[index].data || []).map((row: any) => ({
+      value: String(row.value ?? ""),
+      pageviews: Number(row.pageviews) || 0,
+      visitors: Number(row.visitors) || 0,
+    }));
+  });
+
+  const { data: hourlyRows } = await admin.rpc("samaqu_web_hourly", { p_day: until });
+  const hourly = (hourlyRows || []).map((row: any) => ({
+    hour: Number(row.hour) || 0,
+    pageviews: Number(row.pageviews) || 0,
+    visitors: Number(row.visitors) || 0,
+  }));
+
   return NextResponse.json({
     days,
     since,
@@ -82,5 +113,8 @@ export async function GET(req: NextRequest) {
       pageviews: Number(row.pageviews) || 0,
       visitors: Number(row.visitors) || 0,
     })),
+    breakdowns,
+    hourly,
+    advancedError,
   });
 }

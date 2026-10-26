@@ -30,6 +30,8 @@ const IconPackagePlus: any = (LucideIcons as any).PackagePlus ?? Package;
 const IconClipboardCheck: any = (LucideIcons as any).ClipboardCheck ?? FileText;
 const IconRecipe: any = (LucideIcons as any).NotebookPen ?? (LucideIcons as any).Notebook ?? FileText;
 const IconCalendar: any = (LucideIcons as any).CalendarDays ?? (LucideIcons as any).Calendar ?? FileText;
+const IconTraffic: any =
+  (LucideIcons as any).ChartNoAxesCombined ?? (LucideIcons as any).TrendingUp ?? (LucideIcons as any).LineChart ?? BarChart3;
 import { supabase } from "@/lib/supabase";
 import { Toaster } from "@/components/ops/ui/toaster";
 import OpsFooter from "@/components/ops/OpsFooter";
@@ -38,7 +40,13 @@ type MenuItem = { title: string; href: string; icon: any; soon?: boolean };
 type MenuGroup = { label: string; items: MenuItem[] };
 
 const BASE_MENU_GROUPS: MenuGroup[] = [
-  { label: "Utama", items: [{ title: "Dashboard", href: "/ops", icon: LayoutDashboard }] },
+  {
+    label: "Utama",
+    items: [
+      { title: "Dashboard", href: "/ops", icon: LayoutDashboard },
+      { title: "Trafik", href: "/ops/trafik", icon: IconTraffic },
+    ],
+  },
   {
     label: "Penjualan",
     items: [

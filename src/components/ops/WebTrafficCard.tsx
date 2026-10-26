@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import * as LucideIcons from "lucide-react";
 import { base44 } from "@/lib/ops-api";
@@ -165,9 +166,14 @@ export default function WebTrafficCard() {
             </div>
           </div>
 
-          <p className="mt-4 text-[11px] text-slate-400">
-            Tanpa cookie · tanpa IP mentah · halaman internal (ops, panel-admin, admin, affiliate) tidak dihitung.
-          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] text-slate-400">
+              Tanpa cookie · tanpa IP mentah · halaman internal tidak dihitung.
+            </p>
+            <Link href="/ops/trafik" className="text-[11px] font-bold text-slate-700 hover:underline">
+              Lihat detail →
+            </Link>
+          </div>
         </>
       )}
     </div>
