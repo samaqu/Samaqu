@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useReducer, useEffect, useCallback, useState } from "react";
+import { createContext, useContext, useReducer, useEffect, useCallback, useRef, useState } from "react";
 import { validateVoucher } from "./voucher-utils";
 
 export interface CartItem {
@@ -101,6 +101,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [] });
   const [loaded, setLoaded] = useState(false);
   const [voucher, setVoucher] = useState<VoucherState>({ code: "", id: "", discount: 0 });
+  const checkedVoucherRef = useRef("");
 
   // Load cart + voucher from localStorage
   useEffect(() => {
@@ -147,6 +148,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = useCallback(() => {
     dispatch({ type: "CLEAR" });
+    checkedVoucherRef.current = "";
     setVoucher({ code: "", id: "", discount: 0 });
   }, []);
 
@@ -160,6 +162,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const applyVoucher = useCallback(async (code: string, whatsapp?: string) => {
     const result = await validateVoucher(code, subtotal, whatsapp);
     if (result.valid) {
+      checkedVoucherRef.current = result.voucher.code;
       setVoucher({ code: result.voucher.code, id: result.voucher.id, discount: result.discount });
       return { ok: true };
     }
@@ -167,8 +170,35 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [subtotal]);
 
   const removeVoucher = useCallback(() => {
+    checkedVoucherRef.current = "";
     setVoucher({ code: "", id: "", discount: 0 });
   }, []);
+
+  // Voucher disimpan di localStorage. Saat halaman dibuka, cek ulang ke server:
+  // kalau kode sudah dihapus/dinonaktifkan admin, diskon langsung dibersihkan.
+  useEffect(() => {
+    if (!loaded || !voucher.code) return;
+    if (checkedVoucherRef.current === voucher.code) return;
+    checkedVoucherRef.current = voucher.code;
+
+    let active = true;
+    validateVoucher(voucher.code, subtotal).then((result) => {
+      if (!active) return;
+      if (!result.valid) {
+        checkedVoucherRef.current = "";
+        setVoucher({ code: "", id: "", discount: 0 });
+        return;
+      }
+      setVoucher({
+        code: result.voucher.code,
+        id: result.voucher.id,
+        discount: result.discount,
+      });
+    });
+    return () => {
+      active = false;
+    };
+  }, [loaded, voucher.code, subtotal]);
 
   return (
     <CartContext.Provider value={{ items: state.items, addItem, removeItem, updateQty, updatePrice, clearCart, totalItems, subtotal, voucher, applyVoucher, removeVoucher }}>
