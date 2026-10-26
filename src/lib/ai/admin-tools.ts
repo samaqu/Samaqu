@@ -327,6 +327,8 @@ async function ringkasOperasional(args: Record<string, unknown>): Promise<AdminT
       const saleItems = (items || []) as any[];
       const products = ((productsRes.data || []) as any[]).map((p) => ({
         id: p.id,
+        name: p.name,
+        series: p.series,
         product_type: p.product_type,
       }));
       const top = rankTopProducts({ orders: orders.map((o) => ({ id: o.id, status: o.status, created_at: o.created_at })), items: saleItems, products, limit: 5 });

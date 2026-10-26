@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
   if (productIds.length > 0) {
     const { data: prods } = await admin
       .from("products")
-      .select("id, hpp, sku, product_type")
+      .select("id, name, series, hpp, sku, product_type")
       .in("id", productIds);
     productRows = (prods || []) as any[];
   }

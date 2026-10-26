@@ -38,6 +38,8 @@ type TopProduct = {
   units: number;
   /** Omzet baris (Rp) dari harga tercatat di item pesanan. */
   revenue: number;
+  /** Bagian dari `units` yang berasal dari add-on Open Order. */
+  addonUnits?: number;
 };
 type TrendPoint = { tanggal: string; hari: string; omset: number };
 type TrendHarian = { tanggal: string; label: string; omset: number };
@@ -487,6 +489,11 @@ export default function OpsDashboardPage() {
                         <p className="text-[11px] text-gray-500 truncate" title={subline || undefined}>
                           {subline || "—"}
                         </p>
+                        {p.addonUnits ? (
+                          <p className="text-[10px] font-semibold text-amber-600 mt-0.5">
+                            termasuk {nfmt(p.addonUnits)} add-on Open Order
+                          </p>
+                        ) : null}
                       </div>
                       <div className="shrink-0 text-right">
                         <p className="text-base font-black text-slate-900 leading-none tabular-nums">{nfmt(p.units)}</p>

@@ -68,6 +68,8 @@ export interface TopProduct {
   units: number;
   /** Omzet baris (Rp) dari harga tercatat di item pesanan. */
   revenue: number;
+  /** Bagian dari `units` yang berasal dari add-on Open Order. */
+  addonUnits?: number;
 }
 
 interface Metric {
@@ -445,7 +447,13 @@ export default function DashboardView({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 text-xs">
             {topProducts.slice(0, 4).map((p, i) => {
-              const tooltip = [p.sub, p.revenue > 0 ? `Rp ${p.revenue.toLocaleString("id-ID")}` : ""].filter(Boolean).join(" · ");
+              const tooltip = [
+                p.sub,
+                p.revenue > 0 ? `Rp ${p.revenue.toLocaleString("id-ID")}` : "",
+                p.addonUnits ? `${p.addonUnits} add-on Open Order` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ");
               return (
               <div
                 key={`${p.name}||${p.sub}`}
@@ -459,6 +467,11 @@ export default function DashboardView({
                     {/* baris 1: nama produk lengkap — baris 2: jenis kain · series */}
                     <p className="font-extrabold truncate" style={{ color: "var(--fg)" }}>{p.name}</p>
                     <p className="text-[10px] font-bold truncate mt-0.5" style={{ color: "var(--fg3)" }}>{p.sub || "—"}</p>
+                    {p.addonUnits ? (
+                      <p className="text-[10px] font-bold truncate mt-0.5" style={{ color: "#b45309" }}>
+                        termasuk {p.addonUnits} add-on Open Order
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 <span

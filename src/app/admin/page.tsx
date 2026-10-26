@@ -296,7 +296,12 @@ function AdminPageInner() {
       rankTopProducts({
         orders: dashOrders.map((o) => ({ id: o.id, status: o.status, created_at: o.created_at })),
         items: dashOrders.flatMap((o) => (o.order_items || []).map((it) => ({ ...it, order_id: o.id }))),
-        products: products.map((p) => ({ id: p.id, product_type: p.product_type })),
+        products: products.map((p) => ({
+          id: p.id,
+          name: p.name,
+          series: p.series,
+          product_type: p.product_type,
+        })),
         limit: 4,
       }),
     [dashOrders, products]
