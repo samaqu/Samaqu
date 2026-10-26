@@ -22,6 +22,8 @@ export type CustomerOrder = {
   status: string;
   items: string[];
   address?: string | null;
+  /** Alasan pembatalan (null untuk pesanan lama yang dibatalkan sebelum kolomnya ada). */
+  cancelReason?: string | null;
 };
 
 export type AdminCustomer = {
@@ -216,6 +218,13 @@ export default function CustomerDetailDrawer({
                             {formatDate(o.created_at)}
                             {o.items.length > 0 && ` · ${o.items.slice(0, 2).join(", ")}${o.items.length > 2 ? ` +${o.items.length - 2} lainnya` : ""}`}
                           </p>
+                          {/batal/i.test(o.status) ? (
+                            <p className="cd-order-reason">
+                              {o.cancelReason
+                                ? `Alasan batal: ${o.cancelReason}`
+                                : "Alasan batal tidak tercatat (data lama)"}
+                            </p>
+                          ) : null}
                         </div>
                         <div className="cd-order-right">
                           <span className="cd-order-total">{money(o.total)}</span>
@@ -277,6 +286,7 @@ const CD_CSS = `
 .cd-order:first-child{border-top:0;padding-top:0}
 .cd-order-num{margin:0;font-size:.8rem;font-weight:800;color:#1c1c1c;overflow-wrap:anywhere}
 .cd-order-items{margin:3px 0 0;font-size:.68rem;font-weight:600;color:#9a9a98}
+.cd-order-reason{margin:2px 0 0;font-size:.66rem;font-weight:700;color:#b42318;overflow-wrap:anywhere}
 .cd-order-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
 .cd-order-total{font-size:.78rem;font-weight:800;color:#1c1c1c;white-space:nowrap}
 .cd-pill{font-size:.62rem;font-weight:800;padding:.16rem .5rem;border-radius:999px;white-space:nowrap}

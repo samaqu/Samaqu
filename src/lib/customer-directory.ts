@@ -20,6 +20,8 @@ export type DirectoryOrder = {
   status: string;
   items: string[];
   address: string | null;
+  /** Alasan pembatalan (kolom `orders.cancel_reason`); null untuk data lama. */
+  cancelReason: string | null;
 };
 
 export type DirectoryCustomer = {
@@ -71,6 +73,8 @@ type OrderRow = {
   total: number | null;
   status: string | null;
   created_at: string;
+  /** Alasan pembatalan (migration 20261026_order_cancel_reason.sql). */
+  cancel_reason?: string | null;
   order_items?: ItemRow[] | null;
 };
 type CustomerRow = { id: string; name: string | null; whatsapp: string | null; birth_date?: string | null; created_at?: string | null };
@@ -101,9 +105,25 @@ export async function buildCustomerDirectory(admin: SupabaseClient): Promise<Dir
     customers = (withBirth.data || []) as CustomerRow[];
   }
 
-  const { data: orders, error: ordersError } = await admin
-    .from("orders")
-    .select("id, order_number, customer_id, customer_name, customer_whatsapp, shipping_address, shipping_city, shipping_kecamatan, shipping_postal_code, total, status, created_at, order_items(product_name, series, kain, color, quantity)");
+  // `cancel_reason` baru ditambahkan lewat migration. Kalau kolomnya belum ada, ulangi select
+  // tanpa kolom itu — kalau tidak, SELURUH daftar pesanan gagal dibaca dan riwayat pelanggan
+  // jadi kosong.
+  const ORDER_COLUMNS =
+    "id, order_number, customer_id, customer_name, customer_whatsapp, shipping_address, shipping_city, shipping_kecamatan, shipping_postal_code, total, status, created_at";
+  const ORDER_ITEMS = "order_items(product_name, series, kain, color, quantity)";
+  let orders: OrderRow[] | null = null;
+  let ordersError: { message?: string } | null = null;
+  {
+    const first = await admin.from("orders").select(`${ORDER_COLUMNS}, cancel_reason, ${ORDER_ITEMS}`);
+    if (first.error && /cancel_reason/i.test(first.error.message)) {
+      const fallback = await admin.from("orders").select(`${ORDER_COLUMNS}, ${ORDER_ITEMS}`);
+      orders = (fallback.data || []) as OrderRow[];
+      ordersError = fallback.error;
+    } else {
+      orders = (first.data || []) as OrderRow[];
+      ordersError = first.error;
+    }
+  }
   if (ordersError) console.warn("[CUSTOMERS] Gagal membaca orders:", ordersError.message);
 
   type Agg = DirectoryCustomer;
@@ -173,6 +193,7 @@ export async function buildCustomerDirectory(admin: SupabaseClient): Promise<Dir
       status: o.status || "",
       items: describeItems(o.order_items),
       address: [o.shipping_address, o.shipping_city, o.shipping_postal_code].filter(Boolean).join(", ") || null,
+      cancelReason: String(o.cancel_reason || "").trim() || null,
     });
     agg.ordersCount += 1;
     // "Total belanja" = hanya pesanan yang benar-benar jadi transaksi belanja, memakai aturan

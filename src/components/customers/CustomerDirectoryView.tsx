@@ -52,7 +52,7 @@ function CustomerBadges({ c }: { c: DirectoryCustomer }) {
       )}
       {hanyaPesananBatal(c) && (
         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-          Hanya pesanan batal
+          Batal
         </span>
       )}
       {c.addressIncomplete && (

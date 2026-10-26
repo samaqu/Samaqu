@@ -145,6 +145,8 @@ export async function cancelOrderCompletely(
     status: string;
     updated_at: string;
     cancelled_at?: string;
+    /** Alasan batal — disimpan supaya riwayat pelanggan bisa menjelaskan sebabnya. */
+    cancel_reason?: string | null;
     jnt_void_status?: string;
     jnt_voided_at?: string;
   };
@@ -152,6 +154,7 @@ export async function cancelOrderCompletely(
     status: "dibatalkan",
     updated_at: cancelledAt,
     cancelled_at: cancelledAt,
+    cancel_reason: String(remark || "").trim() || null,
     ...(cancelId ? { jnt_void_status: "voided", jnt_voided_at: cancelledAt } : {}),
   };
 
@@ -161,7 +164,7 @@ export async function cancelOrderCompletely(
   // PostgREST menolak SELURUH update — buang kolom yang disebut pesannya lalu ulangi, supaya
   // pembatalan tetap jalan dan hanya penandanya yang belum tersimpan.
   while (error) {
-    const missing = (["jnt_void_status", "jnt_voided_at", "cancelled_at"] as const).find((k) =>
+    const missing = (["jnt_void_status", "jnt_voided_at", "cancelled_at", "cancel_reason"] as const).find((k) =>
       error!.message.includes(k)
     );
     if (!missing) break;
