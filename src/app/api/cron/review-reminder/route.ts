@@ -9,8 +9,10 @@ import { sendOnce } from "@/lib/order-notify";
  * (header `Authorization: Bearer $CRON_SECRET`).
  *
  * Aturan:
- *  - hanya pesanan `selesai` yang WA "paket diterima" sudah terkirim
- *    (`delivered_notified_at` terisi) minimal 2 hari lalu;
+ *  - pesanan `selesai`, minimal 2 hari sejak paket diterima;
+ *  - "waktu diterima" memakai `delivered_notified_at`. Kalau kosong (pesanan lama,
+ *    sebelum kolom itu ada / WA paket diterima tidak pernah diklaim), dipakai
+ *    `updated_at` sebagai perkiraan — jadi backlog pesanan lama tetap dapat pengingat;
  *  - belum pernah diingatkan (`review_reminded_at` kosong) — klaim atomik di
  *    `sendOnce`, jadi cron berulang tetap mengirim satu kali;
  *  - pesanan yang sudah punya ulasan (status apa pun, termasuk ditolak) dilewati;
@@ -33,24 +35,54 @@ export async function GET(request: NextRequest) {
 
   const supabase = getSupabaseAdmin();
   const cutoff = new Date(Date.now() - DELAY_DAYS * 86_400_000).toISOString();
+  const COLUMNS = "id, order_number, customer_name, customer_whatsapp, delivered_notified_at, updated_at";
 
-  const { data: orders, error } = await supabase
-    .from("orders")
-    .select("id, order_number, customer_name, customer_whatsapp, delivered_notified_at")
-    .eq("status", "selesai")
-    .is("review_reminded_at", null)
-    .not("delivered_notified_at", "is", null)
-    .lte("delivered_notified_at", cutoff)
-    .order("delivered_notified_at", { ascending: true })
-    .limit(LIMIT);
+  // Dua kelompok: yang punya jam terima (WA paket diterima sudah diklaim) dan pesanan lama
+  // yang belum punya kolom itu — untuk yang lama, `updated_at` dipakai sebagai perkiraan.
+  const [delivered, legacy] = await Promise.all([
+    supabase
+      .from("orders")
+      .select(COLUMNS)
+      .eq("status", "selesai")
+      .is("review_reminded_at", null)
+      .not("delivered_notified_at", "is", null)
+      .lte("delivered_notified_at", cutoff)
+      .order("delivered_notified_at", { ascending: true })
+      .limit(LIMIT),
+    supabase
+      .from("orders")
+      .select(COLUMNS)
+      .eq("status", "selesai")
+      .is("review_reminded_at", null)
+      .is("delivered_notified_at", null)
+      .lte("updated_at", cutoff)
+      .order("updated_at", { ascending: true })
+      .limit(LIMIT),
+  ]);
 
+  const error = delivered.error || legacy.error;
   if (error) {
     // Kolom `review_reminded_at` belum ada (migrasi belum dijalankan) → jangan kirim apa pun.
     console.error("[REVIEW-REMINDER] Gagal membaca pesanan:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  if (!orders || orders.length === 0) {
+  const merged = new Map<string, any>();
+  for (const row of [...(delivered.data || []), ...(legacy.data || [])]) {
+    const key = String(row.id);
+    if (!merged.has(key)) merged.set(key, row);
+  }
+
+  // Urutkan dari yang paling lama diterima/selesai, lalu batasi per eksekusi.
+  const orders = [...merged.values()]
+    .sort((a, b) =>
+      String(a.delivered_notified_at || a.updated_at || "").localeCompare(
+        String(b.delivered_notified_at || b.updated_at || ""),
+      ),
+    )
+    .slice(0, LIMIT);
+
+  if (orders.length === 0) {
     return NextResponse.json({ scanned: 0, sent: 0, skipped: 0, failed: 0 });
   }
 
