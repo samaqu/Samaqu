@@ -149,14 +149,13 @@ function TabbedCard({
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
       <div className="flex items-end gap-3 border-b border-slate-100 px-4 pt-3">
-        <h2 className="shrink-0 pb-2.5 text-sm font-bold text-slate-900">{title}</h2>
-
+        {/* Satu tab = judul kartu. Dua tab = tab-nya SEKALIGUS judul (tidak diulang dua kali). */}
         {tabs.length > 1 ? (
           <div
             role="tablist"
             aria-label={title}
             onKeyDown={onKeyDown}
-            className="no-scrollbar flex min-w-0 items-end gap-0.5 overflow-x-auto"
+            className="no-scrollbar flex min-w-0 items-end gap-1 overflow-x-auto"
           >
             {tabs.map((item, index) => {
               const selected = index === active;
@@ -173,10 +172,10 @@ function TabbedCard({
                   aria-controls={`${id}-panel`}
                   tabIndex={selected ? 0 : -1}
                   onClick={() => setActive(index)}
-                  className={`-mb-px whitespace-nowrap border-b-2 px-2 pb-2.5 pt-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/25 focus-visible:ring-offset-2 ${
+                  className={`-mb-px whitespace-nowrap border-b-2 px-2 pb-2.5 pt-1 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/25 focus-visible:ring-offset-2 ${
                     selected
-                      ? "border-slate-900 text-slate-900"
-                      : "border-transparent text-slate-500 hover:text-slate-900"
+                      ? "border-slate-900 font-bold text-slate-900"
+                      : "border-transparent font-semibold text-slate-500 hover:text-slate-900"
                   }`}
                 >
                   {item.label}
@@ -184,7 +183,9 @@ function TabbedCard({
               );
             })}
           </div>
-        ) : null}
+        ) : (
+          <h2 className="shrink-0 pb-2.5 text-[13px] font-bold text-slate-900">{title}</h2>
+        )}
 
         <span className="ml-auto hidden shrink-0 pb-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 sm:block">
           Pengunjung
