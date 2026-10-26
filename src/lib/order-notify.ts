@@ -19,7 +19,8 @@ export type NotifyEvent =
   | "shipped"
   | "delivered"
   | "reminded"
-  | "cancelled";
+  | "cancelled"
+  | "review_reminder";
 
 const CLAIM_COLUMN: Record<NotifyEvent, string> = {
   created: "notify_created_at",
@@ -28,6 +29,7 @@ const CLAIM_COLUMN: Record<NotifyEvent, string> = {
   delivered: "delivered_notified_at",
   reminded: "reminded_at",
   cancelled: "cancelled_notified_at",
+  review_reminder: "review_reminded_at",
 };
 
 export interface ClaimOptions {

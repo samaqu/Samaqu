@@ -443,6 +443,12 @@ export interface DeliveredNotification {
   customerWhatsapp: string;
 }
 
+export interface ReviewReminderNotification {
+  orderNumber: string;
+  customerName: string;
+  customerWhatsapp: string;
+}
+
 export interface PaymentReminderNotification {
   orderNumber: string;
   customerName: string;
@@ -661,6 +667,23 @@ export function buildOrderDeliveredMessage(order: DeliveredNotification): string
   ].join("\n");
 }
 
+/** Pesan pengingat ulasan (2 hari setelah paket diterima, maksimal sekali per pesanan). */
+export function buildReviewReminderMessage(order: ReviewReminderNotification): string {
+  const ka = greetingName(order.customerName);
+  return [
+    `Halo ${ka},`,
+    "",
+    `Paket pesanan ${order.orderNumber} sudah sampai beberapa hari lalu.`,
+    "",
+    "Kalau berkenan, bantu kami dengan ulasan singkat. Pengalaman Ka sangat membantu pembeli lain memilih produk yang tepat.",
+    "",
+    "Tulis ulasan di sini:",
+    `${SITE_URL}/id/akun/ulasan`,
+    "",
+    "Terima kasih telah berbelanja di SAMAQU.",
+  ].join("\n");
+}
+
 /** Pesan pengingat pembayaran (maksimal sekali per pesanan). */
 export function buildPaymentReminderMessage(order: PaymentReminderNotification): string {
   const ka = greetingName(order.customerName);
@@ -805,6 +828,22 @@ export async function notifyCustomerOrderDelivered(order: DeliveredNotification)
   const finalMessage = message.includes(reviewLink)
     ? message
     : `${message}\n\nBantu kami dengan ulasan singkat:\n${reviewLink}`;
+  return sendToCustomer(order.customerWhatsapp, finalMessage);
+}
+
+export async function notifyCustomerReviewReminder(
+  order: ReviewReminderNotification,
+): Promise<boolean> {
+  const reviewLink = `${SITE_URL}/id/akun/ulasan`;
+  const message = await buildNotifikasi("pengingat-ulasan", buildReviewReminderMessage(order), {
+    nama: greetingName(order.customerName),
+    nomor: order.orderNumber,
+    tautan_ulasan: reviewLink,
+  });
+  // Template custom mungkin belum memuat tautannya; pastikan tetap ada, tanpa menggandakan.
+  const finalMessage = message.includes(reviewLink)
+    ? message
+    : `${message}\n\nTulis ulasan:\n${reviewLink}`;
   return sendToCustomer(order.customerWhatsapp, finalMessage);
 }
 
@@ -1092,6 +1131,15 @@ export function templateBawaanNotifikasi(): Record<string, string> {
     { [`${SITE_URL}/id/akun/ulasan`]: p("tautan_ulasan") },
   );
 
+  hasil["pengingat-ulasan"] = gantiDenganPenanda(
+    buildReviewReminderMessage({
+      orderNumber: p("nomor"),
+      customerName: p("nama"),
+      customerWhatsapp: p("wa"),
+    }),
+    { [`${SITE_URL}/id/akun/ulasan`]: p("tautan_ulasan") },
+  );
+
   hasil["pesanan-dibatalkan-pembeli"] = buildOrderCancelledMessage({
     orderNumber: p("nomor"),
     customerName: p("nama"),
@@ -1282,6 +1330,14 @@ export function katalogNotifikasi(): NotifikasiInfo[] {
       aktif: true,
       kapan: "Saat tracking J&T menandai paket terkirim",
       isi: buildOrderDeliveredMessage({ ...pembeli }),
+    },
+    {
+      key: "pengingat-ulasan",
+      label: "Pengingat ulasan",
+      ke: "Pembeli",
+      aktif: true,
+      kapan: "2 hari setelah paket diterima (status selesai), sekali saja, kalau belum ada ulasan",
+      isi: buildReviewReminderMessage({ ...pembeli }),
     },
     {
       key: "pesanan-dibatalkan-pembeli",
