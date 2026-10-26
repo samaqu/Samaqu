@@ -147,21 +147,35 @@ function colorLabelOf(row: OpenOrderCatalogRow, color: string): string {
   return color || "";
 }
 
+/** Kolom harga yang dibutuhkan jalur Open Order (subset dari baris `products`). */
+export type OpenOrderPriceRow = Pick<
+  OpenOrderCatalogRow,
+  | "price"
+  | "minimum_price"
+  | "create_your_price_enabled"
+  | "open_order_price"
+  | "open_order_minimum_price"
+  | "open_order_cyp_enabled"
+>;
+
 /** True kalau baris ini punya harga khusus Open Order (menang atas harga katalog). */
-function hasOpenOrderPrice(row: OpenOrderCatalogRow): boolean {
+function hasOpenOrderPrice(row: OpenOrderPriceRow): boolean {
   return row.open_order_price != null;
 }
 
 /** Create Your Price untuk Open Order: pakai flag khusus bila ada, kalau tidak flag katalog. */
-function rowCypEnabled(row: OpenOrderCatalogRow): boolean {
+function rowCypEnabled(row: OpenOrderPriceRow): boolean {
   return hasOpenOrderPrice(row) ? !!row.open_order_cyp_enabled : !!row.create_your_price_enabled;
 }
 
 /**
- * Harga efektif satu baris. Harga khusus Open Order (`open_order_*`) menang atas harga katalog;
- * saat Create Your Price aktif → harga minimum, kalau tidak → harga biasa.
+ * Harga efektif SATU baris pada JALUR OPEN ORDER. Harga khusus Open Order (`open_order_*`) menang
+ * atas harga katalog; saat Create Your Price aktif → harga minimum, kalau tidak → harga biasa.
+ *
+ * Dipakai wizard Open Order, `/api/open-order`, dan form Ubah Transaksi — supaya pesanan CYO
+ * selalu dihargai dengan harga Open Order, bukan harga katalog (dua jalur ini memang beda angka).
  */
-function effectivePrice(row: OpenOrderCatalogRow): number {
+export function openOrderEffectivePrice(row: OpenOrderPriceRow): number {
   const price = (hasOpenOrderPrice(row) ? row.open_order_price : row.price) ?? 0;
   const minimum = hasOpenOrderPrice(row) ? row.open_order_minimum_price : row.minimum_price;
   if (rowCypEnabled(row) && minimum) return minimum;
@@ -222,7 +236,7 @@ export function buildOpenOrderProducts(
     if (!name || !category) continue;
 
     const series = (row.series ?? "").trim();
-    const price = effectivePrice(row);
+    const price = openOrderEffectivePrice(row);
     if (!price) continue;
 
     const key = `${category}::${name}`;

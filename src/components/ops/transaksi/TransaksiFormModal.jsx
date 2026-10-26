@@ -40,6 +40,7 @@ import { base44 } from "@/lib/ops-api";
 import { MANUAL_PRICE_MAX, MANUAL_PRICE_MIN, MANUAL_SOURCE_KEYS, SOURCE_LABEL, manualPrice } from "@/lib/transaksi";
 import { PAKET_SIZE, isPaketKategori, variantName } from "@/lib/item-label";
 import { OPEN_ORDER_ADDON } from "@/lib/open-order-config";
+import { openOrderEffectivePrice } from "@/lib/open-order-offering";
 import { OPS_STOCK_SIZES } from "@/lib/ops-stock";
 import { categoryRank, seriesRank, variantSortKey } from "@/lib/ops-order";
 import { formatWeightExact } from "@/lib/shipping-weight";
@@ -97,13 +98,21 @@ const clampQty = (value, max) => {
 };
 
 /**
- * Harga satuan yang dipakai satu baris: harga ketikan admin kalau ada, kalau tidak harga katalog.
- * Harga inilah yang dikirim ke server sebagai `order_items.price`, jadi subtotal pesanan — dan
- * semua angka pembukuan yang membacanya (omset, laba, Produk Terlaris) — ikut harga manual.
+ * Harga satuan yang dipakai satu baris, berurutan:
+ *   1. harga ketikan admin (`priceManual`),
+ *   2. harga yang TERCATAT di baris pesanan yang sedang diubah (`recordedPrice`),
+ *   3. harga katalog sekarang.
+ *
+ * Urutan ini sama dengan server (`buildEditSnapshot`: harga baris lama dulu, bukan katalog),
+ * jadi total di layar tidak berbeda dengan total yang dihitung server. Penting untuk Open Order
+ * yang harganya Create Your Price (bisa di bawah katalog): mengganti ukuran/series tidak boleh
+ * membuat harga melompat ke katalog.
  */
-const rowUnitPrice = (row, catalogPrice) => {
+const rowUnitPrice = (row, catalogPrice, recordedPrice = 0) => {
   const manual = row?.priceManual ? manualPrice(row.price) : null;
-  return manual ?? (Number(catalogPrice) || 0);
+  if (manual !== null) return manual;
+  const recorded = Number(recordedPrice) || 0;
+  return recorded > 0 ? recorded : Number(catalogPrice) || 0;
 };
 
 /**
@@ -138,6 +147,12 @@ const sizeRank = (size) => {
 
 export default function TransaksiFormModal({ isOpen, onClose, initialData = null, onSaved, variant = "ops" }) {
   const isEdit = !!initialData;
+  /**
+   * Pesanan Open Order (`CYO-`) memakai JALUR HARGA SENDIRI: kolom `open_order_price` /
+   * `open_order_minimum_price` / `open_order_cyp_enabled` (menu Open Order), bukan harga katalog
+   * (menu Produk). Pesanan website & transaksi manual tetap memakai harga katalog.
+   */
+  const isOpenOrderEdit = isEdit && initialData?.source_key === "open_order";
 
   /**
    * Stok yang sudah "dipesan" oleh pesanan ini (sudah dipotong dari stok katalog).
@@ -159,6 +174,45 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
 
   const reservedFor = (productId, color, size) =>
     Number(reservedByVariant[`${productId}||${color || "default"}||${String(size || "").toUpperCase()}`]) || 0;
+
+  /** Baris pesanan asal (kunci `order_items.id`) — patokan harga yang sudah tercatat. */
+  const recordedItemsById = useMemo(() => {
+    const map = {};
+    for (const item of initialData?.items || []) {
+      if (item?.id) map[item.id] = item;
+    }
+    return map;
+  }, [initialData]);
+
+  /**
+   * Harga yang TERCATAT di baris pesanan. Berlaku selama barisnya masih produk yang SAMA —
+   * ganti ukuran/qty tidak mengubah harga yang sudah disepakati. Kalau admin mengganti
+   * series/produk, harga kembali ke jalur sumber pesanan (lihat `pathPrice`).
+   */
+  const recordedPriceFor = (row) => {
+    const sourceItem = row?.source_item_id ? recordedItemsById[row.source_item_id] : null;
+    if (!sourceItem) return 0;
+    const product = resolveProduct(row);
+    if (product && sourceItem.product_id && String(product.product_id) !== String(sourceItem.product_id)) {
+      return 0;
+    }
+    return Number(sourceItem.price) || 0;
+  };
+
+  /**
+   * Harga bawaan satu varian MENURUT SUMBER PESANAN:
+   * - Open Order (`CYO-`) → jalur Open Order (`open_order_*`, termasuk batas minimum CYP);
+   * - website & transaksi manual → harga katalog (menu Produk).
+   * Dipakai untuk chip series/paket, opsi ukuran, dan placeholder harga — jadi admin selalu
+   * melihat & memakai harga dari menu yang benar, bukan tertukar.
+   */
+  const pathPrice = (entry) =>
+    isOpenOrderEdit ? openOrderEffectivePrice(entry) || Number(entry?.price) || 0 : Number(entry?.price) || 0;
+
+  /** Label sumber harga supaya admin tahu patokan yang sedang dipakai. */
+  const priceSourceTitle = isOpenOrderEdit ? "Harga Open Order" : "Harga katalog";
+  const priceSourceLower = isOpenOrderEdit ? "harga Open Order" : "harga katalog";
+  const priceSourceShort = isOpenOrderEdit ? "Open Order" : "Katalog";
 
   // Tema pink hanya untuk panel admin; dashboard ops tetap slate/black.
   const isPanelForm = variant === "panel";
@@ -329,6 +383,14 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       series: variant.series_name || "",
       color: String(variant.color || "").trim() || "default",
       price: Number(variant.price) || 0,
+      // Jalur harga Open Order — dipakai HANYA saat mengubah pesanan CYO (`pathPrice`).
+      // `open_order_*` menang atas katalog; `minimum_price`/`create_your_price_enabled` adalah
+      // padanan katalog untuk produk yang belum punya kolom `open_order_*`.
+      minimum_price: variant.minimum_price ?? null,
+      create_your_price_enabled: variant.create_your_price_enabled ?? null,
+      open_order_price: variant.open_order_price ?? null,
+      open_order_minimum_price: variant.open_order_minimum_price ?? null,
+      open_order_cyp_enabled: variant.open_order_cyp_enabled ?? null,
       // HPP produk — hanya untuk peringatan kalau harga manual di bawah HPP.
       hpp: Number(variant.hpp) || 0,
       sizes: variant.stock_efektif || variant.stock || {},
@@ -537,7 +599,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       if (!group) {
         return { ...emptyRow(), variant: `${item.color || "default"}||${String(item.size).toUpperCase()}`, quantity: item.quantity, source_item_id: item.id || "" };
       }
-      const manual = recordedManualPrice(item.price, group.price);
+      // Pembanding harga "manual" = harga JALUR pesanan ini (Open Order vs katalog), bukan selalu katalog.
+      const manual = recordedManualPrice(item.price, pathPrice(group));
       return {
         product: group.product_name,
         category: group.category,
@@ -623,7 +686,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     const bySeries = new Map();
     for (const entry of rows) {
       const key = entry.series || "";
-      const current = bySeries.get(key) || { series: entry.series || "", price: entry.price, stock: 0 };
+      const current = bySeries.get(key) || { series: entry.series || "", price: pathPrice(entry), stock: 0 };
       current.stock += Object.values(entry.sizes || {}).reduce((sum, n) => sum + (Number(n) || 0), 0);
       bySeries.set(key, current);
     }
@@ -705,7 +768,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
           stock:
             Object.values(entry.sizes || {}).reduce((sum, n) => sum + (Number(n) || 0), 0) +
             reservedFor(entry.product_id, entry.color, paketSize(entry)),
-          price: entry.price,
+          price: pathPrice(entry),
           linkedTo: entry.linkedTo,
         }
       : null;
@@ -728,7 +791,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
           color: entry.color,
           showColor: multiColor,
           stock: (Number(entry.sizes?.[size]) || 0) + reservedFor(entry.product_id, entry.color, size),
-          price: entry.price,
+          price: pathPrice(entry),
           linkedTo: entry.linkedTo,
         })),
       )
@@ -784,7 +847,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
           : `Stok ${entry.option.size} tersedia ${entry.option.stock}, diminta ${entry.total}`;
       }
     }
-    const unitPrice = rowUnitPrice(row, chosen?.price);
+    const unitPrice = rowUnitPrice(row, chosen?.price, recordedPriceFor(row));
     return {
       product,
       paket,
@@ -1313,6 +1376,16 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     setTouched(true);
     setItems((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   };
+
+  /**
+   * Ganti ukuran: harga baris yang berasal dari pesanan lama DIBIARKAN apa adanya — ukuran tidak
+   * mengubah harga (dan baris tetap terhubung ke `source_item_id`). Baris baru tetap kembali ke
+   * harga katalog karena belum punya harga tercatat.
+   */
+  const sizeChangePatch = (row, value) => ({
+    variant: value,
+    ...(row.source_item_id ? null : { price: "", priceManual: false }),
+  });
 
   /**
    * Tutup baris yang sudah lengkap → berubah jadi satu baris list ringkas.
@@ -2384,7 +2457,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                 ) : (
                                   <select
                                     value={row.variant}
-                                    onChange={(event) => updateRow(index, { variant: event.target.value, price: "", priceManual: false })}
+                                    onChange={(event) => updateRow(index, sizeChangePatch(row, event.target.value))}
                                     className="mt-0.5 block w-auto min-w-[110px] px-2 py-1.5 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-900 dark:text-white"
                                     aria-label="Ukuran"
                                   >
@@ -2440,7 +2513,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                       inputMode="numeric"
                                       value={row.price}
                                       onChange={(event) => updateRow(index, { price: digits(event.target.value), priceManual: true })}
-                                      placeholder={String(info.chosen.price)}
+                                      placeholder={String(info.unitPrice)}
                                       aria-label="Harga satuan"
                                       className="w-28 pl-7 pr-2 py-1.5 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-900 dark:text-white"
                                     />
@@ -2451,7 +2524,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                       onClick={() => updateRow(index, { price: "", priceManual: false })}
                                       className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline"
                                     >
-                                      Katalog
+                                      {priceSourceShort}
                                     </button>
                                   ) : (
                                     <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
@@ -2759,7 +2832,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                     type="button"
                                     disabled={soldOut}
                                     onClick={() => {
-                                      updateRow(index, { variant: option.value, price: "", priceManual: false });
+                                      updateRow(index, sizeChangePatch(row, option.value));
                                       // Ukuran dipilih → lanjut ke Qty/harga.
                                       scrollToStep(qtyStepRef);
                                     }}
@@ -2856,7 +2929,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                   inputMode="numeric"
                                   value={row.price}
                                   onChange={(event) => updateRow(index, { price: digits(event.target.value), priceManual: true })}
-                                  placeholder={String(info.chosen.price)}
+                                  placeholder={String(info.unitPrice)}
                                   aria-label="Harga satuan"
                                   data-invalid={row.priceManual && manualPrice(row.price) === null ? "true" : undefined}
                                   className={`${inputClass} pl-10`}
@@ -2868,17 +2941,24 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                   onClick={() => updateRow(index, { price: "", priceManual: false })}
                                   className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline"
                                 >
-                                  Pakai harga katalog
+                                  Pakai {priceSourceLower}
                                 </button>
                               ) : (
                                 <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                                  Harga katalog Rp {formatRupiah(info.chosen.price)}
+                                  {priceSourceTitle} Rp {formatRupiah(info.chosen.price)}
                                 </span>
                               )}
                             </div>
+                            {/* Admin harus tahu patokan harganya dari menu mana — CYO memakai
+                                harga Open Order (bisa Create Your Price), bukan harga katalog. */}
+                            {isOpenOrderEdit ? (
+                              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                                Pesanan Open Order — harga mengikuti menu Open Order, bukan katalog.
+                              </p>
+                            ) : null}
                             {row.priceManual && manualPrice(row.price) !== null ? (
                               <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
-                                Harga manual Rp {formatRupiah(info.unitPrice)} / pcs · katalog Rp {formatRupiah(info.chosen.price)}
+                                Harga manual Rp {formatRupiah(info.unitPrice)} / pcs · {priceSourceLower} Rp {formatRupiah(info.chosen.price)}
                               </p>
                             ) : null}
                             {row.priceManual && manualPrice(row.price) !== null && info.chosen.hpp > 0 && info.unitPrice < info.chosen.hpp ? (

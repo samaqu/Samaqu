@@ -100,7 +100,13 @@ export async function GET(req: NextRequest) {
   const admin = getSupabaseAdmin();
   const [{ data: products }, { data: rows }] = await Promise.all([
     // `weight` = berat produk (gram), fallback kalau berat per ukuran kosong.
-    admin.from("products").select("id, name, series, price, hpp, category, weight, jenis_kain(name)"),
+    // Kolom `open_order_*` + `minimum_price`/`create_your_price_enabled` ikut dibaca supaya form
+    // Ubah Transaksi bisa memakai JALUR HARGA OPEN ORDER untuk pesanan CYO (bukan harga katalog).
+    admin
+      .from("products")
+      .select(
+        "id, name, series, price, minimum_price, create_your_price_enabled, open_order_enabled, open_order_price, open_order_minimum_price, open_order_cyp_enabled, hpp, category, weight, jenis_kain(name)",
+      ),
     // `weight` = berat per ukuran (gram) — sumber utama yang sama dengan cek ongkir & resi.
     admin.from("product_variants").select("product_id, color, size, stock, sku, price_override, hex, display_order, base_product_id, weight"),
   ]);
@@ -128,6 +134,14 @@ export async function GET(req: NextRequest) {
         color: r.color || "default",
         hex: r.hex || null,
         price: prod.price ?? 0,
+        // Jalur harga Open Order (kolom `open_order_*` menang atas katalog) + padanan katalognya.
+        // Form Ubah Transaksi memilih jalur sesuai sumber pesanan: CYO → Open Order, lainnya → katalog.
+        minimum_price: prod.minimum_price ?? null,
+        create_your_price_enabled: prod.create_your_price_enabled ?? null,
+        open_order_enabled: prod.open_order_enabled ?? null,
+        open_order_price: prod.open_order_price ?? null,
+        open_order_minimum_price: prod.open_order_minimum_price ?? null,
+        open_order_cyp_enabled: prod.open_order_cyp_enabled ?? null,
         hpp: prod.hpp ?? 0,
         stock: {},
         /** SKU per ukuran (baris `product_variants`), dipakai form Barang Masuk. */

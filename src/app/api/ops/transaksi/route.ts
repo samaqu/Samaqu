@@ -19,6 +19,7 @@ import {
 import { computeOrderHppForItems, snapshotOrderHpp } from "@/lib/produksi-order-hpp";
 import { orderEditGuard, weightEditError } from "@/lib/order-edit";
 import { OPEN_ORDER_ADDON, resolveAddonWeight } from "@/lib/open-order-config";
+import { openOrderEffectivePrice } from "@/lib/open-order-offering";
 
 /**
  * Menu "Transaksi" dashboard internal.
@@ -252,9 +253,23 @@ type OldItem = {
 };
 
 /**
+ * Batas bawah harga Open Order satu baris `products` (hanya saat Create Your Price aktif).
+ * Kolom `open_order_*` menang atas katalog; `null` = tidak ada batas bawah.
+ */
+function openOrderMinimumOf(row: any): number | null {
+  if (!row) return null;
+  const hasOpenOrderPrice = row.open_order_price != null;
+  const cyp = hasOpenOrderPrice ? Boolean(row.open_order_cyp_enabled) : Boolean(row.create_your_price_enabled);
+  if (!cyp) return null;
+  const minimum = Number(hasOpenOrderPrice ? row.open_order_minimum_price : row.minimum_price) || 0;
+  return minimum > 0 ? minimum : null;
+}
+
+/**
  * Snapshot untuk EDIT item. Beda dengan create:
- *  - harga default ikut baris LAMA yang diganti (bukan harga katalog sekarang);
- *  - `customer_price`/`minimum_price` disalin dari baris lama;
+ *  - harga default ikut baris LAMA selama produknya SAMA; kalau admin mengganti series/produk,
+ *    harga mengikuti jalur sumber pesanan (Open Order → `open_order_*`, lainnya → katalog);
+ *  - `customer_price` disalin dari baris lama;
  *  - baris add-on Open Order dinormalisasi ke nilai aslinya (tidak boleh berubah).
  */
 async function buildEditSnapshot(
@@ -292,7 +307,13 @@ async function buildEditSnapshot(
   let variants: any[] = [];
   if (productIds.length > 0) {
     const [productResult, variantResult] = await Promise.all([
-      admin.from("products").select("id, name, series, price, jenis_kain(name)").in("id", productIds),
+      // Kolom `open_order_*` ikut dibaca: pesanan CYO memakai jalur harga Open Order, bukan katalog.
+      admin
+        .from("products")
+        .select(
+          "id, name, series, price, minimum_price, create_your_price_enabled, open_order_price, open_order_minimum_price, open_order_cyp_enabled, jenis_kain(name)",
+        )
+        .in("id", productIds),
       admin.from("product_variants").select("product_id, color, size").in("product_id", productIds),
     ]);
     products = productResult.data || [];
@@ -340,8 +361,17 @@ async function buildEditSnapshot(
       oldById.get(row.source_item_id) ||
       oldByKey.get(`${row.product_id}||${row.color}||${row.size}`);
 
-    // Default: harga baris lama yang diganti. Admin boleh mengetik harga baru.
-    let price = old ? Number(old.price) || 0 : Number(product.price) || 0;
+    // Harga default:
+    //  - baris yang masih produk SAMA → harga baris lama (yang sudah disepakati);
+    //  - ganti series/produk atau baris baru → jalur sumber pesanan:
+    //      Open Order (CYO) → `open_order_*` (termasuk minimum CYP), lainnya → katalog.
+    // Admin tetap boleh mengetik harga sendiri.
+    const sameProduct = Boolean(old) && String(old!.product_id) === String(row.product_id);
+    let price = sameProduct
+      ? Number(old!.price) || 0
+      : group === "open_order"
+        ? openOrderEffectivePrice(product)
+        : Number(product.price) || 0;
     let manual = false;
     if (hasManualPrice(row.price)) {
       const typed = manualPrice(row.price);
@@ -354,7 +384,13 @@ async function buildEditSnapshot(
       manual = true;
     }
 
-    const minimum = old?.minimum_price == null ? null : Number(old.minimum_price) || 0;
+    // Batas bawah CYP ikut PRODUK yang dipilih sekarang (bukan cuma baris lama) — jadi ganti
+    // series tidak bisa lolos dengan harga di bawah minimum series barunya.
+    let minimum = old?.minimum_price == null ? null : Number(old.minimum_price) || 0;
+    if (group === "open_order") {
+      const productMinimum = openOrderMinimumOf(product);
+      if (productMinimum !== null) minimum = productMinimum;
+    }
     if (group === "open_order" && minimum != null && price < minimum) {
       return { error: `Harga ${product.name} tidak boleh di bawah harga minimum Open Order (Rp ${minimum}).` };
     }
@@ -370,7 +406,7 @@ async function buildEditSnapshot(
       price,
       manual_price: manual,
       customer_price: old?.customer_price ?? null,
-      minimum_price: old?.minimum_price ?? null,
+      minimum_price: minimum,
       product_image: old?.product_image ?? null,
     });
   }
