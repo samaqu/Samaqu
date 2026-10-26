@@ -18,13 +18,17 @@ import { sendOnce } from "@/lib/order-notify";
  *  - pesanan yang sudah punya ulasan (status apa pun, termasuk ditolak) dilewati;
  *  - nomor WhatsApp kosong dilewati;
  *  - maksimal 10 pesan per eksekusi, dengan jeda 2,5 detik antar pesan — bertahap supaya
- *    tidak kena throttle/limit Fonnte dan tidak terlihat seperti spam.
+ *    tidak kena throttle/limit Fonnte dan tidak terlihat seperti spam;
+ *  - pesanan BARU (≤14 hari) didahulukan, sisanya baru backlog lama. Jadi pengingat untuk
+ *    pembeli yang baru selesai tidak tertahan di belakang antrean pesanan lama.
  *
  * Catatan: `delivered_notified_at` juga terisi kalau WA paket diterima gagal (klaim tidak
  * dilepas), jadi kolom itu dipakai sebagai penanda "sudah sampai", bukan status kirim WA.
  */
 
 const DELAY_DAYS = 2;
+/** Pesanan yang diterima/selesai dalam N hari terakhir didahulukan dari backlog lama. */
+const RECENT_DAYS = 14;
 const LIMIT = 10;
 /** Jeda antar pesan (ms) — 10 pesan ≈ 25 detik, masih di bawah batas fungsi. */
 const SEND_GAP_MS = 2500;
@@ -78,13 +82,18 @@ export async function GET(request: NextRequest) {
     if (!merged.has(key)) merged.set(key, row);
   }
 
-  // Urutkan dari yang paling lama diterima/selesai, lalu batasi per eksekusi.
+  const receivedAt = (row: any) => String(row.delivered_notified_at || row.updated_at || "");
+  const recentCutoff = new Date(Date.now() - RECENT_DAYS * 86_400_000).toISOString();
+
+  // Pesanan baru didahulukan (yang paling lama di antara yang baru lebih dulu), lalu backlog.
+  // Dengan begitu pembeli yang baru selesai tetap diingatkan tepat waktu walau backlog masih ada.
   const orders = [...merged.values()]
-    .sort((a, b) =>
-      String(a.delivered_notified_at || a.updated_at || "").localeCompare(
-        String(b.delivered_notified_at || b.updated_at || ""),
-      ),
-    )
+    .sort((a, b) => {
+      const aRecent = receivedAt(a) >= recentCutoff;
+      const bRecent = receivedAt(b) >= recentCutoff;
+      if (aRecent !== bRecent) return aRecent ? -1 : 1;
+      return receivedAt(a).localeCompare(receivedAt(b));
+    })
     .slice(0, LIMIT);
 
   if (orders.length === 0) {
