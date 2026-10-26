@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { checkPurchaseEligibility, type EligibilityStatus } from "@/lib/affiliate/eligibility";
+import { checkRateLimit } from "@/lib/rate-limit";
+import type { EligibilityStatus } from "@/lib/affiliate/eligibility";
 
 /**
- * Cek syarat bergabung affiliate (minimal 1 pembelian valid).
+ * Cek syarat bergabung affiliate.
  *
- * Publik (tanpa login) karena dipakai di halaman pendaftaran sebelum akun dibuat.
- * Hanya membaca riwayat pesanan lewat email/nomor WhatsApp; tidak mengubah data.
+ * Respons SELALU generik: endpoint publik tidak boleh membocorkan apakah sebuah email/nomor
+ * pernah membeli. Pemeriksaan riwayat yang sebenarnya tetap dilakukan di /api/affiliate/register
+ * (server) dan oleh admin sebelum menyetujui pendaftaran.
  */
 
 const MESSAGE: Record<EligibilityStatus, string> = {
@@ -19,22 +20,16 @@ const MESSAGE: Record<EligibilityStatus, string> = {
 };
 
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
-  const email = String(body?.email || "").trim();
-  const phone = String(body?.phone || "").trim();
-
-  if (!email && !phone) {
+  const limited = await checkRateLimit(req, "affiliate-eligibility", 20, 60 * 60 * 1000);
+  if (!limited.ok) {
     return NextResponse.json(
       { status: "needs_verification", message: MESSAGE.needs_verification },
-      { status: 200 },
+      { status: 429 },
     );
   }
 
-  const admin = getSupabaseAdmin();
-  const result = await checkPurchaseEligibility(admin, { email, phone });
-
   return NextResponse.json({
-    ...result,
-    message: MESSAGE[result.status],
+    status: "needs_verification",
+    message: MESSAGE.needs_verification,
   });
 }

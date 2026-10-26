@@ -44,7 +44,8 @@ function orderBelongsToCustomer(
 ) {
   if (String(order?.customer_id || "") === String(user.id)) return true;
 
-  const emailKey = String(user.email || "").trim().toLowerCase();
+  const emailVerified = Boolean((user as { email_confirmed_at?: string | null }).email_confirmed_at);
+  const emailKey = emailVerified ? String(user.email || "").trim().toLowerCase() : "";
   if (emailKey && String(order?.customer_email || "").trim().toLowerCase() === emailKey) return true;
 
   const phoneKey = normalizeKontak(customer?.whatsapp);

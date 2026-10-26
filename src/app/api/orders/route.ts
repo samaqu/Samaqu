@@ -19,6 +19,8 @@ import { formatProductLabel } from "@/lib/item-label";
 import { resolveAttribution } from "@/lib/affiliate/referral";
 import { recordCommissionForOrder } from "@/lib/affiliate/commission";
 import { snapshotOrderHpp } from "@/lib/produksi-order-hpp";
+import { validateVoucherServer } from "@/lib/voucher-server";
+import { verifyJntShipping } from "@/lib/shipping-verify";
 
 /**
  * Semua baca/tulis pesanan di route ini memakai service role (server-side), supaya policy RLS
@@ -72,11 +74,14 @@ export async function POST(request: NextRequest) {
       weight: shipping?.weight,
     });
     console.log("[ORDERS] Items count:", items?.length);
-    console.log("[ORDERS] Payment:", body.paymentMethod, "Discount:", body.discount);
+    console.log("[ORDERS] Payment:", body.paymentMethod, "Discount: dihitung server (voucher)");
 
     if (!customer?.name || !customer?.whatsapp || !shipping?.address || !shipping?.city) {
       console.log("[ORDERS] ERROR: Data wajib tidak lengkap");
       return NextResponse.json({ error: "Data wajib tidak lengkap" }, { status: 400 });
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      return NextResponse.json({ error: "Item pesanan kosong" }, { status: 400 });
     }
 
     // ── Payment method: id metode dari admin (bank / QRIS / e-wallet / COD) ──
@@ -111,47 +116,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Pilih metode pembayaran terlebih dahulu" }, { status: 400 });
     }
 
-    // ── Shipping cost validation ──
-    // Trust the client-provided shipping cost (already verified via /api/shipping/cost).
-    // This avoids a second RajaOngkir API call per order (saves quota on 100 hit/day limit).
-    let verifiedShippingCost = 0;
-    let verifiedShippingMethod = shipping.method || "manual";
-
-    if (shipping.method && typeof shipping.cost === "number" && shipping.cost >= 0) {
-      verifiedShippingCost = shipping.cost;
-      verifiedShippingMethod = shipping.method;
-      console.log("[ORDERS] Using client shipping cost:", verifiedShippingCost, "method:", verifiedShippingMethod);
-    } else {
-      console.log("[ORDERS] No valid shipping info, cost defaults to 0");
-    }
-
-    // ── Server-side CYP price validation ──
-    // For CYP items: verify customer_price >= minimum_price from DB
-    // For fixed items: use price as-is
+    // ── Validasi harga item DI SERVER ──
+    // CYP: harga pilihan customer minimal harga minimum dari database.
+    // Non-CYP: harga WAJIB sama dengan products.price — harga dari browser tidak dipercaya.
     console.log("[ORDERS] Validating item prices...");
+    const requestedProductIds = Array.from(
+      new Set((items || []).map((item: any) => String(item?.productId || "").trim()).filter(Boolean)),
+    );
+    const { data: productRows, error: productsError } = requestedProductIds.length
+      ? await supabase
+          .from("products")
+          .select("id, price, create_your_price_enabled, minimum_price")
+          .in("id", requestedProductIds)
+      : { data: [], error: null };
+    if (productsError) {
+      console.error("[ORDERS] Gagal membaca produk:", productsError.message);
+      return NextResponse.json({ error: "Gagal memvalidasi harga produk." }, { status: 500 });
+    }
+    const productsById = new Map((productRows || []).map((row: any) => [String(row.id), row]));
+
     const validatedItems: Array<{ productId: string; name: string; image?: string; color?: string; size?: string; series?: string; kain?: string; quantity: number; price: number; customer_price: number | null; minimum_price: number | null; create_your_price_enabled: boolean }> = [];
 
     for (const item of items) {
-      if (item.create_your_price_enabled) {
-        // CYP item: fetch minimum_price from DB (never trust client)
-        const { data: product, error: productError } = await supabase
-          .from("products")
-          .select("minimum_price, create_your_price_enabled")
-          .eq("id", item.productId)
-          .single();
+      const product = productsById.get(String(item.productId || "").trim());
+      if (!product) {
+        console.error("[ORDERS] Product not found:", item.productId);
+        return NextResponse.json({ error: `Produk tidak ditemukan: ${item.name || item.productId}` }, { status: 400 });
+      }
 
-        if (productError || !product) {
-          console.error("[ORDERS] CYP validation: product not found:", item.productId);
-          return NextResponse.json({ error: "Produk tidak ditemukan" }, { status: 400 });
-        }
-
-        if (!product.create_your_price_enabled || !product.minimum_price) {
-          console.error("[ORDERS] CYP validation: product not CYP enabled:", item.productId);
+      // Mode CYP ditentukan DATABASE, bukan flag dari browser. Kalau produk CYP, harga
+      // pilihan customer wajib >= minimum; kalau tidak, harga wajib sama dengan katalog.
+      if (product.create_your_price_enabled) {
+        if (product.minimum_price === null || product.minimum_price === undefined) {
+          console.error("[ORDERS] CYP validation: minimum price missing:", item.productId);
           return NextResponse.json({ error: "Produk ini tidak mendukung Create Your Price" }, { status: 400 });
         }
 
-        const dbMinimumPrice = product.minimum_price;
-        const clientCustomerPrice = item.customer_price || item.price;
+        const dbMinimumPrice = Number(product.minimum_price) || 0;
+        const clientCustomerPrice = Math.round(Number(item.customer_price || item.price) || 0);
 
         if (clientCustomerPrice < dbMinimumPrice) {
           console.error("[ORDERS] CYP validation FAILED:", { productId: item.productId, clientPrice: clientCustomerPrice, dbMinimum: dbMinimumPrice });
@@ -169,9 +171,22 @@ export async function POST(request: NextRequest) {
           create_your_price_enabled: true,
         });
       } else {
-        // Fixed price item: use as-is
+        const expectedPrice = Math.round(Number(product.price) || 0);
+        const submittedPrice = Math.round(Number(item.price) || 0);
+        if (!Number.isFinite(submittedPrice) || submittedPrice !== expectedPrice) {
+          console.error("[ORDERS] Price mismatch:", {
+            productId: item.productId,
+            submitted: submittedPrice,
+            expected: expectedPrice,
+          });
+          return NextResponse.json({
+            error: `Harga "${item.name}" tidak sesuai. Muat ulang halaman lalu coba lagi.`,
+          }, { status: 400 });
+        }
+
         validatedItems.push({
           ...item,
+          price: expectedPrice,
           customer_price: null,
           minimum_price: null,
           create_your_price_enabled: false,
@@ -181,7 +196,60 @@ export async function POST(request: NextRequest) {
 
     const orderNumber = generateOrderNumber();
     const subtotal = validatedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const discount = body.discount || 0;
+
+    // Voucher dihitung dari subtotal SERVER. `body.discount` / `body.voucherId` diabaikan.
+    const voucherCode = typeof body.voucherCode === "string" ? body.voucherCode.trim() : "";
+    const voucherResult = voucherCode
+      ? await validateVoucherServer(voucherCode, subtotal, customer.whatsapp)
+      : null;
+    if (voucherResult && !voucherResult.valid) {
+      return NextResponse.json({ error: voucherResult.error }, { status: 400 });
+    }
+    const discount = voucherResult?.valid ? voucherResult.discount : 0;
+
+    // ── Berat kirim (gram): berat varian → berat produk → nilai klien. ──
+    // Dihitung ULANG dari database dengan fungsi pusat yang sama dengan permintaan ongkir.
+    const weightIds = Array.from(new Set(validatedItems.map((i) => i.productId).filter(Boolean)));
+    let productWeights: Record<string, number> = {};
+    let variantWeights: Record<string, number> = {};
+    if (weightIds.length > 0) {
+      const [{ data: pRows }, { data: vRows }] = await Promise.all([
+        supabase.from("products").select("id, weight").in("id", weightIds),
+        supabase.from("product_variants").select("product_id, color, size, weight").in("product_id", weightIds),
+      ]);
+      productWeights = productWeightMapFromRows(pRows);
+      variantWeights = variantWeightMapFromRows(vRows);
+    }
+    const { grams: serverWeight, missingQty: weightMissing } = sumWeightGramsBySize(
+      validatedItems.map((i) => ({ productId: i.productId, color: i.color, size: i.size, quantity: i.quantity })),
+      productWeights,
+      variantWeights
+    );
+    const weightGrams = weightMissing === 0
+      ? Math.max(300, serverWeight)
+      : Math.max(300, Number(shipping.weight) || serverWeight || 0);
+    const clientWeight = Number(shipping.weight) || 0;
+    if (clientWeight > 0 && clientWeight !== weightGrams) {
+      console.warn("[ORDERS] ⚠️ Berat client ≠ berat server:", {
+        orderNumber,
+        client: clientWeight,
+        server: weightGrams,
+      });
+    }
+
+    // ── Ongkir diverifikasi ke tarif J&T (bukan dari body) ──
+    const shippingCheck = await verifyJntShipping({
+      city: shipping.city,
+      district: shipping.district,
+      weightGrams,
+      method: shipping.method,
+      cost: shipping.cost,
+    });
+    if (!shippingCheck.ok) {
+      return NextResponse.json({ error: shippingCheck.error }, { status: shippingCheck.status });
+    }
+    const verifiedShippingCost = shippingCheck.cost;
+    const verifiedShippingMethod = shippingCheck.method;
     const total = subtotal - discount + verifiedShippingCost;
 
     // ── Server-side stock validation + atomic decrement ──
@@ -242,38 +310,7 @@ export async function POST(request: NextRequest) {
 
     console.log("[ORDERS] Final order:", { orderNumber, subtotal, shippingCost: verifiedShippingCost, discount, total });
 
-    // ── Berat kirim (gram): berat VARIAN (per produk+warna+ukuran) → berat produk → nilai klien. ──
-    // Dihitung ULANG dari DATABASE memakai fungsi pusat yang sama dengan checkout saat meminta
-    // ongkir (`sumWeightGramsBySize`), jadi berat untuk ongkir = yang disimpan = yang dikirim ke resi.
-    const weightIds = Array.from(new Set(validatedItems.map((i) => i.productId).filter(Boolean)));
-    let productWeights: Record<string, number> = {};
-    let variantWeights: Record<string, number> = {};
-    if (weightIds.length > 0) {
-      const [{ data: pRows }, { data: vRows }] = await Promise.all([
-        supabase.from("products").select("id, weight").in("id", weightIds),
-        supabase.from("product_variants").select("product_id, color, size, weight").in("product_id", weightIds),
-      ]);
-      productWeights = productWeightMapFromRows(pRows);
-      variantWeights = variantWeightMapFromRows(vRows);
-    }
-    const { grams: serverWeight, missingQty: weightMissing } = sumWeightGramsBySize(
-      validatedItems.map((i) => ({ productId: i.productId, color: i.color, size: i.size, quantity: i.quantity })),
-      productWeights,
-      variantWeights
-    );
-    const weightGrams = weightMissing === 0 && serverWeight > 0
-      ? serverWeight
-      : (Number(shipping.weight) || serverWeight || 0);
-    // Konsistensi tiga angka: berat yang dipakai client saat meminta ongkir harus sama dengan
-    // hitungan server (yang disimpan ke `orders.weight` dan dipakai untuk resi).
-    const clientWeight = Number(shipping.weight) || 0;
-    if (clientWeight > 0 && clientWeight !== weightGrams) {
-      console.warn("[ORDERS] ⚠️ Berat client ≠ berat server:", {
-        orderNumber,
-        client: clientWeight,
-        server: weightGrams,
-      });
-    }
+    // Berat & ongkir sudah dihitung/diverifikasi di atas (sebelum stok dipotong).
 
     // Insert order
     // Pesanan wajib terikat ke akun yang checkout. Id-nya berasal dari token sesi yang sudah
@@ -414,19 +451,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Increment voucher used_count + save usage
-    if (body.voucherCode) {
-      const { data: vData } = await supabase.from("vouchers").select("used_count").eq("code", body.voucherCode).single();
-      if (vData) {
-        await supabase.from("vouchers").update({ used_count: vData.used_count + 1 }).eq("code", body.voucherCode);
-      }
-      if (body.voucherId) {
-        await supabase.from("voucher_usages").insert({
-          voucher_id: body.voucherId,
-          whatsapp_number: customer.whatsapp.replace(/[^0-9]/g, ""),
-          order_id: order.id,
-        });
-      }
+    // Catat pemakaian voucher hasil validasi SERVER (bukan id/kode dari browser).
+    if (voucherResult && voucherResult.valid) {
+      await supabase
+        .from("vouchers")
+        .update({ used_count: voucherResult.voucher.used_count + 1 })
+        .eq("id", voucherResult.voucher.id);
+      await supabase.from("voucher_usages").insert({
+        voucher_id: voucherResult.voucher.id,
+        whatsapp_number: customer.whatsapp.replace(/[^0-9]/g, ""),
+        order_id: order.id,
+      });
     }
 
     // Resi J&T tidak lagi dibuat di sini: pembuatan resi dipicu admin lewat "Atur Pesanan"

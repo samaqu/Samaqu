@@ -14,5 +14,5 @@ ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can read own admin record" ON admins
   FOR SELECT USING (auth.uid() = user_id);
 
--- Policy: service role can do everything
-CREATE POLICY "Service role all admins" ON admins FOR ALL USING (true);
+-- Tidak ada policy tulis publik. Server memakai service role (melewati RLS).
+-- Dashboard admin hanya membaca baris miliknya sendiri lewat policy di atas.

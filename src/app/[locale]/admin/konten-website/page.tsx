@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2, Plus, Trash2, Upload, Image as ImageIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { requestRevalidate } from "@/lib/admin-revalidate";
 import { useToast } from "@/components/AdminToast";
 import AdminShell from "@/components/AdminShell";
 import { uploadToCloudinary } from "@/lib/cloudinary";
@@ -64,7 +65,7 @@ export default function KontenWebsitePage() {
 
   // Trigger revalidation of homepage after content changes
   async function revalidateHomepage() {
-    try { await fetch("/api/revalidate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ secret: "samaqu-revalidate" }) }); } catch { /* ignore */ }
+    await requestRevalidate();
   }
 
   useEffect(() => {

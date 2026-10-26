@@ -5,11 +5,11 @@ import { createHmac, timingSafeEqual } from "crypto";
  * (termasuk tamu yang belum masuk) tetap bisa melihat pesanannya SETELAH policy RLS `orders`
  * ditutup dari anon.
  *
- * Token = HMAC-SHA256 dari nomor pesanan, kuncinya diturunkan dari rahasia server yang sudah ada
- * (service role key) — jadi tidak perlu env baru. Sifatnya deterministik & tanpa kedaluwarsa,
- * sama seperti tautan pelacakan: yang punya tautan hanya bisa melihat pesanan itu sendiri.
+ * Token = HMAC-SHA256 dari nomor pesanan. Kuncinya `ORDER_TOKEN_SECRET` (fallback `OTP_SECRET`),
+ * TERPISAH dari service role key. Sifatnya deterministik & tanpa kedaluwarsa, sama seperti
+ * tautan pelacakan: yang punya tautan hanya bisa melihat pesanan itu sendiri.
  */
-const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "";
+const KEY = process.env.ORDER_TOKEN_SECRET || process.env.OTP_SECRET || "";
 
 function sign(orderNumber: string): Buffer {
   return createHmac("sha256", KEY).update(String(orderNumber || "").trim()).digest();

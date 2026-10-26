@@ -3,6 +3,7 @@ import { trackShipment } from "@/lib/jnt/track";
 import { getJntConfig } from "@/lib/jnt/config";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin } from "@/lib/ops-auth";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { storeTrackingEvents } from "@/lib/jnt/tracking-sync";
 import type { TrackHistoryItem, TrackResponse } from "@/lib/jnt/types";
 
@@ -110,12 +111,24 @@ function fail(message: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const awb = searchParams.get("awb");
-  const forceRefresh = searchParams.get("refresh") === "1";
   // Admin ops boleh melihat data kurir & nama penerima (dipakai di menu Transaksi & halaman label);
   // peminta publik/customer tetap dapat versi tanpa data itu.
   const sertakanPetugas = await isOpsAdmin(request);
+
+  // Rate limit hanya untuk publik; staf ops sering melacak banyak resi dari satu IP kantor.
+  if (!sertakanPetugas) {
+    const limited = await checkRateLimit(request, "jnt-track", 120, 60 * 60 * 1000);
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: "Terlalu banyak permintaan lacak resi. Coba lagi nanti." },
+        { status: 429 },
+      );
+    }
+  }
+
+  const { searchParams } = new URL(request.url);
+  const awb = searchParams.get("awb");
+  const forceRefresh = searchParams.get("refresh") === "1";
   if (!awb) return fail("Nomor resi wajib diisi");
 
   // Cache dipisah per versi: jawaban untuk admin ops (dengan data kurir/penerima) tidak boleh

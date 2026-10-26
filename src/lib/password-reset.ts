@@ -46,7 +46,9 @@ export type VerifyOtpResult =
 export type ResetPasswordResult = { ok: true } | { ok: false; error: string };
 
 function secret(): string {
-  return process.env.OTP_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "samaqu-otp";
+  const value = String(process.env.OTP_SECRET || "").trim();
+  if (!value) throw new PasswordResetNotReadyError("OTP_SECRET belum diatur.");
+  return value;
 }
 
 function hashValue(value: string): string {
@@ -244,11 +246,22 @@ export async function verifyPasswordResetOtp(
   }
 
   if (!sameHash(String(row.code_hash), hashValue(code))) {
-    const nextAttempts = attempts + 1;
-    await admin
-      .from("password_reset_otp")
-      .update({ attempts: nextAttempts })
-      .eq("id", row.id);
+    // Naikkan attempts ATOMIK lewat RPC supaya percobaan paralel tidak bisa melewati batas.
+    // Fallback update lama hanya dipakai kalau migrasi RPC belum dijalankan.
+    let nextAttempts = attempts + 1;
+    const { data: bumped, error: bumpError } = await admin.rpc("samaqu_otp_bump_attempts", {
+      p_id: row.id,
+      p_max: MAX_ATTEMPTS,
+    });
+    if (!bumpError && bumped !== null && bumped !== undefined) {
+      nextAttempts = Number(bumped);
+    } else {
+      await admin
+        .from("password_reset_otp")
+        .update({ attempts: nextAttempts })
+        .eq("id", row.id);
+    }
+    nextAttempts = Math.min(MAX_ATTEMPTS, Math.max(nextAttempts, attempts + 1));
 
     const attemptsLeft = Math.max(0, MAX_ATTEMPTS - nextAttempts);
     return {

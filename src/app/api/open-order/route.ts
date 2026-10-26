@@ -13,6 +13,7 @@ import {
   type OpenOrderStockRow,
 } from "@/lib/open-order-offering";
 import { sumWeightGramsBySize, productWeightMapFromRows, variantWeightMapFromRows } from "@/lib/shipping-weight";
+import { verifyJntShipping } from "@/lib/shipping-verify";
 import { markLeadBoughtForOrder } from "@/lib/ops-lead-sync";
 import {
   notifyAdminNewOrder,
@@ -295,13 +296,46 @@ export async function POST(request: NextRequest) {
     const subtotal = validatedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const addonTotal = extraCover ? OPEN_ORDER_ADDON.price : 0;
 
-    // Ongkir J&T sudah dihitung di client dari kecamatan tujuan (API key tidak pernah sampai
-    // ke browser) — sama seperti /api/orders, nilainya tidak diverifikasi ulang di sini.
-    // Kalau kosong (kecamatan belum diisi / hitungan gagal), pesanan tetap masuk sebagai
-    // "manual" dan admin menghitung ongkir menyusul.
+    // ── Berat kirim (gram): FUNGSI PUSAT yang sama dengan wizard (berat varian → produk). ──
+    // Add-on Extra Cover & Hanger +300 g dan minimum 300 g sama persis dengan wizard, supaya
+    // berat untuk ongkir = yang disimpan = yang dipakai resi.
+    const weightIds = Array.from(new Set(validatedItems.map((i) => i.productId).filter(Boolean)));
+    let productWeights: Record<string, number> = {};
+    let variantWeights: Record<string, number> = {};
+    if (weightIds.length > 0) {
+      const [{ data: pRows }, { data: vRows }] = await Promise.all([
+        supabaseAdmin.from("products").select("id, weight").in("id", weightIds),
+        supabaseAdmin.from("product_variants").select("product_id, color, size, weight").in("product_id", weightIds),
+      ]);
+      productWeights = productWeightMapFromRows(pRows);
+      variantWeights = variantWeightMapFromRows(vRows);
+    }
+    const { grams: itemsWeight, missingQty: itemsWeightMissing } = sumWeightGramsBySize(
+      validatedItems.map((i) => ({ productId: i.productId, color: i.color, size: i.size, quantity: i.quantity })),
+      productWeights,
+      variantWeights
+    );
+    const weightGrams = Math.max(
+      300,
+      itemsWeight + itemsWeightMissing * DEFAULT_OPEN_ORDER_WEIGHT + (extraCover ? addonWeight : 0)
+    );
+
+    // Ongkir J&T diverifikasi ke tarif server. Pengiriman manual (method kosong + biaya 0)
+    // tetap diizinkan untuk pesanan yang menunggu hitungan admin.
     const rawShipping = body.shipping ?? {};
-    const shippingCost = Math.max(0, Math.round(Number(rawShipping.cost) || 0));
-    const shippingMethod = String(rawShipping.method ?? "").trim() || "manual";
+    const shippingCheck = await verifyJntShipping({
+      city: rawCustomer.city,
+      district: rawCustomer.district,
+      weightGrams,
+      method: rawShipping.method,
+      cost: rawShipping.cost,
+      allowManual: true,
+    });
+    if (!shippingCheck.ok) {
+      return NextResponse.json({ error: shippingCheck.error }, { status: shippingCheck.status });
+    }
+    const shippingCost = shippingCheck.cost;
+    const shippingMethod = shippingCheck.method;
 
     // Metode pembayaran: daftar resminya diatur admin di dashboard (tabel `payment_methods`).
     // Pilihan customer divalidasi di sini; kalau admin belum punya metode aktif sama sekali,
@@ -378,29 +412,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // ── Berat kirim (gram): FUNGSI PUSAT yang sama dengan wizard (berat varian → produk). ──
-    // Add-on Extra Cover & Hanger +300 g dan minimum 300 g sama persis dengan wizard, supaya
-    // berat untuk ongkir = yang disimpan = yang dipakai resi.
-    const weightIds = Array.from(new Set(validatedItems.map((i) => i.productId).filter(Boolean)));
-    let productWeights: Record<string, number> = {};
-    let variantWeights: Record<string, number> = {};
-    if (weightIds.length > 0) {
-      const [{ data: pRows }, { data: vRows }] = await Promise.all([
-        supabaseAdmin.from("products").select("id, weight").in("id", weightIds),
-        supabaseAdmin.from("product_variants").select("product_id, color, size, weight").in("product_id", weightIds),
-      ]);
-      productWeights = productWeightMapFromRows(pRows);
-      variantWeights = variantWeightMapFromRows(vRows);
-    }
-    const { grams: itemsWeight, missingQty: itemsWeightMissing } = sumWeightGramsBySize(
-      validatedItems.map((i) => ({ productId: i.productId, color: i.color, size: i.size, quantity: i.quantity })),
-      productWeights,
-      variantWeights
-    );
-    const weightGrams = Math.max(
-      300,
-      itemsWeight + itemsWeightMissing * DEFAULT_OPEN_ORDER_WEIGHT + (extraCover ? addonWeight : 0)
-    );
+    // Berat & ongkir sudah dihitung/diverifikasi di atas (sebelum stok dipotong).
 
     // ── Atribusi referral (server-side, sama seperti /api/orders) ──
     const referral = await resolveAttribution(supabaseAdmin, request, {

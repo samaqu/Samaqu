@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
+import { isOpsAdmin } from "@/lib/ops-auth";
 
 const LOCALES = ["id", "en"];
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as { secret?: string; productId?: string };
-  // Simple auth to prevent abuse
-  if (body.secret !== process.env.REVALIDATE_SECRET && body.secret !== "samaqu-revalidate") {
+
+  // Dua jalur sah: server-to-server memakai REVALIDATE_SECRET, atau admin yang sudah login
+  // (token Supabase) — browser admin TIDAK lagi membawa secret apa pun.
+  const serverSecret = String(process.env.REVALIDATE_SECRET || "");
+  const secretOk = Boolean(serverSecret) && body.secret === serverSecret;
+  const adminOk = await isOpsAdmin(request);
+  if (!secretOk && !adminOk) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

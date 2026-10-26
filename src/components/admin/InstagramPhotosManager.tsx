@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, ExternalLink, Loader2, Trash2, Upload } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { requestRevalidate } from "@/lib/admin-revalidate";
 import { useToast } from "@/components/AdminToast";
 import AdminShell from "@/components/AdminShell";
 import { INSTAGRAM_DEFAULT_PHOTOS, INSTAGRAM_PROFILE, INSTAGRAM_SLOTS } from "@/lib/instagram-defaults";
@@ -121,11 +122,7 @@ export default function InstagramPhotosManager() {
       setSavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }));
       toast.showToast("success", "Perubahan tersimpan");
       // Best-effort: segarkan halaman Home yang mungkin ter-cache.
-      fetch("/api/revalidate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secret: "samaqu-revalidate" }),
-      }).catch(() => {});
+      void requestRevalidate();
     } catch (e) {
       toast.showToast("error", e instanceof Error ? e.message : "Gagal menyimpan");
     } finally {

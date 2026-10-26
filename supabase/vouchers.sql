@@ -18,5 +18,9 @@ CREATE TABLE IF NOT EXISTS vouchers (
 );
 
 ALTER TABLE vouchers ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Public read vouchers" ON vouchers FOR SELECT USING (true);
-CREATE POLICY "Service role all vouchers" ON vouchers FOR ALL USING (true);
+-- Voucher TIDAK boleh dibaca publik (kode aktif bisa disalahgunakan).
+-- Validasi lewat /api/vouchers/validate; admin memakai session + policy Admin.
+-- Policy final ada di migrations/20261026_vouchers_private_select.sql.
+CREATE POLICY "Admin read vouchers" ON vouchers
+  FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM admins a WHERE a.user_id = auth.uid()));

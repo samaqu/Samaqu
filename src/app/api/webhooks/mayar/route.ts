@@ -51,21 +51,22 @@ export async function POST(request: NextRequest) {
     const data = (body.data ?? {}) as Record<string, unknown>;
     const config = await getMayarConfig();
 
-    // ── Lapis 1: token webhook ──
-    if (config.webhookToken) {
-      const headerToken =
-        request.headers.get("x-callback-token") ||
-        request.headers.get("x-mayar-token") ||
-        request.headers.get("x-webhook-token") ||
-        "";
-      const queryToken = new URL(request.url).searchParams.get("token") ?? "";
-      const provided = headerToken || queryToken;
-      if (!provided || !safeEqual(provided, config.webhookToken)) {
-        console.warn("[MAYAR] Webhook ditolak: token tidak cocok.");
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-    } else {
-      console.warn("[MAYAR] Webhook Token belum diisi — verifikasi hanya lewat API Mayar.");
+    // ── Lapis 1: token webhook WAJIB cocok ──
+    if (!config.webhookToken) {
+      console.error("[MAYAR] Webhook Token belum diatur — request ditolak.");
+      return NextResponse.json({ error: "Webhook token belum dikonfigurasi" }, { status: 401 });
+    }
+
+    const headerToken =
+      request.headers.get("x-callback-token") ||
+      request.headers.get("x-mayar-token") ||
+      request.headers.get("x-webhook-token") ||
+      "";
+    const queryToken = new URL(request.url).searchParams.get("token") ?? "";
+    const provided = headerToken || queryToken;
+    if (!provided || !safeEqual(provided, config.webhookToken)) {
+      console.warn("[MAYAR] Webhook ditolak: token tidak cocok.");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const event = asString(body.event);

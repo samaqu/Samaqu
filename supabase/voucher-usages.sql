@@ -11,7 +11,9 @@ CREATE TABLE IF NOT EXISTS voucher_usages (
 );
 
 ALTER TABLE voucher_usages ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Public read voucher_usages" ON voucher_usages FOR SELECT USING (true);
-CREATE POLICY "Service role all voucher_usages" ON voucher_usages FOR ALL USING (true);
+-- voucher_usages berisi nomor WhatsApp pembeli: hanya admin yang boleh membaca.
+CREATE POLICY "Admin read voucher_usages" ON voucher_usages
+  FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM admins a WHERE a.user_id = auth.uid()));
 
 CREATE INDEX IF NOT EXISTS idx_voucher_usages_voucher_whatsapp ON voucher_usages(voucher_id, whatsapp_number);

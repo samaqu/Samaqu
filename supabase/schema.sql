@@ -81,17 +81,12 @@ ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE testimonials ENABLE ROW LEVEL SECURITY;
 
--- Policies: allow public read for products and testimonials
+-- Policies: public read untuk katalog dan testimoni.
 CREATE POLICY "Public read products" ON products FOR SELECT USING (true);
 CREATE POLICY "Public read testimonials" ON testimonials FOR SELECT USING (true);
 
--- Policies: allow public insert for orders (checkout)
-CREATE POLICY "Public insert orders" ON orders FOR INSERT WITH CHECK (true);
-CREATE POLICY "Public insert order_items" ON order_items FOR INSERT WITH CHECK (true);
-
--- Policies: admin can do everything (you'll need to set up auth later)
--- For now, allow all operations with service role key
-CREATE POLICY "Service role all products" ON products FOR ALL USING (true);
-CREATE POLICY "Service role all orders" ON orders FOR ALL USING (true);
-CREATE POLICY "Service role all order_items" ON order_items FOR ALL USING (true);
-CREATE POLICY "Service role all testimonials" ON testimonials FOR ALL USING (true);
+-- orders / order_items TIDAK punya policy publik.
+-- Checkout dan dashboard memakai service role lewat route /api/*.
+-- Policy baca milik sendiri (customer) dan baca admin ada di
+-- migrations/20261026_rls_final.sql. Jangan menambahkan policy INSERT/UPDATE/DELETE
+-- untuk anon/authenticated di sini.

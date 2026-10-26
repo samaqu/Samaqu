@@ -35,7 +35,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Akun ini bukan akun pelanggan." }, { status: 401 });
     }
 
-    const emailKey = String(user.email || "").trim().toLowerCase();
+    // Email hanya boleh dipakai sebagai penghubung kalau sudah terverifikasi. Tanpa ini,
+    // seseorang bisa mendaftar dengan email orang lain dan melihat riwayat pesanan tamunya.
+    const emailVerified = Boolean((user as { email_confirmed_at?: string | null }).email_confirmed_at);
+    const emailKey = emailVerified ? String(user.email || "").trim().toLowerCase() : "";
     const phoneKey = normalizeKontak(customer.whatsapp);
     const whatsapp = String(customer.whatsapp || "").trim();
     const digits = whatsapp.replace(/\D/g, "").replace(/^0+/, "");

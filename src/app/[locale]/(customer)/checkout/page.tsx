@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Truck, Loader2, RefreshCw } from "lucide-react";
-import { getProductById } from "@/lib/katalog-data";
+import { getProductById as getStaticProductById, type Product } from "@/lib/katalog-data";
+import { getProductById as getDbProductById } from "@/lib/db";
 import { sumWeightGramsBySize, productWeightMapFromRows, variantWeightMapFromRows, variantWeightKey } from "@/lib/shipping-weight";
 import { useCart } from "@/lib/cart-context";
 import { supabase } from "@/lib/supabase";
@@ -159,7 +160,22 @@ function CheckoutContent() {
   const colorParam = searchParams.get("color") || "";
   const sizeParam = searchParams.get("size") || "M";
   const qtyParam = parseInt(searchParams.get("qty") || "1", 10);
-  const product = productId ? getProductById(productId) : null;
+  const staticProduct = productId ? getStaticProductById(productId) : null;
+  const [dbProduct, setDbProduct] = useState<Product | null>(null);
+  useEffect(() => {
+    if (!productId) return;
+    let active = true;
+    getDbProductById(productId)
+      .then((row) => {
+        if (active) setDbProduct(row);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [productId]);
+  // Harga/nama/foto mengikuti database; data statis hanya fallback sampai fetch selesai.
+  const product = dbProduct || staticProduct;
   const { items, clearCart, voucher, applyVoucher, removeVoucher } = useCart();
   const isCartMode = !productId && items.length > 0;
 

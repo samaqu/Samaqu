@@ -23,6 +23,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Box, DollarSign, Edit, Image as ImageIcon, Layers, Package, Shirt, ShoppingCart, TrendingUp, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { requestRevalidate } from "@/lib/admin-revalidate";
 import { useToast } from "@/components/AdminToast";
 import { colorMap } from "@/lib/katalog-data";
 
@@ -276,11 +277,7 @@ export function ProductDetailPanel({
     onPublishedChange?.(next, target);
     toast.showToast("success", next ? "Produk tampil di website" : "Produk disembunyikan");
     // Best-effort: segarkan halaman publik yang ter-cache (Home, katalog, detail produk).
-    fetch("/api/revalidate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ secret: "samaqu-revalidate", productId: product.id }),
-    }).catch(() => {});
+    void requestRevalidate(product.id);
   }
 
   return (
