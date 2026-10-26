@@ -247,6 +247,9 @@ export default function CustomerDirectoryView({
           </div>
         ))}
       </div>
+      <p className="px-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+        Ringkasan seluruh pelanggan — tidak mengikuti tab &amp; filter di bawah.
+      </p>
 
       {/* Tab: memisahkan pelanggan supaya daftarnya mudah dibaca */}
       <div className="rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-slate-800 dark:bg-[#1a1d28]">
