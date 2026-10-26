@@ -32,6 +32,8 @@ type BestSellerRow = {
   isNew: boolean;
   sizes: Breakdown[];
   fallback: boolean;
+  /** Bagian dari `units` yang berasal dari add-on Open Order (sudah digabung ke Cover Hanger). */
+  addonUnits?: number;
   seriesBreakdown?: SeriesBreakdown[];
 };
 
@@ -458,6 +460,11 @@ export default function BestSellerSection() {
                           {row.subname ? (
                             <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-400">
                               {row.subname}
+                            </span>
+                          ) : null}
+                          {row.addonUnits ? (
+                            <span className="mt-0.5 block text-[10px] font-bold text-amber-600">
+                              termasuk {nfmt(row.addonUnits)} add-on Open Order
                             </span>
                           ) : null}
                           <span className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[11px] font-semibold text-slate-500 sm:hidden">

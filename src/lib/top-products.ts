@@ -17,14 +17,7 @@
  */
 
 import { SALE_STATUSES } from "@/lib/transaksi";
-import { OPEN_ORDER_ADDON } from "@/lib/open-order-config";
-
-/**
- * Add-on Open Order (`addon-cover-hanger`) secara fisik adalah produk katalog "Cover Hanger".
- * Di ranking, unit add-on digabung ke baris produk itu dan dicatat di `addonUnits` supaya
- * tidak muncul sebagai dua baris yang membingungkan.
- */
-const COVER_HANGER_PRODUCT_ID = "cover-hanger";
+import { OPEN_ORDER_ADDON, OPEN_ORDER_ADDON_TARGET_ID } from "@/lib/open-order-config";
 
 /**
  * Status pesanan yang dianggap penjualan sah — SATU sumbernya di `src/lib/transaksi.ts`
@@ -148,7 +141,7 @@ export function rankTopProducts(input: {
     // Add-on Open Order digabung ke produk "Cover Hanger" (dihitung sebagai unit produk itu,
     // lalu ditandai di `addonUnits` supaya admin tetap tahu asalnya).
     const isAddon = productId === OPEN_ORDER_ADDON.id;
-    const targetId = isAddon ? COVER_HANGER_PRODUCT_ID : productId;
+    const targetId = isAddon ? OPEN_ORDER_ADDON_TARGET_ID : productId;
     const catalog = targetId ? catalogById.get(targetId) : undefined;
     const rawName = String(it.product_name || "").trim() || "(tanpa nama)";
     const kain = String(it.kain || "").trim();

@@ -14,7 +14,7 @@
  */
 
 import { SALE_STATUSES } from "@/lib/transaksi";
-import { OPEN_ORDER_ADDON } from "@/lib/open-order-config";
+import { OPEN_ORDER_ADDON, OPEN_ORDER_ADDON_TARGET_ID } from "@/lib/open-order-config";
 
 /** Baris `order_items` yang dipakai agregasi. */
 export interface BestSellerItem {
@@ -66,6 +66,8 @@ interface BestSellerRowBase {
   sizes: BestSellerBreakdown[];
   /** true = item lama tanpa relasi master; sengaja tidak digabung. */
   fallback: boolean;
+  /** Bagian dari `units` yang berasal dari add-on Open Order (sudah digabung ke Cover Hanger). */
+  addonUnits: number;
 }
 
 export interface BestSellerSeriesRow extends BestSellerRowBase {
@@ -169,6 +171,8 @@ interface Acc {
   units: number;
   revenue: number;
   sizes: Map<string, number>;
+  /** Unit dari add-on Open Order yang digabung ke baris ini. */
+  addonUnits: number;
 }
 
 interface SeriesAcc extends Acc {
@@ -226,7 +230,11 @@ export function aggregateBestSellers(
     const rawSize = normalizeSize(item.size, rawName);
 
     const productId = text(item.product_id);
-    const master = productId ? catalogById.get(productId) : undefined;
+    // Add-on Open Order digabung ke produk katalog "Cover Hanger": satu baris laporan,
+    // jumlah add-on tetap dicatat di `addonUnits`.
+    const isAddon = productId === OPEN_ORDER_ADDON.id;
+    const masterId = isAddon ? OPEN_ORDER_ADDON_TARGET_ID : productId;
+    const master = masterId ? catalogById.get(masterId) : undefined;
 
     let seriesKey: string;
     let productKey: string;
@@ -241,7 +249,7 @@ export function aggregateBestSellers(
       seriesName = text(master.series);
       kain = catalogKain(master);
       category = text(master.category);
-      seriesKey = `s:${productId}`;
+      seriesKey = `s:${masterId}`;
       productKey = productKeyOf(category, name, kain);
       fallback = false;
     } else if (productId === OPEN_ORDER_ADDON.id) {
@@ -287,9 +295,11 @@ export function aggregateBestSellers(
         units: 0,
         revenue: 0,
         sizes: new Map(),
+        addonUnits: 0,
       } as SeriesAcc);
     seriesEntry.units += qty;
     seriesEntry.revenue += price * qty;
+    if (isAddon) seriesEntry.addonUnits += qty;
     bump(seriesEntry.sizes, sizeLabel, qty);
     seriesGroups.set(seriesKey, seriesEntry);
 
@@ -305,10 +315,12 @@ export function aggregateBestSellers(
         units: 0,
         revenue: 0,
         sizes: new Map(),
+        addonUnits: 0,
         series: new Map(),
       } as ProductAcc);
     productEntry.units += qty;
     productEntry.revenue += price * qty;
+    if (isAddon) productEntry.addonUnits += qty;
     bump(productEntry.sizes, sizeLabel, qty);
 
     const seriesLabel = seriesName || "Tanpa series";
@@ -333,6 +345,7 @@ export function aggregateBestSellers(
       fallback: entry.fallback,
       units: entry.units,
       revenue: entry.revenue,
+      addonUnits: entry.addonUnits,
       sizes: toBreakdown(entry.sizes),
     }))
     .sort((a, b) => b.units - a.units || b.revenue - a.revenue || a.name.localeCompare(b.name));
@@ -347,6 +360,7 @@ export function aggregateBestSellers(
       fallback: entry.fallback,
       units: entry.units,
       revenue: entry.revenue,
+      addonUnits: entry.addonUnits,
       sizes: toBreakdown(entry.sizes),
       seriesBreakdown: [...entry.series.entries()]
         .map(([key, value]) => ({

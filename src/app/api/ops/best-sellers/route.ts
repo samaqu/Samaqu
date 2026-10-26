@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
+import { OPEN_ORDER_ADDON_TARGET_ID } from "@/lib/open-order-config";
 import { BIZ_OFFSET_MS, jakartaDayBounds, jakartaMonthBounds } from "@/lib/ops-followup";
 import {
   aggregateBestSellers,
@@ -105,7 +106,13 @@ async function loadSales(admin: Admin, startIso: string, endIso: string): Promis
 
 /** Nama & kategori katalog untuk produk induk (satu query per potongan id). */
 async function loadCatalog(admin: Admin, items: BestSellerItem[]): Promise<BestSellerCatalogRow[]> {
-  const ids = [...new Set(items.map((item) => String(item.product_id || "")).filter(Boolean))];
+  // Produk target add-on selalu ikut dimuat, supaya unit add-on tetap bisa digabung ke
+  // "Cover Hanger" walau di periode itu tidak ada penjualan Cover Hanger biasa.
+  const ids = [
+    ...new Set(
+      [...items.map((item) => String(item.product_id || "")), OPEN_ORDER_ADDON_TARGET_ID].filter(Boolean),
+    ),
+  ];
   const catalog: BestSellerCatalogRow[] = [];
   for (let i = 0; i < ids.length; i += CHUNK) {
     const chunk = ids.slice(i, i + CHUNK);
@@ -220,14 +227,14 @@ export async function GET(req: NextRequest) {
       previousAgg.series.rows,
       currentAgg.series.totals,
       previousAgg.series.totals,
-      (row) => ({ ...row, units: 0, revenue: 0, sizes: [] }),
+      (row) => ({ ...row, units: 0, revenue: 0, addonUnits: 0, sizes: [] }),
     );
     const productMode = mergeMode<BestSellerProductRow>(
       currentAgg.product.rows,
       previousAgg.product.rows,
       currentAgg.product.totals,
       previousAgg.product.totals,
-      (row) => ({ ...row, units: 0, revenue: 0, sizes: [], seriesBreakdown: [] }),
+      (row) => ({ ...row, units: 0, revenue: 0, addonUnits: 0, sizes: [], seriesBreakdown: [] }),
     );
 
     const orderCounts = { validOrders: currentSales.validOrders, orders: currentSales.orders };

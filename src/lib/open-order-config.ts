@@ -21,6 +21,13 @@ export const OPEN_ORDER_ADDON = {
 };
 
 /**
+ * Baris katalog yang secara fisik SAMA dengan add-on di atas.
+ * Dipakai laporan/ranking supaya "Extra Cover & Hanger" tidak tampil sebagai baris terpisah
+ * dari produk "Cover Hanger" — unitnya digabung, jumlah add-on-nya tetap dicatat.
+ */
+export const OPEN_ORDER_ADDON_TARGET_ID = "cover-hanger";
+
+/**
  * Berat kirim add-on Cover & Hanger (gram) BILA admin belum mengaturnya di menu
  * "Open Order". Nilai resmi disimpan di `store_settings.open_order_addon_weight`
  * (`supabase/open-order-addon-weight.sql`) dan dibaca lewat `resolveAddonWeight`.
