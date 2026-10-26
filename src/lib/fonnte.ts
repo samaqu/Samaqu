@@ -652,6 +652,11 @@ export function buildOrderDeliveredMessage(order: DeliveredNotification): string
     "",
     `Semoga produk yang ${ka} terima sesuai dengan harapan dan bermanfaat.`,
     "",
+    // Ajakan ulasan: status pesanan sudah `selesai` tepat saat pesan ini dikirim, jadi
+    // halaman ulasan sudah bisa dipakai (satu ulasan per item, masuk moderasi admin).
+    "Kalau berkenan, bantu kami dengan ulasan singkat:",
+    `${SITE_URL}/id/akun/ulasan`,
+    "",
     "Terima kasih telah berbelanja di SAMAQU. Kami menghargai kepercayaan Ka kepada kami.",
   ].join("\n");
 }
@@ -789,13 +794,18 @@ export async function notifyCustomerOrderShipped(order: ShippedNotification): Pr
 }
 
 export async function notifyCustomerOrderDelivered(order: DeliveredNotification): Promise<boolean> {
-  return sendToCustomer(
-    order.customerWhatsapp,
-    await buildNotifikasi("pesanan-sampai", buildOrderDeliveredMessage(order), {
-      nama: greetingName(order.customerName),
-      nomor: order.orderNumber,
-    }),
-  );
+  const reviewLink = `${SITE_URL}/id/akun/ulasan`;
+  const message = await buildNotifikasi("pesanan-sampai", buildOrderDeliveredMessage(order), {
+    nama: greetingName(order.customerName),
+    nomor: order.orderNumber,
+    resi: order.awbNo,
+  });
+  // Template custom dari admin mungkin belum memuat tautan ulasan. Pastikan tetap ada,
+  // tanpa menggandakannya kalau template sudah memuat.
+  const finalMessage = message.includes(reviewLink)
+    ? message
+    : `${message}\n\nBantu kami dengan ulasan singkat:\n${reviewLink}`;
+  return sendToCustomer(order.customerWhatsapp, finalMessage);
 }
 
 export async function notifyCustomerPaymentReminder(
