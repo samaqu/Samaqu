@@ -296,7 +296,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
   const bodyRef = useRef(null);
   const [scrollKick, setScrollKick] = useState(0);
 
-  const { data: variants = [] } = useQuery({
+  const { data: variants = [], isSuccess: variantsLoaded } = useQuery({
     queryKey: ["transaksi", "variants"],
     queryFn: () => base44.entities.ProductVariant.list(),
     enabled: isOpen,
@@ -567,7 +567,11 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
 
   /* ── Baris item diubah → telusuri balik jadi langkah bertahapnya ── */
   useEffect(() => {
-    if (!isOpen || dataset.length === 0) return;
+    // Tunggu katalog varian BENAR-BENAR termuat. Tanpa ini, pesanan ber-add-on bisa membuat
+    // `dataset` sudah "tidak kosong" (hanya baris add-on sintetis) saat katalog masih dimuat:
+    // prefill jalan, produk pesanan tidak ketemu, barisnya jadi kosong, lalu penandanya terpakai
+    // sehingga tidak pernah diulang walau katalognya sudah datang.
+    if (!isOpen || !variantsLoaded || dataset.length === 0) return;
     const marker = initialData?.order_number || "__new__";
     if (prefilledFor.current === marker) return;
     prefilledFor.current = marker;
@@ -619,7 +623,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       };
     });
     setItems(rows.length > 0 ? rows : [emptyRow()]);
-  }, [isOpen, initialData, dataset]);
+  }, [isOpen, initialData, dataset, variantsLoaded]);
 
   /* ── Opsi bertahap: tiap langkah hanya berisi opsi yang valid dari langkah sebelumnya ── */
   const categoryOptions = useMemo(
@@ -847,7 +851,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
           : `Stok ${entry.option.size} tersedia ${entry.option.stock}, diminta ${entry.total}`;
       }
     }
-    const unitPrice = rowUnitPrice(row, chosen?.price, recordedPriceFor(row));
+    // Harga tercatat hanya berlaku kalau barisnya benar-benar menunjuk produk yang ada.
+    // Baris kosong (produk belum ketemu) tidak boleh menyumbang subtotal dari harga lama.
+    const unitPrice = rowUnitPrice(row, chosen?.price, product ? recordedPriceFor(row) : 0);
     return {
       product,
       paket,
