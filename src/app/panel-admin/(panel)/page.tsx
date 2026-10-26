@@ -87,6 +87,8 @@ type VariantRow = {
   id: string;
   product_name?: string;
   series_name?: string | null;
+  /** Jenis kain (mis. "B-01") — dilengkapi supaya baris stok sama lengkapnya dengan transaksi. */
+  jenis_kain_name?: string | null;
   color?: string | null;
   stock_efektif?: Record<string, number> | null;
 };
@@ -435,7 +437,14 @@ export default function PanelAdminHome() {
           ) : (
             <div className={styles.list}>
               {lowStock.slice(0, 5).map((v) => {
-                const parts = [v.series_name, v.color && v.color !== "default" ? v.color : null].filter(Boolean).join(" · ");
+                // Urutan sama dengan ringkasan item di "Pesanan terbaru": series · kain · warna.
+                const parts = [
+                  v.series_name,
+                  v.jenis_kain_name,
+                  v.color && v.color !== "default" ? v.color : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
                 return (
                   <div key={v.id} className={styles.listRow}>
                     <div className={styles.listMain}>
