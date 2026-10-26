@@ -40,6 +40,14 @@ interface ProductLite {
   series: string | null;
   price: number | null;
   is_published: boolean;
+  jenis_kain: { name: string } | { name: string }[] | null;
+}
+
+function fabricName(product: ProductLite | null | undefined): string | null {
+  const raw = product?.jenis_kain;
+  if (!raw) return null;
+  const row = Array.isArray(raw) ? raw[0] : raw;
+  return row?.name || null;
 }
 
 interface ProductRuleDraft {
@@ -157,6 +165,8 @@ function ProductPicker({
   const [query, setQuery] = useState("");
   const wrapRef = useRef<HTMLDivElement>(null);
   const selected = products.find((product) => product.id === value);
+  const selectedFabric = fabricName(selected);
+  const selectedTag = selectedFabric || selected?.series || null;
 
   useEffect(() => {
     if (!open) return;
@@ -181,7 +191,8 @@ function ProductPicker({
       return (
         product.name.toLowerCase().includes(term) ||
         product.id.toLowerCase().includes(term) ||
-        String(product.series || "").toLowerCase().includes(term)
+        String(product.series || "").toLowerCase().includes(term) ||
+        String(fabricName(product) || "").toLowerCase().includes(term)
       );
     })
     .slice(0, 60);
@@ -211,9 +222,9 @@ function ProductPicker({
         >
           {selected ? selected.name : value || "Pilih produk"}
         </span>
-        {selected?.series ? (
+        {selectedTag ? (
           <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-500">
-            {selected.series}
+            {selectedTag}
           </span>
         ) : null}
         <ChevronDown
@@ -264,6 +275,7 @@ function ProductPicker({
                     <span className="block truncate text-[11px] text-zinc-400">
                       {product.id}
                       {product.series ? ` · ${product.series}` : ""}
+                      {fabricName(product) ? ` · ${fabricName(product)}` : ""}
                       {product.is_published ? "" : " · draft"}
                     </span>
                   </span>
@@ -327,7 +339,7 @@ export default function AffiliateSettingsView() {
     (async () => {
       const { data, error: productsError } = await supabase
         .from("products")
-        .select("id, name, series, price, is_published")
+        .select("id, name, series, price, is_published, jenis_kain(name)")
         .order("name", { ascending: true });
       if (!alive) return;
       if (productsError) {
@@ -611,6 +623,7 @@ export default function AffiliateSettingsView() {
                           <p className="truncate text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>
                             {rule.id}
                             {product?.series ? ` · ${product.series}` : ""}
+                            {fabricName(product) ? ` · ${fabricName(product)}` : ""}
                           </p>
                         </div>
                         <span className="shrink-0 text-sm font-semibold tabular-nums" style={{ color: "var(--fg)" }}>
