@@ -798,6 +798,7 @@ export async function notifyCustomerOrderDelivered(order: DeliveredNotification)
   const message = await buildNotifikasi("pesanan-sampai", buildOrderDeliveredMessage(order), {
     nama: greetingName(order.customerName),
     nomor: order.orderNumber,
+    tautan_ulasan: reviewLink,
   });
   // Template custom dari admin mungkin belum memuat tautan ulasan. Pastikan tetap ada,
   // tanpa menggandakannya kalau template sudah memuat.
@@ -1080,11 +1081,16 @@ export function templateBawaanNotifikasi(): Record<string, string> {
   });
   hasil["pesanan-dikirim"] = dikirim;
 
-  hasil["pesanan-sampai"] = buildOrderDeliveredMessage({
-    orderNumber: p("nomor"),
-    customerName: p("nama"),
-    customerWhatsapp: p("wa"),
-  });
+  // Tautan ulasan ditampilkan sebagai penanda `{tautan_ulasan}` (bukan URL mentah) supaya
+  // admin bisa memindahkan/menghapusnya dari editor template.
+  hasil["pesanan-sampai"] = gantiDenganPenanda(
+    buildOrderDeliveredMessage({
+      orderNumber: p("nomor"),
+      customerName: p("nama"),
+      customerWhatsapp: p("wa"),
+    }),
+    { [`${SITE_URL}/id/akun/ulasan`]: p("tautan_ulasan") },
+  );
 
   hasil["pesanan-dibatalkan-pembeli"] = buildOrderCancelledMessage({
     orderNumber: p("nomor"),
