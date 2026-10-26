@@ -798,7 +798,6 @@ export async function notifyCustomerOrderDelivered(order: DeliveredNotification)
   const message = await buildNotifikasi("pesanan-sampai", buildOrderDeliveredMessage(order), {
     nama: greetingName(order.customerName),
     nomor: order.orderNumber,
-    resi: order.awbNo,
   });
   // Template custom dari admin mungkin belum memuat tautan ulasan. Pastikan tetap ada,
   // tanpa menggandakannya kalau template sudah memuat.
