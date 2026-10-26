@@ -188,12 +188,16 @@ export default function CustomerDirectoryView({
     const total = customers.length;
     const registered = customers.filter((c) => c.registered).length;
     const buyers = customers.filter(pernahBelanja).length;
+    // Pelanggan yang SELURUH pesanannya dibatalkan — bukan pembeli, tapi juga bukan
+    // "belum pernah transaksi". Dipisah supaya angka batal tidak menumpuk di satu kolom.
+    const cancelled = customers.filter(hanyaPesananBatal).length;
     return {
       total,
       registered,
       guest: total - registered,
       buyers,
-      nonBuyers: total - buyers,
+      cancelled,
+      nonBuyers: total - buyers - cancelled,
     };
   }, [customers]);
 
@@ -220,13 +224,14 @@ export default function CustomerDirectoryView({
   return (
     <div className="space-y-4">
       {/* Ringkasan cepat: total, akun, dan status belanja — dihitung dari data yang sama. */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
         {[
           { label: "Total pelanggan", value: summary.total, caption: "tercatat" },
           { label: "Punya akun", value: summary.registered, caption: `${shareOf(summary.registered)}% dari total` },
           { label: "Belum daftar", value: summary.guest, caption: "dari pesanan" },
           { label: "Pernah belanja", value: summary.buyers, caption: `${shareOf(summary.buyers)}% dari total` },
-          { label: "Belum belanja", value: summary.nonBuyers, caption: "belum ada transaksi" },
+          { label: "Hanya batal", value: summary.cancelled, caption: "tidak dihitung belanja" },
+          { label: "Belum belanja", value: summary.nonBuyers, caption: "belum pernah transaksi" },
         ].map((item) => (
           <div
             key={item.label}
