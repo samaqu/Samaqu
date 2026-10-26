@@ -63,6 +63,8 @@ const RESI_CHECK = "/api/ops/resi-check";
  */
 const ADMIN_ORDERS = "/api/admin/orders";
 const CUSTOMERS = "/api/ops/customers";
+/** Trafik web dari pencatat sisi server (tabel `web_visits`) — bukan Web Analytics Vercel. */
+const ANALYTICS = "/api/ops/analytics";
 
 /** Base44 memakai sort "-created_date" (desc). Kita terjemahkan ke parameter API. */
 function sortParam(sort?: string) {
@@ -452,6 +454,24 @@ export const base44 = {
       async list() {
         const json = await call<{ items: any[] }>("GET", CUSTOMERS);
         return json.items ?? [];
+      },
+    },
+
+    /**
+     * Trafik web publik dari pencatat SISI SERVER (`web_visits`). Angkanya tidak bisa
+     * diblokir ad blocker; halaman internal tidak pernah ikut dihitung.
+     */
+    Analytics: {
+      async traffic(days = 7) {
+        return call<{
+          days: number;
+          since: string;
+          until: string;
+          today: { day: string; pageviews: number; visitors: number };
+          totals: { pageviews: number; visitors: number };
+          series: Array<{ day: string; pageviews: number; visitors: number }>;
+          top: Array<{ path: string; pageviews: number; visitors: number }>;
+        }>("GET", `${ANALYTICS}?days=${days}`);
       },
     },
   },

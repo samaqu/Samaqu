@@ -1,6 +1,7 @@
 import createMiddleware from "next-intl/middleware";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, type NextFetchEvent } from "next/server";
 import { routing } from "./i18n/routing";
+import { trackVisit } from "./lib/web-visit-tracker";
 
 const intlMiddleware = createMiddleware(routing);
 
@@ -12,7 +13,15 @@ const OPS_HOST = "office.samaqu.id";
 const AFFILIATE_HOST = "affiliate.samaqu.id";
 const LOCALES = ["id", "en"];
 
-export default function middleware(request: NextRequest) {
+export default function middleware(request: NextRequest, event: NextFetchEvent) {
+  const response = handleRequest(request);
+  // Hanya respons yang benar-benar merender halaman yang dihitung. Redirect locale (307/308)
+  // dilewati supaya satu kunjungan tidak tercatat dua kali (mis. "/" → "/id").
+  if (response.status < 300) trackVisit(request, event);
+  return response;
+}
+
+function handleRequest(request: NextRequest) {
   // x-pathname dipakai layout/metadata untuk menghitung canonical + hreflang
   // tanpa perlu tahu URL-nya dari sisi klien.
   const headers = new Headers(request.headers);

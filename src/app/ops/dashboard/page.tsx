@@ -8,6 +8,7 @@ import Link from "next/link";
 // OpsShell.tsx). Nilainya `any`, jadi tidak bisa gagal type-check.
 import * as LucideIcons from "lucide-react";
 import GlassCard from "@/components/ops/GlassCard";
+import WebTrafficCard from "@/components/ops/WebTrafficCard";
 
 const IconDashboard: any = (LucideIcons as any).LayoutDashboard ?? (LucideIcons as any).Gauge;
 const IconRefresh: any = (LucideIcons as any).RefreshCw;
@@ -413,6 +414,9 @@ export default function OpsDashboardPage() {
           tone={r.margin >= 0 ? "text-slate-900" : "text-red-600"}
         />
       </div>
+
+      {/* ── Trafik web publik (pencatat sisi server, bukan script browser) ── */}
+      <WebTrafficCard />
 
       {/* ── Tren Penjualan · Produk Terlaris ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
