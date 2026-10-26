@@ -73,6 +73,9 @@ export default function Transaksi({ variant = "ops" }) {
     queryKey: ["transaksi", "orders", start, end],
     queryFn: () => base44.entities.Transaction.orders({ start, end }),
     initialData: [],
+    // Status bisa berubah dari cron tracking J&T tanpa interaksi halaman ini.
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 
   const visibleOrders = useMemo(() => {
@@ -133,6 +136,13 @@ export default function Transaksi({ variant = "ops" }) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [detail, setDetail] = useState(null);
+
+  // Drawer yang sedang terbuka ikut memakai baris terbaru setelah polling.
+  useEffect(() => {
+    if (!detail) return;
+    const fresh = orders.find((o) => o.order_number === detail.order_number);
+    if (fresh && fresh !== detail) setDetail(fresh);
+  }, [orders, detail]);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
