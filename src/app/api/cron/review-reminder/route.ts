@@ -17,14 +17,19 @@ import { sendOnce } from "@/lib/order-notify";
  *    `sendOnce`, jadi cron berulang tetap mengirim satu kali;
  *  - pesanan yang sudah punya ulasan (status apa pun, termasuk ditolak) dilewati;
  *  - nomor WhatsApp kosong dilewati;
- *  - maksimal 40 pesan per eksekusi supaya satu kali jalan tidak menembak terlalu banyak.
+ *  - maksimal 10 pesan per eksekusi, dengan jeda 2,5 detik antar pesan — bertahap supaya
+ *    tidak kena throttle/limit Fonnte dan tidak terlihat seperti spam.
  *
  * Catatan: `delivered_notified_at` juga terisi kalau WA paket diterima gagal (klaim tidak
  * dilepas), jadi kolom itu dipakai sebagai penanda "sudah sampai", bukan status kirim WA.
  */
 
 const DELAY_DAYS = 2;
-const LIMIT = 40;
+const LIMIT = 10;
+/** Jeda antar pesan (ms) — 10 pesan ≈ 25 detik, masih di bawah batas fungsi. */
+const SEND_GAP_MS = 2500;
+
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -97,7 +102,8 @@ export async function GET(request: NextRequest) {
   let skipped = 0;
   let failed = 0;
 
-  for (const order of orders) {
+  for (let index = 0; index < orders.length; index += 1) {
+    const order = orders[index];
     const key = String(order.id);
     if (reviewed.has(key) || !String(order.customer_whatsapp || "").trim()) {
       skipped += 1;
@@ -114,6 +120,11 @@ export async function GET(request: NextRequest) {
 
     if (ok) sent += 1;
     else failed += 1;
+
+    // Jeda antar pesan supaya tidak menembak beruntun.
+    if (index < orders.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, SEND_GAP_MS));
+    }
   }
 
   console.log("[REVIEW-REMINDER] selesai:", { scanned: orders.length, sent, skipped, failed });
