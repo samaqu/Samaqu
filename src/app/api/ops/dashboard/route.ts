@@ -158,19 +158,27 @@ export async function GET(req: NextRequest) {
   // Grafik tren juga penjualan → hanya pesanan lunas (bukan pending/batal).
   const trendValid = ((ordersTrend.data || []) as any[]).filter(isPaidOrder);
   const trendDailyMap = new Map<string, number>();
+  /** Jumlah pesanan lunas per hari — dipakai tooltip grafik (sama seperti dashboard admin). */
+  const trendDailyCount = new Map<string, number>();
   for (const o of trendValid) {
     const created = new Date(o.created_at);
     if (Number.isNaN(created.getTime())) continue;
     const wibDay = new Date(created.getTime() + BIZ_OFFSET_MS).toISOString().slice(0, 10);
     trendDailyMap.set(wibDay, (trendDailyMap.get(wibDay) || 0) + orderRevenue(o));
+    trendDailyCount.set(wibDay, (trendDailyCount.get(wibDay) || 0) + 1);
   }
 
-  const trendHarian: { tanggal: string; label: string; omset: number }[] = [];
+  const trendHarian: { tanggal: string; label: string; omset: number; pesanan: number }[] = [];
   for (let back = 6; back >= 0; back--) {
     const wib = new Date(new Date(startIso).getTime() - back * 86400000 + BIZ_OFFSET_MS);
     const tanggal = wib.toISOString().slice(0, 10);
     const label = `${String(wib.getUTCDate()).padStart(2, "0")}/${String(wib.getUTCMonth() + 1).padStart(2, "0")}`;
-    trendHarian.push({ tanggal, label, omset: trendDailyMap.get(tanggal) || 0 });
+    trendHarian.push({
+      tanggal,
+      label,
+      omset: trendDailyMap.get(tanggal) || 0,
+      pesanan: trendDailyCount.get(tanggal) || 0,
+    });
   }
 
   /* ── Stok ──

@@ -42,7 +42,7 @@ type TopProduct = {
   addonUnits?: number;
 };
 type TrendPoint = { tanggal: string; hari: string; omset: number };
-type TrendHarian = { tanggal: string; label: string; omset: number };
+type TrendHarian = { tanggal: string; label: string; omset: number; pesanan?: number };
 
 type DashboardData = {
   generatedAt: string;
@@ -107,16 +107,8 @@ function StatCard({ label, value, caption, tone }: { label: string; value: strin
   );
 }
 
-/* ── Grafik "Tren Penjualan" (SVG inline, tanpa library/tambahan dependency) ── */
-
-const BULAN_SINGKAT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
-
-/** "2026-10-12" → "12 Okt" (untuk tooltip). */
-function tanggalRingkas(tanggal: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(tanggal || "");
-  if (!m) return tanggal || "";
-  return `${Number(m[3])} ${BULAN_SINGKAT[Number(m[2]) - 1] || m[2]}`;
-}
+/* ── Grafik "Tren Penjualan" — bentuknya disamakan dengan grafik "Pendapatan Bulanan"
+   di dashboard /admin (`MonthlyTrendChart`): HTML/CSS, bukan SVG. ── */
 
 /** Label sumbu Y ringkas: 1.200.000 → "1,2jt"; 800.000 → "800rb"; 0 → "0". */
 function fmtSumbu(v: number): string {
@@ -136,88 +128,121 @@ function niceTop(rawMax: number, ticks = 4): number {
 }
 
 /**
- * Grafik batang tren penjualan — mengikuti wireframe "sales-analytics-view"
- * (Weekly Revenue / Chart.js):
- *  - semua batang tipis transparan dengan tepi 1,5px, HANYA batang tertinggi yang solid
- *  - sudut membulat (borderRadius 8, borderSkipped false)
- *  - garis grid X disembunyikan, grid Y tipis rata (bukan putus-putus), tanpa legend
- * Warna disesuaikan ke palet dashboard ops (biru), bukan palet wireframe.
+ * Grafik batang tren penjualan — satu bahasa dengan `MonthlyTrendChart` di dashboard /admin:
+ *  - sumbu Y 4 langkah (0 … batas atas) dengan label ringkas ("1,2jt" / "800rb");
+ *  - grid horizontal rata, tanpa garis vertikal dan tanpa legend;
+ *  - batang abu muda, batang periode aktif (hari ini) hitam, yang disorot mouse abu tua;
+ *  - tooltip melayang berisi nominal + jumlah pesanan; tanpa mouse menempel di hari ini;
+ *  - label tanggal di bawah tiap batang, hari aktif lebih tegas.
  */
 function TrendChart({ trend }: { trend: TrendHarian[] }) {
+  const [hover, setHover] = useState<number | null>(null);
+
   const max = (trend || []).reduce((m, d) => Math.max(m, Number(d.omset) || 0), 0);
   if (!trend || trend.length === 0 || max <= 0) {
     return <p className="text-sm text-gray-500 py-16 text-center">Belum ada penjualan 7 hari terakhir</p>;
   }
 
-  const VB_W = 720;
-  const VB_H = 300;
-  const padL = 54; // ruang label sumbu Y
-  const padR = 14;
-  const padT = 14;
-  const padB = 30; // ruang label sumbu X
-  const plotW = VB_W - padL - padR;
-  const plotH = VB_H - padT - padB;
-  const baseY = padT + plotH;
   const top = niceTop(max);
   const n = trend.length;
-  const slot = plotW / n;
-  const barW = Math.min(slot * 0.72, 84);
-  const radius = 8;
-  const hMin = 3; // nilai 0 tetap tampak tipis menempel garis dasar
-  const peakIdx = trend.reduce(
-    (best, d, i) => ((Number(d.omset) || 0) > (Number(trend[best]?.omset) || 0) ? i : best),
-    0
-  );
+  const activeIdx = n - 1; // hari ini
+  const focusIdx = hover ?? activeIdx;
+  const focus = trend[focusIdx];
+  const heightOf = (index: number) => (top > 0 ? ((Number(trend[index].omset) || 0) / top) * 100 : 0);
 
   return (
-    <svg
-      viewBox={`0 0 ${VB_W} ${VB_H}`}
-      preserveAspectRatio="xMidYMid meet"
-      className="w-full h-64"
+    <div
+      className="mt-5"
       role="img"
-      aria-label="Tren penjualan 7 hari terakhir"
+      aria-label={`Tren penjualan ${n} hari terakhir (harga produk, tanpa ongkir)`}
     >
-      {/* Grid horizontal rata + label sumbu Y (5 tick seperti wireframe) */}
-      {[0, 1, 2, 3, 4].map((i) => {
-        const value = (top / 4) * i;
-        const y = baseY - (value / top) * plotH;
-        return (
-          <g key={`grid-${i}`}>
-            <line x1={padL} y1={y} x2={VB_W - padR} y2={y} stroke="#eceae4" strokeWidth="1" />
-            <text x={padL - 9} y={y} textAnchor="end" dominantBaseline="middle" fontSize="12" fill="#9a9a98">
-              {fmtSumbu(value)}
-            </text>
-          </g>
-        );
-      })}
+      <div className="flex gap-2">
+        {/* Sumbu Y: 4 langkah dari 0 sampai batas atas. */}
+        <div className="relative h-56 w-11 shrink-0 lg:h-64">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <span
+              key={`y-${i}`}
+              className="absolute right-0 -translate-y-1/2 text-[11px] font-semibold tabular-nums text-slate-400"
+              style={{ top: `${(1 - i / 4) * 100}%` }}
+            >
+              {fmtSumbu((top / 4) * i)}
+            </span>
+          ))}
+        </div>
 
-      {/* Batang + label sumbu X (tanpa garis grid vertikal) */}
-      {trend.map((d, i) => {
-        const value = Number(d.omset) || 0;
-        const h = value > 0 ? Math.max((value / top) * plotH, hMin) : hMin;
-        const x = padL + i * slot + (slot - barW) / 2;
-        const y = baseY - h;
-        const peak = value > 0 && i === peakIdx;
-        return (
-          <g key={d.tanggal}>
-            <title>{`${tanggalRingkas(d.tanggal)} · ${rp(value)}`}</title>
-            <rect
-              x={x}
-              y={y}
-              width={barW}
-              height={h}
-              rx={radius}
-              fill={peak ? "#1c1c1c" : "rgba(28,28,28,0.10)"}
-              stroke="#1c1c1c"
-              strokeWidth="1.5"
+        {/* Area plot: grid + batang + tooltip. */}
+        <div className="relative h-56 flex-1 lg:h-64">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div
+              key={`grid-${i}`}
+              className="absolute inset-x-0 border-t border-slate-100"
+              style={{ top: `${(1 - i / 4) * 100}%` }}
             />
-            <text x={x + barW / 2} y={baseY + 20} textAnchor="middle" fontSize="12" fill="#9a9a98">
+          ))}
+
+          <div className="absolute inset-0 flex items-end gap-1.5 sm:gap-2">
+            {trend.map((d, i) => {
+              const active = i === activeIdx;
+              return (
+                <div
+                  key={d.tanggal}
+                  className="flex h-full flex-1 items-end justify-center"
+                  onMouseEnter={() => setHover(i)}
+                  onMouseLeave={() => setHover(null)}
+                >
+                  <span
+                    className={`w-full max-w-[34px] rounded-t-md transition-colors duration-200 ${
+                      active ? "bg-slate-900" : hover === i ? "bg-slate-400" : "bg-slate-200"
+                    }`}
+                    style={{ height: `${heightOf(i)}%`, minHeight: d.omset > 0 ? 6 : 0 }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Nilai hari yang disorot; tanpa mouse: hari ini. */}
+          <div
+            className="pointer-events-none absolute z-10 transition-all duration-200"
+            style={{
+              left: `${((focusIdx + 0.5) / n) * 100}%`,
+              bottom: `calc(${heightOf(focusIdx)}% + 10px)`,
+              transform: "translateX(-50%)",
+            }}
+          >
+            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.14)]">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-900" />
+                Penjualan · {focus.label}
+              </div>
+              <p className="mt-0.5 whitespace-nowrap text-sm font-extrabold text-slate-900">
+                {rp(focus.omset)}
+              </p>
+              <p className="whitespace-nowrap text-[10px] font-semibold text-slate-400">
+                {nfmt(focus.pesanan || 0)} pesanan
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Label tanggal di bawah tiap batang. */}
+      <div className="mt-2 flex gap-2">
+        <span className="w-11 shrink-0" />
+        <div className="flex flex-1 gap-1.5 sm:gap-2">
+          {trend.map((d, i) => (
+            <span
+              key={`x-${d.tanggal}`}
+              className={`flex-1 text-center text-[11px] font-bold ${
+                i === focusIdx ? "text-slate-900" : "text-slate-400"
+              }`}
+            >
               {d.label}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
