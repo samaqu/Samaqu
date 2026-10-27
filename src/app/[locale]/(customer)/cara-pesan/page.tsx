@@ -112,6 +112,14 @@ export default function CaraPesanPage() {
         </svg>
 
         <div className={s.wrap} style={{ position: "relative" }}>
+          <nav aria-label={t("breadcrumbLabel")} className={s.crumbs}>
+            <Link href="/">{t("breadcrumbHome")}</Link>
+            <span className={s.sep} aria-hidden="true">
+              /
+            </span>
+            <span aria-current="page">{t("breadcrumbCurrent")}</span>
+          </nav>
+
           <div className={s.hero}>
             <div className={s.heroCopy}>
               <p className={`${s.rv} ${s.heroBadge}`}>

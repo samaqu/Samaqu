@@ -305,6 +305,9 @@
     "ctaButton": "Hubungi Kami"
   },
   "caraPesanPage": {
+    "breadcrumbLabel": "Breadcrumb",
+    "breadcrumbHome": "Beranda",
+    "breadcrumbCurrent": "Cara Pesan",
     "heroBadge": "Cara pesan di SAMAQU",
     "heroTitleLead": "Cara mudah berbelanja",
     "heroRotate1": "Thobe.",

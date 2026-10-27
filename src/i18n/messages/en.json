@@ -305,6 +305,9 @@
     "ctaButton": "Contact Us"
   },
   "caraPesanPage": {
+    "breadcrumbLabel": "Breadcrumb",
+    "breadcrumbHome": "Home",
+    "breadcrumbCurrent": "How to Order",
     "heroBadge": "How to order at SAMAQU",
     "heroTitleLead": "Easy shopping for",
     "heroRotate1": "Thobe.",

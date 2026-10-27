@@ -346,7 +346,35 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 48px;
-  padding: 88px 0 96px;
+  padding: 28px 0 96px;
+}
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 28px;
+  font-size: 12.5px;
+  color: #9a9a9a;
+}
+
+.crumbs a {
+  padding: 6px 0;
+  transition: color 0.2s;
+}
+
+.crumbs a:hover {
+  color: var(--white);
+}
+
+.crumbs .sep {
+  color: #4d4d4d;
+}
+
+.crumbs [aria-current="page"] {
+  color: var(--white);
+  font-weight: 600;
 }
 
 .heroCopy {
@@ -1067,6 +1095,10 @@
   .hero {
     gap: 34px;
     padding: 44px 0 64px;
+  }
+  .crumbs {
+    padding-top: 18px;
+    font-size: 12px;
   }
   .hcards {
     min-height: 0;
