@@ -828,14 +828,6 @@
   object-fit: contain;
 }
 
-.payNote {
-  margin: 36px 0 0;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--muted);
-  max-width: 720px;
-}
-
 /* ---------- garansi ---------- */
 .cardPlain {
   border: 1px solid var(--line-strong);
@@ -871,38 +863,94 @@
   color: var(--ink);
 }
 
-/* ---------- kontak ---------- */
-.panelCta {
+/* ---------- kontak / CTA ---------- */
+.cta {
   max-width: 1280px;
   margin: 0 auto;
   background: var(--ink);
   color: var(--white);
   border-radius: var(--radius-lg);
-  padding: clamp(32px, 6vw, 88px);
+  padding: clamp(28px, 5vw, 72px);
   position: relative;
   overflow: hidden;
+  display: grid;
+  gap: clamp(28px, 4vw, 56px);
 }
 
-.panelCta h2 {
+@media (min-width: 960px) {
+  .cta {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    align-items: center;
+  }
+}
+
+.ctaGlow {
+  position: absolute;
+  right: -18%;
+  top: -35%;
+  width: 70%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 45%, transparent 70%);
+  pointer-events: none;
+}
+
+.spinCta {
+  position: absolute;
+  right: -120px;
+  bottom: -140px;
+  width: 460px;
+  height: 460px;
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+.ctaCopy {
+  position: relative;
+}
+
+.ctaEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 18px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #9a9a9a;
+}
+
+.ctaEyebrow i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--white);
+  animation: dot 1.8s ease-in-out infinite;
+}
+
+.ctaTitle {
   margin: 0;
   font-weight: 700;
-  font-size: clamp(34px, 5vw, 64px);
-  line-height: 1.12;
-  letter-spacing: -0.025em;
+  font-size: clamp(32px, 5vw, 60px);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  max-width: 14ch;
 }
 
-.panelCta p {
-  margin: 20px 0 0;
-  font-size: 18px;
+.ctaDesc {
+  margin: 18px 0 0;
+  font-size: clamp(15px, 1.4vw, 18px);
   line-height: 1.65;
-  max-width: 520px;
+  color: var(--on-dark);
+  max-width: 42ch;
 }
 
 .ctaActions {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
-  margin-top: 36px;
+  margin-top: clamp(24px, 3vw, 36px);
 }
 
 .btnLight {
@@ -913,30 +961,84 @@
   padding: 16px 28px;
   border-radius: 999px;
   min-height: 52px;
+  justify-content: center;
 }
 
 .btnOutlineLight {
-  border: 1px solid var(--white);
+  border: 1px solid rgba(255, 255, 255, 0.55);
   color: var(--white);
-  font-weight: 700;
+  font-weight: 600;
   font-size: 15px;
   padding: 16px 28px;
   border-radius: 999px;
   min-height: 52px;
+  justify-content: center;
 }
 
-.panelCta .left {
+@media (hover: hover) and (pointer: fine) {
+  .btnOutlineLight:hover {
+    border-color: var(--white);
+  }
+}
+
+.ctaReasons {
   position: relative;
-  max-width: 680px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
 }
 
-.spinCta {
-  position: absolute;
-  right: -100px;
-  bottom: -120px;
-  width: 440px;
-  height: 440px;
-  opacity: 0.12;
+.ctaReasons li {
+  display: flex;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.ctaReasons li:first-child {
+  padding-top: 20px;
+}
+
+.ctaReasons li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+@media (min-width: 960px) {
+  .ctaReasons {
+    border-top: 0;
+  }
+  .ctaReasons li:first-child {
+    padding-top: 16px;
+  }
+  .ctaReasons li:last-child {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+    padding-bottom: 16px;
+  }
+}
+
+.ctaReasons svg {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  color: var(--white);
+}
+
+.ctaReasons strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.ctaReasons span {
+  display: block;
+  margin-top: 3px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--on-dark-soft);
 }
 
 /* ---------- footer ---------- */
@@ -1006,6 +1108,13 @@
   .stack > a {
     align-self: stretch;
     justify-content: center;
+  }
+  .ctaActions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ctaActions > a {
+    width: 100%;
   }
   .paygrp {
     margin-top: 28px;

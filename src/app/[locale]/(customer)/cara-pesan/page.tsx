@@ -88,6 +88,12 @@ export default function CaraPesanPage() {
     { title: t("warranty3Title"), desc: t("warranty3Desc") },
   ];
 
+  const contactReasons = [
+    { title: t("contactReason1Title"), desc: t("contactReason1Desc") },
+    { title: t("contactReason2Title"), desc: t("contactReason2Desc") },
+    { title: t("contactReason3Title"), desc: t("contactReason3Desc") },
+  ];
+
   return (
     <div className={s.root}>
       {/* ============ HERO ============ */}
@@ -286,7 +292,6 @@ export default function CaraPesanPage() {
             </div>
           ))}
 
-          <p className={`${s.payNote} ${s.sc}`}>{t("payNote")}</p>
         </div>
       </section>
 
@@ -342,7 +347,8 @@ export default function CaraPesanPage() {
 
       {/* ============ KONTAK ============ */}
       <section id="kontak" className={`${s.sec} ${s.secLast}`}>
-        <div className={`${s.panelCta} ${s.onDark} ${s.sc}`}>
+        <div className={`${s.cta} ${s.onDark} ${s.sc}`}>
+          <div className={s.ctaGlow} aria-hidden="true" />
           <svg
             className={`${s.spin} ${s.spinCta}`}
             aria-hidden="true"
@@ -356,10 +362,14 @@ export default function CaraPesanPage() {
             <circle cx="100" cy="100" r="34" />
           </svg>
 
-          <div className={s.left}>
-            <h2>{t("contactTitle")}</h2>
-            <p>{t("contactDesc")}</p>
-            <div className={`${s.ctaActions} ${s.stack}`}>
+          <div className={s.ctaCopy}>
+            <p className={s.ctaEyebrow}>
+              <i aria-hidden="true" />
+              {t("contactEyebrow")}
+            </p>
+            <h2 className={s.ctaTitle}>{t("contactTitle")}</h2>
+            <p className={s.ctaDesc}>{t("contactDesc")}</p>
+            <div className={s.ctaActions}>
               <a
                 className={`${s.btn} ${s.btnLight}`}
                 href={getWhatsAppLink(t("waLinkContact"))}
@@ -378,6 +388,29 @@ export default function CaraPesanPage() {
               </a>
             </div>
           </div>
+
+          <ul className={s.ctaReasons}>
+            {contactReasons.map((reason) => (
+              <li key={reason.title}>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="m8.5 12.2 2.4 2.4 4.6-5" />
+                </svg>
+                <div>
+                  <strong>{reason.title}</strong>
+                  <span>{reason.desc}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
