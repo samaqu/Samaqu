@@ -94,8 +94,8 @@
 .nav a {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
+  gap: 10px;
+  padding: 10px 10px;
   border-radius: 12px;
   color: #cfc4ca;
   text-decoration: none;
@@ -117,6 +117,16 @@
   box-shadow: 0 8px 18px -8px rgba(150, 40, 76, 0.9);
 }
 .nav a.on svg { color: #f3a7c0; }
+/* Satu baris, sejajar dengan ikon. Label terpanjang ("Ulasan Pelanggan") tadinya
+   pecah dua baris sehingga ikon dan badge terlihat tidak sejajar. */
+.navLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .navItemSoon { cursor: default; }
 .navItemSoon:hover { background: transparent; color: #cfc4ca; }
 .navItemSoon:hover svg { color: #a2949b; }

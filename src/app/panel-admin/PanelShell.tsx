@@ -406,7 +406,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
                   return (
                     <div key={item.label} className={`${styles.navItem} ${styles.navItemSoon}`}>
                       <NavIcon name={item.icon} />
-                      <span>{item.label}</span>
+                      <span className={styles.navLabel}>{item.label}</span>
                       <span className={styles.soon}>SOON</span>
                     </div>
                   );
@@ -420,7 +420,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
                     className={activeItem?.href === item.href ? styles.on : undefined}
                   >
                     <NavIcon name={item.icon} />
-                    <span>{item.label}</span>
+                    <span className={styles.navLabel}>{item.label}</span>
                     {item.badge === "reviews" && pendingReviews > 0 && (
                       <span className={styles.navBadge}>{pendingReviews}</span>
                     )}
