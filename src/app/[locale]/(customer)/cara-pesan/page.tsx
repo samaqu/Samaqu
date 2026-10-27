@@ -421,15 +421,6 @@ export default function CaraPesanPage() {
           </ul>
         </div>
       </section>
-
-      <footer className={s.foot}>
-        <span>{t("footerCopyright")}</span>
-        <span>
-          <Link href="/katalog">{t("footerKatalog")}</Link> &nbsp;·&nbsp;{" "}
-          <Link href="/panduan-ukuran">{t("footerSize")}</Link> &nbsp;·&nbsp;{" "}
-          <Link href="/garansi-retur">{t("footerWarranty")}</Link>
-        </span>
-      </footer>
     </div>
   );
 }

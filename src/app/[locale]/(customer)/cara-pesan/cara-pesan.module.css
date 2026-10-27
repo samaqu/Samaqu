@@ -1069,27 +1069,6 @@
   color: var(--on-dark-soft);
 }
 
-/* ---------- footer ---------- */
-.foot {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 32px clamp(20px, 5vw, 72px) 40px;
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px 24px;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.foot a {
-  text-decoration: none;
-}
-
-.foot a:hover {
-  color: var(--ink);
-}
-
 /* ---------- responsive ---------- */
 @media (max-width: 640px) {
   .hero {
