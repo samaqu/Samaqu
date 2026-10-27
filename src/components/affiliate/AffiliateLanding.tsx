@@ -497,62 +497,129 @@ export default function AffiliateLanding() {
         {/* WHY / BENEFITS */}
         <section id="keuntungan" className="section">
           <div className="container">
-            <div className="grid lg:grid-cols-12 gap-8 mb-14 items-end">
+            <div className="grid lg:grid-cols-12 gap-6 lg:gap-10 items-end mb-10 lg:mb-14">
               <div className="lg:col-span-7">
-                <p className="eyebrow mb-5">Kenapa gabung</p>
-                <h2 className="display text-5xl sm:text-6xl">
+                <p className="eyebrow">01 — Kenapa gabung</p>
+                <h2 className="display mt-4 text-[clamp(1.75rem,3.3vw,2.6rem)] leading-[1.1] tracking-[-0.03em]">
                   Tanpa stok barang. <span className="serif font-normal">Cukup</span> satu link
                   dan kepercayaan teman-temanmu.
                 </h2>
               </div>
               <p
-                className="lg:col-span-4 lg:col-start-9 text-lg leading-relaxed"
+                className="lg:col-span-4 lg:col-start-9 text-[0.95rem] leading-relaxed"
                 style={{ color: "var(--c-text-2)" }}
               >
-                Kamu tidak perlu buka toko, kirim paket, atau urus pembayaran. Tugasmu cuma
-                satu: ceritakan produk yang sudah kamu pakai sendiri.
+                Kamu tidak perlu buka toko, kirim paket, atau urus pembayaran — cukup ceritakan
+                produk yang sudah kamu pakai sendiri.
               </p>
             </div>
 
-            <div className="grid md:grid-cols-6 gap-4">
-              <article className="tile tile-dark md:col-span-4 md:row-span-2 min-h-[420px] flex flex-col justify-between">
+            <div className="grid gap-3 lg:grid-cols-12">
+              <article className="relative overflow-hidden rounded-[24px] bg-[#0a0a0b] text-white lg:col-span-7 lg:row-span-2 min-h-[360px] sm:min-h-[420px] flex flex-col justify-between p-7 sm:p-8">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/affiliate/mockup/visual-login.png"
                   alt=""
                   aria-hidden="true"
-                  className="absolute inset-0 w-full h-full object-cover opacity-45"
+                  className="absolute inset-0 w-full h-full object-cover opacity-50"
                 />
-                <div className="relative ico text-white">
-                  <svg viewBox="0 0 24 24">{BENEFITS[0].icon}</svg>
-                </div>
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0"
+                  style={{
+                    background:
+                      "linear-gradient(180deg,rgba(10,10,11,.15) 0%,rgba(10,10,11,.55) 55%,rgba(10,10,11,.95) 100%)",
+                  }}
+                />
+                <span
+                  className="relative shrink-0 w-11 h-11 rounded-2xl grid place-items-center"
+                  style={{
+                    background: "rgba(255,255,255,.12)",
+                    border: "1px solid rgba(255,255,255,.18)",
+                  }}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="#fff"
+                    strokeWidth={1.6}
+                    strokeLinecap="round"
+                    aria-hidden="true"
+                  >
+                    {BENEFITS[0].icon}
+                  </svg>
+                </span>
                 <div className="relative max-w-md">
-                  <h3 className="text-3xl sm:text-4xl">{BENEFITS[0].title}</h3>
-                  <p className="mt-3 leading-relaxed" style={{ color: "var(--c-on-dark)" }}>
+                  <h3 className="text-[1.55rem] sm:text-[1.8rem] font-extrabold leading-[1.15] tracking-[-0.02em]">
+                    {BENEFITS[0].title}
+                  </h3>
+                  <p
+                    className="mt-3 text-[0.9rem] leading-relaxed"
+                    style={{ color: "var(--c-on-dark)" }}
+                  >
                     {BENEFITS[0].text}
                   </p>
                 </div>
               </article>
+
               {BENEFITS.slice(1, 3).map((benefit) => (
-                <article key={benefit.title} className="tile md:col-span-2">
-                  <div className="ico">
-                    <svg viewBox="0 0 24 24">{benefit.icon}</svg>
+                <article
+                  key={benefit.title}
+                  className="rounded-[24px] border border-[#e8e8e9] bg-white p-6 sm:p-7 lg:col-span-5 flex gap-4 transition-colors hover:border-black"
+                >
+                  <span className="shrink-0 w-10 h-10 rounded-xl grid place-items-center border border-[#e8e8e9]">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="#000"
+                      strokeWidth={1.6}
+                      strokeLinecap="round"
+                      aria-hidden="true"
+                    >
+                      {benefit.icon}
+                    </svg>
+                  </span>
+                  <div>
+                    <h3 className="text-[1rem] font-bold tracking-[-0.01em]">{benefit.title}</h3>
+                    <p
+                      className="mt-1.5 text-[0.85rem] leading-relaxed"
+                      style={{ color: "var(--c-text-2)" }}
+                    >
+                      {benefit.text}
+                    </p>
                   </div>
-                  <h3 className="mt-8 text-black">{benefit.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--c-text-2)" }}>
-                    {benefit.text}
-                  </p>
                 </article>
               ))}
+
               {BENEFITS.slice(3).map((benefit) => (
-                <article key={benefit.title} className="tile md:col-span-3">
-                  <div className="ico">
-                    <svg viewBox="0 0 24 24">{benefit.icon}</svg>
+                <article
+                  key={benefit.title}
+                  className="rounded-[24px] border border-[#e8e8e9] bg-white p-6 sm:p-7 lg:col-span-6 flex gap-4 transition-colors hover:border-black"
+                >
+                  <span className="shrink-0 w-10 h-10 rounded-xl grid place-items-center border border-[#e8e8e9]">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="#000"
+                      strokeWidth={1.6}
+                      strokeLinecap="round"
+                      aria-hidden="true"
+                    >
+                      {benefit.icon}
+                    </svg>
+                  </span>
+                  <div>
+                    <h3 className="text-[1rem] font-bold tracking-[-0.01em]">{benefit.title}</h3>
+                    <p
+                      className="mt-1.5 text-[0.85rem] leading-relaxed"
+                      style={{ color: "var(--c-text-2)" }}
+                    >
+                      {benefit.text}
+                    </p>
                   </div>
-                  <h3 className="mt-8 text-black">{benefit.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--c-text-2)" }}>
-                    {benefit.text}
-                  </p>
                 </article>
               ))}
             </div>
@@ -562,72 +629,97 @@ export default function AffiliateLanding() {
         {/* HOW IT WORKS */}
         <section id="cara-kerja" className="section pt-0">
           <div className="container">
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
               <div className="max-w-2xl">
-                <p className="eyebrow mb-5">Cara kerja</p>
-                <h2 className="display text-5xl sm:text-6xl">Empat langkah. Mulai hari ini.</h2>
+                <p className="eyebrow">02 — Cara kerja</p>
+                <h2 className="display mt-4 text-[clamp(1.75rem,3.3vw,2.6rem)] leading-[1.1] tracking-[-0.03em]">
+                  Empat langkah. <span className="serif font-normal">Mulai</span> hari ini.
+                </h2>
               </div>
               <Link href={daftarHref} className="btn btn-primary self-start lg:self-auto">
                 Gabung Sekarang <Arrow />
               </Link>
             </div>
-            <ol className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 list-none p-0">
+
+            <div
+              role="list"
+              className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px overflow-hidden rounded-[24px] border border-[#e8e8e9]"
+              style={{ background: "#e8e8e9" }}
+            >
               {STEPS.map((step) => (
-                <li key={step.n} className={`step${step.key ? " key" : ""}`}>
-                  <span className="step-num" aria-hidden="true">
-                    {step.n}
-                  </span>
-                  <h3 className="mt-10 text-xl font-extrabold tracking-tight">
+                <article
+                  key={step.n}
+                  role="listitem"
+                  className={`flex flex-col p-6 sm:p-7 ${
+                    step.key ? "bg-[#0a0a0b] text-white" : "bg-white"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`text-[0.66rem] font-semibold tracking-[0.18em] uppercase ${
+                        step.key ? "text-white/60" : "text-neutral-500"
+                      }`}
+                    >
+                      Langkah {step.n}
+                    </span>
+                    <span
+                      className={`w-8 h-8 rounded-full grid place-items-center text-[0.7rem] font-bold ${
+                        step.key ? "bg-white text-black" : "border border-[#e8e8e9] text-black"
+                      }`}
+                    >
+                      {step.n}
+                    </span>
+                  </div>
+                  <h3 className="mt-8 text-[1.02rem] font-bold leading-snug tracking-[-0.01em]">
                     <span className="sr-only">{`Langkah ${Number(step.n)}: `}</span>
                     {step.title}
                   </h3>
                   <p
-                    className="mt-3 text-sm leading-relaxed"
+                    className="mt-2 text-[0.85rem] leading-relaxed"
                     style={{ color: step.key ? "var(--c-on-dark)" : "var(--c-text-2)" }}
                   >
                     {step.text}
                   </p>
                   {step.key ? (
-                    <span className="pill bg-white text-black mt-6 self-start">Syarat wajib</span>
+                    <span className="pill bg-white text-black mt-5 self-start text-[0.68rem]">
+                      Syarat wajib
+                    </span>
                   ) : null}
-                </li>
+                </article>
               ))}
-            </ol>
-            <p className="swipe-hint" aria-hidden="true">
-              Geser untuk lanjut{" "}
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M5 12h14M13 6l6 6-6 6" />
-              </svg>
-            </p>
+            </div>
           </div>
         </section>
 
         {/* PURCHASE REQUIREMENT */}
-        <section id="persyaratan" className="pb-24">
+        <section id="persyaratan" className="pb-20 lg:pb-24">
           <div className="container">
-            <div className="grid lg:grid-cols-2 rounded-[28px] overflow-hidden bg-black text-white on-dark">
+            <div className="grid lg:grid-cols-2 overflow-hidden rounded-[28px] bg-[#0a0a0b] text-white on-dark">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/affiliate/mockup/requirement.png"
                 alt="Pelanggan membawa garment bag SAMAQU"
-                className="w-full h-72 sm:h-[420px] lg:h-full object-cover"
+                className="w-full h-64 sm:h-[380px] lg:h-full object-cover"
               />
-              <div className="p-8 sm:p-12 lg:p-16 flex flex-col justify-center">
-                <p className="eyebrow mb-5" style={{ color: "var(--c-on-dark)" }}>
-                  Langkah pertamamu
+              <div className="p-7 sm:p-12 lg:p-14 xl:p-16 flex flex-col justify-center">
+                <p className="eyebrow" style={{ color: "var(--c-on-dark)" }}>
+                  03 — Langkah pertamamu
                 </p>
-                <h2 className="display text-white text-4xl sm:text-5xl">
-                  Mulai dari Mengenal Produk, Lanjut Jadi Partner SAMAQU.
+                <h2 className="display text-white mt-4 text-[clamp(1.6rem,3vw,2.35rem)] leading-[1.15] tracking-[-0.025em] max-w-[22ch]">
+                  Mulai dari mengenal produk, lanjut jadi partner SAMAQU.
                 </h2>
-                <p className="mt-6 leading-relaxed text-lg" style={{ color: "var(--c-on-dark)" }}>
+                <p
+                  className="mt-5 max-w-md text-[0.95rem] leading-relaxed"
+                  style={{ color: "var(--c-on-dark)" }}
+                >
                   Sebelum bergabung sebagai affiliate, pastikan kamu sudah membeli minimal satu
                   produk SAMAQU. Dengan begitu, kamu bisa mengenal produk yang akan kamu
                   rekomendasikan kepada calon pelanggan.
                 </p>
-                <p className="mt-4 font-semibold">
+                <p className="mt-4 max-w-md text-[0.9rem] font-semibold">
                   Orang lebih percaya pada yang sudah memakai, bukan yang cuma menjual.
                 </p>
-                <a href={KATALOG} className="btn btn-light mt-9 self-start">
+                <a href={KATALOG} className="btn btn-light mt-8 self-start">
                   Lihat Koleksi SAMAQU <Arrow />
                 </a>
               </div>
@@ -637,11 +729,13 @@ export default function AffiliateLanding() {
 
         {/* FAQ */}
         <section id="faq" className="section" style={{ background: "var(--c-bg-2)" }}>
-          <div className="container grid lg:grid-cols-12 gap-10">
-            <div className="lg:col-span-4">
-              <p className="eyebrow mb-5">FAQ</p>
-              <h2 className="display text-5xl">Masih ragu? Kami jawab.</h2>
-              <p className="mt-5 leading-relaxed" style={{ color: "var(--c-text-2)" }}>
+          <div className="container grid lg:grid-cols-12 gap-8 lg:gap-10">
+            <div className="lg:col-span-4 lg:sticky lg:top-28 self-start">
+              <p className="eyebrow">04 — FAQ</p>
+              <h2 className="display mt-4 text-[clamp(1.75rem,3vw,2.4rem)] leading-[1.1] tracking-[-0.03em]">
+                Masih ragu? <span className="serif font-normal">Kami jawab.</span>
+              </h2>
+              <p className="mt-5 text-[0.9rem] leading-relaxed" style={{ color: "var(--c-text-2)" }}>
                 Selengkapnya baca{" "}
                 <Link
                   href={syaratHref}
@@ -652,7 +746,7 @@ export default function AffiliateLanding() {
                 .
               </p>
             </div>
-            <div className="lg:col-span-7 lg:col-start-6 bg-white rounded-[28px] px-6 sm:px-10 py-2">
+            <div className="lg:col-span-7 lg:col-start-6 bg-white rounded-[24px] border border-[#e8e8e9] px-5 sm:px-8 py-2">
               {FAQ.map((item, index) => {
                 const open = openFaq === index;
                 return (
@@ -682,75 +776,94 @@ export default function AffiliateLanding() {
         </section>
 
         {/* FINAL CTA */}
-        <section id="gabung" className="relative bg-black text-white on-dark overflow-hidden">
+        <section id="gabung" className="relative bg-[#0a0a0b] text-white on-dark overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/affiliate/mockup/visual-cta.png"
             alt=""
             aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-cover opacity-35"
+            className="absolute inset-0 w-full h-full object-cover opacity-30"
             style={{ objectPosition: "50% 25%" }}
           />
           <div
+            aria-hidden="true"
             className="absolute inset-0"
-            style={{ background: "linear-gradient(0deg,#0a0a0b 10%,rgba(10,10,11,.4))" }}
+            style={{
+              background:
+                "linear-gradient(90deg,rgba(10,10,11,.95) 0%,rgba(10,10,11,.75) 45%,rgba(10,10,11,.2) 85%)",
+            }}
           />
-          <div className="container relative py-28 lg:py-40 text-center">
-            <h2 className="display text-white text-5xl sm:text-7xl lg:text-8xl max-w-5xl mx-auto">
-              Siap Memulai Perjalananmu <span className="serif font-normal">Bersama</span> SAMAQU?
-            </h2>
-            <p
-              className="mt-7 text-lg max-w-xl mx-auto leading-relaxed"
-              style={{ color: "var(--c-on-dark)" }}
-            >
-              Kenali produk SAMAQU, penuhi persyaratan pembelian, dan mulai langkahmu untuk
-              menjadi bagian dari program affiliate.
-            </p>
-            <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
-              <a href={KATALOG} className="btn btn-light">
-                Jelajahi Produk <Arrow />
-              </a>
-              <Link href={loginHref} className="btn btn-ghost">
-                Masuk Affiliate
-              </Link>
+          <div className="container relative py-24 lg:py-32">
+            <div className="max-w-2xl">
+              <p className="eyebrow" style={{ color: "var(--c-on-dark)" }}>
+                Mulai sekarang
+              </p>
+              <h2 className="display text-white mt-5 text-[clamp(2rem,4.2vw,3.4rem)] leading-[1.05] tracking-[-0.03em]">
+                Siap memulai perjalananmu{" "}
+                <span className="serif font-normal">bersama</span> SAMAQU?
+              </h2>
+              <p
+                className="mt-5 max-w-xl text-[0.98rem] leading-relaxed"
+                style={{ color: "var(--c-on-dark)" }}
+              >
+                Kenali produk SAMAQU, penuhi persyaratan pembelian, dan mulai langkahmu untuk
+                menjadi bagian dari program affiliate.
+              </p>
+              <div className="mt-9 flex flex-col sm:flex-row gap-3">
+                <a href={KATALOG} className="btn btn-light">
+                  Jelajahi Produk <Arrow />
+                </a>
+                <Link href={loginHref} className="btn btn-ghost">
+                  Masuk Affiliate
+                </Link>
+              </div>
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="bg-black text-white on-dark">
-        <div className="container pt-16 pb-10 grid md:grid-cols-12 gap-10 border-t border-white/10">
+      <footer className="bg-[#0a0a0b] text-white on-dark">
+        <div className="container py-14 lg:py-16 grid gap-10 md:grid-cols-12 md:gap-8 border-t border-white/10">
           <div className="md:col-span-5">
             <a href="#beranda" className="wordmark">
               SAMAQU
             </a>
-            <p className="mt-4 text-sm leading-relaxed max-w-sm" style={{ color: "var(--c-on-dark)" }}>
+            <p
+              className="mt-4 max-w-xs text-[0.85rem] leading-relaxed"
+              style={{ color: "var(--c-on-dark)" }}
+            >
               Busana muslim pria premium: thobe, kandora, koko, vest, dan kabak. Untuk orang
               biasa yang sedang bertumbuh.
+            </p>
+            <p
+              className="mt-6 text-[0.7rem] tracking-[0.14em] uppercase"
+              style={{ color: "#6f7278" }}
+            >
+              Program affiliate resmi
             </p>
           </div>
           <nav className="md:col-span-3 md:col-start-7" aria-label="Navigasi footer">
             <p className="eyebrow mb-4" style={{ color: "#94969a" }}>
               Halaman
             </p>
-            <ul className="grid gap-2">
+            <ul className="grid gap-2.5">
               <li>
-                <a href="#beranda" className="link">
+                <a href="#beranda" className="link text-[0.85rem]">
                   Beranda
                 </a>
               </li>
               <li>
-                <a href="#keuntungan" className="link">
+                <a href="#keuntungan" className="link text-[0.85rem]">
                   Keuntungan
                 </a>
               </li>
               <li>
-                <a href="#cara-kerja" className="link">
+                <a href="#cara-kerja" className="link text-[0.85rem]">
                   Cara Kerja
                 </a>
               </li>
               <li>
-                <a href="#faq" className="link">
+                <a href="#faq" className="link text-[0.85rem]">
                   FAQ
                 </a>
               </li>
@@ -760,29 +873,29 @@ export default function AffiliateLanding() {
             <p className="eyebrow mb-4" style={{ color: "#94969a" }}>
               Affiliate
             </p>
-            <ul className="grid gap-2">
+            <ul className="grid gap-2.5">
               <li>
-                <a href={KATALOG} className="link">
+                <a href={KATALOG} className="link text-[0.85rem]">
                   Koleksi Produk
                 </a>
               </li>
               <li>
-                <Link href={daftarHref} className="link">
+                <Link href={daftarHref} className="link text-[0.85rem]">
                   Gabung Affiliate
                 </Link>
               </li>
               <li>
-                <Link href={loginHref} className="link">
+                <Link href={loginHref} className="link text-[0.85rem]">
                   Masuk
                 </Link>
               </li>
               <li>
-                <Link href={syaratHref} className="link">
+                <Link href={syaratHref} className="link text-[0.85rem]">
                   Syarat &amp; Ketentuan
                 </Link>
               </li>
               <li>
-                <Link href={kebijakanHref} className="link">
+                <Link href={kebijakanHref} className="link text-[0.85rem]">
                   Kebijakan Privasi
                 </Link>
               </li>
@@ -790,8 +903,8 @@ export default function AffiliateLanding() {
           </nav>
         </div>
         <div
-          className="container pb-24 lg:pb-8 text-xs flex flex-col sm:flex-row justify-between gap-2"
-          style={{ color: "#94969a" }}
+          className="container py-5 pb-24 lg:pb-5 border-t border-white/10 flex flex-col sm:flex-row justify-between gap-2 text-[0.72rem]"
+          style={{ color: "#7c7f85" }}
         >
           <p>© {new Date().getFullYear()} SAMAQU. Hak cipta dilindungi.</p>
           <p>samaqu.id</p>
