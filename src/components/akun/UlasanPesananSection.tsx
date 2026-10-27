@@ -12,6 +12,7 @@ import {
   uploadReviewPhoto,
   type MyReview,
 } from "@/lib/ulasan-client";
+import { useToast } from "@/components/Toast";
 
 export type OrderItem = {
   id: string;
@@ -213,6 +214,7 @@ export function ReviewFormModal({
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     const previous = document.body.style.overflow;
@@ -286,6 +288,11 @@ export function ReviewFormModal({
         created_at: review.created_at || now,
         updated_at: now,
       });
+      toast.show(
+        existing
+          ? "Terima kasih! Ulasanmu dikirim ulang."
+          : "Terima kasih! Ulasanmu sudah terkirim.",
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal mengirim ulasan.");
     } finally {
