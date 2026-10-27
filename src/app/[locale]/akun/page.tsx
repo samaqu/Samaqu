@@ -65,7 +65,8 @@ export default function DashboardAkunPage() {
   const { customer: cust, ready } = useAkunCustomer() as { customer: Cust | null; ready: boolean };
   const [orders, setOrders] = useState<Order[]>([]);
   const [wishCount, setWishCount] = useState(0);
-  const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
+  // status ulasan per item pesanan: pending / published / rejected
+  const [reviewStatus, setReviewStatus] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   // Langsung buka form ulasan dari dashboard (tanpa pindah halaman / fetch ulang).
@@ -103,7 +104,11 @@ export default function DashboardAkunPage() {
           )
         );
         setWishCount(w.count || 0);
-        setReviewedIds(new Set((r || []).map((row) => row.order_item_id).filter(Boolean) as string[]));
+        const statusMap = new Map<string, string>();
+        for (const row of r || []) {
+          if (row.order_item_id) statusMap.set(String(row.order_item_id), String(row.status));
+        }
+        setReviewStatus(statusMap);
       } catch (error) {
         console.error("[dashboard-akun] gagal memuat data:", error);
       } finally {
@@ -300,10 +305,13 @@ export default function DashboardAkunPage() {
                     {recentOrders.map((order) => {
                       const state = statusInfo(orderStatusKey(order));
                       const finished = String(order.status || "").toLowerCase() === "selesai";
-                      const pendingItem = finished
-                        ? (order.order_items || []).find((item) => item.id && !reviewedIds.has(item.id))
-                        : undefined;
-                      const canReview = Boolean(pendingItem);
+                      const items = order.order_items || [];
+                      const reviewOf = (item: OrderItem) => (item.id ? reviewStatus.get(String(item.id)) || null : null);
+                      const pendingItem = finished ? items.find((item) => item.id && !reviewOf(item)) : undefined;
+                      const rejectedItem = finished ? items.find((item) => item.id && reviewOf(item) === "rejected") : undefined;
+                      const actionItem = pendingItem || rejectedItem;
+                      const reviewPending = finished && items.some((item) => reviewOf(item) === "pending");
+                      const reviewPublished = finished && items.some((item) => reviewOf(item) === "published");
                       return (
                         <div key={order.id} className="p-4 transition hover:bg-[#faf8f4]">
                           <button
@@ -329,19 +337,23 @@ export default function DashboardAkunPage() {
                           <div className="mt-3 flex items-end justify-between gap-3">
                             <div className="min-w-0">
                               <span className="block text-[13.5px] font-black" style={{ color: "#000000" }}>Rp{order.total.toLocaleString("id-ID")}</span>
-                              {canReview ? (
+                              {finished ? (
                                 <span className="mt-0.5 block text-[10.5px] font-semibold text-[#8b9793]">{state.label}</span>
                               ) : null}
                             </div>
-                            {canReview ? (
+                            {actionItem ? (
                               <button
                                 type="button"
-                                onClick={() => pendingItem && setReviewItem(toReviewItem(pendingItem))}
+                                onClick={() => setReviewItem(toReviewItem(actionItem))}
                                 className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-black px-4 text-[11.5px] font-extrabold text-white transition active:scale-[.98]"
                               >
-                                Beri Ulasan
+                                {pendingItem ? "Beri Ulasan" : "Kirim ulang"}
                                 <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m9 6 6 6-6 6" /></svg>
                               </button>
+                            ) : reviewPending ? (
+                              <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">Menunggu</span>
+                            ) : reviewPublished ? (
+                              <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">Tayang</span>
                             ) : (
                               <span className={state.pill}>{state.label}</span>
                             )}
@@ -394,7 +406,11 @@ export default function DashboardAkunPage() {
           onClose={() => setReviewItem(null)}
           onSaved={(review) => {
             if (review.order_item_id) {
-              setReviewedIds((prev) => new Set(prev).add(String(review.order_item_id)));
+              setReviewStatus((prev) => {
+                const next = new Map(prev);
+                next.set(String(review.order_item_id), String(review.status || "pending"));
+                return next;
+              });
             }
             setReviewItem(null);
           }}
