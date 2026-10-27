@@ -27,7 +27,7 @@ const NAV: NavItem[] = [
   { href: "/akun/profil", label: "Informasi Profil", group: "Data Saya", icon: "M12 8a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM4.5 20a7.5 7.5 0 0 1 15 0", match: ["/akun/profil"] },
   { href: "/akun/alamat", label: "Alamat Pengiriman", group: "Data Saya", icon: "M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11ZM12 10a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z", match: ["/akun/alamat"] },
   { href: "/akun/ubah-password", label: "Ubah Password", group: "Data Saya", icon: "M6 10V8a6 6 0 0 1 12 0v2M4 10h16v10H4z", match: ["/akun/ubah-password"] },
-  { href: "/akun/bantuan", label: "Hubungi Admin", group: "Bantuan", icon: "M21 12a8 8 0 1 1-3.2-6.4M8 11h8M8 15h5", match: ["/akun/bantuan"] },
+  { href: "/akun/bantuan", label: "Hubungi Admin", group: "Bantuan", icon: "M4 14v-2a8 8 0 0 1 16 0v2M4 14h2.5A1.5 1.5 0 0 1 8 15.5v3A1.5 1.5 0 0 1 6.5 20H6a2 2 0 0 1-2-2v-4ZM20 14h-2.5A1.5 1.5 0 0 0 16 15.5v3A1.5 1.5 0 0 0 17.5 20h.5a2 2 0 0 0 2-2v-4Z", match: ["/akun/bantuan"] },
 ];
 
 /**

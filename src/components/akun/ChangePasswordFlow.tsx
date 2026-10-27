@@ -194,7 +194,7 @@ export default function ChangePasswordFlow({
       {step === "intro" && (
         <div>
           <div className="flex items-start gap-3 rounded-2xl border border-[#EDE7DC] bg-[#faf8f4] px-4 py-3.5">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px]" style={{ background: "#e3ede9" }}>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px]" style={{ background: "#f2f2f2" }}>
               <ShieldCheck size={17} strokeWidth={1.8} style={{ color: "#000000" }} />
             </span>
             <div className="min-w-0">
@@ -332,7 +332,7 @@ export default function ChangePasswordFlow({
 
       {step === "sukses" && (
         <div className="text-center py-3">
-          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full" style={{ background: "#e3ede9", color: "#000000" }}>
+          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full" style={{ background: "#f2f2f2", color: "#000000" }}>
             <ShieldCheck size={22} />
           </div>
           <p className="text-sm font-extrabold" style={{ color: "#000000" }}>

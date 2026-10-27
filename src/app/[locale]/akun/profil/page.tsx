@@ -297,7 +297,7 @@ export default function ProfilPage() {
                 prefetch={true}
                 className="flex items-center gap-3 rounded-2xl border border-[#EDE7DC] bg-[#faf8f4] px-4 py-3.5 transition hover:bg-[#f5f1ea] active:scale-[.99]"
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px]" style={{ background: "#e3ede9" }}>
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px]" style={{ background: "#f2f2f2" }}>
                   <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="none" stroke="#000000" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                     {item.icon}
                   </svg>

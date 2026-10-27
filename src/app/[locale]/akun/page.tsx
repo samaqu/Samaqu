@@ -173,21 +173,21 @@ export default function DashboardAkunPage() {
           <>
             <div className="hidden sm:grid grid-cols-3 gap-4 mb-6">
               <div className="bg-white rounded-[20px] border border-[rgba(0,0,0,0.06)] shadow-[rgba(0,0,0,0.02)_0px_0px_0px_1px,rgba(0,0,0,0.04)_0px_2px_6px,rgba(0,0,0,0.06)_0px_4px_8px] p-5">
-                <div className="w-10 h-10 rounded-[12px] flex items-center justify-center mb-3" style={{ background: "#e3ede9" }}>
+                <div className="w-10 h-10 rounded-[12px] flex items-center justify-center mb-3" style={{ background: "#f2f2f2" }}>
                   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>
                 </div>
                 <p className="text-2xl font-black" style={{ color: "#000000" }}>{activeOrders}</p>
                 <p className="text-xs text-[#8b9793] mt-1">Pesanan Aktif</p>
               </div>
               <div className="bg-white rounded-[20px] border border-[rgba(0,0,0,0.06)] shadow-[rgba(0,0,0,0.02)_0px_0px_0px_1px,rgba(0,0,0,0.04)_0px_2px_6px,rgba(0,0,0,0.06)_0px_4px_8px] p-5">
-                <div className="w-10 h-10 rounded-[12px] flex items-center justify-center mb-3" style={{ background: "#e3ede9" }}>
+                <div className="w-10 h-10 rounded-[12px] flex items-center justify-center mb-3" style={{ background: "#f2f2f2" }}>
                   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20s-7-4.35-7-9a4 4 0 0 1 7-2.65A4 4 0 0 1 19 11c0 4.65-7 9-7 9Z" /></svg>
                 </div>
                 <p className="text-2xl font-black" style={{ color: "#000000" }}>{wishCount}</p>
                 <p className="text-xs text-[#8b9793] mt-1">Wishlist</p>
               </div>
               <div className="bg-white rounded-[20px] border border-[rgba(0,0,0,0.06)] shadow-[rgba(0,0,0,0.02)_0px_0px_0px_1px,rgba(0,0,0,0.04)_0px_2px_6px,rgba(0,0,0,0.06)_0px_4px_8px] p-5">
-                <div className="w-10 h-10 rounded-[12px] flex items-center justify-center mb-3" style={{ background: "#e3ede9" }}>
+                <div className="w-10 h-10 rounded-[12px] flex items-center justify-center mb-3" style={{ background: "#f2f2f2" }}>
                   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
                 </div>
                 <p className="text-2xl font-black" style={{ color: "#000000" }}>Rp{totalSpend.toLocaleString("id-ID")}</p>
@@ -209,7 +209,7 @@ export default function DashboardAkunPage() {
 
               {recentOrders.length === 0 ? (
                 <div className="p-8 text-center">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "#e3ede9" }}>
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "#f2f2f2" }}>
                     <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8" stroke="#000000" strokeWidth="1.5"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /><path d="M12 13v7" /></svg>
                   </div>
                   <p className="text-sm font-semibold mb-1" style={{ color: "#000000" }}>Belum ada pesanan</p>
@@ -312,7 +312,7 @@ export default function DashboardAkunPage() {
                             className="block w-full cursor-pointer text-left"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="w-11 h-11 rounded-[10px] overflow-hidden shrink-0 flex items-center justify-center" style={{ background: "#e3ede9" }}>
+                              <div className="w-11 h-11 rounded-[10px] overflow-hidden shrink-0 flex items-center justify-center" style={{ background: "#f2f2f2" }}>
                                 {order.order_items?.[0]?.product_image ? (
                                   <img src={order.order_items[0].product_image} alt={order.order_items[0].product_name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                                 ) : (
@@ -365,11 +365,11 @@ export default function DashboardAkunPage() {
                   { href: "/akun/pesanan", title: "Pesanan Saya", sub: "Lacak status", icon: <><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></> },
                   { href: "/akun/ulasan", title: "Ulasan Saya", sub: "Beri nilai pesanan", full: true, icon: <path d="M12 3l2.6 5.4 5.9.9-4.3 4.2 1 5.9-5.2-2.8-5.2 2.8 1-5.9L3.5 9.3l5.9-.9Z" /> },
                   { href: "/akun/panduan-ukuran", title: "Panduan Ukuran", sub: "Cari size pas", icon: <><path d="M3 14 14 3l7 7L10 21z" /><path d="M7.5 12.5 9 14M10.5 9.5 12 11M13.5 6.5 15 8" /></> },
-                  { href: "/akun/bantuan", title: "Hubungi Admin", sub: "Chat tim admin", icon: <><path d="M21 12a8 8 0 1 1-3.2-6.4" /><path d="M8 11h8M8 15h5" /></> },
+                  { href: "/akun/bantuan", title: "Hubungi Admin", sub: "Chat tim admin", icon: <><path d="M4 14v-2a8 8 0 0 1 16 0v2" /><path d="M4 14h2.5A1.5 1.5 0 0 1 8 15.5v3A1.5 1.5 0 0 1 6.5 20H6a2 2 0 0 1-2-2v-4Z" /><path d="M20 14h-2.5A1.5 1.5 0 0 0 16 15.5v3A1.5 1.5 0 0 0 17.5 20h.5a2 2 0 0 0 2-2v-4Z" /></> },
                 ].map((it) => (
                   <Link key={it.href} href={to(it.href)} className={`akun-card p-3.5 min-h-[112px] flex flex-col gap-3 transition hover:shadow-lg active:scale-[.99] ${"full" in it && it.full ? "col-span-2" : ""}`}>
                     <span className="flex items-center justify-between gap-2">
-                      <span className="shrink-0 w-9 h-9 rounded-[12px] grid place-items-center" style={{ background: "#e3ede9" }}>
+                      <span className="shrink-0 w-9 h-9 rounded-[12px] grid place-items-center" style={{ background: "#f2f2f2" }}>
                         <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="none" stroke="#000000" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{it.icon}</svg>
                       </span>
                       <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0 text-[#9aa5a1]" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 6 6 6-6 6" /></svg>

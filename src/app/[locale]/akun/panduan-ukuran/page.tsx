@@ -114,7 +114,7 @@ export default function AkunPanduanUkuranPage() {
           </motion.div>
         ) : filteredGuides.length === 0 ? (
           <motion.div key="empty" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="text-center py-20 akun-card">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "#e3ede9" }}>
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "#f2f2f2" }}>
               <Ruler size={28} strokeWidth={1.4} style={{ color: "#000000" }} />
             </div>
             <p className="text-sm font-semibold mb-1" style={{ color: "#000000" }}>{t("emptyTitle")}</p>
@@ -129,7 +129,7 @@ export default function AkunPanduanUkuranPage() {
                 whileHover={{ y: -3, transition: { duration: 0.2 } }}
                 className="group akun-card overflow-hidden flex flex-col"
               >
-                <div className="relative aspect-[4/3] overflow-hidden" style={{ background: "#e3ede9" }}>
+                <div className="relative aspect-[4/3] overflow-hidden" style={{ background: "#f2f2f2" }}>
                   <img
                     src={guide.image_url}
                     alt={`Panduan Ukuran ${guide.category}`}

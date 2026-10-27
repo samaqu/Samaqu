@@ -266,7 +266,7 @@ export default function PesananPage() {
         </>
       ) : (
         <div className="akun-card p-8 md:p-12 text-center md:max-w-[520px] md:mx-auto">
-          <div className="mx-auto w-16 h-16 rounded-2xl grid place-items-center" style={{ background: "#e3ede9" }}>
+          <div className="mx-auto w-16 h-16 rounded-2xl grid place-items-center" style={{ background: "#f2f2f2" }}>
             <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="#000000" strokeWidth="1.5"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>
           </div>
           <p className="mt-4 font-extrabold" style={{ color: "#000000" }}>Belum ada pesanan di tab ini</p>

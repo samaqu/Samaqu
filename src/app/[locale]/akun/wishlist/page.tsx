@@ -101,7 +101,7 @@ export default function WishlistPage() {
         </div>
       ) : (
         <div className="akun-card p-8 md:p-12 text-center md:max-w-[520px] md:mx-auto">
-          <div className="mx-auto w-20 h-20 rounded-2xl grid place-items-center" style={{ background: "#e3ede9" }}>
+          <div className="mx-auto w-20 h-20 rounded-2xl grid place-items-center" style={{ background: "#f2f2f2" }}>
             <svg viewBox="0 0 24 24" className="w-10 h-10" fill="none" stroke="#000000" strokeWidth="1.5"><path d="M12 20s-7-4.35-7-9a4 4 0 0 1 7-2.65A4 4 0 0 1 19 11c0 4.65-7 9-7 9Z" /></svg>
           </div>
           <p className="mt-5 text-lg font-extrabold" style={{ color: "#000000" }}>Wishlist kamu masih kosong</p>
