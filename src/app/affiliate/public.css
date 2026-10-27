@@ -28,7 +28,7 @@
   .af-public header.nav.auth-nav .wordmark{color:#000!important}
 }
 @media (min-width:1024px){
-  .af-public header.nav.auth-nav{background:transparent;color:#000}
+  .af-public header.nav.auth-nav{position:absolute;background:transparent;color:#000}
   .af-public header.nav.auth-nav .wordmark{color:#fff!important}
 }
 

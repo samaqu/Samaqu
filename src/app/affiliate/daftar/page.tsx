@@ -238,7 +238,7 @@ export default function AffiliateRegisterPage() {
             <span className="err" aria-live="polite">{err.name || ""}</span>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-5">
+          <div className="grid gap-5">
             <div className="field">
               <label htmlFor="d-email">Email</label>
               <input
@@ -285,7 +285,7 @@ export default function AffiliateRegisterPage() {
             <span className="err" aria-live="polite">{err.order || ""}</span>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-5">
+          <div className="grid gap-5">
             <div className="field">
               <label htmlFor="d-channel">Channel utama</label>
               <select
