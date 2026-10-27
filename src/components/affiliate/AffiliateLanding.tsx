@@ -369,7 +369,7 @@ export default function AffiliateLanding() {
                   <span className="w-2 h-2 rounded-full bg-white" />
                   Pendaftaran affiliate dibuka
                 </span>
-                <h1 className="display text-white text-[2.6rem] sm:text-6xl xl:text-[5.25rem]">
+                <h1 className="display text-white text-[2rem] sm:text-[2.75rem] xl:text-[3.5rem]">
                   Jadi Bagian dari SAMAQU, Raih{" "}
                   <span className="serif font-normal">Penghasilan Tambahan</span> dari Setiap
                   Penjualan.
