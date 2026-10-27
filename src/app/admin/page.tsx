@@ -29,6 +29,7 @@ import ProductsCatalog from "@/components/admin/ProductsCatalog";
 import ProductDetailDrawer from "@/components/admin/ProductDetailDrawer";
 import LiveChatView from "@/components/admin/LiveChatView";
 import { ADMIN_WF_VARS } from "@/components/admin/admin-theme";
+import { usePendingReviewCount } from "@/lib/use-pending-reviews";
 
 type Panel = "dashboard" | "orders" | "products" | "customers" | "chats" | "content" | "notif-template" | "settings";
 
@@ -109,17 +110,17 @@ interface AdminCatalogProduct extends Product {
 // halaman admin tersendiri (`href`). "Open Order" diletakkan tepat di bawah
 // "Order Management" karena masih satu alur pesanan.
 type NavItem =
-  | { label: string; icon: LucideIcon; panel: Panel; badge?: boolean }
-  | { label: string; icon: LucideIcon; href: string };
+  | { label: string; icon: LucideIcon; panel: Panel; badge?: "orders" | "reviews" }
+  | { label: string; icon: LucideIcon; href: string; badge?: "reviews" };
 
 const navGroups: { title: string; items: NavItem[] }[] = [
   {
     title: "Menu Utama",
     items: [
       { label: "Dashboard", icon: LayoutDashboard, panel: "dashboard" },
-      { label: "Order Management", icon: ShoppingBag, panel: "orders", badge: true },
+      { label: "Order Management", icon: ShoppingBag, panel: "orders", badge: "orders" },
       { label: "Open Order", icon: Shirt, href: "/admin/open-order" },
-      { label: "Ulasan Pelanggan", icon: Star, href: "/admin/testimoni" },
+      { label: "Ulasan Pelanggan", icon: Star, href: "/admin/testimoni", badge: "reviews" },
       { label: "Produk", icon: Package, panel: "products" },
       { label: "Pelanggan", icon: Users, panel: "customers" },
       { label: "Live Chat", icon: MessageCircle, panel: "chats" },
@@ -244,6 +245,16 @@ function AdminPageInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
+
+  // Jumlah ulasan yang menunggu persetujuan -> badge menu "Ulasan Pelanggan".
+  const pendingReviewCount = usePendingReviewCount(!!user && hasAdminPanelAccess(role));
+
+  /** Angka badge sidebar: pesanan belum dibayar atau ulasan belum disetujui. */
+  function badgeFor(kind?: "orders" | "reviews") {
+    if (kind === "orders") return orders.filter((o) => o.status === "pending").length;
+    if (kind === "reviews") return pendingReviewCount;
+    return 0;
+  }
   const [activePanel, setActivePanel] = useState<Panel>("dashboard");
   // Panel yang pernah dibuka tetap TERPASANG (cuma disembunyikan) supaya pindah menu tidak
   // me-render ulang panelnya: datanya tidak diambil lagi dan tidak ada layar loading.
@@ -901,9 +912,9 @@ function AdminPageInner() {
                       >
                         <item.icon size={16} strokeWidth={1.9} />
                         <span className="flex-1 text-left truncate">{item.label}</span>
-                        {item.badge && orders.filter((o) => o.status === "pending").length > 0 && (
+                        {badgeFor(item.badge) > 0 && (
                           <span className="badge" style={{ background: "var(--sub)", color: "var(--fg)" }}>
-                            {orders.filter((o) => o.status === "pending").length}
+                            {badgeFor(item.badge)}
                           </span>
                         )}
                       </button>
@@ -911,6 +922,11 @@ function AdminPageInner() {
                       <Link href={item.href} className="sidebar-link" onClick={() => setSidebarOpen(false)}>
                         <item.icon size={16} strokeWidth={1.9} />
                         <span className="flex-1">{item.label}</span>
+                        {badgeFor(item.badge) > 0 && (
+                          <span className="badge" style={{ background: "var(--sub)", color: "var(--fg)" }}>
+                            {badgeFor(item.badge)}
+                          </span>
+                        )}
                       </Link>
                     )}
                   </li>

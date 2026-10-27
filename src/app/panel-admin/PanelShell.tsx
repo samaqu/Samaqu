@@ -18,6 +18,7 @@ import { Toaster } from "@/components/ops/ui/toaster";
 import { OpsPageMapProvider } from "@/lib/ops-router";
 import { useWibLongDate } from "./wib-date";
 import styles from "./panel.module.css";
+import { usePendingReviewCount } from "@/lib/use-pending-reviews";
 
 const AVATAR =
   "https://res.cloudinary.com/j4ka1ty6/image/upload/w_96,h_96,c_fill,f_auto,q_auto/v1792158930/Avatar_Hijab_Merah_Muda_dalam_Lencana.png";
@@ -98,7 +99,7 @@ function NavIcon({ name }: { name: IconName }) {
   }
 }
 
-type NavItem = { label: string; href: string; icon: IconName; soon?: boolean };
+type NavItem = { label: string; href: string; icon: IconName; soon?: boolean; badge?: "reviews" };
 
 const NAV: { section: string; items: NavItem[] }[] = [
   {
@@ -107,7 +108,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { label: "Beranda", href: "/panel-admin", icon: "home" },
       { label: "Transaksi", href: "/panel-admin/transaksi", icon: "card" },
       { label: "Return", href: "/panel-admin/retur", icon: "return" },
-      { label: "Ulasan Pelanggan", href: "/panel-admin/ulasan", icon: "star" },
+      { label: "Ulasan Pelanggan", href: "/panel-admin/ulasan", icon: "star", badge: "reviews" },
     ],
   },
   {
@@ -143,6 +144,8 @@ export default function PanelShell({ children }: { children: ReactNode }) {
   const tanggal = useWibLongDate();
   const [ready, setReady] = useState(false);
   const [authorized, setAuthorized] = useState(false);
+  /** Ulasan menunggu persetujuan -> badge menu "Ulasan Pelanggan". */
+  const pendingReviews = usePendingReviewCount(authorized);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -418,6 +421,9 @@ export default function PanelShell({ children }: { children: ReactNode }) {
                   >
                     <NavIcon name={item.icon} />
                     <span>{item.label}</span>
+                    {item.badge === "reviews" && pendingReviews > 0 && (
+                      <span className={styles.navBadge}>{pendingReviews}</span>
+                    )}
                   </Link>
                 );
               })}
