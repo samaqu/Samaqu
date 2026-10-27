@@ -141,7 +141,7 @@ export default function UlasanSayaPage() {
       <AkunHeader title="Ulasan Saya" back="/akun" />
 
       <section className="rounded-2xl bg-black px-5 py-4 text-white">
-        <div className="flex items-end justify-between gap-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/50">Ulasan produk</p>
             <p className="mt-1 text-2xl font-extrabold leading-none">{pending.length}</p>
@@ -172,7 +172,7 @@ export default function UlasanSayaPage() {
               key={option.key}
               type="button"
               onClick={() => setTab(option.key)}
-              className={`flex-1 rounded-lg px-3 py-2 text-[12px] font-bold transition ${
+              className={`min-h-10 flex-1 rounded-lg px-3 py-2 text-[12px] font-bold transition ${
                 active ? "bg-white text-black shadow-sm" : "text-[#6c7a75]"
               }`}
             >
@@ -196,7 +196,7 @@ export default function UlasanSayaPage() {
             </div>
           ) : (
             pending.map(({ order, item }) => (
-              <article key={`${order.id}-${item.id}`} className="akun-card flex items-center gap-3 p-3">
+              <article key={`${order.id}-${item.id}`} className="akun-card flex flex-wrap items-center gap-3 p-3">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#f2efe8]">
                   {item.product_image ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -217,7 +217,7 @@ export default function UlasanSayaPage() {
                 <button
                   type="button"
                   onClick={() => openReview(item)}
-                  className="shrink-0 rounded-full bg-black px-3.5 py-2 text-[11px] font-extrabold text-white transition active:scale-[.98]"
+                  className="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-full bg-black px-3.5 py-2 text-[11px] font-extrabold text-white transition active:scale-[.98] sm:w-auto"
                 >
                   Beri Ulasan
                 </button>

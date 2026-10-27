@@ -103,7 +103,7 @@ export default function UlasanPesananSection({
             return (
               <div
                 key={item.id}
-                className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-2.5"
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-3"
               >
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
                   {item.product_image ? (
@@ -139,13 +139,13 @@ export default function UlasanPesananSection({
                   ) : null}
                 </div>
 
-                <div className="shrink-0">
+                <div className="w-full shrink-0 sm:w-auto">
                   {!review ? (
                     <button
                       type="button"
                       onClick={() => setActiveItem(item)}
                       disabled={loading}
-                      className="rounded-full bg-black px-3.5 py-2 text-[11px] font-extrabold text-white transition hover:bg-slate-800 disabled:opacity-50"
+                      className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-black px-3.5 py-2 text-[11px] font-extrabold text-white transition hover:bg-slate-800 disabled:opacity-50 sm:w-auto"
                     >
                       Beri Ulasan
                     </button>
@@ -162,7 +162,7 @@ export default function UlasanPesananSection({
                     <button
                       type="button"
                       onClick={() => setActiveItem(item)}
-                      className="rounded-full border border-slate-300 px-3 py-1.5 text-[10.5px] font-bold text-slate-700 transition hover:bg-slate-50"
+                      className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 px-3.5 py-2 text-[10.5px] font-bold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
                     >
                       Kirim ulang
                     </button>
@@ -287,7 +287,7 @@ export function ReviewFormModal({
         role="dialog"
         aria-modal="true"
         aria-label="Beri Ulasan"
-        className="relative z-10 max-h-[90vh] w-full max-w-[520px] overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl"
+        className="relative z-10 max-h-[92dvh] w-full max-w-[520px] overflow-y-auto rounded-t-2xl bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-2xl sm:pb-5"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -320,7 +320,7 @@ export function ReviewFormModal({
                   type="button"
                   onClick={() => setRating(value)}
                   aria-label={`${value} bintang`}
-                  className="rounded p-1 transition hover:bg-slate-50"
+                  className="grid h-11 w-11 place-items-center rounded-lg transition hover:bg-slate-50"
                 >
                   <Star size={26} fill={value <= rating ? "#111" : "none"} stroke="#111" strokeWidth={1.5} />
                 </button>
@@ -345,7 +345,7 @@ export function ReviewFormModal({
 
         <div className="mt-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Foto (opsional)</p>
-          <div className="mt-1.5 flex items-center gap-3">
+          <div className="mt-1.5 flex flex-wrap items-center gap-3">
             {preview ? (
               <div className="relative h-16 w-16 overflow-hidden rounded-xl border border-slate-200">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -398,7 +398,7 @@ export function ReviewFormModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="flex-1 rounded-xl border-2 border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            className="min-h-11 flex-1 rounded-xl border-2 border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
             Batal
           </button>
@@ -406,7 +406,7 @@ export function ReviewFormModal({
             type="button"
             onClick={save}
             disabled={saving}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+            className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50"
           >
             {saving ? <Loader2 size={15} className="animate-spin" /> : null}
             {saving ? "Mengirim…" : "Kirim Ulasan"}
