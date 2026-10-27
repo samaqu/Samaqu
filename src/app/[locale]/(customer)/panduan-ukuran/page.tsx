@@ -66,6 +66,31 @@ export default function PanduanUkuranPage() {
     loadSizeGuides();
   }, []);
 
+  // Lightbox: Escape menutup, panah kiri/kanan pindah kategori, scroll halaman dikunci.
+  useEffect(() => {
+    if (!lightboxGuide) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setLightboxGuide(null);
+      if (event.key === "ArrowLeft") {
+        const prev = getAdjacentGuide("prev");
+        if (prev) setLightboxGuide(prev);
+      }
+      if (event.key === "ArrowRight") {
+        const next = getAdjacentGuide("next");
+        if (next) setLightboxGuide(next);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
+    };
+    // getAdjacentGuide membaca filteredGuides saat event terjadi, jadi cukup bergantung
+    // pada sumber datanya (sizeGuides + tab aktif) agar tidak kena TDZ saat render.
+  }, [lightboxGuide, sizeGuides, activeTab]);
+
   const filteredGuides =
     activeTab === "Semua"
       ? sizeGuides.filter((g) => g.image_url)
@@ -173,19 +198,19 @@ export default function PanduanUkuranPage() {
                   style={{ boxShadow: "0 2px 12px rgba(43,38,32,.06)", border: "1px solid rgba(0,0,0,.15)" }}
                 >
                   {/* Thumbnail */}
-                  <div className="relative aspect-[4/3] overflow-hidden" style={{ background: "var(--sand-2)" }}>
+                  <button type="button" onClick={() => setLightboxGuide(guide)} aria-label={`Lihat panduan ukuran ${guide.category}`} className="relative aspect-[4/3] w-full overflow-hidden p-3 cursor-zoom-in" style={{ background: "#f2f2f2", borderBottom: "1px solid rgba(0,0,0,.08)" }}>
                     <img
                       src={guide.image_url}
                       alt={`Panduan Ukuran ${guide.category}`}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="w-full h-full object-contain"
                       loading="lazy"
                     />
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ background: "rgba(0,0,0,.35)" }}>
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ background: "rgba(0,0,0,.28)" }}>
                       <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "var(--gold)", boxShadow: "0 4px 16px rgba(0,0,0,.5)" }}>
                         <Eye size={20} color="white" strokeWidth={1.8} />
                       </div>
                     </div>
-                  </div>
+                  </button>
 
                   {/* Info + Button */}
                   <div className="p-4 flex flex-col flex-1">
