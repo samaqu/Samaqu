@@ -9,11 +9,8 @@ import s from "./cara-pesan.module.css";
 
 type TabKey = "normal" | "open";
 
-/**
- * Logo pembayaran mengikuti daftar di mockup. Beberapa brand belum punya aset SVG di
- * `public/assets/payments`, jadi entri tanpa `file` dirender sebagai label teks.
- */
-type PaymentLogo = { alt: string; file?: string };
+/** Logo pembayaran sesuai daftar di mockup (SVG resmi idn-finlogos). */
+type PaymentLogo = { alt: string; file: string };
 
 const PAYMENT_LOGOS: PaymentLogo[][] = [
   [
@@ -23,7 +20,7 @@ const PAYMENT_LOGOS: PaymentLogo[][] = [
     { alt: "DANA", file: "dana.svg" },
     { alt: "ShopeePay", file: "shopeepay.svg" },
     { alt: "LinkAja", file: "linkaja.svg" },
-    { alt: "Jenius" },
+    { alt: "Jenius", file: "jenius.svg" },
   ],
   [
     { alt: "BNI", file: "bni.svg" },
@@ -31,10 +28,15 @@ const PAYMENT_LOGOS: PaymentLogo[][] = [
     { alt: "Mandiri", file: "bank-mandiri.svg" },
     { alt: "CIMB Niaga", file: "bank-cimb-niaga.svg" },
     { alt: "Permata Bank", file: "permata.svg" },
-    { alt: "Bank BJB" },
-    { alt: "BSI" },
+    { alt: "Bank BJB", file: "bank-bjb.svg" },
+    { alt: "BSI", file: "bsi.svg" },
   ],
-  [{ alt: "Alfamart" }, { alt: "Indomaret" }, { alt: "Visa" }, { alt: "Mastercard" }],
+  [
+    { alt: "Alfamart", file: "alfamart.svg" },
+    { alt: "Indomaret", file: "indomaret.svg" },
+    { alt: "Visa", file: "visa.svg" },
+    { alt: "Mastercard", file: "mastercard.svg" },
+  ],
 ];
 
 export default function CaraPesanPage() {
@@ -277,11 +279,7 @@ export default function CaraPesanPage() {
               <div className={s.paylogos}>
                 {group.logos.map((logo) => (
                   <span key={logo.alt} className={s.paylogo}>
-                    {logo.file ? (
-                      <img src={`/assets/payments/${logo.file}`} alt={logo.alt} loading="lazy" />
-                    ) : (
-                      <span className={s.paylogoText}>{logo.alt}</span>
-                    )}
+                    <img src={`/assets/payments/${logo.file}`} alt={logo.alt} loading="lazy" />
                   </span>
                 ))}
               </div>
