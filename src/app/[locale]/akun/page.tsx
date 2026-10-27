@@ -9,6 +9,7 @@ import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { useAkunCustomer } from "@/components/akun/AkunContext";
 import { useSafeLocale } from "@/lib/safe-i18n";
 import CustomerOrderDrawer from "@/components/akun/CustomerOrderDrawer";
+import { ReviewFormModal, type OrderItem as ReviewItem } from "@/components/akun/UlasanPesananSection";
 import DashboardProductSection from "@/components/akun/DashboardProductSection";
 
 import { statusInfo, rupiah, tglID } from "@/lib/akun-format";
@@ -24,6 +25,21 @@ interface OrderItem {
   quantity: number;
   price: number;
   product_image?: string;
+  series?: string | null;
+}
+
+/** Bentuk item yang dipakai ReviewFormModal (butuh `id` item pesanan). */
+function toReviewItem(item: OrderItem): ReviewItem {
+  return {
+    id: String(item.id),
+    product_id: item.product_id ?? null,
+    product_name: item.product_name,
+    product_image: item.product_image ?? null,
+    series: item.series ?? null,
+    color: item.color,
+    size: item.size,
+    quantity: item.quantity,
+  };
 }
 interface Order {
   id: string;
@@ -52,6 +68,8 @@ export default function DashboardAkunPage() {
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  // Langsung buka form ulasan dari dashboard (tanpa pindah halaman / fetch ulang).
+  const [reviewItem, setReviewItem] = useState<ReviewItem | null>(null);
 
   useEffect(() => {
     if (!ready) return;
@@ -282,8 +300,10 @@ export default function DashboardAkunPage() {
                     {recentOrders.map((order) => {
                       const state = statusInfo(orderStatusKey(order));
                       const finished = String(order.status || "").toLowerCase() === "selesai";
-                      const needsReview = (order.order_items || []).some((item) => item.id && !reviewedIds.has(item.id));
-                      const canReview = finished && needsReview;
+                      const pendingItem = finished
+                        ? (order.order_items || []).find((item) => item.id && !reviewedIds.has(item.id))
+                        : undefined;
+                      const canReview = Boolean(pendingItem);
                       return (
                         <div key={order.id} className="p-4 transition hover:bg-[#faf8f4]">
                           <button
@@ -314,13 +334,14 @@ export default function DashboardAkunPage() {
                               ) : null}
                             </div>
                             {canReview ? (
-                              <Link
-                                href={to("/akun/ulasan")}
+                              <button
+                                type="button"
+                                onClick={() => pendingItem && setReviewItem(toReviewItem(pendingItem))}
                                 className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-black px-4 text-[11.5px] font-extrabold text-white transition active:scale-[.98]"
                               >
                                 Beri Ulasan
                                 <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m9 6 6 6-6 6" /></svg>
-                              </Link>
+                              </button>
                             ) : (
                               <span className={state.pill}>{state.label}</span>
                             )}
@@ -366,6 +387,19 @@ export default function DashboardAkunPage() {
       </div>
 
       <CustomerOrderDrawer order={selectedOrder} onClose={() => setSelectedOrder(null)} />
+
+      {reviewItem ? (
+        <ReviewFormModal
+          item={reviewItem}
+          onClose={() => setReviewItem(null)}
+          onSaved={(review) => {
+            if (review.order_item_id) {
+              setReviewedIds((prev) => new Set(prev).add(String(review.order_item_id)));
+            }
+            setReviewItem(null);
+          }}
+        />
+      ) : null}
     </>
   );
 }
