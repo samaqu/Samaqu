@@ -75,18 +75,34 @@ export default function UkuranProdukPage() {
 
     try {
       const url = await uploadToCloudinary(file);
-      if (url) {
-        // Update state
-        setGuides((prev) =>
-          prev.map((g) =>
-            g.category === category
-              ? { ...g, image_url: url }
-              : g
-          )
+      if (!url) throw new Error("Upload gagal");
+
+      // Simpan langsung ke database, supaya foto tidak hilang kalau halaman ditutup
+      // sebelum tombol Simpan ditekan.
+      const { error } = await supabase
+        .from("size_guide_images")
+        .upsert(
+          { category, image_url: url, updated_at: new Date().toISOString() },
+          { onConflict: "category" }
         );
-        toast.showToast("success", `Gambar ${category} berhasil diupload`);
+
+      // Baris kategori ini bisa saja belum ada di tabel; `map` saja tidak akan
+      // menambahkannya, jadi foto tidak pernah tampil. Tambahkan kalau belum ada.
+      setGuides((prev) => {
+        if (!prev.some((g) => g.category === category)) {
+          return [
+            ...prev,
+            { id: `local-${category}`, category, image_url: url, updated_at: new Date().toISOString() },
+          ];
+        }
+        return prev.map((g) => (g.category === category ? { ...g, image_url: url } : g));
+      });
+
+      if (error) {
+        console.error("[ukuran-produk] gagal menyimpan gambar:", error);
+        toast.showToast("error", `Foto terunggah tapi gagal disimpan: ${error.message}`);
       } else {
-        toast.showToast("error", "Upload gagal");
+        toast.showToast("success", `Gambar ${category} berhasil diupload`);
       }
     } catch {
       toast.showToast("error", "Gagal upload gambar");
@@ -94,19 +110,25 @@ export default function UkuranProdukPage() {
     setUploadingId(null);
   }
 
-  function handleRemoveImage(category: string) {
-    setGuides((prev) =>
-      prev.map((g) =>
-        g.category === category ? { ...g, image_url: "" } : g
-      )
-    );
+  async function handleRemoveImage(category: string) {
+    setGuides((prev) => prev.map((g) => (g.category === category ? { ...g, image_url: "" } : g)));
+    const { error } = await supabase
+      .from("size_guide_images")
+      .upsert({ category, image_url: "", updated_at: new Date().toISOString() }, { onConflict: "category" });
+    if (error) {
+      console.error("[ukuran-produk] gagal menghapus gambar:", error);
+      toast.showToast("error", `Gagal menghapus foto: ${error.message}`);
+    } else {
+      toast.showToast("success", `Gambar ${category} dihapus`);
+    }
   }
 
   async function handleSave() {
     setSaving(true);
     try {
+      let failure = "";
       for (const guide of guides) {
-        await supabase
+        const { error } = await supabase
           .from("size_guide_images")
           .upsert(
             {
@@ -116,9 +138,14 @@ export default function UkuranProdukPage() {
             },
             { onConflict: "category" }
           );
+        if (error && !failure) failure = error.message;
       }
-      toast.showToast("success", "Panduan ukuran berhasil disimpan");
       await loadGuides();
+      if (failure) {
+        toast.showToast("error", `Gagal menyimpan: ${failure}`);
+      } else {
+        toast.showToast("success", "Panduan ukuran berhasil disimpan");
+      }
     } catch {
       toast.showToast("error", "Gagal menyimpan");
     }
