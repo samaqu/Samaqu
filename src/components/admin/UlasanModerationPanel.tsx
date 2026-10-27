@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, CheckCircle, Loader2, Star, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { tglJamID } from "@/lib/akun-format";
 
 /**
  * Antrean moderasi ulasan customer.
@@ -38,13 +39,6 @@ const TABS: { key: Tab; label: string }[] = [
 async function authToken() {
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token || "";
-}
-
-function dateLabel(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? ""
-    : date.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export default function UlasanModerationPanel() {
@@ -242,7 +236,7 @@ export default function UlasanModerationPanel() {
                         ))}
                       </span>
                       <span className="text-[10px]" style={{ color: "var(--text-muted, #6b7280)" }}>
-                        {dateLabel(item.created_at)}
+                        {tglJamID(item.created_at)}
                       </span>
                     </div>
 

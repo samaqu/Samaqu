@@ -12,6 +12,7 @@ import {
 import { getCustomerOrders } from "@/lib/customer-auth";
 import { getMyReviews, type MyReview } from "@/lib/ulasan-client";
 import { useSafeLocale } from "@/lib/safe-i18n";
+import { tglJamID } from "@/lib/akun-format";
 
 type Order = {
   id: string;
@@ -43,13 +44,6 @@ function Stars({ value, size = 12 }: { value: number; size?: number }) {
       ))}
     </span>
   );
-}
-
-function dateLabel(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? ""
-    : date.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export default function UlasanSayaPage() {
@@ -211,7 +205,7 @@ export default function UlasanSayaPage() {
                     {[item.series, item.color, item.size].filter(Boolean).join(" · ") || "—"}
                   </p>
                   <p className="mt-1 text-[10px] font-semibold text-[#9aa5a1]">
-                    {order.order_number} · {dateLabel(order.created_at)}
+                    {order.order_number} · {tglJamID(order.created_at)}
                   </p>
                 </div>
                 <button
@@ -252,7 +246,7 @@ export default function UlasanSayaPage() {
                       Catatan admin: {review.admin_note}
                     </p>
                   ) : null}
-                  <p className="mt-2 text-[10px] text-[#9aa5a1]">{dateLabel(review.updated_at || review.created_at)}</p>
+                  <p className="mt-2 text-[10px] text-[#9aa5a1]">{tglJamID(review.created_at)}</p>
                 </div>
                 <div className="shrink-0">
                   {review.status === "published" ? (

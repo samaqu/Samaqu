@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Image as ImageIcon, Loader2, Star, X } from "lucide-react";
 import { validateMediaFile } from "@/lib/cloudinary";
+import { tglJamID } from "@/lib/akun-format";
 import { useSafeLocale } from "@/lib/safe-i18n";
 import {
   getMyReviews,
@@ -125,13 +126,14 @@ export default function UlasanPesananSection({
                     {item.quantity ? ` · ${item.quantity} pcs` : ""}
                   </p>
                   {review ? (
-                    <div className="mt-1 flex items-center gap-2">
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
                       <Stars value={review.rating} />
                       <span
                         className={`rounded-full border px-1.5 py-0.5 text-[9.5px] font-bold ${STATUS_STYLE[review.status] || STATUS_STYLE.pending}`}
                       >
                         {STATUS_LABEL[review.status] || review.status}
                       </span>
+                      <span className="whitespace-nowrap text-[9.5px] text-slate-400">{tglJamID(review.created_at)}</span>
                     </div>
                   ) : null}
                   {review?.status === "rejected" && review.admin_note ? (
