@@ -276,6 +276,26 @@ export default function CaraPesanPage() {
               </Link>
             </div>
           </div>
+
+          <div className={`${s.waCard} ${s.sc}`}>
+            <span className={s.waIcon} aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5 0-2.4-.3-4.6-2.4-2.2-2.1-2.6-3.9-2.7-4.4-.1-.5.4-1.6 1-1.9.2-.1.5-.1.7 0l.9 1.7c.1.2 0 .5-.1.7l-.4.5c-.1.2-.2.4 0 .7.2.4.8 1.2 1.4 1.7.7.6 1.4.9 1.7 1 .2.1.4 0 .6-.2l.5-.6c.2-.2.4-.3.7-.2l1.6.8c.3.1.4.6.3 1.1Z" />
+              </svg>
+            </span>
+            <div className={s.waBody}>
+              <p className={s.waTitle}>{t("waInfoTitle")}</p>
+              <p className={s.waDesc}>{t("waInfoDesc")}</p>
+            </div>
+            <a
+              className={`${s.btn} ${s.btnDark}`}
+              href={getWhatsAppLink(t("waLinkOrder"))}
+              target="_blank"
+              rel="noopener"
+            >
+              {t("waInfoCta")} <span className={s.ar}>→</span>
+            </a>
+          </div>
         </div>
       </section>
 

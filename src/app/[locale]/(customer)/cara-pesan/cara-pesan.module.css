@@ -742,6 +742,53 @@
   min-height: 52px;
 }
 
+.waCard {
+  margin-top: clamp(32px, 4vw, 56px);
+  display: flex;
+  align-items: center;
+  gap: clamp(16px, 2vw, 24px);
+  flex-wrap: wrap;
+  padding: clamp(20px, 3vw, 28px);
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.waIcon {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--white);
+  display: grid;
+  place-items: center;
+}
+
+.waBody {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.waTitle {
+  margin: 0;
+  font-size: clamp(17px, 2vw, 20px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.waDesc {
+  margin: 6px 0 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--body);
+  max-width: 56ch;
+}
+
+.waCard > a {
+  flex: none;
+}
+
 /* ---------- dark panel ---------- */
 .panelDark {
   max-width: 1280px;
@@ -1126,6 +1173,13 @@
   }
   .ctaActions > a {
     width: 100%;
+  }
+  .waCard {
+    align-items: flex-start;
+  }
+  .waCard > a {
+    width: 100%;
+    justify-content: center;
   }
   .paygrp {
     margin-top: 28px;
