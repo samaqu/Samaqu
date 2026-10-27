@@ -218,6 +218,15 @@ export function ReviewFormModal({
     return () => { document.body.style.overflow = previous; };
   }, []);
 
+  // Tombol Escape menutup sheet, sama seperti app native (tidak saat sedang mengirim).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !saving) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [saving, onClose]);
+
   useEffect(() => {
     if (!file) return;
     const url = URL.createObjectURL(file);
@@ -281,136 +290,156 @@ export function ReviewFormModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[10000] flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
       <button type="button" aria-label="Tutup" className="absolute inset-0" onClick={() => !saving && onClose()} />
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Beri Ulasan"
-        className="relative z-10 max-h-[92dvh] w-full max-w-[520px] overflow-y-auto rounded-t-2xl bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl sm:rounded-2xl sm:pb-5"
+        className="relative z-10 flex max-h-[92dvh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-3xl"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Beri Ulasan</p>
-            <h3 className="mt-0.5 truncate text-base font-extrabold text-slate-900">
-              {item.product_name || "Produk"}
-            </h3>
-            <p className="mt-0.5 text-[11px] text-slate-400">
-              {[item.series, item.color, item.size].filter(Boolean).join(" · ") || "—"}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => !saving && onClose()}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-slate-400 hover:bg-slate-100"
-            aria-label="Tutup"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="mt-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Rating</p>
-          <div className="mt-1.5 flex gap-1">
-            {Array.from({ length: 5 }, (_, index) => {
-              const value = index + 1;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setRating(value)}
-                  aria-label={`${value} bintang`}
-                  className="grid h-11 w-11 place-items-center rounded-lg transition hover:bg-slate-50"
-                >
-                  <Star size={26} fill={value <= rating ? "#111" : "none"} stroke="#111" strokeWidth={1.5} />
-                </button>
-              );
-            })}
+        {/* Header sementara (tidak ikut scroll) */}
+        <div className="shrink-0 border-b border-slate-100 px-5 pb-3 pt-3 sm:pt-5">
+          <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-slate-200 sm:hidden" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Beri Ulasan</p>
+              <h3 className="mt-0.5 truncate text-base font-extrabold text-slate-900">
+                {item.product_name || "Produk"}
+              </h3>
+              <p className="mt-0.5 text-[11px] text-slate-400">
+                {[item.series, item.color, item.size].filter(Boolean).join(" · ") || "—"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => !saving && onClose()}
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-slate-400 hover:bg-slate-100"
+              aria-label="Tutup"
+            >
+              <X size={18} />
+            </button>
           </div>
         </div>
 
-        <div className="mt-4">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Ulasan</p>
-            <span className="text-[10px] tabular-nums text-slate-400">{content.length}/1000</span>
+        {/* Isi bisa di-scroll */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div>
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Rating</p>
+              <span className="text-[11px] font-extrabold tabular-nums text-slate-900">{rating}/5</span>
+            </div>
+            <div className="mt-1.5 flex items-center gap-0.5">
+              {Array.from({ length: 5 }, (_, index) => {
+                const value = index + 1;
+                const active = value <= rating;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setRating(value)}
+                    aria-label={`${value} bintang`}
+                    aria-pressed={active}
+                    className="grid h-12 w-12 place-items-center rounded-xl transition hover:bg-slate-50 active:scale-95"
+                  >
+                    <Star
+                      size={30}
+                      fill={active ? "#111113" : "none"}
+                      stroke={active ? "#111113" : "#cbd5e1"}
+                      strokeWidth={1.6}
+                    />
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <textarea
-            value={content}
-            onChange={(event) => setContent(event.target.value.slice(0, 1000))}
-            rows={4}
-            placeholder="Ceritakan bahan, ukuran, jahitan, dan pengalamanmu memakai produk ini."
-            className="mt-1.5 w-full resize-none rounded-xl border-2 border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] font-medium text-slate-900 outline-none focus:border-slate-400"
-          />
-        </div>
 
-        <div className="mt-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Foto (opsional)</p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-3">
-            {preview ? (
-              <div className="relative h-16 w-16 overflow-hidden rounded-xl border border-slate-200">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={preview} alt="" className="h-full w-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFile(null);
-                    setKeepPhoto(false);
-                    setPreview("");
-                    if (inputRef.current) inputRef.current.value = "";
-                  }}
-                  className="absolute right-0.5 top-0.5 grid h-5 w-5 place-items-center rounded-full bg-black/70 text-white"
-                  aria-label="Hapus foto"
-                >
-                  <X size={11} />
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-600"
-              >
-                <ImageIcon size={18} />
-                <span className="text-[9px] font-bold">Pilih</span>
-              </button>
-            )}
-            <p className="text-[10.5px] leading-relaxed text-slate-400">
-              JPG/PNG/WebP, maks 10 MB. Foto otomatis diperkecil dan dikompres.
-            </p>
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(event) => pickFile(event.target.files?.[0] || null)}
+          <div className="mt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Ulasan</p>
+              <span className="text-[10px] tabular-nums text-slate-400">{content.length}/1000</span>
+            </div>
+            <textarea
+              value={content}
+              onChange={(event) => setContent(event.target.value.slice(0, 1000))}
+              rows={4}
+              placeholder="Ceritakan bahan, ukuran, jahitan, dan pengalamanmu memakai produk ini."
+              className="mt-1.5 w-full resize-none rounded-xl border-2 border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] font-medium text-slate-900 outline-none focus:border-slate-400"
             />
           </div>
+
+          <div className="mt-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Foto (opsional)</p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-3">
+              {preview ? (
+                <div className="relative h-16 w-16 overflow-hidden rounded-xl border border-slate-200">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={preview} alt="" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFile(null);
+                      setKeepPhoto(false);
+                      setPreview("");
+                      if (inputRef.current) inputRef.current.value = "";
+                    }}
+                    className="absolute right-0.5 top-0.5 grid h-6 w-6 place-items-center rounded-full bg-black/70 text-white"
+                    aria-label="Hapus foto"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-600"
+                >
+                  <ImageIcon size={18} />
+                  <span className="text-[9px] font-bold">Pilih</span>
+                </button>
+              )}
+              <p className="min-w-0 flex-1 text-[10.5px] leading-relaxed text-slate-400">
+                JPG/PNG/WebP, maks 10 MB. Foto otomatis diperkecil dan dikompres.
+              </p>
+              <input
+                ref={inputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(event) => pickFile(event.target.files?.[0] || null)}
+              />
+            </div>
+          </div>
+
+          {error ? (
+            <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700">
+              {error}
+            </p>
+          ) : null}
         </div>
 
-        {error ? (
-          <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700">
-            {error}
-          </p>
-        ) : null}
-
-        <div className="mt-5 flex gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            className="min-h-11 flex-1 rounded-xl border-2 border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          >
-            Batal
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving}
-            className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50"
-          >
-            {saving ? <Loader2 size={15} className="animate-spin" /> : null}
-            {saving ? "Mengirim…" : "Kirim Ulasan"}
-          </button>
+        {/* Aksi tetap di bawah, aman dari home bar */}
+        <div className="shrink-0 border-t border-slate-100 px-5 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:pb-4">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="min-h-11 flex-1 rounded-xl border-2 border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving}
+              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              {saving ? <Loader2 size={15} className="animate-spin" /> : null}
+              {saving ? "Mengirim…" : "Kirim Ulasan"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
