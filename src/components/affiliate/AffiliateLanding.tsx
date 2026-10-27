@@ -362,68 +362,132 @@ export default function AffiliateLanding() {
             alt="Model mengenakan thobe SAMAQU warna maroon"
             className="hero-bg"
           />
-          <div className="container hero-inner w-full pt-40 pb-24 lg:pt-48 lg:pb-32">
-            <div className="grid lg:grid-cols-12 gap-10 items-end">
+          <div className="container hero-inner w-full pt-40 pb-20 lg:pt-48 lg:pb-28">
+            <div className="grid lg:grid-cols-12 gap-12 lg:gap-10 items-end">
               <div className="lg:col-span-7">
                 <span className="pill glass text-white mb-7">
                   <span className="w-2 h-2 rounded-full bg-white" />
                   Pendaftaran affiliate dibuka
                 </span>
-                <h1 className="display text-white text-[2rem] sm:text-[2.75rem] xl:text-[3.5rem]">
-                  Jadi Bagian dari SAMAQU, Raih{" "}
-                  <span className="serif font-normal">Penghasilan Tambahan</span> dari Setiap
-                  Penjualan.
+                <h1 className="display text-white mt-1 sm:mt-7 text-[clamp(2.1rem,4.7vw,3.55rem)] leading-[1.05] tracking-[-0.03em]">
+                  Jadi bagian dari SAMAQU,{" "}
+                  <span className="serif font-normal">raih penghasilan tambahan</span> dari
+                  setiap penjualan.
                 </h1>
                 <p
-                  className="mt-7 text-lg sm:text-xl leading-relaxed max-w-xl"
+                  className="mt-6 text-[0.98rem] sm:text-[1.05rem] leading-relaxed max-w-[46ch]"
                   style={{ color: "var(--c-on-dark)" }}
                 >
-                  Kamu sudah sering merekomendasikan barang ke teman. Sekarang, rekomendasimu
-                  bisa dihitung. Bagikan link referral milikmu dan dapatkan komisi dari setiap
-                  transaksi yang memenuhi syarat.
+                  Kamu sudah sering merekomendasikan barang ke teman. Sekarang rekomendasimu
+                  bisa dihitung — bagikan link referral dan dapatkan komisi dari setiap transaksi
+                  yang memenuhi syarat.
                 </p>
-                <div className="mt-10 flex flex-col sm:flex-row gap-3">
+                <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-3">
                   <Link href={daftarHref} className="btn btn-light">
                     Mulai Jadi Affiliate <Arrow />
                   </Link>
                   <a href="#cara-kerja" className="btn btn-ghost">
-                    Pelajari Cara Kerjanya
+                    Pelajari cara kerjanya
                   </a>
                 </div>
+                <ul
+                  className="mt-9 flex flex-wrap items-center gap-x-5 gap-y-2 text-[0.78rem]"
+                  style={{ color: "var(--c-on-dark)" }}
+                >
+                  {["Gratis gabung", "Tanpa stok barang", "Cair ke rekening sendiri"].map((item, i) => (
+                    <li key={item} className="flex items-center gap-5">
+                      {i > 0 && (
+                        <span
+                          aria-hidden
+                          className="w-px h-3"
+                          style={{ background: "rgba(255,255,255,.25)" }}
+                        />
+                      )}
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <div className="lg:col-span-4 lg:col-start-9 grid gap-3 mt-6 lg:mt-0">
-                <div className="glass p-5">
-                  <p
-                    className="text-xs font-semibold tracking-widest uppercase"
-                    style={{ color: "var(--c-on-dark)" }}
-                  >
-                    Link referral kamu
-                  </p>
-                  <div className="mt-3 flex items-center justify-between gap-3 bg-white text-black rounded-full pl-5 pr-1.5 py-1.5">
-                    <code className="text-sm font-semibold truncate">samaqu.id/r/namakamu</code>
-                    <span className="pill bg-black text-white text-xs">Bagikan</span>
+              <div className="lg:col-span-5 lg:col-start-8 mt-8 lg:mt-0">
+                <div className="glass p-5 sm:p-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <p
+                      className="text-[0.66rem] font-semibold tracking-[0.18em] uppercase"
+                      style={{ color: "var(--c-on-dark)" }}
+                    >
+                      Link referral kamu
+                    </p>
+                    <span
+                      className="text-[0.66rem] tracking-[0.12em] uppercase"
+                      style={{ color: "rgba(255,255,255,.45)" }}
+                    >
+                      contoh
+                    </span>
                   </div>
-                  <p className="mt-3 text-sm" style={{ color: "var(--c-on-dark)" }}>
-                    Satu link. Kirim lewat WhatsApp, Instagram, atau TikTok. Setiap transaksi
-                    tercatat atas namamu.
-                  </p>
-                </div>
-                <div className="glass p-5 flex items-center gap-4">
-                  <svg
-                    width="22"
-                    height="22"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#fff"
-                    strokeWidth="1.8"
-                    aria-hidden="true"
+
+                  <div className="mt-3 flex items-center justify-between gap-2 bg-white text-black rounded-full pl-4 pr-1.5 py-1.5">
+                    <code className="text-[0.8rem] font-semibold truncate">
+                      samaqu.id/r/namakamu
+                    </code>
+                    <span className="pill bg-black text-white text-[0.68rem]">Bagikan</span>
+                  </div>
+
+                  <div
+                    className="mt-5 pt-5 grid gap-4"
+                    style={{ borderTop: "1px solid rgba(255,255,255,.14)" }}
                   >
-                    <path d="M6 7h12l-1 13H7L6 7z" />
-                    <path d="M9 7a3 3 0 0 1 6 0" />
-                  </svg>
-                  <p className="text-sm text-white">
-                    Syarat gabung: beli minimal <b>1 produk SAMAQU</b> dulu.
-                  </p>
+                    <div className="flex items-start gap-3">
+                      <span
+                        className="shrink-0 w-8 h-8 rounded-full grid place-items-center"
+                        style={{ background: "rgba(255,255,255,.1)" }}
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#fff"
+                          strokeWidth="1.7"
+                          strokeLinecap="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1" />
+                          <path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" />
+                        </svg>
+                      </span>
+                      <p
+                        className="text-[0.82rem] leading-relaxed"
+                        style={{ color: "var(--c-on-dark)" }}
+                      >
+                        Satu link untuk WhatsApp, Instagram, atau TikTok. Setiap transaksi
+                        tercatat atas namamu.
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span
+                        className="shrink-0 w-8 h-8 rounded-full grid place-items-center"
+                        style={{ background: "rgba(255,255,255,.1)" }}
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#fff"
+                          strokeWidth="1.7"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M6 7h12l-1 13H7L6 7z" />
+                          <path d="M9 7a3 3 0 0 1 6 0" />
+                        </svg>
+                      </span>
+                      <p className="text-[0.82rem] leading-relaxed text-white">
+                        Syarat gabung: sudah pernah beli minimal{" "}
+                        <b className="font-semibold">1 produk SAMAQU</b>.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
