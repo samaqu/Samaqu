@@ -13,8 +13,10 @@ import DashboardProductSection from "@/components/akun/DashboardProductSection";
 
 import { statusInfo, rupiah, tglID } from "@/lib/akun-format";
 import { orderStatusKey } from "@/lib/order-flow";
+import { getMyReviews } from "@/lib/ulasan-client";
 
 interface OrderItem {
+  id?: string;
   product_id?: string | null;
   product_name: string;
   color: string;
@@ -47,6 +49,7 @@ export default function DashboardAkunPage() {
   const { customer: cust, ready } = useAkunCustomer() as { customer: Cust | null; ready: boolean };
   const [orders, setOrders] = useState<Order[]>([]);
   const [wishCount, setWishCount] = useState(0);
+  const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
@@ -60,9 +63,10 @@ export default function DashboardAkunPage() {
     let alive = true;
     async function init() {
       try {
-        const [o, w] = await Promise.all([
+        const [o, w, r] = await Promise.all([
           getCustomerOrders(id),
           supabase.from("wishlists").select("product_id", { count: "exact", head: true }).eq("customer_id", id),
+          getMyReviews(),
         ]);
         if (!alive) return;
         const list = (o as Order[]) || [];
@@ -81,6 +85,7 @@ export default function DashboardAkunPage() {
           )
         );
         setWishCount(w.count || 0);
+        setReviewedIds(new Set((r || []).map((row) => row.order_item_id).filter(Boolean) as string[]));
       } catch (error) {
         console.error("[dashboard-akun] gagal memuat data:", error);
       } finally {
@@ -274,33 +279,55 @@ export default function DashboardAkunPage() {
 
                   {/* Mobile: kartu */}
                   <div className="md:hidden divide-y divide-[#EBEBEB]">
-                    {recentOrders.map((order) => (
-                      <button
-                        key={order.id}
-                        type="button"
-                        onClick={() => setSelectedOrder(order)}
-                        className="block w-full p-4 text-left hover:bg-[#faf8f4] transition cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-[10px] overflow-hidden shrink-0 flex items-center justify-center" style={{ background: "#e3ede9" }}>
-                            {order.order_items?.[0]?.product_image ? (
-                              <img src={order.order_items[0].product_image} alt={order.order_items[0].product_name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                    {recentOrders.map((order) => {
+                      const state = statusInfo(orderStatusKey(order));
+                      const finished = String(order.status || "").toLowerCase() === "selesai";
+                      const needsReview = (order.order_items || []).some((item) => item.id && !reviewedIds.has(item.id));
+                      const canReview = finished && needsReview;
+                      return (
+                        <div key={order.id} className="p-4 transition hover:bg-[#faf8f4]">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrder(order)}
+                            className="block w-full cursor-pointer text-left"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-11 h-11 rounded-[10px] overflow-hidden shrink-0 flex items-center justify-center" style={{ background: "#e3ede9" }}>
+                                {order.order_items?.[0]?.product_image ? (
+                                  <img src={order.order_items[0].product_image} alt={order.order_items[0].product_name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                                ) : (
+                                  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.5"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[13.5px] font-bold truncate" style={{ color: "#000000" }}>{order.order_items?.[0]?.product_name || "Produk"}</p>
+                                <p className="text-[11.5px] text-[#8b9793] font-mono mt-0.5 truncate">#{order.order_number} &middot; {tglID(order.created_at)}</p>
+                              </div>
+                              <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0" fill="none" stroke="#CCCCCC" strokeWidth="2"><path d="m9 6 6 6-6 6" /></svg>
+                            </div>
+                          </button>
+                          <div className="mt-3 flex items-end justify-between gap-3">
+                            <div className="min-w-0">
+                              <span className="block text-[13.5px] font-black" style={{ color: "#000000" }}>Rp{order.total.toLocaleString("id-ID")}</span>
+                              {canReview ? (
+                                <span className="mt-0.5 block text-[10.5px] font-semibold text-[#8b9793]">{state.label}</span>
+                              ) : null}
+                            </div>
+                            {canReview ? (
+                              <Link
+                                href={to("/akun/ulasan")}
+                                className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-black px-4 text-[11.5px] font-extrabold text-white transition active:scale-[.98]"
+                              >
+                                Beri Ulasan
+                                <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m9 6 6 6-6 6" /></svg>
+                              </Link>
                             ) : (
-                              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.5"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>
+                              <span className={state.pill}>{state.label}</span>
                             )}
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13.5px] font-bold truncate" style={{ color: "#000000" }}>{order.order_items?.[0]?.product_name || "Produk"}</p>
-                            <p className="text-[11.5px] text-[#8b9793] font-mono mt-0.5 truncate">#{order.order_number} &middot; {tglID(order.created_at)}</p>
-                          </div>
-                          <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0" fill="none" stroke="#CCCCCC" strokeWidth="2"><path d="m9 6 6 6-6 6" /></svg>
                         </div>
-                        <div className="mt-3 flex items-center justify-between gap-3">
-                          <span className="text-[13.5px] font-black" style={{ color: "#000000" }}>Rp{order.total.toLocaleString("id-ID")}</span>
-                          <span className={statusInfo(orderStatusKey(order)).pill}>{statusInfo(orderStatusKey(order)).label}</span>
-                        </div>
-                      </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 </>
               )}
