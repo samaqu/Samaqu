@@ -21,6 +21,8 @@ function Arrow() {
   );
 }
 
+const CHANNELS = ["Instagram", "Facebook", "TikTok", "WhatsApp", "Lainnya"] as const;
+
 export default function AffiliateRegisterPage() {
   // Prefix path portal: "" di affiliate.samaqu.id, "/affiliate" di domain utama.
   const [base, setBase] = useState("/affiliate");
@@ -33,6 +35,10 @@ export default function AffiliateRegisterPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [orderNumber, setOrderNumber] = useState("");
+  const [channel, setChannel] = useState("");
+  const [channelOther, setChannelOther] = useState("");
+  const [handle, setHandle] = useState("");
+  const [contentNote, setContentNote] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [tos, setTos] = useState(false);
@@ -48,6 +54,13 @@ export default function AffiliateRegisterPage() {
       next.phone = "Nomor telepon harus diawali 0 dan berisi 9–14 digit.";
     }
     if (!orderNumber.trim()) next.order = "Masukkan nomor pesanan sebagai bukti pembelian.";
+    const resolvedChannel = channel === "Lainnya" ? channelOther.trim() : channel;
+    if (!resolvedChannel) next.channel = "Pilih channel utama.";
+    if (channel === "Lainnya" && resolvedChannel.length > 0 && resolvedChannel.length < 2) {
+      next.channelOther = "Sebutkan nama channel-nya.";
+    }
+    if (handle.trim().length < 2) next.handle = "Isi username atau link akunmu.";
+    if (contentNote.trim().length > 600) next.content = "Cerita konten maksimal 600 karakter.";
     if (password.length < 8 || !/\d/.test(password) || !/[a-zA-Z]/.test(password)) {
       next.pw = "Minimal 8 karakter, kombinasi huruf dan angka.";
     }
@@ -83,6 +96,9 @@ export default function AffiliateRegisterPage() {
           email: email.trim(),
           phone: phone.trim(),
           orderNumber: orderNumber.trim(),
+          primaryChannel: channel === "Lainnya" ? channelOther.trim() : channel,
+          channelHandle: handle.trim(),
+          contentDescription: contentNote.trim(),
           password,
           tos,
         }),
@@ -267,6 +283,79 @@ export default function AffiliateRegisterPage() {
               Dipakai admin untuk memverifikasi syarat pembelian.
             </span>
             <span className="err" aria-live="polite">{err.order || ""}</span>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-5">
+            <div className="field">
+              <label htmlFor="d-channel">Channel utama</label>
+              <select
+                id="d-channel"
+                className="input"
+                value={channel}
+                aria-invalid={Boolean(err.channel)}
+                onChange={(e) => setChannel(e.target.value)}
+              >
+                <option value="">Pilih channel</option>
+                {CHANNELS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <span className="err" aria-live="polite">{err.channel || ""}</span>
+            </div>
+            <div className="field">
+              <label htmlFor="d-handle">Username / link akun</label>
+              <input
+                id="d-handle"
+                className="input"
+                placeholder="@namakamu atau https://..."
+                value={handle}
+                aria-invalid={Boolean(err.handle)}
+                onChange={(e) => setHandle(e.target.value)}
+              />
+              <span className="text-xs" style={{ color: "var(--c-muted)" }}>
+                Supaya admin bisa melihat channel yang kamu pakai.
+              </span>
+              <span className="err" aria-live="polite">{err.handle || ""}</span>
+            </div>
+          </div>
+
+          {channel === "Lainnya" ? (
+            <div className="field">
+              <label htmlFor="d-channel-other">Sebutkan channel-nya</label>
+              <input
+                id="d-channel-other"
+                className="input"
+                placeholder="Contoh: Podcast, Blog, Telegram"
+                value={channelOther}
+                aria-invalid={Boolean(err.channelOther)}
+                onChange={(e) => setChannelOther(e.target.value)}
+              />
+              <span className="err" aria-live="polite">{err.channelOther || ""}</span>
+            </div>
+          ) : null}
+
+          <div className="field">
+            <label htmlFor="d-content">
+              Ceritakan sedikit tentang kontenmu{" "}
+              <span className="font-normal" style={{ color: "var(--c-muted)" }}>
+                (opsional)
+              </span>
+            </label>
+            <textarea
+              id="d-content"
+              className="input resize-none"
+              rows={4}
+              maxLength={600}
+              placeholder="Contoh: konten outfit harian dan tips padu padan thobe untuk pria."
+              value={contentNote}
+              onChange={(e) => setContentNote(e.target.value)}
+            />
+            <span className="text-xs" style={{ color: "var(--c-muted)" }}>
+              {contentNote.length}/600
+            </span>
+            <span className="err" aria-live="polite">{err.content || ""}</span>
           </div>
 
           <div className="field">

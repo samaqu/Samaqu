@@ -34,6 +34,9 @@ interface AffiliateRow {
   phone: string | null;
   status: string;
   rejectReason: string | null;
+  primaryChannel: string | null;
+  channelHandle: string | null;
+  contentDescription: string | null;
   approvedAt: string | null;
   createdAt: string;
   links: number;
@@ -92,7 +95,7 @@ export default function AffiliateDataView() {
     return list.filter((a) => {
       if (statusFilter && a.status !== statusFilter) return false;
       if (!q) return true;
-      return [a.fullName, a.email, a.affiliateCode, a.phone || ""]
+      return [a.fullName, a.email, a.affiliateCode, a.phone || "", a.primaryChannel || "", a.channelHandle || ""]
         .join(" ")
         .toLowerCase()
         .includes(q);
@@ -172,6 +175,21 @@ export default function AffiliateDataView() {
                 <AdminTh>
                   <div className="font-semibold" style={{ color: "var(--fg)" }}>{a.fullName}</div>
                   <div className="text-[11px]" style={{ color: "var(--fg3)" }}>{a.email}{a.phone ? ` · ${a.phone}` : ""}</div>
+                  {a.primaryChannel ? (
+                    <div className="text-[11px] truncate max-w-[240px]" style={{ color: "var(--fg3)" }}>
+                      {a.primaryChannel}
+                      {a.channelHandle ? ` · ${a.channelHandle}` : ""}
+                    </div>
+                  ) : null}
+                  {a.contentDescription ? (
+                    <div
+                      className="text-[11px] truncate max-w-[240px]"
+                      style={{ color: "var(--fg3)" }}
+                      title={a.contentDescription}
+                    >
+                      {a.contentDescription}
+                    </div>
+                  ) : null}
                 </AdminTh>
                 <AdminTh>
                   <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--sub)", color: "var(--fg2)" }}>

@@ -45,6 +45,9 @@ export async function POST(req: NextRequest) {
   const phone = String(body.phone || "").trim();
   const password = String(body.password || "");
   const tos = body.tos === true;
+  const primaryChannel = String(body.primaryChannel || "").trim();
+  const channelHandle = String(body.channelHandle || "").trim();
+  const contentDescription = String(body.contentDescription || "").trim();
 
   if (fullName.length < 3) {
     return NextResponse.json({ error: "Nama lengkap minimal 3 karakter." }, { status: 400 });
@@ -60,6 +63,18 @@ export async function POST(req: NextRequest) {
   }
   if (!tos) {
     return NextResponse.json({ error: "Kamu harus menyetujui Ketentuan Program Affiliate." }, { status: 400 });
+  }
+  if (!primaryChannel || primaryChannel.length > 40) {
+    return NextResponse.json({ error: "Pilih channel utama (maksimal 40 karakter)." }, { status: 400 });
+  }
+  if (channelHandle.length < 2 || channelHandle.length > 160) {
+    return NextResponse.json(
+      { error: "Username atau link akun wajib diisi (2–160 karakter)." },
+      { status: 400 },
+    );
+  }
+  if (contentDescription.length > 600) {
+    return NextResponse.json({ error: "Cerita konten maksimal 600 karakter." }, { status: 400 });
   }
 
   const admin = getSupabaseAdmin();
@@ -107,20 +122,43 @@ export async function POST(req: NextRequest) {
 
   // 2. Buat profil affiliate (status menunggu persetujuan admin).
   const affiliateCode = await generateAffiliateCode();
-  const { data: created, error: insertError } = await admin
+  const baseProfile = {
+    user_id: user.id,
+    affiliate_code: affiliateCode,
+    full_name: fullName,
+    display_name: fullName,
+    email,
+    phone,
+    status: "menunggu",
+    terms_accepted_at: new Date().toISOString(),
+  };
+
+  let { data: created, error: insertError } = await admin
     .from("affiliates")
     .insert({
-      user_id: user.id,
-      affiliate_code: affiliateCode,
-      full_name: fullName,
-      display_name: fullName,
-      email,
-      phone,
-      status: "menunggu",
-      terms_accepted_at: new Date().toISOString(),
+      ...baseProfile,
+      primary_channel: primaryChannel,
+      channel_handle: channelHandle,
+      content_description: contentDescription || null,
     })
     .select("id")
     .maybeSingle();
+
+  // Kalau migrasi kolom channel belum dijalankan, pendaftaran tetap disimpan
+  // (tanpa data channel) alih-alih gagal total.
+  if (
+    insertError &&
+    (insertError.code === "42703" || /column .* does not exist/i.test(insertError.message))
+  ) {
+    console.warn(
+      "[affiliate] Kolom channel belum ada di tabel affiliates. Jalankan supabase/migrations/20261027_affiliate_channel.sql.",
+    );
+    ({ data: created, error: insertError } = await admin
+      .from("affiliates")
+      .insert(baseProfile)
+      .select("id")
+      .maybeSingle());
+  }
 
   if (insertError || !created) {
     console.error("[affiliate] Gagal membuat profil affiliate:", insertError?.message);

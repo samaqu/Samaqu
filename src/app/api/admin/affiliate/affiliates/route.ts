@@ -33,6 +33,9 @@ export async function GET(req: NextRequest) {
     reject_reason: string | null;
     approved_at: string | null;
     created_at: string;
+    primary_channel: string | null;
+    channel_handle: string | null;
+    content_description: string | null;
   }[];
 
   if (affiliates.length === 0) {
@@ -101,6 +104,9 @@ export async function GET(req: NextRequest) {
     phone: a.phone,
     status: a.status,
     rejectReason: a.reject_reason,
+    primaryChannel: a.primary_channel,
+    channelHandle: a.channel_handle,
+    contentDescription: a.content_description,
     approvedAt: a.approved_at,
     createdAt: a.created_at,
     links: linkMap.get(a.id) || 0,
