@@ -1,158 +1,396 @@
 "use client";
 
-import Image from "next/image";
+import { useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
 import Link from "next/link";
 import { getWhatsAppLink } from "@/lib/store-settings";
 import { useSafeTranslations } from "@/lib/safe-i18n";
+import s from "./cara-pesan.module.css";
+
+type TabKey = "normal" | "open";
+
+/**
+ * Logo pembayaran mengikuti daftar di mockup. Beberapa brand belum punya aset SVG di
+ * `public/assets/payments`, jadi entri tanpa `file` dirender sebagai label teks.
+ */
+type PaymentLogo = { alt: string; file?: string };
+
+const PAYMENT_LOGOS: PaymentLogo[][] = [
+  [
+    { alt: "QRIS", file: "qris.svg" },
+    { alt: "GoPay", file: "gopay.svg" },
+    { alt: "OVO", file: "ovo.svg" },
+    { alt: "DANA", file: "dana.svg" },
+    { alt: "ShopeePay", file: "shopeepay.svg" },
+    { alt: "LinkAja", file: "linkaja.svg" },
+    { alt: "Jenius" },
+  ],
+  [
+    { alt: "BNI", file: "bni.svg" },
+    { alt: "BRI", file: "bri.svg" },
+    { alt: "Mandiri", file: "bank-mandiri.svg" },
+    { alt: "CIMB Niaga", file: "bank-cimb-niaga.svg" },
+    { alt: "Permata Bank", file: "permata.svg" },
+    { alt: "Bank BJB" },
+    { alt: "BSI" },
+  ],
+  [{ alt: "Alfamart" }, { alt: "Indomaret" }, { alt: "Visa" }, { alt: "Mastercard" }],
+];
 
 export default function CaraPesanPage() {
   const t = useSafeTranslations("caraPesanPage");
+  const [tab, setTab] = useState<TabKey>("normal");
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const websiteSteps = [
-    { num: "01", title: t("webStep1Title"), desc: t("webStep1Desc") },
-    { num: "02", title: t("webStep2Title"), desc: t("webStep2Desc") },
-    { num: "03", title: t("webStep3Title"), desc: t("webStep3Desc") },
-    { num: "04", title: t("webStep4Title"), desc: t("webStep4Desc") },
-    { num: "05", title: t("webStep5Title"), desc: t("webStep5Desc"), accent: true },
+  const tabKeys: TabKey[] = ["normal", "open"];
+
+  const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    event.preventDefault();
+    const next = (index + (event.key === "ArrowRight" ? 1 : tabKeys.length - 1)) % tabKeys.length;
+    setTab(tabKeys[next]);
+    tabRefs.current[next]?.focus();
+  };
+
+  const normalSteps = [
+    { num: "01", title: t("normalStep1Title"), desc: t("normalStep1Desc") },
+    { num: "02", title: t("normalStep2Title"), desc: t("normalStep2Desc") },
+    { num: "03", title: t("normalStep3Title"), desc: t("normalStep3Desc") },
+    { num: "04", title: t("normalStep4Title"), desc: t("normalStep4Desc") },
+    { num: "05", title: t("normalStep5Title"), desc: t("normalStep5Desc") },
   ];
 
-  const whatsappSteps = [
-    { num: "01", title: t("waStep1Title"), desc: t("waStep1Desc") },
-    { num: "02", title: t("waStep2Title"), desc: t("waStep2Desc") },
-    { num: "03", title: t("waStep3Title"), desc: t("waStep3Desc") },
-    { num: "04", title: t("waStep4Title"), desc: t("waStep4Desc") },
+  const openSteps = [
+    { num: "01", title: t("openStep1Title"), desc: t("openStep1Desc") },
+    { num: "02", title: t("openStep2Title"), desc: t("openStep2Desc") },
+    { num: "03", title: t("openStep3Title"), desc: t("openStep3Desc") },
+    { num: "04", title: t("openStep4Title"), desc: t("openStep4Desc") },
+    { num: "05", title: t("openStep5Title"), desc: t("openStep5Desc") },
+  ];
+
+  const paymentGroups = [t("payGroup1"), t("payGroup2"), t("payGroup3")].map((label, i) => ({
+    label,
+    logos: PAYMENT_LOGOS[i],
+  }));
+
+  const statuses = [
+    { title: t("status1Title"), desc: t("status1Desc") },
+    { title: t("status2Title"), desc: t("status2Desc") },
+    { title: t("status3Title"), desc: t("status3Desc") },
+    { title: t("status4Title"), desc: t("status4Desc") },
+  ];
+
+  const warranties = [
+    { title: t("warranty1Title"), desc: t("warranty1Desc") },
+    { title: t("warranty2Title"), desc: t("warranty2Desc") },
+    { title: t("warranty3Title"), desc: t("warranty3Desc") },
   ];
 
   return (
-    <section className="min-h-screen" style={{ background: "var(--cream)" }}>
-      {/* Hero */}
-      <div style={{ background: "var(--espresso)", color: "var(--cream)" }}>
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 pt-24 pb-16 sm:py-24 grid lg:grid-cols-2 gap-12 items-center">
-          <div>
-              <p className="text-xs tracking-[0.3em] uppercase font-ui mb-5" style={{ color: "#ffffff" }}>{t("heroEyebrow")}</p>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl leading-[1.08] font-medium" style={{ fontFamily: "var(--font-cormorant), Georgia, serif" }}>
-              {t("heroTitle")} <span className="italic" style={{ color: "#ffffff" }}>{t("heroTitleAccent")}</span>
-            </h1>
-            <p className="text-2xl sm:text-3xl mt-4 font-ui" style={{ color: "rgba(255,255,255,.72)", fontFamily: "var(--font-cormorant), Georgia, serif" }}>
-              {t("heroSubtitle")}
-            </p>
-            <p className="mt-6 font-ui leading-relaxed max-w-xl" style={{ color: "rgba(255,255,255,.72)" }}>
-              {t("heroDesc")}
-            </p>
-            <div className="mt-9 flex flex-col sm:flex-row gap-3">
-              <a href="#website" className="text-center rounded-full px-7 py-3.5 text-sm font-medium font-ui transition-colors hover:opacity-90" style={{ background: "var(--cream)", color: "var(--espresso)" }}>{t("heroCtaWeb")}</a>
-              <a href="#whatsapp" className="text-center rounded-full px-7 py-3.5 text-sm font-ui border transition-colors hover:bg-white/10" style={{ borderColor: "rgba(255,255,255,.4)" }}>{t("heroCtaWa")}</a>
-            </div>
-          </div>
-          <div className="relative">
-            <Image src="/images/e6311168-b0e0-4586-9209-a2ad19712a37.png" alt="Samaqu Collection" width={800} height={700} className="w-full h-72 sm:h-[26rem] object-cover rounded-2xl" />
-            <Image src="/images/d454a908-d0e1-4d2d-a4d7-71c2f0436d2a.png" alt="Fabric detail" width={320} height={384} className="hidden sm:block absolute -bottom-8 -left-8 w-40 h-48 object-cover rounded-xl border-4" style={{ borderColor: "var(--espresso)" }} />
-          </div>
-        </div>
-      </div>
+    <div className={s.root}>
+      {/* ============ HERO ============ */}
+      <section className={`${s.topsec} ${s.onDark}`}>
+        <svg
+          className={`${s.spin} ${s.heroGraphic}`}
+          aria-hidden="true"
+          viewBox="0 0 200 200"
+          fill="none"
+          stroke="#FFFFFF"
+          strokeWidth="1"
+        >
+          <rect x="40" y="40" width="120" height="120" />
+          <rect x="40" y="40" width="120" height="120" transform="rotate(45 100 100)" />
+          <circle cx="100" cy="100" r="30" />
+        </svg>
 
-      {/* Two options quick */}
-      <div style={{ background: "var(--sand-2)" }}>
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 py-12 grid sm:grid-cols-2 gap-5">
-          <a href="#website" className="rounded-2xl p-6 flex items-start gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg bg-white" style={{ border: "1px solid rgba(0,0,0,.08)" }}>
-            <span className="text-3xl" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--gold)" }}>01</span>
-            <span>
-              <span className="block font-medium font-ui" style={{ color: "var(--espresso)" }}>{t("option1Title")}</span>
-              <span className="block text-sm font-ui mt-1" style={{ color: "var(--text-secondary)" }}>{t("option1Desc")}</span>
-            </span>
-          </a>
-          <a href="#whatsapp" className="rounded-2xl p-6 flex items-start gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg bg-white" style={{ border: "1px solid rgba(0,0,0,.08)" }}>
-            <span className="text-3xl" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--gold)" }}>02</span>
-            <span>
-              <span className="block font-medium font-ui" style={{ color: "var(--espresso)" }}>{t("option2Title")}</span>
-              <span className="block text-sm font-ui mt-1" style={{ color: "var(--text-secondary)" }}>{t("option2Desc")}</span>
-            </span>
-          </a>
-        </div>
-      </div>
-
-      {/* Website Steps */}
-      <section id="website" className="py-16 sm:py-24 scroll-mt-20">
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 grid lg:grid-cols-[0.9fr_1.1fr] gap-12 lg:gap-16">
-          <div className="lg:sticky lg:top-24 self-start">
-            <p className="text-xs tracking-[0.3em] uppercase font-ui mb-4" style={{ color: "var(--gold)" }}>{t("webOption")}</p>
-            <h2 className="text-3xl sm:text-4xl leading-tight" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--espresso)" }}>{t("webTitle")}</h2>
-            <p className="italic text-xl font-ui mt-2" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--text-secondary)" }}>{t("webSubtitle")}</p>
-            <div className="my-7 h-px" style={{ background: "linear-gradient(90deg,transparent,rgba(0,0,0,.25),transparent)" }} />
-            <Image src="/images/141ca791-3f39-4055-9409-d945ad3205a4.png" alt="Samaqu Product" width={600} height={400} className="w-full h-56 sm:h-72 object-cover rounded-2xl" />
-            <Link href="/katalog" className="mt-7 inline-flex justify-center w-full sm:w-auto rounded-full px-8 py-3.5 text-sm font-medium font-ui text-white transition-colors hover:opacity-90" style={{ background: "var(--espresso)" }}>{t("webCta")}</Link>
-          </div>
-          <ol className="space-y-7">
-            {websiteSteps.map((step) => (
-              <li key={step.num} className="relative pl-16">
-                <span className="absolute left-0 top-0 w-12 h-12 rounded-full flex items-center justify-center text-lg" style={{ background: step.accent ? "var(--gold)" : "var(--bg-tertiary, #e5e5e5)", color: step.accent ? "white" : "var(--espresso)", fontFamily: "var(--font-cormorant), Georgia, serif" }}>
-                  {step.num}
+        <div className={s.wrap} style={{ position: "relative" }}>
+          <div className={s.hero}>
+            <div className={s.heroCopy}>
+              <p className={`${s.rv} ${s.heroBadge}`}>
+                <span className={s.dot} />
+                {t("heroBadge")}
+              </p>
+              <h1 className={s.rv}>
+                {t("heroTitleLead")}
+                <span className={s.rt}>
+                  <span className={s.rw}>{t("heroRotate1")}</span>
+                  <span className={s.rw}>{t("heroRotate2")}</span>
+                  <span className={s.rw}>{t("heroRotate3")}</span>
                 </span>
-                <h3 className="text-lg font-medium font-ui" style={{ color: "var(--espresso)" }}>{step.title}</h3>
-                <p className="font-ui mt-1.5 leading-relaxed" style={{ color: "var(--text-secondary)" }}>{step.desc}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
+              </h1>
+              <p className={`${s.rv} ${s.heroSub}`}>{t("heroDesc")}</p>
 
-      {/* WhatsApp Steps */}
-      <section id="whatsapp" className="py-16 sm:py-24 scroll-mt-20" style={{ background: "var(--sand-2)" }}>
-        <div className="max-w-6xl mx-auto px-5 sm:px-8">
-          <div className="max-w-2xl">
-            <p className="text-xs tracking-[0.3em] uppercase font-ui mb-4" style={{ color: "var(--gold)" }}>{t("waOption")}</p>
-            <h2 className="text-3xl sm:text-4xl leading-tight" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--espresso)" }}>{t("waTitle")}</h2>
-            <p className="italic text-xl font-ui mt-2" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--text-secondary)" }}>{t("waSubtitle")}</p>
-            <p className="mt-5 font-ui leading-relaxed" style={{ color: "var(--text-secondary)" }}>{t("waDesc")}</p>
-          </div>
-          <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {whatsappSteps.map((step) => (
-              <div key={step.num} className="rounded-2xl p-6 bg-white" style={{ border: "1px solid rgba(0,0,0,.08)" }}>
-                <span className="text-2xl" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--gold)" }}>{step.num}</span>
-                <h3 className="font-medium font-ui mt-3" style={{ color: "var(--espresso)" }}>{step.title}</h3>
-                <p className="text-sm font-ui mt-2 leading-relaxed" style={{ color: "var(--text-secondary)" }}>{step.desc}</p>
+              <div className={`${s.rv} ${s.heroActions} ${s.stack}`}>
+                <Link className={`${s.btn} ${s.btnPrimary}`} href="/katalog">
+                  {t("heroCtaShop")} <span className={s.ar}>→</span>
+                </Link>
+                <a className={`${s.btn} ${s.btnOutlineDark}`} href="#jalur">
+                  {t("heroCtaGuide")}
+                </a>
               </div>
-            ))}
-          </div>
-          <a href={getWhatsAppLink(t("waLink1"))} target="_blank" rel="noopener"
-            className="mt-10 inline-flex items-center gap-2 rounded-full px-8 py-3.5 text-sm font-medium font-ui text-white transition-colors hover:opacity-90"
-            style={{ background: "var(--espresso)" }}>
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5 0-2.4-.3-4.6-2.4-2.2-2.1-2.6-3.9-2.7-4.4-.1-.5.4-1.6 1-1.9.2-.1.5-.1.7 0l.9 1.7c.1.2 0 .5-.1.7l-.4.5c-.1.2-.2.4 0 .7.2.4.8 1.2 1.4 1.7.7.6 1.4.9 1.7 1 .2.1.4 0 .6-.2l.5-.6c.2-.2.4-.3.7-.2l1.6.8c.3.1.4.6.3 1.1Z" /></svg>
-            {t("waCta")}
-          </a>
-        </div>
-      </section>
 
-      {/* Ukuran */}
-      <section id="ukuran" className="py-16 sm:py-24 scroll-mt-20">
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-          <Image src="/images/45a87b19-8c07-4762-8169-11b4afb305f0.png" alt="Samaqu Size Guide" width={800} height={600} className="w-full h-72 sm:h-[24rem] object-cover rounded-2xl order-last lg:order-first" />
-          <div>
-            <h2 className="text-3xl sm:text-4xl leading-tight" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--espresso)" }}>{t("sizeTitle")}</h2>
-            <p className="italic text-xl font-ui mt-2" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--text-secondary)" }}>{t("sizeSubtitle")}</p>
-            <p className="mt-5 font-ui leading-relaxed" style={{ color: "var(--text-secondary)" }}>{t("sizeDesc")}</p>
-            <div className="mt-8 flex flex-col sm:flex-row gap-3">
-              <Link href="/panduan-ukuran" className="text-center rounded-full px-7 py-3.5 text-sm font-medium font-ui text-white transition-colors hover:opacity-90" style={{ background: "var(--espresso)" }}>{t("sizeCtaGuide")}</Link>
-              <a href={getWhatsAppLink(t("waLink2"))} target="_blank" rel="noopener" className="text-center rounded-full px-7 py-3.5 text-sm font-ui border transition-colors hover:bg-[var(--bg-tertiary, #e5e5e5)]" style={{ borderColor: "rgba(0,0,0,.25)", color: "var(--espresso)" }}>{t("sizeCtaAdmin")}</a>
+              <div className={`${s.rv} ${s.heroChips}`}>
+                <span>{t("heroChip1")}</span>
+                <span>{t("heroChip2")}</span>
+                <span>{t("heroChip3")}</span>
+              </div>
+            </div>
+
+            <div className={`${s.rv} ${s.hcards}`}>
+              <div className={`${s.f1} ${s.hcard} ${s.hcardLight}`}>
+                <p className={s.hcardLabel}>{t("hcard1Label")}</p>
+                <p className={s.hcardTitle}>{t("hcard1Title")}</p>
+                <div className={s.pillRow}>
+                  <span className={`${s.pill} ${s.pillSolid}`}>{t("hcard1Pill1")}</span>
+                  <span className={s.pill}>{t("hcard1Pill2")}</span>
+                  <span className={s.pill}>{t("hcard1Pill3")}</span>
+                </div>
+              </div>
+
+              <div className={`${s.f2} ${s.hcard} ${s.hcardDark}`}>
+                <p className={s.hcardLabel}>{t("hcard2Label")}</p>
+                <p className={s.hcardTitle}>{t("hcard2Title")}</p>
+                <div className={s.hcardRow}>
+                  <span>{t("hcard2Row1")}</span>
+                  <b>{t("hcard2Val1")}</b>
+                </div>
+                <div className={s.hcardRow}>
+                  <span>{t("hcard2Row2")}</span>
+                  <b>{t("hcard2Val2")}</b>
+                </div>
+              </div>
+
+              <div className={`${s.f3} ${s.hcard} ${s.hcardAccent}`}>
+                <p className={s.hcardLabel}>{t("hcard3Label")}</p>
+                <p className={s.hcardTitle}>{t("hcard3Title")}</p>
+                <div className={s.miniBar}>
+                  <i />
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Closing */}
-      <section className="py-16 sm:py-24 text-center" style={{ background: "var(--espresso)", color: "var(--cream)" }}>
-        <div className="max-w-3xl mx-auto px-5 sm:px-8">
-          <h2 className="text-3xl sm:text-5xl leading-tight" style={{ fontFamily: "var(--font-cormorant), Georgia, serif" }}>
-              {t("closingTitle")} <span className="italic" style={{ color: "#ffffff" }}>{t("closingTitleAccent")}</span>.
-          </h2>
-          <p className="mt-6 font-ui leading-relaxed" style={{ color: "rgba(255,255,255,.72)" }}>{t("closingDesc")}</p>
-          <p className="italic text-2xl mt-6" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "#ffffff" }}>{t("closingTagline")}</p>
-          <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/katalog" className="rounded-full px-8 py-3.5 text-sm font-medium font-ui transition-colors hover:opacity-90" style={{ background: "var(--cream)", color: "var(--espresso)" }}>{t("closingCtaWeb")}</Link>
-            <a href={getWhatsAppLink(t("waLink3"))} target="_blank" rel="noopener" className="rounded-full px-8 py-3.5 text-sm font-ui border transition-colors hover:bg-white/10" style={{ borderColor: "rgba(255,255,255,.4)" }}>{t("closingCtaWa")}</a>
+      {/* ============ JALUR ============ */}
+      <section id="jalur" className={`${s.sec} ${s.secAlt}`}>
+        <div className={s.wrap}>
+          <div className={`${s.sc} ${s.secHead}`}>
+            <div>
+              <p className={s.eyebrow}>{t("routeEyebrow")}</p>
+              <h2 className={s.h2}>{t("routeTitle")}</h2>
+              <p className={s.lead}>{t("routeLead")}</p>
+            </div>
+
+            <div className={s.tabs} role="tablist" aria-label={t("tabsLabel")}>
+              {tabKeys.map((key, i) => (
+                <button
+                  key={key}
+                  ref={(el) => {
+                    tabRefs.current[i] = el;
+                  }}
+                  type="button"
+                  id={`tab-${key}`}
+                  role="tab"
+                  className={s.tabbtn}
+                  aria-selected={tab === key}
+                  aria-controls={`panel-${key}`}
+                  tabIndex={tab === key ? 0 : -1}
+                  onClick={() => setTab(key)}
+                  onKeyDown={(event) => onTabKeyDown(event, i)}
+                >
+                  {key === "normal" ? t("tabNormal") : t("tabOpen")}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div role="tabpanel" id="panel-normal" aria-labelledby="tab-normal" hidden={tab !== "normal"}>
+            <p className={`${s.rv} ${s.tabNote}`}>{t("normalNote")}</p>
+
+            <ol className={s.stitch}>
+              {normalSteps.map((step, i) => (
+                <li key={step.num} className={s.rv} style={{ animationDelay: `${i * 0.09}s` }}>
+                  <span
+                    className={`${s.knot} ${i === normalSteps.length - 1 ? s.num : ""}`}
+                    aria-hidden="true"
+                  >
+                    {step.num}
+                  </span>
+                  <h3>{step.title}</h3>
+                  <p>{step.desc}</p>
+                </li>
+              ))}
+            </ol>
+
+            <div className={`${s.rv} ${s.secCta}`}>
+              <Link className={`${s.btn} ${s.btnDark}`} href="/katalog">
+                {t("normalCta")} <span className={s.ar}>→</span>
+              </Link>
+            </div>
+          </div>
+
+          <div role="tabpanel" id="panel-open" aria-labelledby="tab-open" hidden={tab !== "open"}>
+            <p className={`${s.rv} ${s.tabNote}`}>
+              {t("openNoteLead")} <strong>{t("openNoteHandle")}</strong>
+              {t("openNoteTail")}
+            </p>
+
+            <ol className={s.stitch}>
+              {openSteps.map((step, i) => (
+                <li key={step.num} className={s.rv} style={{ animationDelay: `${i * 0.09}s` }}>
+                  <span
+                    className={`${s.knot} ${i === openSteps.length - 1 ? s.num : ""}`}
+                    aria-hidden="true"
+                  >
+                    {step.num}
+                  </span>
+                  <h3>{step.title}</h3>
+                  <p>{step.desc}</p>
+                </li>
+              ))}
+            </ol>
+
+            <div className={`${s.rv} ${s.secCta}`}>
+              <Link className={`${s.btn} ${s.btnDark}`} href="/open-order">
+                {t("openCta1")} <span className={s.ar}>→</span>
+              </Link>
+              <Link className={`${s.btn} ${s.btnOutline}`} href="/create-your-price">
+                {t("openCta2")}
+              </Link>
+            </div>
           </div>
         </div>
       </section>
-    </section>
+
+      {/* ============ PEMBAYARAN ============ */}
+      <section className={s.sec}>
+        <div className={s.wrap}>
+          <div className={s.sc}>
+            <p className={s.eyebrow}>{t("payEyebrow")}</p>
+            <h2 className={s.h2}>{t("payTitle")}</h2>
+          </div>
+
+          {paymentGroups.map((group) => (
+            <div key={group.label} className={`${s.paygrp} ${s.sc}`}>
+              <p className={s.paylabel}>{group.label}</p>
+              <div className={s.paylogos}>
+                {group.logos.map((logo) => (
+                  <span key={logo.alt} className={s.paylogo}>
+                    {logo.file ? (
+                      <img src={`/assets/payments/${logo.file}`} alt={logo.alt} loading="lazy" />
+                    ) : (
+                      <span className={s.paylogoText}>{logo.alt}</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <p className={`${s.payNote} ${s.sc}`}>{t("payNote")}</p>
+        </div>
+      </section>
+
+      {/* ============ SETELAH CHECKOUT ============ */}
+      <section className={s.sec}>
+        <div className={`${s.panelDark} ${s.sc}`}>
+          <div>
+            <p className={s.eyebrow}>{t("statusEyebrow")}</p>
+            <h2 className={s.h2}>{t("statusTitle")}</h2>
+            <p className={s.lead}>{t("statusDesc")}</p>
+          </div>
+
+          <div style={{ marginTop: 52 }}>
+            <div className={s.bar}>
+              <i />
+            </div>
+            <div className={s.statuses}>
+              {statuses.map((status) => (
+                <div key={status.title}>
+                  <h3>{status.title}</h3>
+                  <p>{status.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ============ GARANSI ============ */}
+      <section className={s.sec}>
+        <div className={s.wrap}>
+          <div className={s.sc}>
+            <p className={s.eyebrow}>{t("warrantyEyebrow")}</p>
+            <h2 className={s.h2}>{t("warrantyTitle")}</h2>
+          </div>
+
+          <div className={s.grid3}>
+            {warranties.map((item) => (
+              <article key={item.title} className={`${s.cardPlain} ${s.sc}`}>
+                <h3>{item.title}</h3>
+                <p>{item.desc}</p>
+              </article>
+            ))}
+          </div>
+
+          <p className={s.sc} style={{ margin: "28px 0 0" }}>
+            <Link className={s.linkMore} href="/garansi-retur">
+              {t("warrantyMore")}
+            </Link>
+          </p>
+        </div>
+      </section>
+
+      {/* ============ KONTAK ============ */}
+      <section id="kontak" className={`${s.sec} ${s.secLast}`}>
+        <div className={`${s.panelCta} ${s.onDark} ${s.sc}`}>
+          <svg
+            className={`${s.spin} ${s.spinCta}`}
+            aria-hidden="true"
+            viewBox="0 0 200 200"
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth="1"
+          >
+            <rect x="40" y="40" width="120" height="120" />
+            <rect x="40" y="40" width="120" height="120" transform="rotate(45 100 100)" />
+            <circle cx="100" cy="100" r="34" />
+          </svg>
+
+          <div className={s.left}>
+            <h2>{t("contactTitle")}</h2>
+            <p>{t("contactDesc")}</p>
+            <div className={`${s.ctaActions} ${s.stack}`}>
+              <a
+                className={`${s.btn} ${s.btnLight}`}
+                href={getWhatsAppLink(t("waLinkContact"))}
+                target="_blank"
+                rel="noopener"
+              >
+                {t("contactWa")} <span className={s.ar}>→</span>
+              </a>
+              <a
+                className={`${s.btn} ${s.btnOutlineLight}`}
+                href="https://instagram.com/samaqu.id"
+                target="_blank"
+                rel="noopener"
+              >
+                {t("contactIg")}
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer className={s.foot}>
+        <span>{t("footerCopyright")}</span>
+        <span>
+          <Link href="/katalog">{t("footerKatalog")}</Link> &nbsp;·&nbsp;{" "}
+          <Link href="/panduan-ukuran">{t("footerSize")}</Link> &nbsp;·&nbsp;{" "}
+          <Link href="/garansi-retur">{t("footerWarranty")}</Link>
+        </span>
+      </footer>
+    </div>
   );
 }
