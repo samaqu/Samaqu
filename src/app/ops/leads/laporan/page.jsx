@@ -534,12 +534,30 @@ function smoothPath(points) {
   return d;
 }
 
-function DailyChart({ days, filter, onFilter, showCls }) {
+function DailyChart({ days = [], filter, onFilter, showCls }) {
   const reduce = useReducedMotion();
   const wrapRef = useRef(null);
   const [width, setWidth] = useState(720);
   const [hover, setHover] = useState(null);
   const [drawn, setDrawn] = useState(false);
+
+  /**
+   * Grafik tidak boleh bergantung pada bentuk objek dari pemanggil: nilai yang hilang /
+   * bukan angka diperlakukan 0 supaya koordinat SVG tidak pernah NaN (NaN di atribut SVG
+   * membuat React gagal render dan halaman jadi "This page couldn't load").
+   */
+  const safeDays = useMemo(
+    () =>
+      (days || []).map((d) => ({
+        tanggal: String(d?.tanggal || ""),
+        leads: Number.isFinite(Number(d?.leads)) ? Number(d.leads) : 0,
+        closing: Number.isFinite(Number(d?.closing)) ? Number(d.closing) : 0,
+        total: Number.isFinite(Number(d?.total)) ? Number(d.total) : 0,
+        nominal: Number.isFinite(Number(d?.nominal)) ? Number(d.nominal) : 0,
+        bySource: d?.bySource && typeof d.bySource === "object" ? d.bySource : {},
+      })),
+    [days],
+  );
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -552,7 +570,7 @@ function DailyChart({ days, filter, onFilter, showCls }) {
   }, []);
 
   // Setiap kali data/filter berganti, garis digambar ulang dari awal.
-  const signature = useMemo(() => days.map((d) => `${d.tanggal}:${d.leads}:${d.closing}`).join("|") + filter, [days, filter]);
+  const signature = useMemo(() => safeDays.map((d) => `${d.tanggal}:${d.leads}:${d.closing}`).join("|") + filter, [safeDays, filter]);
   useEffect(() => {
     setDrawn(false);
     const timer = setTimeout(() => setDrawn(true), reduce ? 0 : 40);
@@ -561,26 +579,25 @@ function DailyChart({ days, filter, onFilter, showCls }) {
 
   const innerW = Math.max(120, width - CHART.padLeft - CHART.padRight);
   const innerH = CHART.height - CHART.padTop - CHART.padBottom;
-  const maxLeads = Math.max(4, ...days.map((d) => d.leads));
-  const maxClosing = Math.max(1, ...days.map((d) => d.closing));
-  const stepX = days.length > 1 ? innerW / (days.length - 1) : 0;
+  const maxLeads = Math.max(4, ...safeDays.map((d) => d.leads));
+  const stepX = safeDays.length > 1 ? innerW / (safeDays.length - 1) : 0;
   const xAt = (i) => CHART.padLeft + i * stepX;
   const yAt = (v) => CHART.padTop + innerH - (v / maxLeads) * innerH;
 
-  const points = days.map((d, i) => ({ x: xAt(i), y: yAt(d.leads) }));
+  const points = safeDays.map((d, i) => ({ x: xAt(i), y: yAt(d.leads) }));
   const line = smoothPath(points);
   const area = points.length
     ? `${line} L ${points[points.length - 1].x} ${CHART.padTop + innerH} L ${points[0].x} ${CHART.padTop + innerH} Z`
     : "";
 
-  const peakIndex = days.reduce((best, d, i) => (d.leads > (days[best]?.leads ?? -1) ? i : best), 0);
-  const peak = days[peakIndex] && days[peakIndex].leads > 0 ? days[peakIndex] : null;
-  const hasLeads = days.some((d) => d.leads > 0);
+  const peakIndex = safeDays.reduce((best, d, i) => (d.leads > (safeDays[best]?.leads ?? -1) ? i : best), 0);
+  const peak = safeDays[peakIndex] && safeDays[peakIndex].leads > 0 ? safeDays[peakIndex] : null;
+  const hasLeads = safeDays.some((d) => d.leads > 0);
   const ticks = [0, Math.round(maxLeads / 2), maxLeads];
-  const labelEvery = Math.max(1, Math.ceil(days.length / 7));
-  const hoverDay = hover !== null ? days[hover] : null;
+  const labelEvery = Math.max(1, Math.ceil(safeDays.length / 7));
+  const hoverDay = hover !== null ? safeDays[hover] : null;
 
-  const summary = `Grafik garis leads per hari ${days.length ? formatTanggalID(days[0].tanggal) : ""} sampai ${days.length ? formatTanggalID(days[days.length - 1].tanggal) : ""}. Total ${nfmt(days.reduce((s, d) => s + d.leads, 0))} leads, ${nfmt(days.reduce((s, d) => s + d.closing, 0))} closing. ${peak ? `Hari tertinggi ${formatTanggalID(peak.tanggal)} dengan ${peak.leads} leads.` : "Belum ada leads pada periode ini."}`;
+  const summary = `Grafik garis leads per hari ${safeDays.length ? formatTanggalID(safeDays[0].tanggal) : ""} sampai ${safeDays.length ? formatTanggalID(safeDays[safeDays.length - 1].tanggal) : ""}. Total ${nfmt(safeDays.reduce((s, d) => s + d.leads, 0))} leads, ${nfmt(safeDays.reduce((s, d) => s + d.closing, 0))} closing. ${peak ? `Hari tertinggi ${formatTanggalID(peak.tanggal)} dengan ${peak.leads} leads.` : "Belum ada leads pada periode ini."}`;
 
   return (
     <div>
@@ -702,7 +719,7 @@ function DailyChart({ days, filter, onFilter, showCls }) {
           ) : null}
 
           {/* titik closing */}
-          {days.map((d, i) =>
+          {safeDays.map((d, i) =>
             d.closing > 0 ? (
               <circle
                 key={`c-${d.tanggal}`}
@@ -729,8 +746,8 @@ function DailyChart({ days, filter, onFilter, showCls }) {
           ) : null}
 
           {/* label tanggal — semua tanggal tetap punya tick, labelnya tiap ±5 hari */}
-          {days.map((d, i) => {
-            const isEdge = i === 0 || i === days.length - 1;
+          {safeDays.map((d, i) => {
+            const isEdge = i === 0 || i === safeDays.length - 1;
             if (!(i % labelEvery === 0 || isEdge || i === peakIndex)) return null;
             return (
               <g key={`x-${d.tanggal}`}>
@@ -743,7 +760,7 @@ function DailyChart({ days, filter, onFilter, showCls }) {
           })}
 
           {/* area hover */}
-          {days.map((d, i) => (
+          {safeDays.map((d, i) => (
             <rect
               key={`h-${d.tanggal}`}
               x={xAt(i) - (stepX || innerW) / 2}
@@ -831,9 +848,9 @@ function PeakPill({ x, y, width, day, visible, reduce }) {
 
 /* ───────────────────────── rekap harian ───────────────────────── */
 
-function DailyTable({ days, totals }) {
+function DailyTable({ days = [], totals }) {
   const [expanded, setExpanded] = useState(false);
-  const newestFirst = useMemo(() => [...days].reverse(), [days]);
+  const newestFirst = useMemo(() => [...(days || [])].reverse(), [days]);
   const visible = expanded ? newestFirst : newestFirst.slice(0, 7);
   const th = { fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted, padding: "10px 12px", whiteSpace: "nowrap" };
   const td = { fontSize: 14, padding: "10px 12px", borderTop: `1px solid ${COLORS.rowLine}`, whiteSpace: "nowrap" };
@@ -1076,22 +1093,39 @@ export default function LaporanLeads() {
     [bySource, totals.nominal],
   );
 
-  /** Semua tanggal bulan terpilih (hari kosong tetap muncul di grafik & tabel). */
+  /**
+   * Hari-hari bulan terpilih (hari kosong tetap ikut supaya grafik & tabel punya semua tanggal).
+   * `leads` adalah alias dari `total` — grafik membaca `d.leads`, sedangkan agregat menyimpan
+   * jumlah lead di `total`. Tanpa alias ini nilainya undefined → koordinat SVG jadi NaN.
+   */
   const allDays = useMemo(() => {
     const map = new Map(agg.days.map((d) => [d.tanggal, d]));
     return Array.from({ length: dayCount }, (_, i) => {
       const key = `${monthKey}-${pad(i + 1)}`;
-      return map.get(key) || { tanggal: key, bySource: {}, bySourceClosing: {}, total: 0, closing: 0, nominal: 0 };
+      const raw = map.get(key) || { tanggal: key, bySource: {}, bySourceClosing: {}, total: 0, closing: 0, nominal: 0 };
+      return {
+        ...raw,
+        bySource: raw.bySource || {},
+        bySourceClosing: raw.bySourceClosing || {},
+        total: Number(raw.total) || 0,
+        closing: Number(raw.closing) || 0,
+        nominal: Number(raw.nominal) || 0,
+        leads: Number(raw.total) || 0,
+      };
     });
   }, [agg.days, dayCount, monthKey]);
 
   const chartDays = useMemo(() => {
     if (sourceFilter === "all") return allDays;
-    return allDays.map((d) => ({
-      ...d,
-      total: d.bySource[sourceFilter] || 0,
-      closing: d.bySourceClosing?.[sourceFilter] || 0,
-    }));
+    return allDays.map((d) => {
+      const leads = d.bySource[sourceFilter] || 0;
+      return {
+        ...d,
+        total: leads,
+        leads,
+        closing: d.bySourceClosing[sourceFilter] || 0,
+      };
+    });
   }, [allDays, sourceFilter]);
 
   const prevTotals = prevAgg.totals;
