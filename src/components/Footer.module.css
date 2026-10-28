@@ -1,7 +1,7 @@
 .footer {
   padding: 0;
-  border-top: 1px solid #242424;
-  background: #0a0a0a;
+  border-top: 1px solid #2b2b2b;
+  background: #111111;
   color: #ffffff;
   font-family: var(--font-inter, "Inter"), "Inter", system-ui, sans-serif;
 }

@@ -15,8 +15,11 @@ import {
   ChatCircle as MessageCircle,
   CaretDown,
   Bag,
+  User,
 } from "@phosphor-icons/react";
+import { ShieldCheckIcon } from "@phosphor-icons/react/dist/csr/ShieldCheck";
 import HouseIcon from "@/components/icons/HouseIcon";
+import menu from "@/components/MobileMenu.module.css";
 import ProfileDropdown from "@/components/ProfileDropdown";
 import { CartBadge } from "@/components/CartBadge";
 import CartDrawer from "@/components/CartDrawer";
@@ -53,6 +56,33 @@ function LocaleFlag({ code }: { code: Locale }) {
 /* ── Nav data ── */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type IconComponent = React.ComponentType<any>;
+
+type MenuIconProps = {
+  size?: number;
+  className?: string;
+  "aria-hidden"?: boolean | "true" | "false";
+};
+
+function TruckIcon({ size = 16, className, "aria-hidden": ariaHidden }: MenuIconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden={ariaHidden}
+    >
+      <path d="M3 6h11v10H3zM14 10h4l3 3v3h-7z" />
+      <circle cx="7" cy="18" r="2" />
+      <circle cx="17" cy="18" r="2" />
+    </svg>
+  );
+}
 type NavItem = { label: string; href: string; hasDropdown?: false; Icon?: IconComponent } | { label: string; hasDropdown: true; Icon?: IconComponent };
 
 function getNavItems(t: (key: string) => string): NavItem[] {
@@ -62,14 +92,6 @@ function getNavItems(t: (key: string) => string): NavItem[] {
     { label: t("nav.testimoni"), href: "/testimoni", Icon: MessageCircle },
     { label: t("nav.sama_quran"), href: "/sama-quran", Icon: BookOpen },
     { label: t("nav.bantuan"), hasDropdown: true, Icon: Question },
-  ];
-}
-
-type NavLinkItem = { label: string; href: string; hasDropdown?: false; Icon?: IconComponent };
-
-function getMobileExtraItems(t: (key: string) => string): NavLinkItem[] {
-  return [
-    { label: t("nav.tentang"), href: "/tentang-kami", Icon: BookOpen },
   ];
 }
 
@@ -103,7 +125,6 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [mobileBantuanOpen, setMobileBantuanOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const navItems = getNavItems(t);
@@ -338,15 +359,12 @@ export default function Navbar() {
       </header>
 
       {/* ── Mobile Drawer ── */}
-      <MobileDrawer title="Menu">
+      <MobileDrawer title="SAMAQU">
         <DrawerNavContent
           onClose={() => setMenuOpen(false)}
-          isHome={isHome}
           homeHref={homeHref}
           locale={locale}
           t={t}
-          bantuanOpen={mobileBantuanOpen}
-          toggleBantuan={() => setMobileBantuanOpen((v) => !v)}
           switchLocale={switchLocale}
         />
       </MobileDrawer>
@@ -360,185 +378,163 @@ export default function Navbar() {
 /* ── Mobile drawer nav content ── */
 function DrawerNavContent({
   onClose,
-  isHome,
   homeHref,
   locale,
   t,
-  bantuanOpen,
-  toggleBantuan,
   switchLocale,
 }: {
   onClose: () => void;
-  isHome: boolean;
   homeHref: string;
   locale: Locale;
   t: (key: string) => string;
-  bantuanOpen: boolean;
-  toggleBantuan: () => void;
   switchLocale: (locale: Locale) => void;
 }) {
   const pathname = usePathname();
-  // Katalog tidak ditampilkan di drawer — di mobile sudah ada menu "Kategori" di nav bawah.
-  // (Navbar desktop tetap menampilkan Katalog.)
-  const navItems = getNavItems(t).filter((item) => !("href" in item) || item.href !== "/katalog");
-  const extraItems = getMobileExtraItems(t);
-  const bantuanLinks = getBantuanLinks(t);
+  const currentPath = (pathname || "").replace(/\/$/, "");
+  const createYourPriceHref = `/${locale}/create-your-price`;
+
+  const mainLinks = [
+    { label: t("nav.home"), href: homeHref },
+    { label: t("nav.katalog"), href: `/${locale}/katalog` },
+    { label: t("nav.testimoni"), href: `/${locale}/testimoni` },
+    { label: t("nav.sama_quran"), href: `/${locale}/sama-quran` },
+    { label: t("nav.tentang"), href: `/${locale}/tentang-kami` },
+  ];
+
+  const helpLinks: { label: string; href: string; Icon: React.ComponentType<MenuIconProps> }[] = [
+    { label: t("nav.panduan"), href: `/${locale}/panduan-ukuran`, Icon: Ruler },
+    { label: t("nav.cara_pesan"), href: `/${locale}/cara-pesan`, Icon: Bag },
+    { label: t("nav.faq"), href: `/${locale}/faq`, Icon: Question },
+    { label: t("nav.cek_resi"), href: `/${locale}/cek-resi`, Icon: TruckIcon },
+    { label: t("nav.garansi_retur"), href: `/${locale}/garansi-retur`, Icon: ShieldCheckIcon },
+  ];
+
+  const isActive = (href: string) =>
+    currentPath === href ||
+    (href !== `/${locale}` && currentPath.startsWith(`${href}/`));
 
   return (
-    <nav className="flex flex-col h-full" role="navigation" aria-label="Menu mobile">
-      <ul className="flex flex-col" role="list">
-        {navItems.map((item) => {
-          const href = item.hasDropdown
-            ? "#"
-            : item.href === "/"
-              ? homeHref
-              : `/${locale}${item.href}`;
-          if (!item.hasDropdown) {
-            return (
-              <li key={item.label}>
-                <a
-                  href={href}
-                  className="flex items-center gap-4 px-6 py-4 text-[13px] tracking-[0.18em] uppercase font-ui transition-colors duration-200 hover:text-gold hover:bg-[var(--sand-2)]"
-                  style={{
-                    color: "var(--espresso)",
-                    borderBottom: "1px solid rgba(0,0,0,.12)",
-                  }}
-                  onClick={onClose}
-                >
-                  {item.label}
-                </a>
-              </li>
-            );
-          }
+    <nav className={menu.nav} aria-label="Menu utama">
+      <a
+        href={createYourPriceHref}
+        className={menu.createCard}
+        onClick={onClose}
+        aria-current={currentPath === createYourPriceHref ? "page" : undefined}
+      >
+        <span className={menu.createCopy}>
+          <span className={menu.createLabel}>{t("nav.program")}</span>
+          <span className={menu.createTitle}>
+            {t("nav.cyp_lead")}{" "}
+            <span className={menu.priceWord}>{t("nav.cyp_accent")}</span>
+          </span>
+        </span>
+        <span className={menu.createArrow} aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7 17 17 7M9 7h8v8" />
+          </svg>
+        </span>
+      </a>
 
-          // Bantuan — accordion dropdown
-          return (
-            <li key={item.label}>
-              <button
-                onClick={toggleBantuan}
-                className="flex items-center justify-between w-full px-6 py-4 text-[13px] tracking-[0.18em] uppercase font-ui transition-colors duration-200 hover:text-gold hover:bg-[var(--sand-2)]"
-                style={{
-                  color: "var(--espresso)",
-                  borderBottom: "1px solid rgba(0,0,0,.12)",
-                }}
-              >
-                <span>{item.label}</span>
-                <CaretDown
-                  size={16}
-                  className={`transition-transform duration-300 ${bantuanOpen ? "rotate-180" : ""}`}
-                  style={{ color: "var(--espresso)" }}
-                />
-              </button>
-
-              {/* Sub-links */}
-              <AnimatePresence>
-                {bantuanOpen && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.25 }}
-                    className="overflow-hidden"
-                  >
-                    {bantuanLinks.map((link) => (
-                      <a
-                        key={link.label}
-                        href={`/${locale}${resolveHref(link.href, isHome)}`}
-                        className="flex items-center gap-4 pl-14 pr-6 py-3.5 text-[12px] tracking-[0.16em] uppercase font-ui transition-colors duration-200 hover:text-gold hover:bg-[var(--sand-2)]"
-                        style={{
-                          color: "var(--espresso)",
-                          borderBottom: "1px solid rgba(0,0,0,.08)",
-                        }}
-                        onClick={onClose}
-                      >
-                        {link.label}
-                      </a>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </li>
-          );
-        })}
-
-        {/* Extra items (mobile only) — Tentang Kami */}
-        {extraItems.map((item) => (
-          <li key={item.label}>
+      <ul className={menu.mainList}>
+        {mainLinks.map((item) => (
+          <li key={item.href} className={menu.mainItem}>
             <a
-              href={`/${locale}${item.href === "/" ? "" : item.href}`}
-              className="flex items-center gap-4 px-6 py-4 text-[13px] tracking-[0.18em] uppercase font-ui transition-colors duration-200 hover:text-gold hover:bg-[var(--sand-2)]"
-              style={{
-                color: "var(--espresso)",
-                borderBottom: "1px solid rgba(0,0,0,.12)",
-              }}
+              href={item.href}
+              className={menu.mainLink}
               onClick={onClose}
+              aria-current={isActive(item.href) ? "page" : undefined}
             >
-              {item.label}
+              <span className={menu.mainTextMask}>
+                <span className={menu.mainText}>{item.label}</span>
+              </span>
             </a>
           </li>
         ))}
       </ul>
 
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Language switcher in drawer */}
-      <div className="px-6 pb-2">
-        <div className="flex items-center gap-3 py-3" style={{ borderBottom: "1px solid rgba(0,0,0,.12)" }}>
-          <span className="text-[13px] tracking-[0.18em] uppercase font-ui" style={{ color: "var(--espresso)" }}>Bahasa</span>
-          <div className="flex items-center rounded-full overflow-hidden" style={{ border: "1px solid rgba(0,0,0,.2)" }}>
-            {locales.map((loc) => (
-              <button
-                key={loc}
-                onClick={() => switchLocale(loc)}
-                aria-label={FLAG_LABELS[loc]}
-                title={FLAG_LABELS[loc]}
-                className="grid place-items-center px-3 py-1.5 transition-all duration-200"
-                style={{
-                  background: locale === loc ? "var(--espresso)" : "transparent",
-                  opacity: locale === loc ? 1 : 0.6,
-                }}
-              >
-                <LocaleFlag code={loc} />
-              </button>
-            ))}
-          </div>
+      <div className={menu.helpSection}>
+        <p className={menu.helpLabel}>{t("nav.bantuan")}</p>
+        <div className={menu.helpGrid}>
+          {helpLinks.map((item, index) => (
+            <a
+              key={item.href}
+              href={item.href}
+              className={`${menu.helpLink} ${index === helpLinks.length - 1 ? menu.helpLinkWide : ""}`}
+              onClick={onClose}
+            >
+              <item.Icon size={16} className={menu.helpIcon} aria-hidden="true" />
+              <span>{item.label}</span>
+            </a>
+          ))}
         </div>
-      </div>
 
-      {/* Account link */}
-      <div className="px-6 pb-2">
         <a
-          href={`/${locale}/akun`}
-          className="flex items-center gap-4 px-0 py-3 text-[13px] tracking-[0.18em] uppercase font-ui transition-colors duration-200 hover:text-gold"
-          style={{
-            color: "var(--espresso)",
-            borderBottom: "1px solid rgba(0,0,0,.12)",
-          }}
+          href="https://affiliate.samaqu.id/"
+          target="_blank"
+          rel="noopener"
+          className={menu.affiliateBox}
           onClick={onClose}
         >
-          {t("nav.account")}
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={menu.affiliateIcon}
+            aria-hidden="true"
+          >
+            <circle cx="9" cy="7" r="3" />
+            <path d="M3 20c0-4 2.8-7 6-7 2.2 0 4.2 1.2 5.3 3" />
+            <path d="M18 8v6M15 11h6" />
+          </svg>
+          <span>{t("nav.affiliate_program")}</span>
+          <span className={menu.affiliateArrow} aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17 17 7M9 7h8v8" />
+            </svg>
+          </span>
         </a>
       </div>
 
-      {/* CTA area */}
-      <div className="p-6 space-y-3 border-t" style={{ borderColor: "rgba(0,0,0,.15)" }}>
+      <div className={menu.bottom}>
+        <div className={menu.bottomRow}>
+          <div className={menu.langSwitch} role="group" aria-label="Bahasa">
+            {locales.map((loc) => (
+              <button
+                key={loc}
+                type="button"
+                className={menu.langButton}
+                aria-pressed={locale === loc}
+                onClick={() => {
+                  onClose();
+                  switchLocale(loc);
+                }}
+              >
+                {loc.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          <a href={`/${locale}/akun`} className={menu.accountLink} onClick={onClose}>
+            <User size={16} className={menu.accountIcon} aria-hidden="true" />
+            <span>{t("nav.account")}</span>
+          </a>
+        </div>
+
         <a
           href={getWhatsAppLink("Halo Admin SAMAQU, saya tertarik dengan koleksi Anda dan ingin bertanya soal pemesanan.")}
           target="_blank"
           rel="noopener"
-          className="flex items-center justify-center gap-2 w-full px-5 py-3.5 text-[11px] tracking-[0.16em] uppercase font-ui font-medium transition-all duration-300 hover:opacity-90 rounded-sm"
-          style={{ background: "#000", color: "white" }}
+          className={menu.chatButton}
           onClick={onClose}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M17.6 6.3A7.85 7.85 0 0 0 12 4a7.94 7.94 0 0 0-6.9 11.9L4 20l4.2-1.1A7.9 7.9 0 0 0 12 19.9 7.94 7.94 0 0 0 17.6 6.3Z" />
-          </svg>
-          {t("nav.chat_admin")}
+          <MessageCircle size={18} className={menu.chatIcon} aria-hidden="true" />
+          <span>{t("nav.chat_admin")}</span>
         </a>
-        <p className="text-center text-[10px] tracking-[0.2em] uppercase mt-4 font-ui" style={{ color: "var(--stone)" }}>
-          SAMAQU — Busana Muslim Premium
-        </p>
       </div>
     </nav>
   );

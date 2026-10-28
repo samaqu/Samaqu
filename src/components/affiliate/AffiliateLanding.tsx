@@ -3,6 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { portalBaseFor, portalPath } from "@/lib/affiliate/site";
+import { getWhatsAppLink } from "@/lib/store-settings";
+import hero from "./AffiliateHero.module.css";
+import why from "./AffiliateWhyJoin.module.css";
+import how from "./AffiliateHowItWorks.module.css";
+import faq from "./AffiliateFaq.module.css";
+import cta from "./AffiliateCta.module.css";
 
 /**
  * Landing page publik SAMAQU Affiliate Center — port 1:1 dari mockup
@@ -13,10 +19,49 @@ import { portalBaseFor, portalPath } from "@/lib/affiliate/site";
  * ditampilkan sebagai janji; tidak ada persentase komisi di halaman ini.
  */
 
-const BENEFITS = [
+const CHECK_MARK = <path d="M5 12.5 9.5 17 19 7.5" />;
+
+const DUTIES = [
+  { full: "Bagikan link referral", short: "Bagikan link" },
+  { full: "Ceritakan produk yang kamu pakai", short: "Ceritakan produknya" },
+  { full: "Terima komisinya", short: "Terima komisi" },
+];
+
+const SAMAQU_DUTIES = [
   {
-    title: "Link Referral Pribadi",
-    text: "Link unik milikmu sendiri. Siapa pun yang belanja lewat link ini tercatat sebagai hasil rekomendasimu.",
+    label: "Stok barang",
+    icon: (
+      <>
+        <path d="M21 8.5 12 3 3 8.5v7L12 21l9-5.5v-7Z" />
+        <path d="m3.3 8.6 8.7 4.9 8.7-4.9M12 21v-7.5" />
+      </>
+    ),
+  },
+  {
+    label: "Pengiriman paket",
+    icon: (
+      <>
+        <path d="M3 16V6h11v10M14 9h4l3 3v4" />
+        <circle cx="7" cy="18" r="2" />
+        <circle cx="17.5" cy="18" r="2" />
+      </>
+    ),
+  },
+  {
+    label: "Pembayaran",
+    icon: (
+      <>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M3 9h18M7 15h4" />
+      </>
+    ),
+  },
+];
+
+const WHY_FEATURES = [
+  {
+    title: "Link referral pribadi",
+    text: "Setiap belanja lewat linkmu tercatat atas namamu.",
     icon: (
       <>
         <path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1" />
@@ -25,99 +70,101 @@ const BENEFITS = [
     ),
   },
   {
-    title: "Pantau Performa Penjualan",
-    text: "Lihat link mana yang paling banyak menghasilkan transaksi.",
+    title: "Pantau performa",
+    text: "Lihat link mana yang paling banyak menghasilkan.",
     icon: (
       <>
         <path d="M4 19V5M4 19h16" />
-        <path d="M8 15l4-4 3 3 5-6" />
+        <path d="m7 15 4-4 3 3 5-6" />
       </>
     ),
   },
   {
-    title: "Komisi yang Transparan",
-    text: "Status komisi setiap transaksi jelas, tanpa hitung-hitungan manual.",
+    title: "Komisi transparan",
+    text: "Status setiap komisi jelas, tanpa hitung manual.",
     icon: (
       <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7v10M9.5 9.5c0-1 1-1.8 2.5-1.8s2.5.8 2.5 1.8-1 1.6-2.5 2-2.5 1-2.5 2 1 1.8 2.5 1.8 2.5-.8 2.5-1.8" />
+        <circle cx="12" cy="12" r="8.5" />
+        <circle cx="12" cy="12" r="3.2" />
       </>
     ),
   },
   {
-    title: "Dashboard Affiliate",
-    text: "Semua aktivitasmu dalam satu layar: link, ringkasan, dan info akun.",
+    title: "Riwayat lengkap",
+    text: "Transaksi dan komisi tersimpan, cek kapan saja.",
     icon: (
       <>
-        <rect x="3" y="4" width="18" height="16" rx="2" />
-        <path d="M3 9h18M9 9v11" />
-      </>
-    ),
-  },
-  {
-    title: "Riwayat Transaksi & Komisi",
-    text: "Setiap transaksi dan komisi tersimpan rapi, bisa kamu cek kapan saja.",
-    icon: (
-      <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7v5l3 2" />
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 7.5V12l3 2" />
       </>
     ),
   },
 ];
 
+const WHY_AUDIENCE = [
+  "Mahasiswa",
+  "Karyawan",
+  "Ibu rumah tangga",
+  "Content creator",
+  "Santri",
+];
+
+const CHART_BARS = [30, 45, 38, 60, 52, 75, 92];
+
+const STAT_LABELS = ["Klik", "Transaksi", "Komisi"];
+
 const STEPS = [
   {
     n: "01",
-    title: "Kenali Produk SAMAQU",
-    text: "Pelajari koleksinya dan pilih produk yang paling ingin kamu rekomendasikan.",
+    title: "Kenali produk",
+    text: "Pilih koleksi yang paling ingin kamu rekomendasikan.",
   },
   {
     n: "02",
-    title: "Beli Minimal Satu Produk",
-    text: "Wajib sebelum bergabung. Rasakan sendiri kualitasnya, supaya rekomendasimu tulus dan meyakinkan.",
+    title: "Beli minimal 1 produk",
+    text: "Rasakan sendiri kualitasnya, biar rekomendasimu tulus.",
     key: true,
   },
   {
     n: "03",
-    title: "Daftar Jadi Affiliate",
-    text: "Ajukan pendaftaran. Akunmu akan diverifikasi dan disetujui admin sesuai ketentuan program.",
+    title: "Daftar affiliate",
+    text: "Akunmu diverifikasi dan disetujui admin.",
   },
   {
     n: "04",
-    title: "Bagikan & Raih Komisi",
-    text: "Akun aktif, link siap dibagikan. Dapatkan komisi dari setiap transaksi yang memenuhi syarat.",
+    title: "Share & raih komisi",
+    text: "Komisi hingga 20% dari setiap transaksi yang memenuhi syarat.",
   },
 ];
 
 const FAQ = [
   {
-    q: "Apa itu SAMAQU Affiliate?",
-    a: "Program untuk kamu yang ingin dapat penghasilan tambahan dengan merekomendasikan produk SAMAQU lewat link referral pribadi. Kamu memperoleh komisi dari transaksi yang memenuhi syarat.",
+    q: "Berapa komisi yang bisa saya dapat?",
+    a: "Hingga 20% dari setiap transaksi yang memenuhi syarat. Besaran detailnya mengikuti ketentuan program.",
   },
   {
-    q: "Bagaimana cara mendapatkan komisi?",
-    a: "Setelah akunmu aktif, bagikan link referral milikmu. Komisi diberikan untuk transaksi melalui link tersebut yang memenuhi syarat sesuai ketentuan program.",
+    q: "Apakah harus beli produk dulu?",
+    a: "Ya, minimal satu produk SAMAQU. Supaya kamu kenal langsung produk yang kamu rekomendasikan.",
   },
   {
-    q: "Apakah harus membeli produk terlebih dahulu?",
-    a: "Ya. Calon affiliate wajib membeli minimal satu produk SAMAQU sebelum mendaftar, agar mengenal langsung produk yang akan direkomendasikan.",
+    q: "Ada biaya pendaftaran?",
+    a: "Tidak ada. Daftar affiliate SAMAQU gratis.",
   },
   {
-    q: "Bagaimana cara mendaftar?",
-    a: "Setelah syarat pembelian terpenuhi, klik “Gabung Affiliate” dan lengkapi formulir pendaftaran. Pengajuanmu akan diproses oleh tim SAMAQU.",
+    q: "Bagaimana cara daftarnya?",
+    a: "Setelah syarat pembelian terpenuhi, klik “Gabung Sekarang” dan isi formulirnya. Pengajuanmu diproses tim SAMAQU.",
   },
   {
-    q: "Apakah pendaftaran langsung membuat akun aktif?",
-    a: "Belum. Setiap pendaftaran melalui verifikasi dan persetujuan admin sesuai ketentuan program. Link referral bisa digunakan setelah akun disetujui dan aktif.",
+    q: "Apakah akun langsung aktif?",
+    a: "Belum. Akun diverifikasi dan disetujui admin dulu. Link referral bisa dipakai setelah akun aktif.",
   },
   {
-    q: "Bagaimana cara mengetahui performa penjualan?",
-    a: "Lewat Dashboard Affiliate. Di sana kamu bisa memantau performa, riwayat transaksi, dan status komisi setelah akun aktif.",
+    q: "Bagaimana memantau penjualan?",
+    a: "Lewat Dashboard Affiliate. Ada performa link, riwayat transaksi, dan status komisi.",
   },
   {
-    q: "Kapan komisi dapat dicairkan?",
-    a: "Jadwal dan mekanisme pencairan mengikuti ketentuan resmi program SAMAQU Affiliate, yang akan diinformasikan kepada affiliate yang sudah aktif.",
+    q: "Kapan komisi bisa dicairkan?",
+    a: "Jadwal pencairan mengikuti ketentuan resmi program dan diinformasikan ke affiliate yang sudah aktif.",
   },
 ];
 
@@ -138,7 +185,6 @@ export default function AffiliateLanding() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [sticky, setSticky] = useState(false);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [activeSection, setActiveSection] = useState("beranda");
   const [cookieVisible, setCookieVisible] = useState(false);
   const [cookieIn, setCookieIn] = useState(false);
@@ -213,26 +259,27 @@ export default function AffiliateLanding() {
     const root = rootRef.current;
     if (!root) return;
 
-    const groups = ["#keuntungan .tile", "#cara-kerja .step", ".faq-item"];
+    const groups = [".faq-item"];
     const singles = [
       "main section:not(.hero) .eyebrow",
       "main section:not(.hero) h2",
       "main section:not(.hero) h2 + p",
-      "#keuntungan .lg\\:col-span-4",
-      "#persyaratan .grid",
       "#gabung p",
       "#gabung .flex",
-      "#cara-kerja .btn",
     ];
     const targets: HTMLElement[] = [];
+    const skipped = (el: HTMLElement) => !!el.closest("[data-reveal-skip]");
     groups.forEach((selector) => {
       root.querySelectorAll<HTMLElement>(selector).forEach((el, index) => {
+        if (skipped(el)) return;
         el.style.setProperty("--d", `${(index % 5) * 0.09}s`);
         targets.push(el);
       });
     });
     singles.forEach((selector) => {
-      root.querySelectorAll<HTMLElement>(selector).forEach((el) => targets.push(el));
+      root.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+        if (!skipped(el)) targets.push(el);
+      });
     });
 
     const ro = new IntersectionObserver(
@@ -355,139 +402,75 @@ export default function AffiliateLanding() {
 
       <main id="main">
         {/* HERO */}
-        <section id="beranda" className="hero on-dark" ref={heroRef}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/affiliate/mockup/hero.png"
-            alt="Model mengenakan thobe SAMAQU warna maroon"
-            className="hero-bg"
-          />
-          <div className="container hero-inner w-full pt-40 pb-20 lg:pt-48 lg:pb-28">
-            <div className="grid lg:grid-cols-12 gap-12 lg:gap-10 items-end">
-              <div className="lg:col-span-7">
-                <span className="pill glass text-white mb-7">
-                  <span className="w-2 h-2 rounded-full bg-white" />
-                  Pendaftaran affiliate dibuka
+        <section
+          id="beranda"
+          className={`${hero.root} on-dark`}
+          ref={heroRef}
+          aria-labelledby="affiliate-hero-title"
+        >
+          <div className={hero.inner}>
+            <div className={hero.grid}>
+              <div className={hero.copy}>
+                <span className={hero.badge}>
+                  <span className={hero.dot} aria-hidden="true" />
+                  SAMAQU Affiliate Program
                 </span>
-                <h1 className="display text-white mt-1 sm:mt-7 text-[clamp(2.1rem,4.7vw,3.55rem)] leading-[1.05] tracking-[-0.03em]">
-                  Jadi bagian dari SAMAQU,{" "}
-                  <span className="serif font-normal">raih penghasilan tambahan</span> dari
-                  setiap penjualan.
+
+                <h1 id="affiliate-hero-title" className={hero.title}>
+                  Komisi hingga <span className={hero.highlight}>20%</span>
+                  <span className={hero.titleLine}>dari setiap rekomendasi.</span>
                 </h1>
-                <p
-                  className="mt-6 text-[0.98rem] sm:text-[1.05rem] leading-relaxed max-w-[46ch]"
-                  style={{ color: "var(--c-on-dark)" }}
-                >
-                  Kamu sudah sering merekomendasikan barang ke teman. Sekarang rekomendasimu
-                  bisa dihitung — bagikan link referral dan dapatkan komisi dari setiap transaksi
-                  yang memenuhi syarat.
+
+                <p className={hero.sub}>
+                  Gabung sekarang, bagikan link, raih komisinya. Tanpa modal stok, sisanya kami
+                  yang urus.
                 </p>
-                <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-3">
-                  <Link href={daftarHref} className="btn btn-light">
-                    Mulai Jadi Affiliate <Arrow />
+
+                <div className={hero.actions}>
+                  <Link href={daftarHref} className={hero.primary}>
+                    Gabung Sekarang
                   </Link>
-                  <a href="#cara-kerja" className="btn btn-ghost">
-                    Pelajari cara kerjanya
+                  <a href="#cara-kerja" className={hero.secondary}>
+                    Lihat cara kerja
                   </a>
                 </div>
-                <ul
-                  className="mt-9 flex flex-wrap items-center gap-x-5 gap-y-2 text-[0.78rem]"
-                  style={{ color: "var(--c-on-dark)" }}
-                >
-                  {["Gratis gabung", "Tanpa stok barang", "Cair ke rekening sendiri"].map((item, i) => (
-                    <li key={item} className="flex items-center gap-5">
-                      {i > 0 && (
-                        <span
-                          aria-hidden
-                          className="w-px h-3"
-                          style={{ background: "rgba(255,255,255,.25)" }}
-                        />
-                      )}
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
+
+                <p className={hero.fine}>
+                  Gratis daftar · Tanpa stok · Cair ke rekening sendiri
+                </p>
               </div>
-              <div className="lg:col-span-5 lg:col-start-8 mt-8 lg:mt-0">
-                <div className="glass p-5 sm:p-6">
-                  <div className="flex items-center justify-between gap-3">
-                    <p
-                      className="text-[0.66rem] font-semibold tracking-[0.18em] uppercase"
-                      style={{ color: "var(--c-on-dark)" }}
-                    >
-                      Link referral kamu
-                    </p>
-                    <span
-                      className="text-[0.66rem] tracking-[0.12em] uppercase"
-                      style={{ color: "rgba(255,255,255,.45)" }}
-                    >
-                      contoh
+
+              <div className={hero.demoWrap} aria-hidden="true">
+                <div className={hero.demo}>
+                  <p className={hero.demoLabel}>LINK REFERRAL KAMU</p>
+                  <div className={hero.linkRow}>
+                    <span className={hero.linkText}>
+                      <span className={hero.linkPrefix}>samaqu.id/r/</span>
+                      <span className={hero.linkName}>
+                        namakamu<span className={hero.caret} />
+                      </span>
                     </span>
+                    <span className={hero.share}>Bagikan</span>
                   </div>
+                </div>
 
-                  <div className="mt-3 flex items-center justify-between gap-2 bg-white text-black rounded-full pl-4 pr-1.5 py-1.5">
-                    <code className="text-[0.8rem] font-semibold truncate">
-                      samaqu.id/r/namakamu
-                    </code>
-                    <span className="pill bg-black text-white text-[0.68rem]">Bagikan</span>
-                  </div>
-
-                  <div
-                    className="mt-5 pt-5 grid gap-4"
-                    style={{ borderTop: "1px solid rgba(255,255,255,.14)" }}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span
-                        className="shrink-0 w-8 h-8 rounded-full grid place-items-center"
-                        style={{ background: "rgba(255,255,255,.1)" }}
-                      >
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#fff"
-                          strokeWidth="1.7"
-                          strokeLinecap="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1" />
-                          <path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" />
-                        </svg>
-                      </span>
-                      <p
-                        className="text-[0.82rem] leading-relaxed"
-                        style={{ color: "var(--c-on-dark)" }}
-                      >
-                        Satu link untuk WhatsApp, Instagram, atau TikTok. Setiap transaksi
-                        tercatat atas namamu.
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <span
-                        className="shrink-0 w-8 h-8 rounded-full grid place-items-center"
-                        style={{ background: "rgba(255,255,255,.1)" }}
-                      >
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#fff"
-                          strokeWidth="1.7"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M6 7h12l-1 13H7L6 7z" />
-                          <path d="M9 7a3 3 0 0 1 6 0" />
-                        </svg>
-                      </span>
-                      <p className="text-[0.82rem] leading-relaxed text-white">
-                        Syarat gabung: sudah pernah beli minimal{" "}
-                        <b className="font-semibold">1 produk SAMAQU</b>.
-                      </p>
-                    </div>
-                  </div>
+                <div className={hero.note}>
+                  <span className={hero.noteIcon}>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M5 12.5l4.5 4.5L19 7.5" />
+                    </svg>
+                  </span>
+                  Komisi baru tercatat
                 </div>
               </div>
             </div>
@@ -495,327 +478,369 @@ export default function AffiliateLanding() {
         </section>
 
         {/* WHY / BENEFITS */}
-        <section id="keuntungan" className="section">
-          <div className="container">
-            <div className="grid lg:grid-cols-12 gap-6 lg:gap-10 items-end mb-10 lg:mb-14">
-              <div className="lg:col-span-7">
-                <p className="eyebrow">01 — Kenapa gabung</p>
-                <h2 className="display mt-4 text-[clamp(1.75rem,3.3vw,2.6rem)] leading-[1.1] tracking-[-0.03em]">
-                  Tanpa stok barang. <span className="serif font-normal">Cukup</span> satu link
-                  dan kepercayaan teman-temanmu.
-                </h2>
-              </div>
-              <p
-                className="lg:col-span-4 lg:col-start-9 text-[0.95rem] leading-relaxed"
-                style={{ color: "var(--c-text-2)" }}
-              >
-                Kamu tidak perlu buka toko, kirim paket, atau urus pembayaran — cukup ceritakan
-                produk yang sudah kamu pakai sendiri.
-              </p>
+        <section
+          id="keuntungan"
+          className={why.root}
+          aria-labelledby="why-join-title"
+          data-reveal-skip
+        >
+          <div className={why.inner}>
+            <div className={`${why.header} ${why.reveal}`}>
+              <p className={why.eyebrow}>KENAPA GABUNG</p>
+              <h2 id="why-join-title" className={why.title}>
+                Kamu cukup share.
+                <span className={why.titleMuted}>Sisanya kami yang urus.</span>
+              </h2>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-12">
-              <article className="relative overflow-hidden rounded-[24px] bg-[#0a0a0b] text-white lg:col-span-7 lg:row-span-2 min-h-[360px] sm:min-h-[420px] flex flex-col justify-between p-7 sm:p-8">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/affiliate/mockup/visual-login.png"
-                  alt=""
-                  aria-hidden="true"
-                  className="absolute inset-0 w-full h-full object-cover opacity-50"
-                />
-                <div
-                  aria-hidden="true"
-                  className="absolute inset-0"
-                  style={{
-                    background:
-                      "linear-gradient(180deg,rgba(10,10,11,.15) 0%,rgba(10,10,11,.55) 55%,rgba(10,10,11,.95) 100%)",
-                  }}
-                />
-                <span
-                  className="relative shrink-0 w-11 h-11 rounded-2xl grid place-items-center"
-                  style={{
-                    background: "rgba(255,255,255,.12)",
-                    border: "1px solid rgba(255,255,255,.18)",
-                  }}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="#fff"
-                    strokeWidth={1.6}
-                    strokeLinecap="round"
-                    aria-hidden="true"
-                  >
-                    {BENEFITS[0].icon}
-                  </svg>
-                </span>
-                <div className="relative max-w-md">
-                  <h3 className="text-[1.55rem] sm:text-[1.8rem] font-extrabold leading-[1.15] tracking-[-0.02em]">
-                    {BENEFITS[0].title}
-                  </h3>
-                  <p
-                    className="mt-3 text-[0.9rem] leading-relaxed"
-                    style={{ color: "var(--c-on-dark)" }}
-                  >
-                    {BENEFITS[0].text}
-                  </p>
+            <div className={`${why.dutyGrid} ${why.reveal}`}>
+              <article className={`${why.card} ${why.dutyCard}`}>
+                <h3 className={why.cardLabel}>TUGAS KAMU</h3>
+                <ul className={why.dutyList}>
+                  {DUTIES.map((duty) => (
+                    <li key={duty.full} className={why.dutyItem}>
+                      <span className={why.dutyIcon} aria-hidden="true">
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.7"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          {CHECK_MARK}
+                        </svg>
+                      </span>
+                      <span className={why.itemFull}>{duty.full}</span>
+                      <span className={why.itemShort}>{duty.short}</span>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+
+              <article className={`${why.card} ${why.oursCard}`}>
+                <h3 className={why.cardLabel}>URUSAN SAMAQU</h3>
+                <ul className={why.dutyList}>
+                  {SAMAQU_DUTIES.map((item) => (
+                    <li key={item.label} className={why.dutyItem}>
+                      <span className={why.dutyIcon} aria-hidden="true">
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.7"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          {item.icon}
+                        </svg>
+                      </span>
+                      <span>{item.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            </div>
+
+            <div className={why.bento}>
+              <article className={`${why.bentoCard} ${why.dashboard} ${why.reveal}`}>
+                <div className={why.dashHead}>
+                  <h3 className={why.dashTitle}>Dashboard Affiliate</h3>
+                  <p className={why.dashDesc}>Link, performa, dan komisi dalam satu layar.</p>
+                </div>
+
+                <div className={why.mock} aria-hidden="true">
+                  <div className={why.stats}>
+                    {STAT_LABELS.map((label, index) => (
+                      <div
+                        key={label}
+                        className={`${why.stat} ${
+                          index === 2 ? why.statDark : why.statLight
+                        }`}
+                      >
+                        <span className={why.statLabel}>{label}</span>
+                        <span className={why.statBar} />
+                      </div>
+                    ))}
+                  </div>
+                  <div className={why.chart}>
+                    {CHART_BARS.map((height, index) => (
+                      <span
+                        key={index}
+                        className={`${why.bar} ${
+                          index === 5 ? why.barMid : index === 6 ? why.barDark : ""
+                        }`}
+                        style={{ height: `${height}%` }}
+                      />
+                    ))}
+                  </div>
                 </div>
               </article>
 
-              {BENEFITS.slice(1, 3).map((benefit) => (
-                <article
-                  key={benefit.title}
-                  className="rounded-[24px] border border-[#e8e8e9] bg-white p-6 sm:p-7 lg:col-span-5 flex gap-4 transition-colors hover:border-black"
-                >
-                  <span className="shrink-0 w-10 h-10 rounded-xl grid place-items-center border border-[#e8e8e9]">
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="#000"
-                      strokeWidth={1.6}
-                      strokeLinecap="round"
-                      aria-hidden="true"
-                    >
-                      {benefit.icon}
-                    </svg>
-                  </span>
-                  <div>
-                    <h3 className="text-[1rem] font-bold tracking-[-0.01em]">{benefit.title}</h3>
-                    <p
-                      className="mt-1.5 text-[0.85rem] leading-relaxed"
-                      style={{ color: "var(--c-text-2)" }}
-                    >
-                      {benefit.text}
-                    </p>
-                  </div>
-                </article>
-              ))}
+              <div className={why.featureList}>
+                {WHY_FEATURES.map((feature) => (
+                  <article
+                    key={feature.title}
+                    className={`${why.feature} ${why.bentoCard} ${why.reveal}`}
+                  >
+                    <span className={why.featureIcon} aria-hidden="true">
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        {feature.icon}
+                      </svg>
+                    </span>
+                    <h3 className={why.featureTitle}>{feature.title}</h3>
+                    <p className={why.featureText}>{feature.text}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
 
-              {BENEFITS.slice(3).map((benefit) => (
-                <article
-                  key={benefit.title}
-                  className="rounded-[24px] border border-[#e8e8e9] bg-white p-6 sm:p-7 lg:col-span-6 flex gap-4 transition-colors hover:border-black"
-                >
-                  <span className="shrink-0 w-10 h-10 rounded-xl grid place-items-center border border-[#e8e8e9]">
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="#000"
-                      strokeWidth={1.6}
-                      strokeLinecap="round"
-                      aria-hidden="true"
-                    >
-                      {benefit.icon}
-                    </svg>
-                  </span>
-                  <div>
-                    <h3 className="text-[1rem] font-bold tracking-[-0.01em]">{benefit.title}</h3>
-                    <p
-                      className="mt-1.5 text-[0.85rem] leading-relaxed"
-                      style={{ color: "var(--c-text-2)" }}
-                    >
-                      {benefit.text}
-                    </p>
-                  </div>
-                </article>
-              ))}
+            <div className={`${why.audience} ${why.reveal}`}>
+              <p className={why.audienceLabel}>Cocok buat</p>
+              <ul className={why.chips}>
+                {WHY_AUDIENCE.map((item) => (
+                  <li key={item} className={why.chip}>
+                    {item}
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </section>
 
-        {/* HOW IT WORKS */}
-        <section id="cara-kerja" className="section pt-0">
-          <div className="container">
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
-              <div className="max-w-2xl">
-                <p className="eyebrow">02 — Cara kerja</p>
-                <h2 className="display mt-4 text-[clamp(1.75rem,3.3vw,2.6rem)] leading-[1.1] tracking-[-0.03em]">
-                  Empat langkah. <span className="serif font-normal">Mulai</span> hari ini.
-                </h2>
-              </div>
-              <Link href={daftarHref} className="btn btn-primary self-start lg:self-auto">
-                Gabung Sekarang <Arrow />
-              </Link>
+        {/* HOW IT WORKS + FIRST STEP */}
+        <section
+          id="cara-kerja"
+          className={how.root}
+          aria-labelledby="how-title"
+          data-reveal-skip
+        >
+          <div className={how.inner}>
+            <div className={`${how.header} ${how.reveal}`}>
+              <p className={how.eyebrow}>CARA KERJA</p>
+              <h2 id="how-title" className={how.title}>
+                Empat langkah.
+                <span className={how.titleMuted}>Mulai hari ini.</span>
+              </h2>
             </div>
 
-            <div
-              role="list"
-              className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px overflow-hidden rounded-[24px] border border-[#e8e8e9]"
-              style={{ background: "#e8e8e9" }}
-            >
-              {STEPS.map((step) => (
-                <article
-                  key={step.n}
-                  role="listitem"
-                  className={`flex flex-col p-6 sm:p-7 ${
-                    step.key ? "bg-[#0a0a0b] text-white" : "bg-white"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`text-[0.66rem] font-semibold tracking-[0.18em] uppercase ${
-                        step.key ? "text-white/60" : "text-neutral-500"
-                      }`}
-                    >
-                      Langkah {step.n}
-                    </span>
-                    <span
-                      className={`w-8 h-8 rounded-full grid place-items-center text-[0.7rem] font-bold ${
-                        step.key ? "bg-white text-black" : "border border-[#e8e8e9] text-black"
-                      }`}
-                    >
+            <div className={how.stepsWrap}>
+              <span className={how.thread} aria-hidden="true" />
+              <ol className={how.steps}>
+                {STEPS.map((step, index) => (
+                  <li
+                    key={step.n}
+                    className={`${how.step} ${step.key ? how.stepKey : ""} ${
+                      index === STEPS.length - 1 ? how.stepLast : ""
+                    } ${how.reveal}`}
+                  >
+                    <span className={how.circle} aria-hidden="true">
                       {step.n}
                     </span>
-                  </div>
-                  <h3 className="mt-8 text-[1.02rem] font-bold leading-snug tracking-[-0.01em]">
-                    <span className="sr-only">{`Langkah ${Number(step.n)}: `}</span>
-                    {step.title}
-                  </h3>
-                  <p
-                    className="mt-2 text-[0.85rem] leading-relaxed"
-                    style={{ color: step.key ? "var(--c-on-dark)" : "var(--c-text-2)" }}
-                  >
-                    {step.text}
-                  </p>
-                  {step.key ? (
-                    <span className="pill bg-white text-black mt-5 self-start text-[0.68rem]">
-                      Syarat wajib
-                    </span>
-                  ) : null}
-                </article>
-              ))}
+                    <div className={how.stepBody}>
+                      <div className={how.stepHeading}>
+                        <h3 className={how.stepTitle}>
+                          <span className="sr-only">Langkah {step.n}: </span>
+                          {step.title}
+                        </h3>
+                        {step.key ? <span className={how.badge}>Syarat wajib</span> : null}
+                      </div>
+                      <p className={how.stepDesc}>{step.text}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
             </div>
-          </div>
-        </section>
 
-        {/* PURCHASE REQUIREMENT */}
-        <section id="persyaratan" className="pb-20 lg:pb-24">
-          <div className="container">
-            <div className="grid lg:grid-cols-2 overflow-hidden rounded-[28px] bg-[#0a0a0b] text-white on-dark">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/affiliate/mockup/requirement.png"
-                alt="Pelanggan membawa garment bag SAMAQU"
-                className="w-full h-64 sm:h-[380px] lg:h-full object-cover"
-              />
-              <div className="p-7 sm:p-12 lg:p-14 xl:p-16 flex flex-col justify-center">
-                <p className="eyebrow" style={{ color: "var(--c-on-dark)" }}>
-                  03 — Langkah pertamamu
-                </p>
-                <h2 className="display text-white mt-4 text-[clamp(1.6rem,3vw,2.35rem)] leading-[1.15] tracking-[-0.025em] max-w-[22ch]">
-                  Mulai dari mengenal produk, lanjut jadi partner SAMAQU.
-                </h2>
-                <p
-                  className="mt-5 max-w-md text-[0.95rem] leading-relaxed"
-                  style={{ color: "var(--c-on-dark)" }}
+            <div className={`${how.ctaGrid} ${how.reveal}`}>
+              <article className={how.quoteCard}>
+                <svg
+                  className={how.quoteIcon}
+                  viewBox="0 0 36 28"
+                  fill="currentColor"
+                  aria-hidden="true"
                 >
-                  Sebelum bergabung sebagai affiliate, pastikan kamu sudah membeli minimal satu
-                  produk SAMAQU. Dengan begitu, kamu bisa mengenal produk yang akan kamu
-                  rekomendasikan kepada calon pelanggan.
-                </p>
-                <p className="mt-4 max-w-md text-[0.9rem] font-semibold">
-                  Orang lebih percaya pada yang sudah memakai, bukan yang cuma menjual.
-                </p>
-                <a href={KATALOG} className="btn btn-light mt-8 self-start">
-                  Lihat Koleksi SAMAQU <Arrow />
-                </a>
+                  <path d="M0 17.2C0 10.8 3.7 5.5 9.6 2.4l2.6 4.4c-3.4 2.1-5.3 4.7-5.6 7.5h4.8V28H0V17.2Zm20 0c0-6.4 3.7-11.7 9.6-14.8l2.6 4.4c-3.4 2.1-5.3 4.7-5.6 7.5H32V28H20V17.2Z" />
+                </svg>
+                <blockquote className={how.quote}>
+                  Orang lebih percaya pada yang sudah memakai,
+                  <span className={how.quoteMuted}>bukan yang cuma menjual.</span>
+                </blockquote>
+              </article>
+
+              <div className={how.inviteWrap}>
+                <article className={how.inviteCard}>
+                  <div className={how.inviteText}>
+                    <p className={how.inviteLabel}>Belum punya produk SAMAQU?</p>
+                    <h3 className={how.inviteTitle}>Mulai dari koleksi favoritmu</h3>
+                  </div>
+                  <a href={KATALOG} className={`${how.cardButton} ${how.btnOutline}`}>
+                    Lihat Koleksi
+                    <svg
+                      className={how.btnIcon}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M7 17 17 7M9 7h8v8" />
+                    </svg>
+                  </a>
+                </article>
+
+                <article className={how.inviteCard}>
+                  <div className={how.inviteText}>
+                    <p className={how.inviteLabel}>Sudah pernah beli?</p>
+                    <h3 className={how.inviteTitle}>Tinggal satu langkah lagi</h3>
+                  </div>
+                  <Link href={daftarHref} className={`${how.cardButton} ${how.btnSolid}`}>
+                    Gabung Sekarang
+                    <svg
+                      className={how.btnIcon}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M5 12h14M13 6l6 6-6 6" />
+                    </svg>
+                  </Link>
+                </article>
               </div>
             </div>
           </div>
         </section>
 
         {/* FAQ */}
-        <section id="faq" className="section" style={{ background: "var(--c-bg-2)" }}>
-          <div className="container grid lg:grid-cols-12 gap-8 lg:gap-10">
-            <div className="lg:col-span-4 lg:sticky lg:top-28 self-start">
-              <p className="eyebrow">04 — FAQ</p>
-              <h2 className="display mt-4 text-[clamp(1.75rem,3vw,2.4rem)] leading-[1.1] tracking-[-0.03em]">
-                Masih ragu? <span className="serif font-normal">Kami jawab.</span>
-              </h2>
-              <p className="mt-5 text-[0.9rem] leading-relaxed" style={{ color: "var(--c-text-2)" }}>
-                Selengkapnya baca{" "}
-                <Link
-                  href={syaratHref}
-                  className="font-semibold text-black underline underline-offset-4"
-                >
-                  Syarat &amp; Ketentuan program
-                </Link>
-                .
-              </p>
-            </div>
-            <div className="lg:col-span-7 lg:col-start-6 bg-white rounded-[24px] border border-[#e8e8e9] px-5 sm:px-8 py-2">
-              {FAQ.map((item, index) => {
-                const open = openFaq === index;
-                return (
-                  <div className={`faq-item${open ? " open" : ""}`} key={item.q}>
-                    <h3>
-                      <button
-                        className="faq-q"
-                        aria-expanded={open}
-                        aria-controls={`faq-${index + 1}`}
-                        onClick={() => setOpenFaq(open ? null : index)}
-                        type="button"
-                      >
-                        {item.q}
-                        <span className="faq-icon" aria-hidden="true" />
-                      </button>
-                    </h3>
-                    <div id={`faq-${index + 1}`} className="faq-a" aria-hidden={!open}>
-                      <div>
-                        <p>{item.a}</p>
-                      </div>
+        <section id="faq" className={faq.root} aria-labelledby="faq-title" data-reveal-skip>
+          <div className={faq.inner}>
+            <div className={faq.grid}>
+              <div className={faq.left}>
+                <div className={`${faq.header} ${faq.reveal}`}>
+                  <p className={faq.eyebrow}>FAQ</p>
+                  <h2 id="faq-title" className={faq.title}>
+                    Masih ragu?
+                    <span className={faq.titleMuted}>Kami jawab.</span>
+                  </h2>
+                </div>
+
+                <p className={`${faq.skText} ${faq.reveal}`}>
+                  Detail lengkap ada di{" "}
+                  <Link href={syaratHref} className={faq.skLink}>
+                    Syarat &amp; Ketentuan
+                  </Link>{" "}
+                  program.
+                </p>
+
+                <div className={`${faq.help} ${faq.reveal}`}>
+                  <h3 className={faq.helpTitle}>Pertanyaanmu belum terjawab?</h3>
+                  <p className={faq.helpText}>Tim kami siap bantu lewat chat.</p>
+                  <a
+                    href={getWhatsAppLink("Halo Admin SAMAQU, saya butuh bantuan.")}
+                    target="_blank"
+                    rel="noopener"
+                    className={faq.helpButton}
+                  >
+                    <svg
+                      className={faq.helpIcon}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M21 11.5a7.5 7.5 0 0 1-10.9 6.7L4 20l1.8-4.2A7.5 7.5 0 1 1 21 11.5Z" />
+                      <path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01" />
+                    </svg>
+                    Chat Admin
+                  </a>
+                </div>
+              </div>
+
+              <div className={`${faq.list} ${faq.reveal}`}>
+                {FAQ.map((item, index) => (
+                  <details key={item.q} className={faq.item} open={index === 0}>
+                    <summary className={faq.summary}>
+                      <span className={faq.question}>{item.q}</span>
+                      <span className={faq.icon} aria-hidden="true" />
+                    </summary>
+                    <div className={faq.answer}>
+                      <p>{item.a}</p>
                     </div>
-                  </div>
-                );
-              })}
+                  </details>
+                ))}
+              </div>
             </div>
           </div>
         </section>
 
         {/* FINAL CTA */}
-        <section id="gabung" className="relative bg-[#0a0a0b] text-white on-dark overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/affiliate/mockup/visual-cta.png"
-            alt=""
-            aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-cover opacity-30"
-            style={{ objectPosition: "50% 25%" }}
-          />
-          <div
-            aria-hidden="true"
-            className="absolute inset-0"
-            style={{
-              background:
-                "linear-gradient(90deg,rgba(10,10,11,.95) 0%,rgba(10,10,11,.75) 45%,rgba(10,10,11,.2) 85%)",
-            }}
-          />
-          <div className="container relative py-24 lg:py-32">
-            <div className="max-w-2xl">
-              <p className="eyebrow" style={{ color: "var(--c-on-dark)" }}>
-                Mulai sekarang
-              </p>
-              <h2 className="display text-white mt-5 text-[clamp(2rem,4.2vw,3.4rem)] leading-[1.05] tracking-[-0.03em]">
-                Siap memulai perjalananmu{" "}
-                <span className="serif font-normal">bersama</span> SAMAQU?
-              </h2>
-              <p
-                className="mt-5 max-w-xl text-[0.98rem] leading-relaxed"
-                style={{ color: "var(--c-on-dark)" }}
-              >
-                Kenali produk SAMAQU, penuhi persyaratan pembelian, dan mulai langkahmu untuk
-                menjadi bagian dari program affiliate.
-              </p>
-              <div className="mt-9 flex flex-col sm:flex-row gap-3">
-                <a href={KATALOG} className="btn btn-light">
-                  Jelajahi Produk <Arrow />
-                </a>
-                <Link href={loginHref} className="btn btn-ghost">
-                  Masuk Affiliate
-                </Link>
+        <section
+          id="gabung"
+          className={`${cta.root} on-dark`}
+          aria-labelledby="cta-title"
+          data-reveal-skip
+        >
+          <div className={cta.inner}>
+            <div className={cta.grid}>
+              <div className={`${cta.content} ${cta.reveal}`}>
+                <p className={cta.eyebrow}>MULAI SEKARANG</p>
+                <h2 id="cta-title" className={cta.title}>
+                  Komisi pertamamu
+                  <span className={cta.titleMuted}>dimulai dari satu link.</span>
+                </h2>
+                <p className={cta.sub}>
+                  Gabung gratis, bagikan link, dan raih komisi hingga 20% dari setiap transaksi
+                  yang memenuhi syarat.
+                </p>
+                <div className={cta.actions}>
+                  <Link href={daftarHref} className={`${cta.button} ${cta.primary}`}>
+                    Gabung Sekarang
+                    <svg
+                      className={cta.arrow}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M5 12h14M13 6l6 6-6 6" />
+                    </svg>
+                  </Link>
+                  <a href={KATALOG} className={`${cta.button} ${cta.secondary}`}>
+                    Lihat Koleksi
+                  </a>
+                </div>
+                <p className={cta.small}>
+                  Sudah punya akun?{" "}
+                  <Link href={loginHref} className={cta.loginLink}>
+                    Masuk
+                  </Link>
+                </p>
+              </div>
+
+              <div className={cta.number} aria-hidden="true">
+                20%
               </div>
             </div>
           </div>
@@ -924,7 +949,8 @@ export default function AffiliateLanding() {
           aria-label="Persetujuan cookie"
         >
           <p>
-            Kami memakai cookie untuk mencatat link referral dan meningkatkan pengalamanmu. Baca{" "}
+            Kami memakai cookie untuk mencatat link referral
+            <span className="cookie-extra"> dan meningkatkan pengalamanmu</span>. Baca{" "}
             <Link href={kebijakanHref}>Kebijakan Privasi</Link>.
           </p>
           <div className="cookie-actions">

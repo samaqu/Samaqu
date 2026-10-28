@@ -131,54 +131,56 @@ export default function AffiliateRegisterPage() {
             </Link>
           </div>
 
-          <span className={s.badge}>SAMAQU Affiliate Program</span>
+          <div className={s.asideMain}>
+            <span className={s.badge}>SAMAQU Affiliate Program</span>
 
-          <p className={s.visualTitle}>
-            Komisi hingga <span className={s.highlight}>20%</span>
-            <span className={s.visualMuted}>dari setiap rekomendasi.</span>
-          </p>
+            <p className={s.visualTitle}>
+              Komisi hingga <span className={s.highlight}>20%</span>
+              <span className={s.visualMuted}>dari setiap rekomendasi.</span>
+            </p>
 
-          <div className={s.stepsWrap}>
-            <span className={s.thread} aria-hidden="true" />
-            <ol className={s.steps}>
-              <li className={s.step}>
-                <span className={`${s.stepCircle} ${s.stepDone}`} aria-hidden="true">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M5 12.5 9.5 17 19 7.5" />
-                  </svg>
-                </span>
-                <span className={s.stepTextDone}>Beli minimal 1 produk SAMAQU</span>
-              </li>
-              <li className={s.step}>
-                <span className={`${s.stepCircle} ${s.stepCurrent}`} aria-hidden="true">
-                  02
-                </span>
-                <span className={s.stepTitleRow}>
-                  <span className={s.stepTextActive}>Isi formulir pendaftaran</span>
-                  <span className={s.hereBadge}>Kamu di sini</span>
-                </span>
-              </li>
-              <li className={s.step}>
-                <span className={s.stepCircle} aria-hidden="true">
-                  03
-                </span>
-                <span className={s.stepTextTodo}>Verifikasi &amp; persetujuan admin</span>
-              </li>
-              <li className={s.step}>
-                <span className={s.stepCircle} aria-hidden="true">
-                  04
-                </span>
-                <span className={s.stepTextTodo}>Bagikan link, raih komisi</span>
-              </li>
-            </ol>
+            <div className={s.stepsWrap}>
+              <span className={s.thread} aria-hidden="true" />
+              <ol className={s.steps}>
+                <li className={s.step}>
+                  <span className={`${s.stepCircle} ${s.stepDone}`} aria-hidden="true">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M5 12.5 9.5 17 19 7.5" />
+                    </svg>
+                  </span>
+                  <span className={s.stepTextDone}>Beli minimal 1 produk SAMAQU</span>
+                </li>
+                <li className={s.step}>
+                  <span className={`${s.stepCircle} ${s.stepCurrent}`} aria-hidden="true">
+                    02
+                  </span>
+                  <span className={s.stepTitleRow}>
+                    <span className={s.stepTextActive}>Isi formulir pendaftaran</span>
+                    <span className={s.hereBadge}>Kamu di sini</span>
+                  </span>
+                </li>
+                <li className={s.step}>
+                  <span className={s.stepCircle} aria-hidden="true">
+                    03
+                  </span>
+                  <span className={s.stepTextTodo}>Verifikasi &amp; persetujuan admin</span>
+                </li>
+                <li className={s.step}>
+                  <span className={s.stepCircle} aria-hidden="true">
+                    04
+                  </span>
+                  <span className={s.stepTextTodo}>Bagikan link, raih komisi</span>
+                </li>
+              </ol>
+            </div>
           </div>
 
           <p className={s.asideFine}>
