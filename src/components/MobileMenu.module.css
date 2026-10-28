@@ -1,18 +1,26 @@
+/* Menu drawer mobile — ukuran compact supaya SEMUA isi muat satu layar tanpa scroll.
+   Yang diubah hanya ukuran & jarak; urutan, isi, ikon, dan warna tetap. */
+
 .nav {
   display: flex;
   width: 100%;
-  min-height: 100%;
+  min-height: 0;
+  flex: 1;
   flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
 }
 
+/* ── Kartu Create Your Price ── */
 .createCard {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-top: 22px;
-  padding: 16px 16px 16px 18px;
-  border-radius: 20px;
+  gap: 12px;
+  flex: none;
+  height: 56px;
+  padding: 0 14px;
+  border-radius: 16px;
   background: #0a0a0a;
   color: #ffffff;
   text-decoration: none;
@@ -23,23 +31,24 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 6px;
+  gap: 1px;
 }
 
 .createLabel {
   color: #9e9e9e;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.22em;
-  line-height: 1.4;
+  line-height: 1.2;
 }
 
 .createTitle {
   color: #ffffff;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
   letter-spacing: -0.03em;
-  line-height: 1.2;
+  line-height: 1.15;
+  white-space: nowrap;
 }
 
 .priceWord {
@@ -52,8 +61,8 @@
 
 .createArrow {
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   flex: none;
   place-items: center;
   border-radius: 50%;
@@ -63,14 +72,16 @@
 
 .createArrow svg {
   display: block;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
+/* ── Menu utama ── */
 .mainList {
   display: flex;
+  flex: none;
   flex-direction: column;
-  margin: 18px 0 0;
+  margin: 8px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -80,13 +91,14 @@
 }
 
 .mainLink {
-  display: block;
-  padding: 12px 0;
+  display: flex;
+  height: 44px;
+  align-items: center;
   color: #1a1a1a;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.03em;
-  line-height: 1.25;
+  line-height: 1;
   text-decoration: none;
   transition: color 0.35s;
 }
@@ -123,21 +135,23 @@
   animation-delay: 0.49s;
 }
 
+/* ── Grup Bantuan ── */
 .helpSection {
   display: flex;
+  flex: none;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 22px;
+  gap: 6px;
+  margin-top: 14px;
   animation: menuFadeUp 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.58s both;
 }
 
 .helpLabel {
-  margin: 0;
+  margin: 0 0 8px;
   color: #6b6b6b;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.22em;
-  line-height: 1.4;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 
@@ -149,16 +163,17 @@
 
 .helpLink {
   display: flex;
-  min-height: 44px;
+  height: 40px;
+  min-height: 40px;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
+  gap: 7px;
+  padding: 0 11px;
   border-radius: 12px;
   background: #f2f2f2;
   color: #111111;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.2;
   text-decoration: none;
   transition: background 0.2s;
 }
@@ -169,40 +184,42 @@
 
 .helpIcon {
   display: block;
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   flex: none;
 }
 
 .affiliateBox {
   display: flex;
   width: 100%;
-  min-height: 48px;
+  height: 46px;
+  min-height: 46px;
   align-items: center;
-  gap: 10px;
-  padding: 0 14px;
+  gap: 9px;
+  margin-top: 8px;
+  padding: 0 12px;
   border: 1px solid #e2e2e2;
   border-radius: 14px;
   background: #ffffff;
   color: #111111;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.2;
   text-decoration: none;
   transition: border-color 0.2s;
 }
 
 .affiliateIcon {
   display: block;
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   flex: none;
 }
 
 .affiliateArrow {
   display: grid;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   flex: none;
   place-items: center;
   margin-left: auto;
@@ -213,16 +230,18 @@
 
 .affiliateArrow svg {
   display: block;
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
 }
 
+/* ── Footer: toggle bahasa, Akun, tombol bawah ── */
 .bottom {
   display: flex;
+  flex: none;
   flex-direction: column;
-  gap: 12px;
-  margin-top: auto;
-  padding-top: 24px;
+  gap: 10px;
+  margin-top: 0;
+  padding-top: 12px;
   animation: menuFadeUp 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.66s both;
 }
 
@@ -230,21 +249,21 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
 }
 
 .langSwitch {
   display: inline-flex;
   align-items: center;
-  padding: 3px;
+  padding: 2px;
   border: 1px solid #e2e2e2;
   border-radius: 999px;
 }
 
 .langButton {
-  min-width: 46px;
+  min-width: 42px;
   height: 34px;
-  padding: 0 12px;
+  padding: 0 11px;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -264,42 +283,43 @@
 
 .accountLink {
   display: inline-flex;
-  min-height: 44px;
+  min-height: 34px;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   color: #111111;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   text-decoration: none;
 }
 
 .accountIcon {
   display: block;
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
 }
 
 .chatButton {
   display: flex;
   width: 100%;
-  min-height: 54px;
+  height: 48px;
+  min-height: 48px;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 9px;
   border-radius: 999px;
   background: #111111;
   color: #ffffff;
   font-size: 15px;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.2;
   text-decoration: none;
   transition: background 0.2s;
 }
 
 .chatIcon {
   display: block;
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
 }
 
 .nav :focus-visible {
@@ -367,33 +387,98 @@
   }
 }
 
-@media (max-height: 860px) {
+/* ── Layar pendek (tinggi < 700px): semua dirapatkan bertahap ── */
+@media (max-height: 699px) {
   .createCard {
-    margin-top: 16px;
-    padding: 14px;
-  }
-
-  .mainList {
-    margin-top: 12px;
+    height: 50px;
   }
 
   .mainLink {
-    padding: 9px 0;
-    font-size: 22px;
-  }
-
-  .helpSection {
-    gap: 10px;
-    margin-top: 16px;
+    height: 40px;
+    font-size: 18px;
   }
 
   .helpLink {
-    min-height: 42px;
+    height: 36px;
+    min-height: 36px;
+  }
+
+  .chatButton {
+    height: 44px;
+    min-height: 44px;
+  }
+}
+
+/* ── HP kecil (tinggi < 600px, mis. 360×640): dipadatkan lagi ±25% ── */
+@media (max-height: 599px) {
+  .createCard {
+    height: 46px;
+    border-radius: 14px;
+  }
+
+  .createTitle {
+    font-size: 16px;
+  }
+
+  .createArrow {
+    width: 30px;
+    height: 30px;
+  }
+
+  .mainList {
+    margin-top: 4px;
+  }
+
+  .mainLink {
+    height: 32px;
+    font-size: 17px;
+  }
+
+  .helpSection {
+    margin-top: 10px;
+    gap: 4px;
+  }
+
+  .helpLabel {
+    margin-bottom: 2px;
+  }
+
+  .helpGrid {
+    gap: 4px;
+  }
+
+  .helpLink {
+    height: 32px;
+    min-height: 32px;
+    padding: 0 9px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+
+  .affiliateBox {
+    height: 38px;
+    min-height: 38px;
+    margin-top: 4px;
+    border-radius: 12px;
+    font-size: 13px;
   }
 
   .bottom {
-    gap: 10px;
-    padding-top: 14px;
+    gap: 7px;
+    padding-top: 8px;
+  }
+
+  .langButton {
+    height: 30px;
+  }
+
+  .accountLink {
+    min-height: 30px;
+  }
+
+  .chatButton {
+    height: 40px;
+    min-height: 40px;
   }
 }
 

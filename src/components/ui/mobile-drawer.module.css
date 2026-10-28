@@ -4,12 +4,17 @@
   z-index: 9999;
 }
 
+/* Tinggi satu layar penuh, TANPA scroll. 100vh dulu sebagai fallback untuk browser yang
+   belum mengenal dvh, lalu ditimpa 100dvh (menyesuaikan toolbar browser mobile). */
 .content {
   display: flex;
   width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
   height: 100dvh;
   flex-direction: column;
-  padding: 18px 20px 24px;
+  justify-content: space-between;
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom, 0px));
   overflow: hidden;
   outline: none;
   background: #ffffff;
@@ -27,18 +32,20 @@
   animation: curtainOut 0.4s cubic-bezier(0.7, 0, 0.2, 1) both;
 }
 
+/* ── Header: logo + tombol close ── */
 .header {
   display: flex;
-  height: 48px;
-  flex: 0 0 48px;
+  height: 40px;
+  flex: 0 0 40px;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .title {
   margin: 0;
   color: #111111;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 800;
   letter-spacing: 0.14em;
   line-height: 1;
@@ -46,8 +53,8 @@
 
 .close {
   display: grid;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   flex: none;
   place-items: center;
   border: 1px solid #e2e2e2;
@@ -69,18 +76,35 @@
   outline-offset: 3px;
 }
 
+/* ── Konten tengah: mengambil sisa ruang, tidak boleh punya scrollbar ── */
 .body {
   display: flex;
   min-height: 0;
-  flex: 1;
-  overflow-y: auto;
+  flex: 1 1 auto;
+  overflow: hidden;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  padding-top: 14px;
+}
+
+.body::-webkit-scrollbar,
+.body::-webkit-scrollbar-track,
+.body::-webkit-scrollbar-thumb {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .body > * {
-  min-height: 100%;
+  min-height: 0;
   width: 100%;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .close:hover {
+    border-color: #cfcfcf;
+    background: #f2f2f2;
+  }
 }
 
 @keyframes curtainIn {
@@ -98,13 +122,6 @@
   }
   to {
     clip-path: inset(0 0 100% 0);
-  }
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .close:hover {
-    border-color: #cfcfcf;
-    background: #f2f2f2;
   }
 }
 

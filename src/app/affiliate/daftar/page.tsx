@@ -222,8 +222,9 @@ export default function AffiliateRegisterPage() {
                     strokeLinejoin="round"
                     aria-hidden="true"
                   >
-                    <path d="M6 7h12l-1 13H7L6 7z" />
-                    <path d="M9 7a3 3 0 0 1 6 0" />
+                    <path d="M6 7h12l-1.2 12.2a1 1 0 0 1-1 .8H8.2a1 1 0 0 1-1-.8L6 7z" />
+                    <path d="M9.2 7.2V6a2.8 2.8 0 0 1 5.6 0v1.2" />
+                    <path d="M9.5 11.5v4M14.5 11.5v4" />
                   </svg>
                 </span>
                 <p className={s.conditionText}>
