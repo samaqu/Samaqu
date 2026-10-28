@@ -47,6 +47,19 @@ function displayColor(color, group) {
 
 const TYPE_LABEL = { tukar_size: "Tukar Size", return: "Return" };
 
+/**
+ * Nomor pesanan itu pendek dan tidak berspasi (SMQ-…, CYO-…, atau nomor marketplace).
+ * Kolom ini memang juga bisa dipakai mencari NAMA / no. HP, jadi yang dianggap salah hanya
+ * teks panjang atau teks yang memuat tanda baca alamat (":", koma, baris baru) — pola tipikal
+ * blok identitas yang ditempel. Pencarian nama biasa tetap lolos tanpa peringatan.
+ */
+const looksLikeIdentityBlock = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  if (/[:\n]/.test(text)) return true;
+  return text.length > 40;
+};
+
 const STATUS = {
   diajukan: { label: "Diajukan", badge: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-900" },
   disetujui: { label: "Disetujui", badge: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-900" },
@@ -792,11 +805,14 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Kosongkan untuk nomor otomatis RTS-…"
+                maxLength={40}
+                placeholder="No. pesanan / referensi (maks. 40 karakter)"
                 className={`${inputClass} mt-2`}
               />
-              <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                Boleh nomor marketplace/IG sebagai referensi. Kosong = otomatis RTS-YYYYMMDD-NNNN.
+              <p className={`mt-1 text-[11px] font-semibold ${looksLikeIdentityBlock(query) ? "text-amber-700 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"}`}>
+                {looksLikeIdentityBlock(query)
+                  ? "Isi nomor pesanan saja (mis. SMQ-20261028-1234). Nama & alamat punya kolomnya sendiri di bawah."
+                  : "Boleh nomor marketplace/IG sebagai referensi. Kosong = otomatis RTS-YYYYMMDD-NNNN."}
               </p>
             </>
           ) : order ? (
@@ -831,6 +847,18 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
                     setPickerOpen(true);
                     setNotFound("");
                   }}
+                  onPaste={(event) => {
+                    // Tempel blok identitas (nama + alamat + WA) sangat mudah terjadi; bantu
+                    // ambil nomor pesanannya saja kalau polanya dikenali.
+                    const text = event.clipboardData?.getData("text") || "";
+                    const found = text.match(/\b(?:SMQ|CYO)-\d{8}-\d+\b/i);
+                    if (found) {
+                      event.preventDefault();
+                      setQuery(found[0].toUpperCase());
+                      setPickerOpen(true);
+                      setNotFound("");
+                    }
+                  }}
                   onFocus={() => setPickerOpen(true)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
@@ -842,6 +870,11 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
                   placeholder="Cari no. pesanan / nama / no. HP"
                   className={`${inputClass} pl-9`}
                 />
+                {looksLikeIdentityBlock(query) ? (
+                  <p className="mt-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                    Itu bukan nomor pesanan. Isi dengan nomor pesanan saja (mis. SMQ-20261028-1234) — nama dan alamat terisi otomatis.
+                  </p>
+                ) : null}
                 {orderBusy ? (
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-slate-400">Mencari…</span>
                 ) : null}

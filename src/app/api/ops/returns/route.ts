@@ -132,6 +132,24 @@ export async function POST(req: NextRequest) {
 
     if (!TYPE.includes(type)) return bad("Jenis retur tidak valid");
     if (!orderNumber && !manual) return bad("Nomor pesanan wajib diisi");
+
+    /**
+     * Nomor pesanan harus nomor, bukan blok identitas. Tanpa penjagaan ini, teks bebas
+     * (nama + alamat + WA) pernah tersimpan apa adanya di `returns.order_number` dan
+     * muncul di kolom "Pesanan" daftar retur.
+     */
+    const ORDER_NUMBER_MAX = 40;
+    /** Nomor pesanan/referensi: tanpa spasi, tanpa titik dua, tanpa teks alamat. */
+    const ORDER_NUMBER_RE = /^[A-Za-z0-9#][A-Za-z0-9._/#-]*$/;
+    if (orderNumber) {
+      if (orderNumber.length > ORDER_NUMBER_MAX) {
+        return bad(`Nomor pesanan maksimal ${ORDER_NUMBER_MAX} karakter. Tempel nomor pesanan saja (mis. SMQ-20261028-1234), bukan nama/alamat.`);
+      }
+      if (!ORDER_NUMBER_RE.test(orderNumber)) {
+        return bad("Nomor pesanan hanya boleh berisi huruf, angka, dan tanda - . _ / — bukan spasi, titik dua, atau teks alamat.");
+      }
+    }
+
     if (inputItems.length === 0) return bad("Pilih minimal satu produk");
     if (manual && !manualCustomerName) {
       return bad("Nama pelanggan wajib diisi");
