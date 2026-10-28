@@ -2,6 +2,7 @@
 
 import { useStoreSettings, getWhatsAppLink } from "@/lib/store-settings";
 import { useSafeTranslations } from "@/lib/safe-i18n";
+import s from "./Footer.module.css";
 
 function getNavLinks(t: (key: string) => string) {
   return [
@@ -9,11 +10,6 @@ function getNavLinks(t: (key: string) => string) {
     { href: "/testimoni", label: t("nav.testimoni") },
     { href: "/tentang-kami", label: t("nav.tentang") },
     { href: "/faq", label: t("nav.faq") },
-    {
-      href: "https://instagram.com/samaqu.id",
-      label: "Instagram",
-      external: true,
-    },
   ];
 }
 
@@ -35,132 +31,78 @@ export default function Footer() {
   const helpLinks = getHelpLinks(t);
 
   return (
-    <footer className="relative pt-12 sm:pt-20 pb-20 sm:pb-14 overflow-hidden" style={{ background: "#000" }}>
-      {/* Subtle noise overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-[0.03]"
-        style={{
-          backgroundImage:
-            "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E\")",
-          backgroundSize: "128px 128px",
-        }}
-        aria-hidden="true"
-      />
+    <footer className={s.footer}>
+      <div className={s.container}>
+        <div className={s.main}>
+          <div className={s.brandBlock}>
+            <img src="/logo.svg" alt="SAMAQU" className={s.logo} style={{ filter: "invert(1) brightness(0.9)" }} />
+            <p className={s.tagline}>{t("footer.tagline")}</p>
 
-      {/* Aksen garis atas */}
-      <div
-        className="absolute top-0 inset-x-0 h-px"
-        style={{
-          background:
-            "linear-gradient(90deg, transparent 5%, rgba(255,255,255,.18) 30%, rgba(255,255,255,.3) 50%, rgba(255,255,255,.18) 70%, transparent 95%)",
-        }}
-        aria-hidden="true"
-      />
-
-      <div className="relative max-w-[1200px] mx-auto px-5 sm:px-8">
-        {/* Multi-column grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 pb-8 sm:pb-10 border-b" style={{ borderColor: "rgba(0,0,0,.12)" }}>
-          {/* Column 1: Logo + Tagline */}
-          <div className="col-span-2 sm:col-span-2 lg:col-span-1">
-            <img
-              src="/logo.svg"
-              alt="SAMAQU"
-              className="h-8 sm:h-10 w-auto mb-3 sm:mb-4"
-              style={{ filter: "invert(1) brightness(0.9)" }}
-            />
-            <p
-              className="text-xs sm:text-sm max-w-xs leading-[1.75] font-ui"
-              style={{ color: "rgba(255,255,255,.75)" }}
-            >
-              {t("footer.tagline")}
-            </p>
-          </div>
-
-          {/* Column 2: Navigasi */}
-          <div>
-            <p className="text-[11px] tracking-[0.22em] uppercase font-ui font-semibold mb-3 sm:mb-4" style={{ color: "#ffffff" }}>
-              {t("footer.nav")}
-            </p>
-            <nav aria-label="Navigasi footer" className="flex flex-col gap-2 sm:gap-2.5">
-              {navLinks.map((link) => (
+            <div className={s.connect}>
+              <p className={s.heading}>{t("footer.connected")}</p>
+              <div className={s.socials}>
+                {instagramUrl && (
+                  <a
+                    href={instagramUrl}
+                    target="_blank"
+                    rel="noopener"
+                    aria-label="Instagram"
+                    className={s.social}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="2" y="2" width="20" height="20" rx="5" />
+                      <circle cx="12" cy="12" r="5" />
+                      <circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none" />
+                    </svg>
+                  </a>
+                )}
                 <a
-                  key={link.href}
-                  href={link.href}
-                  target={link.external ? "_blank" : undefined}
-                  rel={link.external ? "noopener" : undefined}
-                  className="text-[12px] sm:text-[13px] tracking-[0.12em] uppercase font-ui transition-colors duration-300 hover:text-white"
-                  style={{ color: "rgba(248,246,242,.7)" }}
-                >
-                  {link.label}
-                </a>
-              ))}
-            </nav>
-          </div>
-
-          {/* Column 3: Bantuan */}
-          <div>
-            <p className="text-[11px] tracking-[0.22em] uppercase font-ui font-semibold mb-3 sm:mb-4" style={{ color: "#ffffff" }}>
-              {t("footer.help")}
-            </p>
-            <nav aria-label="Bantuan footer" className="flex flex-col gap-2 sm:gap-2.5">
-              {helpLinks.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  className="text-[12px] sm:text-[13px] tracking-[0.12em] uppercase font-ui transition-colors duration-300 hover:text-white"
-                  style={{ color: "rgba(248,246,242,.7)" }}
-                >
-                  {link.label}
-                </a>
-              ))}
-            </nav>
-          </div>
-
-          {/* Column 4: Terhubung */}
-          <div>
-            <p className="text-[11px] tracking-[0.22em] uppercase font-ui font-semibold mb-3 sm:mb-4" style={{ color: "#ffffff" }}>
-              {t("footer.connected")}
-            </p>
-            <div className="flex items-center gap-3">
-              {instagramUrl && (
-                <a
-                  href={instagramUrl}
+                  href={getWhatsAppLink("Halo Admin SAMAQU, saya tertarik dengan koleksi Anda dan ingin bertanya soal pemesanan.")}
                   target="_blank"
                   rel="noopener"
-                  aria-label="Instagram"
-                  className="flex items-center justify-center w-10 h-10 rounded-full transition-colors duration-300 hover:text-white"
-                  style={{ color: "rgba(248,246,242,.7)" }}
+                  aria-label="WhatsApp Admin SAMAQU"
+                  className={s.social}
                 >
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="2" width="20" height="20" rx="5" />
-                    <circle cx="12" cy="12" r="5" />
-                    <circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none" />
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
+                    <path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1zm0 0a5 5 0 0 0 5 5m0 0a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1h1z" />
                   </svg>
                 </a>
-              )}
-              <a
-                href={getWhatsAppLink("Halo Admin SAMAQU, saya tertarik dengan koleksi Anda dan ingin bertanya soal pemesanan.")}
-                target="_blank"
-                rel="noopener"
-                aria-label="WhatsApp Admin SAMAQU"
-                className="flex items-center justify-center w-10 h-10 rounded-full transition-colors duration-300 hover:text-white"
-                style={{ color: "rgba(248,246,242,.7)" }}
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
-                  <path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1zm0 0a5 5 0 0 0 5 5m0 0a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1h1z" />
-                </svg>
-              </a>
+              </div>
             </div>
+          </div>
+
+          <div className={s.linkColumns}>
+            <nav aria-label="Navigasi footer" className={s.linkColumn}>
+              <p className={s.heading}>{t("footer.nav")}</p>
+              <ul className={s.links}>
+                {navLinks.map((link) => (
+                  <li key={link.href}>
+                    <a href={link.href} className={s.link}>
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+
+            <nav aria-label="Bantuan footer" className={s.linkColumn}>
+              <p className={s.heading}>{t("footer.help")}</p>
+              <ul className={s.links}>
+                {helpLinks.map((link) => (
+                  <li key={link.href}>
+                    <a href={link.href} className={s.link}>
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
           </div>
         </div>
 
-        {/* Copyright */}
-        <div
-          className="pt-5 sm:pt-8 text-[11px] sm:text-xs font-ui text-center"
-          style={{ color: "rgba(255,255,255,.45)" }}
-        >
-          <p>{t("footer.copyright")}</p>
+        <div className={s.bottom}>
+          <p className={s.copyright}>{t("footer.copyright")}</p>
         </div>
       </div>
     </footer>

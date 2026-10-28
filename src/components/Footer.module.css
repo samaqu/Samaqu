@@ -1,0 +1,191 @@
+.footer {
+  padding: 0;
+  border-top: 1px solid #242424;
+  background: #0a0a0a;
+  color: #ffffff;
+  font-family: var(--font-inter, "Inter"), "Inter", system-ui, sans-serif;
+}
+
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px calc(28px + env(safe-area-inset-bottom));
+}
+
+.main {
+  display: grid;
+  gap: 36px;
+}
+
+.brandBlock {
+  min-width: 0;
+}
+
+.logo {
+  display: block;
+  width: 112px;
+  height: auto;
+  margin-bottom: 18px;
+}
+
+.tagline {
+  max-width: 360px;
+  margin: 0;
+  color: #bdbdbd;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.connect {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.heading {
+  margin: 0;
+  color: #8c8c8c;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.socials {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.social {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid #2f2f2f;
+  border-radius: 50%;
+  color: #cfcfcf;
+  text-decoration: none;
+  transition: color 0.2s, border-color 0.2s, transform 0.2s;
+}
+
+.social svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+.linkColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.linkColumn {
+  min-width: 0;
+}
+
+.linkColumn .heading {
+  margin-bottom: 14px;
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.link {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  color: #cfcfcf;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-decoration: none;
+  transition: color 0.2s, transform 0.2s;
+}
+
+.bottom {
+  margin-top: 36px;
+  padding-top: 20px;
+  border-top: 1px solid #242424;
+}
+
+.copyright {
+  margin: 0;
+  color: #7e7e7e;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.footer :focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .link:hover {
+    color: #ffffff;
+    transform: translateX(2px);
+  }
+
+  .social:hover {
+    border-color: #ffffff;
+    color: #ffffff;
+    transform: translateY(-2px);
+  }
+}
+
+@media (min-width: 900px) {
+  .container {
+    padding: 56px 32px calc(32px + env(safe-area-inset-bottom));
+  }
+
+  .main {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 72px;
+    align-items: start;
+  }
+
+  .logo {
+    width: 126px;
+  }
+
+  .connect {
+    margin-top: 34px;
+  }
+
+  .linkColumns {
+    gap: 56px;
+  }
+
+  .linkColumn .heading {
+    margin-bottom: 18px;
+  }
+
+  .bottom {
+    margin-top: 44px;
+    padding-top: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .social,
+  .link {
+    transition: none;
+  }
+
+  .social:hover,
+  .link:hover {
+    transform: none;
+  }
+}

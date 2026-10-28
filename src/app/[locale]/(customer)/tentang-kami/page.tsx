@@ -1,260 +1,432 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import { ShieldCheck, Scissors, Ruler, MessageCircle } from "lucide-react";
-import Breadcrumb from "@/components/Breadcrumb";
+import Link from "next/link";
+import Image from "next/image";
+import { HandHeartIcon } from "@phosphor-icons/react/dist/csr/HandHeart";
+import Footer from "@/components/Footer";
 import { getWhatsAppLink } from "@/lib/store-settings";
 import { useSafeTranslations } from "@/lib/safe-i18n";
+import s from "./tentang-kami.module.css";
 
-const headerVariants = {
-  hidden: { opacity: 0, y: 18 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" as const } },
-};
-
-function useCountUp(target: number, duration = 1800) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const counted = useRef(false);
-
-  useEffect(() => {
-    if (!ref.current || counted.current) return;
-    const el = ref.current;
-    const io = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && !counted.current) {
-        counted.current = true;
-        const start = performance.now();
-        const step = (now: number) => {
-          const p = Math.min((now - start) / duration, 1);
-          const eased = 1 - Math.pow(1 - p, 3);
-          el.textContent = Math.floor(eased * target).toLocaleString("id-ID");
-          if (p < 1) requestAnimationFrame(step);
-          else el.textContent = target.toLocaleString("id-ID");
-        };
-        requestAnimationFrame(step);
-        io.disconnect();
-      }
-    }, { threshold: 0.5 });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [target, duration]);
-
-  return ref;
+function FabricIcon() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7 13h25v25H7Z" />
+      <path d="M12 18h15v15H12Z" strokeDasharray="4 4" />
+      <path d="m33 16 9-9" />
+      <ellipse cx="40" cy="9" rx="2.5" ry="1.5" transform="rotate(-45 40 9)" />
+    </svg>
+  );
 }
 
-function StatNumber({ target, suffix = "" }: { target: number; suffix?: string }) {
-  const ref = useCountUp(target);
-  return <span ref={ref}>0</span>;
+function FeatherIcon() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M40 7C25 8 14 18 10 38c-1 4 0 5 1 5 19-3 29-16 30-31 0-2 0-3-1-5Z" />
+      <path d="m10 42 20-20M24 21c-4 0-8 2-11 5M29 26c0 4-1 8-4 11" />
+    </svg>
+  );
 }
+
+function PriceTagIcon() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 6h16a4 4 0 0 1 4 4v13a4 4 0 0 1-1.2 2.8L24.8 40a3.5 3.5 0 0 1-5 0L5.6 25.8A4 4 0 0 1 4.4 23V10a4 4 0 0 1 4-4Z" />
+      <circle cx="15" cy="14" r="2.5" />
+      <path d="M19 25h21" strokeDasharray="4 4" />
+    </svg>
+  );
+}
+
+const OFFER_ICONS = [FabricIcon, FeatherIcon, PriceTagIcon];
 
 export default function TentangKamiPage() {
   const t = useSafeTranslations("tentangKami");
+  const heroTitle = `${t("heroTitleLead")} ${t("heroTitleAccent")}`;
+  const peopleTags = [t("peopleTag1"), t("peopleTag2"), t("peopleTag3")];
+  const offerTags = [t("offerTag1"), t("offerTag2"), t("offerTag3")];
 
   return (
-    <section className="min-h-screen" style={{ background: "var(--cream)" }}>
-      {/* ═══ HERO ═══ */}
-      <div className="relative overflow-hidden" style={{ background: "var(--espresso)" }}>
-        <img src="/images/about/f2d1d803-2825-410f-a01e-5e125e8d2208.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" />
-        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,.8), rgba(0,0,0,.7), #000000)" }} />
-        <div className="absolute top-24 right-8 w-40 h-40 rounded-full border opacity-20 hidden md:block" style={{ borderColor: "#ffffff" }} />
-        <div className="absolute bottom-16 left-10 w-24 h-24 rounded-full border opacity-15 hidden md:block" style={{ borderColor: "#ffffff" }} />
+    <>
+      <main className={s.root}>
+        <section className={`${s.hero} ${s.onDark}`}>
+          <div className={s.wrap}>
+            <nav aria-label={t("breadcrumbLabel")} className={s.crumbs}>
+              <Link href="/">{t("breadcrumbHome")}</Link>
+              <span aria-hidden="true">/</span>
+              <span aria-current="page">{t("breadcrumbCurrent")}</span>
+            </nav>
 
-        <div className="relative pt-28 sm:pt-32 lg:pt-36 pb-16 sm:pb-24 lg:pb-32">
-          <div className="max-w-4xl mx-auto px-5 sm:px-8 text-center">
-            <motion.div initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}>
-              <motion.p variants={headerVariants} className="text-[11px] sm:text-[12px] tracking-[0.32em] uppercase mb-4 sm:mb-6 font-ui font-medium" style={{ color: "#ffffff" }}>
-                {t("heroEyebrow")}
-              </motion.p>
-              <motion.h1 variants={headerVariants} className="text-[2rem] sm:text-5xl lg:text-6xl font-semibold leading-[1.05] tracking-tight" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--cream)" }}>
-                {t("heroTitle1")} <em style={{ color: "#ffffff" }}>{t("heroTitle2")}</em> {t("heroTitle3")}
-              </motion.h1>
-              <motion.div variants={headerVariants} className="mx-auto my-6 sm:my-8 h-px w-16" style={{ background: "#ffffff" }} />
-              <motion.p variants={headerVariants} className="text-sm sm:text-base lg:text-lg leading-relaxed max-w-2xl mx-auto font-ui" style={{ color: "rgba(255,255,255,.8)" }}>
-                {t("heroDesc")}
-              </motion.p>
-            </motion.div>
-          </div>
-        </div>
-      </div>
-
-      {/* ═══ BREADCRUMB ═══ */}
-      <div className="max-w-[1200px] mx-auto px-5 sm:px-8 lg:px-14" style={{ paddingTop: "40px", paddingBottom: "32px" }}>
-        <Breadcrumb />
-      </div>
-
-      {/* ═══ CERITA BRAND ═══ */}
-      <div className="py-16 sm:py-24 lg:py-28">
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-14">
-          <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
-            {/* Image */}
-            <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, margin: "-10%" }} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}>
-              <div className="relative">
-                <img src="/images/about/897ae4e0-8b7a-43e9-843b-3b5b27141774.png" alt="Kandora premium SAMAQU" className="w-full h-[320px] sm:h-[420px] md:h-[560px] object-cover rounded-2xl" style={{ boxShadow: "0 25px 50px -12px rgba(0,0,0,.25)" }} />
-                <div className="absolute -bottom-4 -right-3 sm:-right-6 px-5 py-4 rounded-xl shadow-2xl max-w-[200px] hidden sm:block" style={{ background: "var(--espresso)", color: "var(--cream)" }}>
-                  <p className="text-3xl" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "#ffffff" }}>Est.</p>
-                  <p className="text-sm font-ui" style={{ color: "rgba(255,255,255,.8)" }}>{t("badge")}</p>
+            <div className={s.heroGrid}>
+              <div className={s.heroCopy}>
+                <p className={s.eyebrow}>{t("heroEyebrow")}</p>
+                <h1 className={s.heroTitle} aria-label={heroTitle}>
+                  <span>{t("heroTitleLead")}</span>
+                  <span className={s.heroTitleAccent}>{t("heroTitleAccent")}</span>
+                </h1>
+                <div className={s.heroStory}>
+                  <p>{t("heroP1")}</p>
+                  <p>{t("heroP2")}</p>
                 </div>
               </div>
-            </motion.div>
 
-            {/* Text */}
-            <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, margin: "-10%" }} transition={{ duration: 0.7, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}>
-              <p className="text-[11px] sm:text-[12px] tracking-[0.32em] uppercase font-ui font-semibold mb-4" style={{ color: "var(--gold)" }}>{t("storyEyebrow")}</p>
-              <h2 className="text-[1.6rem] sm:text-4xl lg:text-5xl font-semibold leading-tight mb-5 sm:mb-6" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--espresso)" }}>
-                {t("storyTitle")}
+              <div className={s.heroArtFrame}>
+                <img
+                  className={s.heroImage}
+                  src="https://res.cloudinary.com/kq5d3al5/image/upload/v1793159114/samaqu-hero-thobe-1000.webp"
+                  alt={t("heroArtAlt")}
+                  width={1000}
+                  height={1250}
+                  fetchPriority="high"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="cerita" className={s.journeySection}>
+          <div className={s.journeyContainer}>
+            <div className={`${s.reveal} ${s.journeyIntro}`}>
+              <p className={s.journeyEyebrow}>
+                <span className={s.journeyEyebrowLine} aria-hidden="true" />
+                <span>{t("chapterJourney")}</span>
+              </p>
+              <h2 className={s.journeyTitle}>
+                <span>{t("journeyTitleLead")} </span>
+                <span className={s.journeyTitleAccent}>{t("journeyTitleAccent")}</span>
               </h2>
-              <div className="h-px w-16 mb-6 sm:mb-8" style={{ background: "#ffffff" }} />
-              <div className="space-y-4 sm:space-y-5 font-ui text-sm sm:text-base lg:text-lg leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                <p dangerouslySetInnerHTML={{ __html: t.markup("storyP1", { span: (chunks: string) => `<span>${chunks}</span>` }) }} />
-                <p>{t("storyP2")}</p>
-              </div>
-              <div className="grid grid-cols-3 gap-3 sm:gap-4 mt-8 sm:mt-10">
-                {[
-                  { title: t("value1Title"), sub: t("value1Sub") },
-                  { title: t("value2Title"), sub: t("value2Sub") },
-                  { title: t("value3Title"), sub: t("value3Sub") },
-                ].map((v, i) => (
-                  <div key={v.title} className={`text-center sm:text-left ${i === 1 ? "border-x px-2 sm:px-3" : ""}`} style={{ borderColor: "rgba(0,0,0,.2)" }}>
-                    <p className="text-base sm:text-lg" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--espresso)" }}>{v.title}</p>
-                    <p className="text-[10px] sm:text-xs font-ui mt-1" style={{ color: "var(--stone)" }}>{v.sub}</p>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </div>
+              <p className={s.journeyParagraph}>{t("journeyDesc")}</p>
+            </div>
 
-      {/* ═══ STATISTIK ═══ */}
-      <div className="py-16 sm:py-24" style={{ background: "var(--espresso)" }}>
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-14">
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }} className="text-center max-w-2xl mx-auto mb-10 sm:mb-14">
-            <p className="text-[11px] sm:text-[12px] tracking-[0.32em] uppercase font-ui font-semibold mb-4" style={{ color: "#ffffff" }}>{t("statEyebrow")}</p>
-            <h2 className="text-[1.6rem] sm:text-4xl lg:text-5xl font-semibold" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--cream)" }}>
-              {t("statTitle")}
-            </h2>
-          </motion.div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 md:gap-6">
-            {[
-              { value: 6, label: t("stat1Label"), suffix: "" },
-              { value: 12, label: t("stat2Label"), suffix: "+" },
-              { value: 2500, label: t("stat3Label"), suffix: "+" },
-              { value: 5, label: t("stat4Label"), suffix: "" },
-            ].map((stat, i) => (
-              <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.1 }} className="text-center">
-                <p className="text-[2.2rem] sm:text-5xl lg:text-6xl font-semibold" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "#ffffff" }}>
-                  <StatNumber target={stat.value} />{stat.suffix}
-                </p>
-                <div className="mx-auto my-3 sm:my-4 h-px w-12 sm:w-16" style={{ background: "#ffffff" }} />
-                <p className="text-[13px] sm:text-base font-ui" style={{ color: "rgba(255,255,255,.8)" }}>{stat.label}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ═══ KOMITMEN KUALITAS ═══ */}
-      <div className="py-16 sm:py-24 lg:py-28" style={{ background: "var(--bg-secondary, #efe8e0)" }}>
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-14">
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }} className="text-center max-w-2xl mx-auto mb-12 sm:mb-16">
-            <p className="text-[11px] sm:text-[12px] tracking-[0.32em] uppercase font-ui font-semibold mb-4" style={{ color: "var(--gold)" }}>{t("commitEyebrow")}</p>
-            <h2 className="text-[1.6rem] sm:text-4xl lg:text-5xl font-semibold mb-4 sm:mb-5" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--espresso)" }}>
-              {t("commitTitle")}
-            </h2>
-            <p className="font-ui text-sm sm:text-base lg:text-lg leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-              {t("commitDesc")}
-            </p>
-          </motion.div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
-            {[
-              { icon: ShieldCheck, title: t("commit1Title"), desc: t("commit1Desc") },
-              { icon: Scissors, title: t("commit2Title"), desc: t("commit2Desc") },
-              { icon: Ruler, title: t("commit3Title"), desc: t("commit3Desc") },
-              { icon: MessageCircle, title: t("commit4Title"), desc: t("commit4Desc") },
-            ].map((item, i) => (
-              <motion.div key={item.title} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.1 }}
-                className="qcard rounded-2xl p-6 sm:p-8" style={{ background: "var(--cream)", border: "1px solid rgba(0,0,0,.2)" }}>
-                <div className="qicon inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full mb-5 sm:mb-6" style={{ border: "1px solid rgba(0,0,0,.4)", color: "var(--gold)" }}>
-                  <item.icon size={22} strokeWidth={1.4} />
+            <ol className={`${s.reveal} ${s.steps}`}>
+              <li className={s.step}>
+                <div className={s.markerColumn} aria-hidden="true">
+                  <span className={s.questionMarker}>?</span>
+                  <svg className={s.stitchLine} width="2" height="100%" aria-hidden="true">
+                    <line
+                      x1="1"
+                      y1="0"
+                      x2="1"
+                      y2="100%"
+                      stroke="#8A8A8A"
+                      strokeWidth="2"
+                      strokeDasharray="8 6"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <svg className={s.needle} width="12" height="30" viewBox="0 0 12 30" fill="none" aria-hidden="true">
+                    <ellipse cx="6" cy="5" rx="2.2" ry="4.2" stroke="#5C5C5C" strokeWidth="1.6" />
+                    <path d="M6 9.2V29" stroke="#5C5C5C" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
                 </div>
-                <h3 className="text-xl sm:text-2xl mb-2 sm:mb-3" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--espresso)" }}>{item.title}</h3>
-                <p className="font-ui text-[13px] sm:text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>{item.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </div>
+                <div className={s.questionContent}>
+                  <p className={s.stepLabel}>{t("questionLabel")}</p>
+                  <blockquote className={s.questionQuote}>{t("questionText")}</blockquote>
+                </div>
+              </li>
 
-      {/* ═══ GALERI ═══ */}
-      <div className="py-16 sm:py-24 lg:py-28">
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-14">
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }} className="text-center max-w-2xl mx-auto mb-10 sm:mb-14">
-            <p className="text-[11px] sm:text-[12px] tracking-[0.32em] uppercase font-ui font-semibold mb-4" style={{ color: "var(--gold)" }}>{t("galleryEyebrow")}</p>
-            <h2 className="text-[1.6rem] sm:text-4xl lg:text-5xl font-semibold" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--espresso)" }}>
-              {t("galleryTitle")}
-            </h2>
-          </motion.div>
-          <div className="grid grid-cols-2 md:grid-cols-4 md:grid-rows-2 gap-3 sm:gap-4 md:gap-5">
-            <div className="gallery-item relative overflow-hidden rounded-xl sm:rounded-2xl md:row-span-2 col-span-2 h-52 sm:h-64 md:h-auto md:min-h-[400px]">
-              <img src="/images/about/70cc4d03-6ed5-41e3-a349-9525e031af58.png" alt="Detail busana SAMAQU" className="w-full h-full object-cover transition-transform duration-700 hover:scale-105" />
-              <div className="gallery-overlay absolute inset-0 flex items-end p-4 sm:p-5" style={{ background: "linear-gradient(to top, rgba(0,0,0,.7), transparent)" }}>
-                <span className="text-base sm:text-xl" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--cream)" }}>{t("galleryOverlay")}</span>
+              <li className={s.step}>
+                <div className={s.markerColumn} aria-hidden="true">
+                  <span className={`${s.questionMarker} ${s.answerMarker}`}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path
+                        d="m5 12 4.5 4.5L19 7"
+                        stroke="#FFFFFF"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                </div>
+                <div className={s.answerCard}>
+                  <p className={s.answerTitle}>
+                    {t("answerTitleLead")}{" "}
+                    <span className={s.answerHighlight}>{t("answerTitleAccent")}</span>
+                  </p>
+                  <p className={s.answerDesc}>{t("answerDesc")}</p>
+                </div>
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <section className={s.peopleSection}>
+          <div className={s.peopleContainer}>
+            <div className={`${s.reveal} ${s.peopleIntro}`}>
+              <div className={s.peopleHeading}>
+                <p className={s.peopleEyebrow}>
+                  <span className={s.peopleEyebrowLine} aria-hidden="true" />
+                  <span>{t("chapterPeople")}</span>
+                </p>
+                <h2 className={s.peopleTitle}>
+                  <span>{t("peopleTitleLead")} </span>
+                  <span className={s.peopleTitleAccent}>{t("peopleTitleAccent")}</span>
+                </h2>
+              </div>
+              <p className={s.peopleLead}>{t("peopleDesc1")}</p>
+            </div>
+
+            <div className={`${s.reveal} ${s.peopleStepsWrap}`}>
+              <span className={s.peopleStitchDesktop} aria-hidden="true">
+                <svg width="100%" height="2" aria-hidden="true">
+                  <line
+                    x1="0"
+                    y1="1"
+                    x2="100%"
+                    y2="1"
+                    stroke="#8A8A8A"
+                    strokeWidth="2"
+                    strokeDasharray="8 6"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
+              <span className={s.peopleStitchMobile} aria-hidden="true">
+                <svg width="2" height="100%" aria-hidden="true">
+                  <line
+                    x1="1"
+                    y1="0"
+                    x2="1"
+                    y2="100%"
+                    stroke="#8A8A8A"
+                    strokeWidth="2"
+                    strokeDasharray="7 5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
+              <ol className={s.peopleSteps}>
+                {peopleTags.map((tag, index) => (
+                  <li key={tag} className={s.peopleStep}>
+                    <span className={s.peopleStepNumber}>0{index + 1}</span>
+                    <span className={s.peopleStepWord}>{tag}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            <div className={`${s.reveal} ${s.peopleStatements}`}>
+              <p className={`${s.peopleStatement} ${s.peopleStatementSoft}`}>{t("peopleDesc2")}</p>
+              <p className={`${s.peopleStatement} ${s.peopleStatementBold}`}>{t("peopleClosing")}</p>
+            </div>
+
+            <div className={`${s.reveal} ${s.peopleClosingBar}`}>
+              <p className={s.peopleClosingText}>{t("peopleBridge")}</p>
+              <svg className={s.threadNeedle} viewBox="0 0 180 24" fill="none" aria-hidden="true">
+                <path
+                  d="M2 12H110"
+                  stroke="#8A8A8A"
+                  strokeWidth="2"
+                  strokeDasharray="8 6"
+                  strokeLinecap="round"
+                />
+                <ellipse cx="116" cy="12" rx="7" ry="3" stroke="#FFFFFF" strokeWidth="1.8" />
+                <path d="M123 12H176" stroke="#FFFFFF" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </div>
+          </div>
+        </section>
+
+        <section className={s.offerSection}>
+          <div className={s.offerContainer}>
+            <div className={`${s.reveal} ${s.offerIntro}`}>
+              <div className={s.offerHeading}>
+                <p className={s.offerEyebrow}>
+                  <span className={s.offerEyebrowLine} aria-hidden="true" />
+                  <span>{t("chapterOffer")}</span>
+                </p>
+                <h2 className={s.offerTitle}>
+                  <span>{t("offerTitleLead")} </span>
+                  <span className={s.offerTitleAccent}>{t("offerTitleAccent")}</span>
+                </h2>
+              </div>
+              <p className={s.offerSub}>{t("offerSub")}</p>
+            </div>
+
+            <div className={`${s.reveal} ${s.offerCards}`}>
+              {offerTags.map((tag, index) => {
+                const Icon = OFFER_ICONS[index];
+                return (
+                  <article key={tag} className={s.offerCardOuter}>
+                    <div className={s.offerCardInner}>
+                      <div className={s.offerCardTop}>
+                        <span className={s.offerCardIcon}>
+                          <Icon />
+                        </span>
+                        <span className={s.offerCardNumber}>0{index + 1}</span>
+                      </div>
+                      <h3 className={s.offerCardLabel}>{tag}</h3>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className={`${s.reveal} ${s.offerClosing}`}>
+              <p className={s.offerClosingText}>
+                <span>{t("offerClosingLead")}</span>{" "}
+                <span className={s.offerClosingAccent}>{t("offerClosingAccent")}</span>
+              </p>
+              <svg className={s.offerThreadNeedle} viewBox="0 0 180 24" fill="none" aria-hidden="true">
+                <path
+                  d="M2 12H110"
+                  stroke="#8A8A8A"
+                  strokeWidth="2"
+                  strokeDasharray="8 6"
+                  strokeLinecap="round"
+                />
+                <ellipse cx="116" cy="12" rx="7" ry="3" stroke="#111111" strokeWidth="1.8" />
+                <path d="M123 12H176" stroke="#111111" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </div>
+          </div>
+        </section>
+
+        <section className={s.section}>
+          <div className={s.wrap}>
+            <div className={`${s.reveal} ${s.impact}`}>
+              <div className={s.impactCopy}>
+                <p className={s.eyebrow}>{t("chapterImpact")}</p>
+                <h2 className={s.impactTitle}>{t("impactTitle")}</h2>
+                <p className={s.impactDesc}>{t("impactDesc")}</p>
+              </div>
+              <div className={s.impactIcon} aria-hidden="true">
+                <HandHeartIcon weight="thin" />
               </div>
             </div>
-            {[
-              { src: "/images/about/83338354-398a-40b8-88d6-0c39aab362e0.png", alt: "Koleksi SAMAQU" },
-              { src: "/images/about/7e9438fb-090c-4499-864e-60ee00729172.png", alt: "Produk SAMAQU" },
-              { src: "/images/about/ed8b38f2-83b0-4bf4-b061-f5d9bab20bf4.png", alt: "Tekstur kain SAMAQU" },
-              { src: "/images/about/42ec219d-db51-471a-9c70-242750655b4a.png", alt: "Busana SAMAQU" },
-            ].map((img, i) => (
-              <div key={i} className="gallery-item relative overflow-hidden rounded-xl sm:rounded-2xl h-36 sm:h-44 md:h-auto md:min-h-[180px]">
-                <img src={img.src} alt={img.alt} className="w-full h-full object-cover transition-transform duration-700 hover:scale-105" />
-                <div className="gallery-overlay absolute inset-0" style={{ background: "rgba(0,0,0,.15)" }} />
-              </div>
-            ))}
           </div>
-        </div>
-      </div>
+        </section>
 
-      {/* ═══ CTA ═══ */}
-      <div className="relative py-20 sm:py-28 lg:py-32 overflow-hidden" style={{ background: "var(--espresso)" }}>
-        <img src="/images/about/10ac37bd-e678-47b3-a673-daedffd0de5a.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />
-        <div className="absolute inset-0" style={{ background: "rgba(0,0,0,.8)" }} />
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-56 h-56 rounded-full border opacity-10 hidden md:block" style={{ borderColor: "#ffffff" }} />
-
-        <div className="relative max-w-3xl mx-auto px-5 sm:px-8 text-center">
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
-            <p className="text-[11px] sm:text-[12px] tracking-[0.32em] uppercase font-ui font-semibold mb-5 sm:mb-6" style={{ color: "#ffffff" }}>{t("ctaEyebrow")}</p>
-            <h2 className="text-[1.8rem] sm:text-4xl lg:text-5xl xl:text-6xl font-semibold leading-tight mb-5 sm:mb-6" style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "var(--cream)" }}>
-              {t("ctaTitle")}
-            </h2>
-            <p className="text-sm sm:text-base lg:text-lg leading-relaxed max-w-xl mx-auto mb-8 sm:mb-10 font-ui" style={{ color: "rgba(255,255,255,.8)" }}>
-              {t("ctaDesc")}
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-              <a href="/katalog" className="inline-flex items-center gap-2 rounded-full px-7 sm:px-8 py-3 sm:py-3.5 text-[12px] sm:text-sm tracking-[0.08em] uppercase font-ui font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg w-full sm:w-auto justify-center" style={{ background: "#ffffff", color: "#000000", boxShadow: "0 8px 28px -8px rgba(0,0,0,.4)" }}>
-                {t("ctaBtn1")}
-                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 9h10M10 4l5 5-5 5" /></svg>
-              </a>
-              <a href={getWhatsAppLink(t("ctaBtn2"))} className="inline-flex items-center gap-2 rounded-full px-7 sm:px-8 py-3 sm:py-3.5 text-[12px] sm:text-sm tracking-[0.08em] uppercase font-ui font-semibold transition-all duration-300 w-full sm:w-auto justify-center" style={{ border: "1px solid rgba(255,255,255,.25)", color: "var(--cream)" }}>
-                {t("ctaBtn2")}
-              </a>
+        <section className={s.growthSection}>
+          <div className={s.growthContainer}>
+            <div className={`${s.reveal} ${s.growthIntro}`}>
+              <p className={s.growthEyebrow}>
+                <span className={s.growthEyebrowLine} aria-hidden="true" />
+                <span>{t("chapterGrowth")}</span>
+              </p>
+              <div className={s.growthBox}>
+                <p className={s.growthParagraph}>{t("growthP1")}</p>
+                <span className={s.growthStitch} aria-hidden="true">
+                  <svg className={s.growthStitchVertical} width="2" height="100%" aria-hidden="true">
+                    <line
+                      x1="1"
+                      y1="0"
+                      x2="1"
+                      y2="100%"
+                      stroke="#8A8A8A"
+                      strokeWidth="2"
+                      strokeDasharray="8 6"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <svg className={s.growthStitchHorizontal} width="100%" height="2" aria-hidden="true">
+                    <line
+                      x1="0"
+                      y1="1"
+                      x2="100%"
+                      y2="1"
+                      stroke="#8A8A8A"
+                      strokeWidth="2"
+                      strokeDasharray="7 5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </span>
+                <p className={s.growthParagraph}>{t("growthP2")}</p>
+              </div>
             </div>
-          </motion.div>
-        </div>
-      </div>
 
-      <style jsx global>{`
-        .qcard { transition: transform .4s ease, box-shadow .4s ease, border-color .4s ease; }
-        @media (hover: hover) {
-          .qcard:hover { transform: translateY(-6px); box-shadow: 0 24px 48px -28px rgba(0,0,0,.35); border-color: var(--gold); }
-          .qcard:hover .qicon { color: #fff; background: var(--gold); border-color: var(--gold); }
-        }
-        .qicon { transition: all .4s ease; }
-        .gallery-overlay { opacity: 0; transition: opacity .4s ease; }
-        @media (hover: hover) {
-          .gallery-item:hover .gallery-overlay { opacity: 1; }
-        }
-      `}</style>
-    </section>
+            <h2 className={`${s.reveal} ${s.growthTitle}`}>
+              <span>{t("growthTitleLead")}</span>{" "}
+              <span className={s.growthHighlight}>{t("growthTitleHighlight")}</span>{" "}
+              <span>{t("growthTitleTail")}</span>
+            </h2>
+
+            <div className={`${s.reveal} ${s.growthFoot}`}>
+              <svg className={s.growthVisual} viewBox="0 0 300 64" fill="none" aria-hidden="true">
+                <path
+                  d="M0 58H300"
+                  stroke="#8A8A8A"
+                  strokeWidth="2"
+                  strokeDasharray="8 6"
+                  strokeLinecap="round"
+                />
+                <circle cx="18" cy="55" r="3" fill="#BDBDBD" />
+                <circle cx="50" cy="53" r="5" fill="#A8A8A8" />
+                <circle cx="88" cy="50" r="8" fill="#8A8A8A" />
+                <circle cx="133" cy="46" r="12" fill="#6B6B6B" />
+                <circle cx="187" cy="41" r="17" fill="#3D3D3D" />
+                <circle cx="255" cy="30" r="28" fill="#111111" />
+                <path
+                  d="m244 30 7 7 14-15"
+                  stroke="#FFFFFF"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <p className={s.growthClosing}>{t("growthP4")}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className={s.ctaSection}>
+          <div className={s.ctaContainer}>
+            <div className={`${s.reveal} ${s.ctaGrid}`}>
+              <div className={s.ctaPanel}>
+                <p className={s.ctaPill}>
+                  <span className={s.ctaPillDot} aria-hidden="true" />
+                  {t("closingLead")}
+                </p>
+                <h2 className={s.ctaTitle}>
+                  <span>{t("closingTitleLead")} </span>
+                  <span className={s.ctaTitleAccent}>{t("closingTitleAccent")}</span>
+                </h2>
+              </div>
+
+              <div className={s.ctaRight}>
+                <div className={s.ctaImageFrame}>
+                  <Image
+                    src="/images/samaqu-cta-thobe-1000.webp"
+                    alt={t("ctaImageAlt")}
+                    fill
+                    sizes="(min-width: 768px) 42vw, 100vw"
+                    className={s.ctaImage}
+                  />
+                  <p className={s.ctaImageCaption}>{t("closingLabel")}</p>
+                </div>
+
+                <div className={s.ctaActions}>
+                  <Link href="/katalog" className={`${s.ctaAction} ${s.ctaActionWhite}`}>
+                    <span className={`${s.ctaActionIcon} ${s.ctaActionIconDark}`} aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M7 17 17 7M9 7h8v8" />
+                      </svg>
+                    </span>
+                    <span className={s.ctaActionLabel}>{t("ctaCatalog")}</span>
+                  </Link>
+
+                  <a
+                    href={getWhatsAppLink(t("ctaWhatsapp"))}
+                    target="_blank"
+                    rel="noopener"
+                    className={`${s.ctaAction} ${s.ctaActionGray}`}
+                  >
+                    <span className={`${s.ctaActionIcon} ${s.ctaActionIconLight}`} aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 5h14v10H10l-5 4V5Z" />
+                      </svg>
+                    </span>
+                    <span className={s.ctaActionLabel}>{t("ctaAdmin")}</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+      <Footer />
+    </>
   );
 }
