@@ -229,6 +229,9 @@ function StatCard({ item, index, showCls }) {
         display: "flex",
         flexDirection: "column",
         gap: 8,
+        /* Ukuran angka mengikuti LEBAR KARTU (bukan viewport), jadi "Rp332,2 rb" di kartu
+           kelima tidak pernah terpotong berapa pun lebar sidebar/layar. */
+        containerType: "inline-size",
       }}
     >
       <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: dark ? "rgba(255,255,255,0.65)" : COLORS.muted }}>
@@ -237,12 +240,17 @@ function StatCard({ item, index, showCls }) {
       <p
         className="tabular-nums"
         style={{
-          fontSize: 34,
+          /* cqw = persen lebar kartu itu sendiri (kartu ini container query). Koefisien 17%
+             dipilih setelah dihitung dengan teks terpanjang ("Rp332,2 rb"): muat sampai
+             lebar kartu ~150px, lalu tetap dibatasi 34px di kartu lebar. */
+          fontSize: "clamp(17px, 17cqw, 34px)",
           fontWeight: 800,
           lineHeight: 1.05,
           letterSpacing: "-0.02em",
           color: dark ? "#FFFFFF" : COLORS.ink,
           whiteSpace: "nowrap",
+          overflow: "visible",
+          maxWidth: "100%",
         }}
       >
         {item.format === "short" ? <CountValue target={item.value} format="short" /> : item.format === "percent" ? <CountValue target={item.value} format="percent" /> : <CountValue target={item.value} />}
