@@ -375,10 +375,11 @@ function buildInsights({ rows, totals, leaks }) {
 /* ───────────────────────── kontribusi per sumber ───────────────────────── */
 
 function ContributionBars({ metrics, showCls }) {
+  const bySource = metrics.bySource || {};
   const rows = [
-    { key: "leads", label: "Leads", total: metrics.totals.total, values: (s) => metrics.bySource[s].leads },
-    { key: "closing", label: "Closing", total: metrics.totals.closing, values: (s) => metrics.bySource[s].closing },
-    { key: "nominal", label: "Nominal", total: metrics.totals.nominal, values: (s) => metrics.bySource[s].nominal },
+    { key: "leads", label: "Leads", total: metrics.totals.total, values: (s) => bySource[s]?.leads || 0 },
+    { key: "closing", label: "Closing", total: metrics.totals.closing, values: (s) => bySource[s]?.closing || 0 },
+    { key: "nominal", label: "Nominal", total: metrics.totals.nominal, values: (s) => bySource[s]?.nominal || 0 },
   ];
 
   return (
@@ -802,13 +803,13 @@ function DailyChart({ days = [], filter, onFilter, showCls }) {
               {nfmt(hoverDay.total)} leads · {nfmt(hoverDay.closing)} closing
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              {SOURCES.filter((s) => (hoverDay.bySource[s] || 0) > 0).map((s) => (
+              {SOURCES.filter((s) => (hoverDay.bySource?.[s] || 0) > 0).map((s) => (
                 <span key={s} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: "#374151", fontWeight: 600 }}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                     <SourceDot source={s} size={7} />
                     {SOURCE_LABEL[s]}
                   </span>
-                  <span className="tabular-nums">{nfmt(hoverDay.bySource[s])}</span>
+                  <span className="tabular-nums">{nfmt(hoverDay.bySource?.[s])}</span>
                 </span>
               ))}
             </div>
@@ -850,7 +851,10 @@ function PeakPill({ x, y, width, day, visible, reduce }) {
 
 function DailyTable({ days = [], totals }) {
   const [expanded, setExpanded] = useState(false);
-  const newestFirst = useMemo(() => [...(days || [])].reverse(), [days]);
+  const newestFirst = useMemo(
+    () => [...(days || [])].reverse().map((d) => ({ ...d, bySource: d?.bySource || {} })),
+    [days],
+  );
   const visible = expanded ? newestFirst : newestFirst.slice(0, 7);
   const th = { fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted, padding: "10px 12px", whiteSpace: "nowrap" };
   const td = { fontSize: 14, padding: "10px 12px", borderTop: `1px solid ${COLORS.rowLine}`, whiteSpace: "nowrap" };
@@ -880,7 +884,7 @@ function DailyTable({ days = [], totals }) {
               <tr key={d.tanggal} className="lt-row">
                 <td style={{ ...td, fontWeight: 700, color: COLORS.ink }}>{formatTanggalPendek(d.tanggal)}</td>
                 {SOURCES.map((s) => (
-                  <td key={s} style={{ ...td, textAlign: "right", color: d.bySource[s] ? "#374151" : COLORS.faint }}>{nfmt(d.bySource[s])}</td>
+                  <td key={s} style={{ ...td, textAlign: "right", color: d.bySource?.[s] ? "#374151" : COLORS.faint }}>{nfmt(d.bySource?.[s])}</td>
                 ))}
                 <td style={{ ...td, textAlign: "right", fontWeight: 800, color: COLORS.ink }}>{nfmt(d.total)}</td>
                 <td style={{ ...td, textAlign: "right", fontWeight: 700 }}>{nfmt(d.closing)}</td>
@@ -891,7 +895,7 @@ function DailyTable({ days = [], totals }) {
               <td style={{ ...td, fontWeight: 800, color: COLORS.ink, borderTop: `2px solid ${COLORS.border}` }}>Total</td>
               {SOURCES.map((s) => (
                 <td key={s} style={{ ...td, textAlign: "right", fontWeight: 800, color: COLORS.ink, borderTop: `2px solid ${COLORS.border}` }}>
-                  {nfmt(totals.bySource[s].leads)}
+                  {nfmt(totals?.bySource?.[s]?.leads)}
                 </td>
               ))}
               <td style={{ ...td, textAlign: "right", fontWeight: 800, color: COLORS.ink, borderTop: `2px solid ${COLORS.border}` }}>{nfmt(totals.total)}</td>
@@ -1079,7 +1083,7 @@ export default function LaporanLeads() {
   const sourceRows = useMemo(
     () =>
       SOURCES.map((s) => {
-        const row = bySource[s];
+        const row = bySource[s] || { leads: 0, closing: 0, nominal: 0 };
         return {
           source: s,
           leads: row.leads,
@@ -1413,7 +1417,7 @@ export default function LaporanLeads() {
             {/* REKAP HARIAN */}
             <Panel delay={0.18}>
               <PanelHead title="Rekap harian" subtitle={`${monthKeyLabel(monthKey)} · ${dayCount} hari`} />
-              <DailyTable days={allDays} totals={totals} />
+              <DailyTable days={allDays} totals={{ ...totals, bySource }} />
             </Panel>
 
             <p style={{ margin: 0, fontSize: 11, color: COLORS.faint, fontWeight: 600 }}>
