@@ -2,26 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import AuthLayout from "@/components/affiliate/AuthLayout";
 import { useToast } from "@/components/affiliate/ui";
 import { portalBaseFor, portalPath } from "@/lib/affiliate/site";
+import s from "./register.module.css";
 
 /**
  * Pendaftaran akun affiliate — port 1:1 dari mockup "pages/daftar".
  * Data tetap dikirim ke /api/affiliate/register (akun auth + profil affiliate
  * berstatus "menunggu" sampai disetujui admin).
  */
-function Arrow() {
-  return (
-    <span className="arr" aria-hidden="true">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-        <path d="M5 12h14M13 6l6 6-6 6" />
-      </svg>
-    </span>
-  );
-}
-
-const CHANNELS = ["Instagram", "Facebook", "TikTok", "WhatsApp", "Lainnya"] as const;
+const CHANNELS = ["Instagram", "TikTok", "WhatsApp", "Facebook", "Lainnya"] as const;
 
 export default function AffiliateRegisterPage() {
   // Prefix path portal: "" di affiliate.samaqu.id, "/affiliate" di domain utama.
@@ -125,292 +115,476 @@ export default function AffiliateRegisterPage() {
   };
 
   return (
-    <AuthLayout
-      backHref={portalPath(base)}
-      eyebrow="Langkah 2 dari 4 · Pendaftaran"
-      title="Daftar jadi affiliate"
-      subtitle={
-        <>
-          Sudah punya akun?{" "}
-          <Link
-            href={portalPath(base, "login")}
-            className="font-semibold text-black underline underline-offset-4"
-          >
-            Masuk
-          </Link>
-        </>
-      }
-      topSlot={
-        <div className="stepper mb-8" aria-hidden="true">
-          <span className="on" />
-          <span className="on" />
-          <span />
-          <span />
-        </div>
-      }
-      visualImage="/affiliate/mockup/visual-cta.png"
-      visualImageAlt="Model mengenakan vest putih dan thobe cokelat SAMAQU"
-      visualPosition="50% 25%"
-      visualEyebrow="Gabung affiliate"
-      visualTitle={
-        <>
-          Rekomendasimu, <span className="serif font-normal">penghasilan tambahanmu.</span>
-        </>
-      }
-      visualList={[
-        "Beli minimal satu produk SAMAQU",
-        "Isi formulir pendaftaran ini",
-        "Tunggu verifikasi & persetujuan admin",
-        "Bagikan link referral, raih komisi",
-      ]}
-    >
-      {!success ? (
-        <div className="notice mt-8">
-          <svg
-            className="flex-none mt-0.5"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#000"
-            strokeWidth="1.8"
-            aria-hidden="true"
-          >
-            <path d="M6 7h12l-1 13H7L6 7z" />
-            <path d="M9 7a3 3 0 0 1 6 0" />
-          </svg>
-          <span>
-            <b>Syarat wajib:</b> kamu harus sudah membeli minimal satu produk SAMAQU. Belum beli?{" "}
-            <a
-              href="https://www.samaqu.id/id/katalog"
-              className="font-semibold underline underline-offset-4"
+    <div className="af-public">
+      <div className={s.layout}>
+        <aside className={`${s.aside} on-dark`}>
+          <div className={s.asideTop}>
+            <Link
+              href={portalPath(base)}
+              className={s.brand}
+              aria-label="SAMAQU, ke beranda"
             >
-              Lihat koleksi
-            </a>
-          </span>
-        </div>
-      ) : null}
-
-      {success ? (
-        <div className="success show mt-10">
-          <div className="w-14 h-14 rounded-full bg-black text-white flex items-center justify-center mb-6">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-              <path d="M5 12l5 5 9-10" />
-            </svg>
+              SAMAQU
+            </Link>
+            <Link href={portalPath(base)} className={s.back}>
+              ← Beranda
+            </Link>
           </div>
-          <h2 tabIndex={-1} className="display text-3xl sm:text-4xl">
-            Pendaftaranmu sudah kami terima.
-          </h2>
-          <p className="mt-3 leading-relaxed" style={{ color: "var(--c-text-2)" }}>
-            Tim SAMAQU akan memverifikasi data dan bukti pembelianmu. Kamu akan dihubungi
-            setelah akun disetujui dan aktif.
+
+          <span className={s.badge}>SAMAQU Affiliate Program</span>
+
+          <p className={s.visualTitle}>
+            Komisi hingga <span className={s.highlight}>20%</span>
+            <span className={s.visualMuted}>dari setiap rekomendasi.</span>
           </p>
-          <Link href={portalPath(base, "login")} className="btn btn-outline mt-6">
-            Masuk ke akun affiliate
-          </Link>
-        </div>
-      ) : (
-        <form
-          className="mt-8 grid gap-5"
-          noValidate
-          onSubmit={(e) => {
-            e.preventDefault();
-            submit();
-          }}
-        >
-          {err.form ? (
-            <div className="notice" role="alert" style={{ background: "#fef2f2", color: "#b42318" }}>
-              {err.form}
-            </div>
-          ) : null}
 
-          <div className="field">
-            <label htmlFor="d-nama">Nama lengkap</label>
-            <input
-              id="d-nama"
-              className="input"
-              placeholder="Nama sesuai identitas"
-              autoComplete="name"
-              value={fullName}
-              aria-invalid={Boolean(err.name)}
-              onChange={(e) => setFullName(e.target.value)}
-            />
-            <span className="err" aria-live="polite">{err.name || ""}</span>
+          <div className={s.stepsWrap}>
+            <span className={s.thread} aria-hidden="true" />
+            <ol className={s.steps}>
+              <li className={s.step}>
+                <span className={`${s.stepCircle} ${s.stepDone}`} aria-hidden="true">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M5 12.5 9.5 17 19 7.5" />
+                  </svg>
+                </span>
+                <span className={s.stepTextDone}>Beli minimal 1 produk SAMAQU</span>
+              </li>
+              <li className={s.step}>
+                <span className={`${s.stepCircle} ${s.stepCurrent}`} aria-hidden="true">
+                  02
+                </span>
+                <span className={s.stepTitleRow}>
+                  <span className={s.stepTextActive}>Isi formulir pendaftaran</span>
+                  <span className={s.hereBadge}>Kamu di sini</span>
+                </span>
+              </li>
+              <li className={s.step}>
+                <span className={s.stepCircle} aria-hidden="true">
+                  03
+                </span>
+                <span className={s.stepTextTodo}>Verifikasi &amp; persetujuan admin</span>
+              </li>
+              <li className={s.step}>
+                <span className={s.stepCircle} aria-hidden="true">
+                  04
+                </span>
+                <span className={s.stepTextTodo}>Bagikan link, raih komisi</span>
+              </li>
+            </ol>
           </div>
 
-          <div className="grid gap-5">
-            <div className="field">
-              <label htmlFor="d-email">Email</label>
-              <input
-                id="d-email"
-                type="email"
-                className="input"
-                placeholder="nama@email.com"
-                autoComplete="email"
-                value={email}
-                aria-invalid={Boolean(err.email)}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              <span className="err" aria-live="polite">{err.email || ""}</span>
-            </div>
-            <div className="field">
-              <label htmlFor="d-wa">No. WhatsApp</label>
-              <input
-                id="d-wa"
-                type="tel"
-                className="input"
-                placeholder="08xxxxxxxxxx"
-                autoComplete="tel"
-                value={phone}
-                aria-invalid={Boolean(err.phone)}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-              <span className="err" aria-live="polite">{err.phone || ""}</span>
-            </div>
-          </div>
+          <p className={s.asideFine}>
+            Gratis daftar · Tanpa stok · Cair ke rekening sendiri
+          </p>
 
-          <div className="field">
-            <label htmlFor="d-order">Nomor pesanan SAMAQU</label>
-            <input
-              id="d-order"
-              className="input"
-              placeholder="Contoh: SMQ-000000"
-              value={orderNumber}
-              aria-invalid={Boolean(err.order)}
-              onChange={(e) => setOrderNumber(e.target.value)}
-            />
-            <span className="text-xs" style={{ color: "var(--c-muted)" }}>
-              Dipakai admin untuk memverifikasi syarat pembelian.
-            </span>
-            <span className="err" aria-live="polite">{err.order || ""}</span>
+          <div className={s.mobileProgress}>
+            <div className={s.progress} role="img" aria-label="Langkah 2 dari 4">
+              <span className={`${s.progressSeg} ${s.progressDone}`} />
+              <span className={`${s.progressSeg} ${s.progressCurrent}`} />
+              <span className={s.progressSeg} />
+              <span className={s.progressSeg} />
+            </div>
+            <p className={s.progressText}>Langkah 2 dari 4 · Isi formulir pendaftaran</p>
           </div>
+        </aside>
 
-          <div className="grid gap-5">
-            <div className="field">
-              <label htmlFor="d-channel">Channel utama</label>
-              <select
-                id="d-channel"
-                className="input"
-                value={channel}
-                aria-invalid={Boolean(err.channel)}
-                onChange={(e) => setChannel(e.target.value)}
+        <main className={s.formPanel}>
+          <div className={s.formShell}>
+            <div className={s.formHead}>
+              <h1 className={s.title}>Daftar jadi affiliate</h1>
+              <p className={s.subtitle}>
+                Sudah punya akun?{" "}
+                <Link href={portalPath(base, "login")} className={s.loginLink}>
+                  Masuk
+                </Link>
+              </p>
+            </div>
+
+            {!success ? (
+              <div className={s.condition}>
+                <span className={s.conditionIcon} aria-hidden="true">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 7h12l-1 13H7L6 7z" />
+                    <path d="M9 7a3 3 0 0 1 6 0" />
+                  </svg>
+                </span>
+                <p className={s.conditionText}>
+                  <b>Syarat: sudah beli minimal 1 produk SAMAQU.</b>{" "}
+                  <a
+                    href="https://www.samaqu.id/id/katalog"
+                    className={s.collectionLink}
+                  >
+                    Belum beli? Lihat koleksi
+                  </a>
+                </p>
+              </div>
+            ) : null}
+
+            {success ? (
+              <div className={s.success}>
+                <div className={s.successIcon} aria-hidden="true">
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M5 12l5 5 9-10" />
+                  </svg>
+                </div>
+                <h2 tabIndex={-1} className={s.successTitle}>
+                  Pendaftaranmu sudah kami terima.
+                </h2>
+                <p className={s.successText}>
+                  Tim SAMAQU akan memverifikasi data dan bukti pembelianmu. Kamu akan dihubungi
+                  setelah akun disetujui dan aktif.
+                </p>
+                <Link href={portalPath(base, "login")} className={s.successButton}>
+                  Masuk ke akun affiliate
+                </Link>
+              </div>
+            ) : (
+              <form
+                className={s.form}
+                noValidate
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  submit();
+                }}
               >
-                <option value="">Pilih channel</option>
-                {CHANNELS.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <span className="err" aria-live="polite">{err.channel || ""}</span>
-            </div>
-            <div className="field">
-              <label htmlFor="d-handle">Username / link akun</label>
-              <input
-                id="d-handle"
-                className="input"
-                placeholder="@namakamu atau https://..."
-                value={handle}
-                aria-invalid={Boolean(err.handle)}
-                onChange={(e) => setHandle(e.target.value)}
-              />
-              <span className="text-xs" style={{ color: "var(--c-muted)" }}>
-                Supaya admin bisa melihat channel yang kamu pakai.
-              </span>
-              <span className="err" aria-live="polite">{err.handle || ""}</span>
-            </div>
+                {err.form ? (
+                  <div className={s.formError} role="alert">
+                    {err.form}
+                  </div>
+                ) : null}
+
+                <div className={s.group}>
+                  <div className={s.groupHead}>
+                    <span className={s.groupNum} aria-hidden="true">
+                      01
+                    </span>
+                    <span className={s.groupLabel}>DATA DIRI</span>
+                  </div>
+
+                  <div className={s.field}>
+                    <label htmlFor="d-nama" className={s.label}>
+                      Nama lengkap
+                    </label>
+                    <input
+                      id="d-nama"
+                      className={s.input}
+                      placeholder="Nama sesuai identitas"
+                      autoComplete="name"
+                      value={fullName}
+                      aria-invalid={Boolean(err.name)}
+                      aria-describedby="d-nama-err"
+                      onChange={(e) => setFullName(e.target.value)}
+                    />
+                    <span id="d-nama-err" className={s.error} aria-live="polite">
+                      {err.name || ""}
+                    </span>
+                  </div>
+
+                  <div className={s.twoCols}>
+                    <div className={s.field}>
+                      <label htmlFor="d-email" className={s.label}>
+                        Email
+                      </label>
+                      <input
+                        id="d-email"
+                        type="email"
+                        className={s.input}
+                        placeholder="nama@email.com"
+                        autoComplete="email"
+                        value={email}
+                        aria-invalid={Boolean(err.email)}
+                        aria-describedby="d-email-err"
+                        onChange={(e) => setEmail(e.target.value)}
+                      />
+                      <span id="d-email-err" className={s.error} aria-live="polite">
+                        {err.email || ""}
+                      </span>
+                    </div>
+
+                    <div className={s.field}>
+                      <label htmlFor="d-wa" className={s.label}>
+                        No. WhatsApp
+                      </label>
+                      <input
+                        id="d-wa"
+                        type="tel"
+                        className={s.input}
+                        placeholder="08xxxxxxxxxx"
+                        autoComplete="tel"
+                        value={phone}
+                        aria-invalid={Boolean(err.phone)}
+                        aria-describedby="d-wa-err"
+                        onChange={(e) => setPhone(e.target.value)}
+                      />
+                      <span id="d-wa-err" className={s.error} aria-live="polite">
+                        {err.phone || ""}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={s.group}>
+                  <div className={s.groupHead}>
+                    <span className={s.groupNum} aria-hidden="true">
+                      02
+                    </span>
+                    <span className={s.groupLabel}>VERIFIKASI PEMBELIAN</span>
+                  </div>
+
+                  <div className={s.field}>
+                    <label htmlFor="d-order" className={s.label}>
+                      Nomor pesanan SAMAQU
+                    </label>
+                    <input
+                      id="d-order"
+                      className={s.input}
+                      placeholder="Lihat di invoice pesananmu"
+                      value={orderNumber}
+                      aria-invalid={Boolean(err.order)}
+                      aria-describedby="d-order-hint d-order-err"
+                      onChange={(e) => setOrderNumber(e.target.value)}
+                    />
+                    <p id="d-order-hint" className={s.hint}>
+                      Dipakai admin untuk mengecek syarat pembelian.
+                    </p>
+                    <span id="d-order-err" className={s.error} aria-live="polite">
+                      {err.order || ""}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={s.group}>
+                  <div className={s.groupHead}>
+                    <span className={s.groupNum} aria-hidden="true">
+                      03
+                    </span>
+                    <span className={s.groupLabel}>CHANNEL PROMOSI</span>
+                  </div>
+
+                  <fieldset
+                    className={s.chipsField}
+                    aria-invalid={Boolean(err.channel)}
+                    aria-describedby="d-channel-err"
+                  >
+                    <legend className={s.legend}>
+                      Di mana kamu paling sering share?
+                    </legend>
+                    <div className={s.chips}>
+                      {CHANNELS.map((c) => {
+                        const id = `d-channel-${c.toLowerCase()}`;
+                        return (
+                          <label
+                            key={c}
+                            htmlFor={id}
+                            className={`${s.chip} ${channel === c ? s.chipActive : ""}`}
+                          >
+                            <input
+                              id={id}
+                              type="radio"
+                              name="d-channel"
+                              value={c}
+                              checked={channel === c}
+                              onChange={(e) => setChannel(e.target.value)}
+                              aria-invalid={Boolean(err.channel)}
+                              aria-describedby="d-channel-err"
+                              className={s.radio}
+                            />
+                            {c}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <span id="d-channel-err" className={s.error} aria-live="polite">
+                      {err.channel || ""}
+                    </span>
+                  </fieldset>
+
+                  {channel === "Lainnya" ? (
+                    <div className={s.field}>
+                      <label htmlFor="d-channel-other" className={s.label}>
+                        Sebutkan channel-nya
+                      </label>
+                      <input
+                        id="d-channel-other"
+                        className={s.input}
+                        placeholder="Contoh: Podcast, Blog, Telegram"
+                        value={channelOther}
+                        aria-invalid={Boolean(err.channelOther)}
+                        aria-describedby="d-channel-other-err"
+                        onChange={(e) => setChannelOther(e.target.value)}
+                      />
+                      <span id="d-channel-other-err" className={s.error} aria-live="polite">
+                        {err.channelOther || ""}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  <div className={s.field}>
+                    <label htmlFor="d-handle" className={s.label}>
+                      Username atau link akun
+                    </label>
+                    <input
+                      id="d-handle"
+                      className={s.input}
+                      placeholder="@username atau link profil"
+                      value={handle}
+                      aria-invalid={Boolean(err.handle)}
+                      aria-describedby="d-handle-hint d-handle-err"
+                      onChange={(e) => setHandle(e.target.value)}
+                    />
+                    <p id="d-handle-hint" className={s.hint}>
+                      Supaya admin bisa melihat channel yang kamu pakai.
+                    </p>
+                    <span id="d-handle-err" className={s.error} aria-live="polite">
+                      {err.handle || ""}
+                    </span>
+                  </div>
+
+                  <div className={s.field}>
+                    <div className={s.labelRow}>
+                      <label htmlFor="d-content" className={s.label}>
+                        Ceritakan sedikit tentang kontenmu
+                      </label>
+                      <span className={s.optional}>Opsional</span>
+                    </div>
+                    <textarea
+                      id="d-content"
+                      className={`${s.input} ${s.textarea}`}
+                      rows={4}
+                      maxLength={600}
+                      placeholder="Contoh: konten outfit harian dan tips padu padan thobe untuk pria."
+                      value={contentNote}
+                      aria-invalid={Boolean(err.content)}
+                      aria-describedby="d-content-err"
+                      onChange={(e) => setContentNote(e.target.value)}
+                    />
+                    <span className={s.counter}>{contentNote.length}/600</span>
+                    <span id="d-content-err" className={s.error} aria-live="polite">
+                      {err.content || ""}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={s.group}>
+                  <div className={s.groupHead}>
+                    <span className={s.groupNum} aria-hidden="true">
+                      04
+                    </span>
+                    <span className={s.groupLabel}>BUAT AKUN</span>
+                  </div>
+
+                  <div className={s.field}>
+                    <label htmlFor="d-pw" className={s.label}>
+                      Kata sandi
+                    </label>
+                    <div className={s.pwWrap}>
+                      <input
+                        id="d-pw"
+                        type={show ? "text" : "password"}
+                        className={`${s.input} ${s.pwInput}`}
+                        placeholder="Minimal 8 karakter"
+                        autoComplete="new-password"
+                        value={password}
+                        aria-invalid={Boolean(err.pw)}
+                        aria-describedby="d-pw-err"
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className={s.pwToggle}
+                        aria-pressed={show}
+                        onClick={() => setShow((v) => !v)}
+                      >
+                        {show ? "Sembunyikan" : "Lihat"}
+                      </button>
+                    </div>
+                    <span id="d-pw-err" className={s.error} aria-live="polite">
+                      {err.pw || ""}
+                    </span>
+                  </div>
+
+                  <div className={s.field}>
+                    <label className={s.tos} htmlFor="d-agree">
+                      <input
+                        id="d-agree"
+                        type="checkbox"
+                        className={s.tosInput}
+                        checked={tos}
+                        aria-invalid={Boolean(err.tos)}
+                        aria-describedby="d-agree-err"
+                        onChange={(e) => setTos(e.target.checked)}
+                      />
+                      <span className={s.tosText}>
+                        Saya menyetujui{" "}
+                        <Link
+                          href={portalPath(base, "syarat-ketentuan")}
+                          target="_blank"
+                          rel="noopener"
+                          className={s.tosLink}
+                        >
+                          syarat &amp; ketentuan
+                        </Link>{" "}
+                        program SAMAQU Affiliate dan memahami akun akan aktif setelah disetujui
+                        admin.
+                      </span>
+                    </label>
+                    <span id="d-agree-err" className={s.error} aria-live="polite">
+                      {err.tos || ""}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={s.submitBlock}>
+                  <button type="submit" className={s.submit} disabled={busy}>
+                    {busy ? "Mengirim…" : "Ajukan Pendaftaran"}
+                    <svg
+                      className={s.submitArrow}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M5 12h14M13 6l6 6-6 6" />
+                    </svg>
+                  </button>
+                  <p className={s.formNote}>
+                    Pengajuan diproses tim SAMAQU. Kamu akan dikabari setelah disetujui.
+                  </p>
+                </div>
+              </form>
+            )}
           </div>
-
-          {channel === "Lainnya" ? (
-            <div className="field">
-              <label htmlFor="d-channel-other">Sebutkan channel-nya</label>
-              <input
-                id="d-channel-other"
-                className="input"
-                placeholder="Contoh: Podcast, Blog, Telegram"
-                value={channelOther}
-                aria-invalid={Boolean(err.channelOther)}
-                onChange={(e) => setChannelOther(e.target.value)}
-              />
-              <span className="err" aria-live="polite">{err.channelOther || ""}</span>
-            </div>
-          ) : null}
-
-          <div className="field">
-            <label htmlFor="d-content">
-              Ceritakan sedikit tentang kontenmu{" "}
-              <span className="font-normal" style={{ color: "var(--c-muted)" }}>
-                (opsional)
-              </span>
-            </label>
-            <textarea
-              id="d-content"
-              className="input resize-none"
-              rows={4}
-              maxLength={600}
-              placeholder="Contoh: konten outfit harian dan tips padu padan thobe untuk pria."
-              value={contentNote}
-              onChange={(e) => setContentNote(e.target.value)}
-            />
-            <span className="text-xs" style={{ color: "var(--c-muted)" }}>
-              {contentNote.length}/600
-            </span>
-            <span className="err" aria-live="polite">{err.content || ""}</span>
-          </div>
-
-          <div className="field">
-            <label htmlFor="d-pw">Buat kata sandi</label>
-            <div className="pw-wrap">
-              <input
-                id="d-pw"
-                type={show ? "text" : "password"}
-                className="input pr-28"
-                placeholder="Minimal 8 karakter"
-                autoComplete="new-password"
-                value={password}
-                aria-invalid={Boolean(err.pw)}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <button
-                type="button"
-                className="pw-toggle"
-                aria-pressed={show}
-                onClick={() => setShow((v) => !v)}
-              >
-                {show ? "Sembunyikan" : "Lihat"}
-              </button>
-            </div>
-            <span className="err" aria-live="polite">{err.pw || ""}</span>
-          </div>
-
-          <label className="check" htmlFor="d-agree">
-            <input
-              id="d-agree"
-              type="checkbox"
-              checked={tos}
-              aria-invalid={Boolean(err.tos)}
-              onChange={(e) => setTos(e.target.checked)}
-            />{" "}
-            <span>
-              Saya menyetujui{" "}
-              <Link
-                href={portalPath(base, "syarat-ketentuan")}
-                target="_blank"
-                rel="noopener"
-                className="font-semibold text-black underline underline-offset-4"
-              >
-                syarat &amp; ketentuan
-              </Link>{" "}
-              program SAMAQU Affiliate dan memahami akun akan aktif setelah disetujui admin.
-            </span>
-          </label>
-          <span className="err -mt-3" aria-live="polite">{err.tos || ""}</span>
-
-          <button type="submit" className="btn btn-primary w-full" disabled={busy}>
-            {busy ? "Mengirim…" : "Ajukan Pendaftaran"} <Arrow />
-          </button>
-        </form>
-      )}
-    </AuthLayout>
+        </main>
+      </div>
+    </div>
   );
 }
