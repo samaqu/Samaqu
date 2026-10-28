@@ -105,7 +105,7 @@ const currentMonthKey = () => {
 
 /* ───────────────────────── hook animasi ───────────────────────── */
 
-/** Ticker satu angka: 0 → nilai akhir 1,6 s ease-out (requestAnimationFrame). */
+/** Ticker satu angka: nilai lama → nilai akhir 1,6 s ease-out (requestAnimationFrame). */
 function useCountUp(target, duration = 1600) {
   const reduce = useReducedMotion();
   const [value, setValue] = useState(reduce ? Number(target) || 0 : 0);
@@ -130,11 +130,20 @@ function useCountUp(target, duration = 1600) {
       const eased = 1 - Math.pow(1 - t, 3);
       const next = from + (to - from) * eased;
       setValue(next);
+      fromRef.current = next;
       if (t < 1) raf = requestAnimationFrame(tick);
-      else fromRef.current = to;
+      else {
+        fromRef.current = to;
+        setValue(to);
+      }
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    // Ganti bulan di tengah animasi: nilai terakhir tetap jadi titik awal animasi berikutnya,
+    // jadi angkanya tidak melompat balik ke 0.
+    return () => {
+      cancelAnimationFrame(raf);
+      fromRef.current = from + (to - from) * Math.min(1, (performance.now() - startedAt) / duration);
+    };
   }, [target, duration, reduce]);
 
   return value;
@@ -216,6 +225,7 @@ function StatCard({ item, index, showCls }) {
         borderRadius: 20,
         padding: 20,
         minWidth: 0,
+        flex: 1,
         display: "flex",
         flexDirection: "column",
         gap: 8,
@@ -281,10 +291,11 @@ function buildInsights({ rows, totals, leaks }) {
   const out = [];
   const rate = totals.total ? (totals.closing / totals.total) * 100 : 0;
   const withClosing = rows.filter((r) => r.closing > 0);
+  const bestConvSource = withClosing.length > 0 ? [...withClosing].sort((a, b) => b.conversion - a.conversion || b.closing - a.closing)[0] : null;
 
   // ★ Sumber konversi tertinggi + kontribusinya ke closing & nominal.
-  if (withClosing.length > 0 && totals.closing > 0) {
-    const best = [...withClosing].sort((a, b) => b.conversion - a.conversion || b.closing - a.closing)[0];
+  if (bestConvSource && totals.closing > 0) {
+    const best = bestConvSource;
     const shareClosing = (best.closing / totals.closing) * 100;
     const shareNominal = totals.nominal ? (best.nominal / totals.nominal) * 100 : 0;
     out.push({
@@ -299,8 +310,10 @@ function buildInsights({ rows, totals, leaks }) {
   }
 
   // ! Sumber leads terbanyak tapi konversinya di bawah rata-rata.
-  const biggest = [...rows].sort((a, b) => b.leads - a.leads)[0];
-  if (biggest && biggest.leads > 0 && totals.total > 0 && biggest.conversion < rate) {
+  // Dicek dari seluruh sumber (bukan urutan konversi) dan dilewati bila sumber yang sama sudah
+  // muncul di insight biru, supaya dua kotak tidak membahas hal yang sama.
+  const biggest = [...rows].sort((a, b) => b.leads - a.leads || a.conversion - b.conversion)[0];
+  if (biggest && biggest.source !== bestConvSource?.source && biggest.leads > 0 && totals.total > 0 && biggest.conversion < rate) {
     out.push({
       tone: "amber",
       html: (
@@ -312,9 +325,10 @@ function buildInsights({ rows, totals, leaks }) {
     });
   }
 
-  // ↑ Rata-rata nilai per closing tertinggi.
+  // ↑ Rata-rata nilai per closing tertinggi (boleh sumber yang sama dengan insight biru: sudut
+  // pembahasannya berbeda — nominal per closing, bukan konversi).
   if (withClosing.length > 0) {
-    const bestAvg = [...withClosing].sort((a, b) => b.avg / 1 - a.avg / 1)[0];
+    const bestAvg = [...withClosing].sort((a, b) => b.avg - a.avg || b.closing - a.closing)[0];
     if (bestAvg.avg > 0) {
       out.push({
         tone: "green",
@@ -369,6 +383,7 @@ function ContributionBars({ metrics, showCls }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <Legend />
       {rows.map((row, rowIndex) => (
         <div key={row.key}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
@@ -392,15 +407,17 @@ function ContributionBars({ metrics, showCls }) {
                   style={{
                     flexGrow: raw,
                     flexBasis: 0,
+                    /** Segmen tetap kelihatan walau porsinya kecil (≥ 2px), tapi tidak menggeser skala. */
+                    minWidth: 2,
                     background: SOURCE_COLOR[s],
-                    minWidth: share >= 2 ? 0 : 3,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    overflow: "hidden",
                   }}
                 >
                   {share >= 12 ? (
-                    <span className="tabular-nums" style={{ fontSize: 10, fontWeight: 800, color: "#FFFFFF", padding: "0 4px" }}>
+                    <span className="tabular-nums" style={{ fontSize: 10, fontWeight: 800, color: "#FFFFFF", padding: "0 4px", whiteSpace: "nowrap" }}>
                       {pct(share)}
                     </span>
                   ) : null}
@@ -410,7 +427,6 @@ function ContributionBars({ metrics, showCls }) {
           </div>
         </div>
       ))}
-      <Legend />
     </div>
   );
 }
@@ -558,12 +574,13 @@ function DailyChart({ days, filter, onFilter, showCls }) {
     : "";
 
   const peakIndex = days.reduce((best, d, i) => (d.leads > (days[best]?.leads ?? -1) ? i : best), 0);
-  const peak = days[peakIndex];
+  const peak = days[peakIndex] && days[peakIndex].leads > 0 ? days[peakIndex] : null;
+  const hasLeads = days.some((d) => d.leads > 0);
   const ticks = [0, Math.round(maxLeads / 2), maxLeads];
   const labelEvery = Math.max(1, Math.ceil(days.length / 7));
   const hoverDay = hover !== null ? days[hover] : null;
 
-  const summary = `Grafik garis leads per hari ${days.length ? formatTanggalID(days[0].tanggal) : ""} sampai ${days.length ? formatTanggalID(days[days.length - 1].tanggal) : ""}. Total ${nfmt(days.reduce((s, d) => s + d.leads, 0))} leads, ${nfmt(days.reduce((s, d) => s + d.closing, 0))} closing. Hari tertinggi ${peak ? `${formatTanggalID(peak.tanggal)} dengan ${peak.leads} leads` : "-"}.`;
+  const summary = `Grafik garis leads per hari ${days.length ? formatTanggalID(days[0].tanggal) : ""} sampai ${days.length ? formatTanggalID(days[days.length - 1].tanggal) : ""}. Total ${nfmt(days.reduce((s, d) => s + d.leads, 0))} leads, ${nfmt(days.reduce((s, d) => s + d.closing, 0))} closing. ${peak ? `Hari tertinggi ${formatTanggalID(peak.tanggal)} dengan ${peak.leads} leads.` : "Belum ada leads pada periode ini."}`;
 
   return (
     <div>
@@ -598,8 +615,29 @@ function DailyChart({ days, filter, onFilter, showCls }) {
       </div>
 
       <div ref={wrapRef} style={{ position: "relative", width: "100%" }}>
+        {!hasLeads ? (
+          <div
+            style={{
+              height: CHART.height,
+              display: "grid",
+              placeItems: "center",
+              textAlign: "center",
+              borderRadius: 16,
+              background: "#FAFBFC",
+              border: `1px dashed ${COLORS.border}`,
+            }}
+          >
+            <div>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: COLORS.ink }}>
+                Belum ada leads pada periode ini
+              </p>
+              <p style={{ margin: "4px 0 0", fontSize: 12, color: COLORS.muted }}>
+                {filter === "all" ? "Pindah bulan atau tambahkan lead lewat menu Leads." : `Tidak ada lead dari ${SOURCE_LABEL[filter]} di bulan ini.`}
+              </p>
+            </div>
+          </div>
+        ) : (
         <svg
-          width="100%"
           height={CHART.height}
           viewBox={`0 0 ${width} ${CHART.height}`}
           role="img"
@@ -724,13 +762,14 @@ function DailyChart({ days, filter, onFilter, showCls }) {
             <PeakPill x={xAt(peakIndex)} y={yAt(peak.leads)} width={width} day={peak} visible={drawn} reduce={reduce} />
           ) : null}
         </svg>
+        )}
 
-        {hoverDay ? (
+        {hoverDay && hasLeads ? (
           <div
             style={{
               position: "absolute",
               left: Math.min(Math.max(xAt(hover) - 90, 0), Math.max(0, width - 190)),
-              top: 0,
+              top: 8,
               width: 180,
               background: "#FFFFFF",
               border: `1px solid ${COLORS.border}`,
@@ -928,6 +967,21 @@ export default function LaporanLeads() {
   const [start, end] = rangeOf(monthKey);
   const [prevStart, prevEnd] = rangeOf(prevKey);
 
+  /**
+   * Pembanding bulan sebelumnya dibuat apple-to-apple: bulan berjalan dibandingkan dengan
+   * rentang tanggal yang SAMA di bulan sebelumnya (1–13 Okt vs 1–13 Sep), bukan bulan penuh
+   * (yang selalu membuat bulan berjalan terlihat turun). Bulan yang sudah selesai memakai
+   * bulan penuh. Dihitung dalam WIB, sama seperti batas bulan laporan.
+   */
+  const todayKeyWib = currentMonthKey();
+  const isCurrentMonth = monthKey === currentMonthKey();
+  const dayOfMonthWib = Number(
+    new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(8, 10),
+  );
+  const prevCompareEnd = isCurrentMonth
+    ? `${prevKey}-${pad(Math.min(dayOfMonthWib, Number(prevEnd.slice(8, 10))))}`
+    : prevEnd;
+
   const { data: leads = [], isLoading, isFetching } = useQuery({
     queryKey: ["leads_report", start, end],
     queryFn: async () => {
@@ -938,9 +992,9 @@ export default function LaporanLeads() {
 
   // Pembanding bulan sebelumnya — dipakai chip "▲ X% vs [bulan]". Gagal/tidak ada data → chip disembunyikan.
   const { data: prevLeads = [] } = useQuery({
-    queryKey: ["leads_report_prev", prevStart, prevEnd],
+    queryKey: ["leads_report_prev", prevStart, prevCompareEnd],
     queryFn: async () => {
-      const page = await base44.entities.Lead.filter({ tanggal: { $gte: prevStart, $lte: prevEnd } }, { sort: "tanggal", limit: 1000 });
+      const page = await base44.entities.Lead.filter({ tanggal: { $gte: prevStart, $lte: prevCompareEnd } }, { sort: "tanggal", limit: 1000 });
       return page.items || [];
     },
     throwOnError: false,
@@ -961,7 +1015,7 @@ export default function LaporanLeads() {
     list.forEach((l) => {
       const tanggal = String(l.tanggal || "");
       if (!byDate[tanggal]) {
-        byDate[tanggal] = { tanggal, bySource: {}, total: 0, closing: 0, nominal: 0 };
+        byDate[tanggal] = { tanggal, bySource: {}, bySourceClosing: {}, total: 0, closing: 0, nominal: 0 };
       }
       const row = byDate[tanggal];
       const isClosing = l.status === "closing";
@@ -984,6 +1038,7 @@ export default function LaporanLeads() {
         if (SOURCES.includes(l.sumber)) {
           bySource[l.sumber].closing += 1;
           bySource[l.sumber].nominal += value;
+          row.bySourceClosing[l.sumber] = (row.bySourceClosing[l.sumber] || 0) + 1;
         }
       }
     });
@@ -999,7 +1054,9 @@ export default function LaporanLeads() {
   const rate = totals.total ? (totals.closing / totals.total) * 100 : 0;
   const avgPerClosing = totals.closing ? totals.nominal / totals.closing : 0;
   const dayCount = Number(end.slice(8, 10));
-  const perDay = dayCount ? totals.total / dayCount : 0;
+  /** Rata-rata per hari memakai hari yang SUDAH berjalan, bukan panjang bulan penuh. */
+  const elapsedDays = isCurrentMonth ? Math.min(dayOfMonthWib, dayCount) : dayCount;
+  const perDay = elapsedDays ? totals.total / elapsedDays : 0;
 
   /** Baris per sumber, urut konversi tertinggi (tabel & insight memakai urutan ini). */
   const sourceRows = useMemo(
@@ -1024,7 +1081,7 @@ export default function LaporanLeads() {
     const map = new Map(agg.days.map((d) => [d.tanggal, d]));
     return Array.from({ length: dayCount }, (_, i) => {
       const key = `${monthKey}-${pad(i + 1)}`;
-      return map.get(key) || { tanggal: key, bySource: {}, total: 0, closing: 0, nominal: 0 };
+      return map.get(key) || { tanggal: key, bySource: {}, bySourceClosing: {}, total: 0, closing: 0, nominal: 0 };
     });
   }, [agg.days, dayCount, monthKey]);
 
@@ -1033,20 +1090,27 @@ export default function LaporanLeads() {
     return allDays.map((d) => ({
       ...d,
       total: d.bySource[sourceFilter] || 0,
-      closing: sourceFilter === "Meta ads" && d.closingMetaAds !== undefined ? d.closingMetaAds : d.closing,
+      closing: d.bySourceClosing?.[sourceFilter] || 0,
     }));
   }, [allDays, sourceFilter]);
 
   const prevTotals = prevAgg.totals;
   const prevRate = prevTotals.total ? (prevTotals.closing / prevTotals.total) * 100 : 0;
   const prevAvg = prevTotals.closing ? prevTotals.nominal / prevTotals.closing : 0;
+  /**
+   * Chip tren hanya muncul kalau pembandingnya benar-benar ada angkanya. Bulan lalu punya
+   * leads tetapi nominalnya Rp0 tidak boleh menghasilkan "+∞%" atau "▼ 100%".
+   */
   const deltaOf = (now, before) => {
     if (!before) return null;
     return ((now - before) / before) * 100;
   };
-  const prevHasData = prevLeads.length > 0;
 
-  const showCls = useReveal(`${monthKey}-${isLoading}`, 40, 0.06);
+  /**
+   * Animasi muncul: kartu berurutan 0,06 s (slot 0–4). Elemen lain (bar, tabel) tidak
+   * ikut menunggu slot-slot itu — jeda dipadatkan supaya tidak ada yang telat >1 detik.
+   */
+  const showCls = useReveal(`${monthKey}-${isLoading}`, 40, 0.025);
   const insightCls = useReveal(`${monthKey}-insight`, 8, 0.12);
   const insights = useMemo(() => buildInsights({ rows: sourceRows, totals, leaks }), [sourceRows, totals, leaks]);
 
@@ -1055,14 +1119,14 @@ export default function LaporanLeads() {
       label: "Total Leads",
       value: totals.total,
       caption: `± ${perDay.toLocaleString("id-ID", { maximumFractionDigits: 1 })} leads per hari`,
-      delta: prevHasData ? deltaOf(totals.total, prevTotals.total) : null,
+      delta: deltaOf(totals.total, prevTotals.total),
       prevLabel,
     },
     {
       label: "Closing",
       value: totals.closing,
       caption: "transaksi dari leads",
-      delta: prevHasData ? deltaOf(totals.closing, prevTotals.closing) : null,
+      delta: deltaOf(totals.closing, prevTotals.closing),
       prevLabel,
     },
     {
@@ -1071,7 +1135,7 @@ export default function LaporanLeads() {
       format: "percent",
       progress: rate,
       caption: `${nfmt(totals.closing)} dari ${nfmt(totals.total)} lead`,
-      delta: prevHasData ? deltaOf(rate, prevRate) : null,
+      delta: deltaOf(rate, prevRate),
       prevLabel,
     },
     {
@@ -1079,7 +1143,7 @@ export default function LaporanLeads() {
       value: totals.nominal,
       format: "short",
       caption: rp(totals.nominal),
-      delta: prevHasData ? deltaOf(totals.nominal, prevTotals.nominal) : null,
+      delta: deltaOf(totals.nominal, prevTotals.nominal),
       prevLabel,
     },
     {
@@ -1088,7 +1152,7 @@ export default function LaporanLeads() {
       format: "short",
       tone: "dark",
       caption: `dari ${nfmt(totals.closing)} closing`,
-      delta: prevHasData ? deltaOf(avgPerClosing, prevAvg) : null,
+      delta: deltaOf(avgPerClosing, prevAvg),
       prevLabel,
     },
   ];
@@ -1129,15 +1193,19 @@ export default function LaporanLeads() {
     }
   }
 
-  /* ── Salin ringkasan (logic tetap) ── */
+  /* ── Salin ringkasan ── */
   async function handleCopySummary() {
     setExportError("");
+    const top = [...sourceRows].sort((a, b) => b.leads - a.leads)[0];
     const lines = [
-      `Laporan Leads SAMAQU — ${MONTHS[month]} ${year}`,
-      `Total leads: ${totals.total}`,
-      `Total closing: ${totals.closing}`,
+      `Laporan Leads SAMAQU — ${monthKeyLabel(monthKey)}`,
+      `Total leads: ${nfmt(totals.total)}`,
+      `Total closing: ${nfmt(totals.closing)}`,
       `Konversi: ${pct(rate)}`,
-      `Sumber terbesar: ${SOURCE_LABEL[sourceRows.reduce((a, b) => (b.leads > a.leads ? b : a), sourceRows[0])?.source] || "-"} (${nfmt(sourceRows.reduce((a, b) => (b.leads > a.leads ? b : a), sourceRows[0])?.leads || 0)})`,
+      `Nominal closing: ${rp(totals.nominal)}`,
+      top && top.leads > 0
+        ? `Sumber terbesar: ${SOURCE_LABEL[top.source]} (${nfmt(top.leads)} leads, ${pct(top.conversion)} konversi)`
+        : "Sumber terbesar: belum ada data",
     ];
     try {
       await navigator.clipboard.writeText(lines.join("\n"));
@@ -1243,10 +1311,12 @@ export default function LaporanLeads() {
           </div>
         ) : (
           <>
-            {/* 5 KARTU ANGKA */}
+            {/* 5 KARTU ANGKA — mobile: 2 kolom dengan kartu terakhir melebar penuh */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
               {cards.map((item, i) => (
-                <StatCard key={item.label} item={item} index={i} showCls={showCls} />
+                <div key={item.label} className={i === cards.length - 1 ? "col-span-2 md:col-span-1" : ""} style={{ minWidth: 0, display: "flex" }}>
+                  <StatCard item={item} index={i} showCls={showCls} />
+                </div>
               ))}
             </div>
 
