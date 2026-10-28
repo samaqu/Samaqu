@@ -2138,15 +2138,6 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
                   </span>
                 </div>
               ) : null}
-              {isExchange && record.shipping_out_awb ? (
-                <button
-                  type="button"
-                  onClick={openLabel}
-                  className={`mt-2 w-full rounded-xl px-4 py-2.5 text-sm font-bold ${accent}`}
-                >
-                  <Printer size={15} className="mr-1.5 inline" /> Cetak Resi Pengganti
-                </button>
-              ) : null}
               {record.type === "return" ? (
                 <>
                   <Row label="Refund" value={`Rp ${formatRupiah(record.refund_amount || 0)}`} />
@@ -2218,6 +2209,16 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
             {record.status === "barang_diterima" && isExchange && !record.shipping_out_awb ? (
               <button type="button" onClick={createResi} disabled={Boolean(busy)} className={`w-full rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-50 ${accent}`}>
                 <Truck size={15} className="mr-1.5 inline" /> {busy === "resi" ? "Membuat resi…" : "Buat Resi Pengganti"}
+              </button>
+            ) : null}
+
+            {isExchange && record.shipping_out_awb ? (
+              <button
+                type="button"
+                onClick={openLabel}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <Printer size={15} /> Cetak Resi Pengganti
               </button>
             ) : null}
 
