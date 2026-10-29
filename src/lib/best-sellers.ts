@@ -231,9 +231,12 @@ export function aggregateBestSellers(
 
     const productId = text(item.product_id);
     // Add-on Open Order digabung ke produk katalog "Cover Hanger": satu baris laporan,
-    // jumlah add-on tetap dicatat di `addonUnits`.
-    const isAddon = productId === OPEN_ORDER_ADDON.id;
-    const masterId = isAddon ? OPEN_ORDER_ADDON_TARGET_ID : productId;
+    // jumlah add-on tetap dicatat di `addonUnits`. Pesanan BARU memakai id katalog
+    // (`cover-hanger`) dengan nama add-on; pesanan LAMA memakai id bayangan `addon-cover-hanger`.
+    const isAddon =
+      productId === OPEN_ORDER_ADDON.id ||
+      (productId === OPEN_ORDER_ADDON_TARGET_ID && rawName === OPEN_ORDER_ADDON.name);
+    const masterId = productId === OPEN_ORDER_ADDON.id ? OPEN_ORDER_ADDON_TARGET_ID : productId;
     const master = masterId ? catalogById.get(masterId) : undefined;
 
     let seriesKey: string;

@@ -27,8 +27,6 @@ import {
   variantWeightMapFromRows,
   type ResolvedLineWeight,
 } from "@/lib/shipping-weight";
-import { OPEN_ORDER_ADDON, resolveAddonWeight } from "@/lib/open-order-config";
-import { useStoreSettings } from "@/lib/store-settings";
 
 /**
  * Isi detail pesanan untuk dashboard admin — memakai susunan & gaya yang sama dengan
@@ -226,13 +224,6 @@ export default function OrderDetailContent({
   const alamat = [order.shipping_address, order.shipping_city, order.shipping_postal_code].filter(Boolean).join(", ");
 
   const [showAlamat, setShowAlamat] = useState(false);
-
-  // Rincian berat (internal admin): pesanan Open Order bisa memuat add-on "Extra Cover & Hanger"
-  // — satu baris `order_items` ber-id "addon-cover-hanger". Berat add-on mengikuti setting admin
-  // (`store_settings.open_order_addon_weight`), dipakai memisah berat produk vs berat add-on.
-  const settings = useStoreSettings();
-  const addonWeight = resolveAddonWeight(settings.open_order_addon_weight);
-  const hasAddon = items.some((it) => it.product_id === OPEN_ORDER_ADDON.id);
 
   // "Atur Pesanan" — pembuatan resi J&T manual, dan hanya untuk pesanan yang sudah diproses
   // admin (chip status → Diproses, ala Shopee): pesanan yang masih menunggu pembayaran belum

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { buildFbc, getClientIp, getMetaCookies, sendMetaPurchaseEvent } from "@/lib/meta-capi";
-import { OPEN_ORDER_ADDON, resolveAddonWeight } from "@/lib/open-order-config";
+import { OPEN_ORDER_ADDON, OPEN_ORDER_ADDON_TARGET_ID, OPEN_ORDER_ADDON_VARIANT, resolveAddonWeight, resolveAddonWeightFromCatalog } from "@/lib/open-order-config";
 import { readOpenOrderWindow } from "@/lib/open-order-settings";
 import { resolveOpenOrderState } from "@/lib/open-order-window";
 import {
@@ -76,6 +76,8 @@ interface ValidatedItem {
   price: number;
   minimumPrice: number;
   cypEnabled: boolean;
+  /** true = baris add-on Cover & Hanger (satu-satunya item tanpa pilihan customer). */
+  isAddon?: boolean;
 }
 
 interface OrderItemRow {
@@ -292,13 +294,83 @@ export async function POST(request: NextRequest) {
       .select("open_order_addon_weight")
       .eq("id", 1)
       .maybeSingle();
-    const addonWeight = resolveAddonWeight(addonSetting?.open_order_addon_weight);
+    const addonSettingWeight = resolveAddonWeight(addonSetting?.open_order_addon_weight);
+
+    // ── Add-on Cover & Hanger = produk katalog `cover-hanger` ──
+    // Add-on memakai varian "Set Hanger + Cover" / ALL SIZE yang SAMA dengan katalog: stoknya
+    // dipotong seperti produk lain (dan dikembalikan saat batal), beratnya diambil dari berat
+    // varian itu supaya ongkir checkout = berat resi = berat label.
+    let addonWeight = addonSettingWeight;
+    if (extraCover) {
+      const [{ data: addonProduct }, { data: addonVariant }] = await Promise.all([
+        supabaseAdmin
+          .from("products")
+          .select("id, weight, price")
+          .eq("id", OPEN_ORDER_ADDON_TARGET_ID)
+          .maybeSingle(),
+        supabaseAdmin
+          .from("product_variants")
+          .select("product_id, color, size, stock, weight")
+          .eq("product_id", OPEN_ORDER_ADDON_TARGET_ID)
+          .eq("color", OPEN_ORDER_ADDON_VARIANT.color)
+          .eq("size", OPEN_ORDER_ADDON_VARIANT.size)
+          .maybeSingle(),
+      ]);
+
+      if (!addonProduct) {
+        return NextResponse.json(
+          { error: "Extra Cover & Hanger sedang tidak tersedia. Hapus add-on lalu coba lagi." },
+          { status: 400 },
+        );
+      }
+
+      // Variannya wajib ada: tanpa baris varian, stok add-on tidak bisa dipotong dan resi akan
+      // memakai berat fallback — dua-duanya tidak diinginkan.
+      if (!addonVariant) {
+        return NextResponse.json(
+          { error: "Extra Cover & Hanger sedang tidak tersedia. Hapus add-on lalu coba lagi." },
+          { status: 400 },
+        );
+      }
+
+      // Stok kosong → tolak di server (UI hanya lapisan pertama).
+      const availableStock = Math.max(0, Number(addonVariant.stock) || 0);
+      if (availableStock < 1) {
+        return NextResponse.json(
+          { error: "Stok Extra Cover & Hanger sudah habis. Hapus add-on lalu coba lagi." },
+          { status: 400 },
+        );
+      }
+
+      addonWeight = resolveAddonWeightFromCatalog(
+        addonVariant?.weight,
+        addonProduct.weight,
+        addonSetting?.open_order_addon_weight,
+      );
+
+      // Harga tetap Rp35.000 (harga add-on, bukan harga katalog produknya).
+      validatedItems.push({
+        productId: OPEN_ORDER_ADDON_TARGET_ID,
+        productName: OPEN_ORDER_ADDON.name,
+        color: OPEN_ORDER_ADDON_VARIANT.color,
+        size: OPEN_ORDER_ADDON_VARIANT.size,
+        series: null,
+        kain: null,
+        quantity: 1,
+        price: OPEN_ORDER_ADDON.price,
+        minimumPrice: OPEN_ORDER_ADDON.price,
+        cypEnabled: false,
+        isAddon: true,
+      });
+    }
+
     const subtotal = validatedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const addonTotal = extraCover ? OPEN_ORDER_ADDON.price : 0;
 
     // ── Berat kirim (gram): FUNGSI PUSAT yang sama dengan wizard (berat varian → produk). ──
-    // Add-on Extra Cover & Hanger +300 g dan minimum 300 g sama persis dengan wizard, supaya
-    // berat untuk ongkir = yang disimpan = yang dipakai resi.
+    // Baris add-on ikut sebagai item biasa (produk `cover-hanger` + variannya), jadi beratnya
+    // diambil dari berat varian katalog — angka yang sama dipakai ongkir, resi J&T, dan label.
+    // Minimum 300 g tetap sama persis dengan wizard.
     const weightIds = Array.from(new Set(validatedItems.map((i) => i.productId).filter(Boolean)));
     let productWeights: Record<string, number> = {};
     let variantWeights: Record<string, number> = {};
@@ -491,26 +563,8 @@ export async function POST(request: NextRequest) {
       minimum_price: item.cypEnabled ? item.minimumPrice : null,
     }));
 
-    if (extraCover) {
-      orderItems.push({
-        order_id: order.id,
-        product_id: OPEN_ORDER_ADDON.id,
-        product_name: OPEN_ORDER_ADDON.name,
-        color: null,
-        size: null,
-        quantity: 1,
-        price: OPEN_ORDER_ADDON.price,
-        series: null,
-        kain: null,
-        // Add-on belum tentu punya foto di katalog — kalau tidak ada, tampilannya memakai
-        // placeholder netral (bukan foto produk lain).
-        product_image:
-          orderItemPhoto({ product_id: OPEN_ORDER_ADDON.id, product_name: OPEN_ORDER_ADDON.name }, photoLookup) ||
-          null,
-        customer_price: null,
-        minimum_price: null,
-      });
-    }
+    // Add-on Cover & Hanger sudah ikut di `validatedItems` (produk `cover-hanger` + varian
+    // katalognya), jadi barisnya tersimpan seperti produk lain — tidak ada baris bayangan lagi.
 
     const { error: itemsError } = await supabaseAdmin.from("order_items").insert(orderItems);
 
@@ -573,31 +627,21 @@ export async function POST(request: NextRequest) {
       quantity: item.quantity,
       price: item.price,
     }));
-    if (extraCover) {
-      notificationItems.push({
-        name: OPEN_ORDER_ADDON.name,
-        color: null,
-        size: null,
-        quantity: 1,
-        price: OPEN_ORDER_ADDON.price,
-      });
-    }
     const paymentInstruction = paymentRow ? paymentInstructionFrom(paymentRow) : null;
-    const invoiceItemLines = [
-      ...validatedItems.map((item) => ({
-        // Format sama dengan notifikasi WA: nama · series · warna · kain · size.
-        label: formatProductLabel({
-          name: item.productName,
-          series: item.series,
-          kain: item.kain,
-          color: item.color,
-          size: item.size,
-          quantity: item.quantity,
-        }),
-        quantity: item.quantity || 1,
-      })),
-      ...(extraCover ? [{ label: OPEN_ORDER_ADDON.name, quantity: 1 }] : []),
-    ];
+    const invoiceItemLines = validatedItems.map((item) => ({
+      // Format sama dengan notifikasi WA: nama · series · warna · kain · size.
+      label: item.isAddon
+        ? item.productName
+        : formatProductLabel({
+            name: item.productName,
+            series: item.series,
+            kain: item.kain,
+            color: item.color,
+            size: item.size,
+            quantity: item.quantity,
+          }),
+      quantity: item.quantity || 1,
+    }));
 
     console.log("[OPEN-ORDER] Created:", { orderNumber, items: orderItems.length, total });
 

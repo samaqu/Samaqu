@@ -139,9 +139,12 @@ export function rankTopProducts(input: {
     if (productId && freeGift.has(productId)) continue;
 
     // Add-on Open Order digabung ke produk "Cover Hanger" (dihitung sebagai unit produk itu,
-    // lalu ditandai di `addonUnits` supaya admin tetap tahu asalnya).
-    const isAddon = productId === OPEN_ORDER_ADDON.id;
-    const targetId = isAddon ? OPEN_ORDER_ADDON_TARGET_ID : productId;
+    // lalu ditandai di `addonUnits` supaya admin tetap tahu asalnya). Pesanan BARU memakai id
+    // katalog `cover-hanger` + nama add-on; pesanan LAMA memakai id bayangan `addon-cover-hanger`.
+    const isAddon =
+      productId === OPEN_ORDER_ADDON.id ||
+      (productId === OPEN_ORDER_ADDON_TARGET_ID && String(it.product_name || "").trim() === OPEN_ORDER_ADDON.name);
+    const targetId = productId === OPEN_ORDER_ADDON.id ? OPEN_ORDER_ADDON_TARGET_ID : productId;
     const catalog = targetId ? catalogById.get(targetId) : undefined;
     const rawName = String(it.product_name || "").trim() || "(tanpa nama)";
     const kain = String(it.kain || "").trim();

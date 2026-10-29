@@ -34,6 +34,10 @@ const ADDON_CSS = `
 .oo-addon-seal{display:grid;place-items:center;width:24px;height:24px;border-radius:999px;border:1px solid rgba(0,0,0,.55);color:transparent;transition:background-color .25s ease,border-color .25s ease,color .25s ease,transform .25s ease}
 .oo-addon.is-on{border-color:rgba(150,116,47,.7);background:linear-gradient(180deg,#FCF8F0,#F6EEE0);box-shadow:0 2px 6px rgba(0,0,0,.06),0 18px 36px -26px rgba(0,0,0,.6)}
 .oo-addon.is-on .oo-addon-seal{background:var(--gold-deep);border-color:var(--gold-deep);color:#FBF7EF;transform:scale(1.04)}
+.oo-addon.is-out{cursor:not-allowed;opacity:.55}
+.oo-addon.is-out:hover{border-color:rgba(0,0,0,.45);box-shadow:0 1px 2px rgba(0,0,0,.04),0 12px 28px -24px rgba(0,0,0,.55)}
+.oo-addon.is-out::before{transform:scaleY(.4)}
+.oo-addon-out{font-size:9px;line-height:1;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#b3261e}
 `;
 
 export function lineName(line: CartLine, products: OpenOrderProduct[]): string {
@@ -57,6 +61,7 @@ export default function StepCart({
   subtotal,
   extraCover,
   onToggleExtra,
+  addonAvailable,
   itemsWeight,
   addonWeight,
   totalWeight,
@@ -70,6 +75,8 @@ export default function StepCart({
   subtotal: number;
   extraCover: boolean;
   onToggleExtra: (next: boolean) => void;
+  /** false = stok varian katalog habis → kartu add-on tampil "Habis" dan tidak bisa dipilih. */
+  addonAvailable: boolean;
   /** Berat barang saja (gram) — tanpa add-on. */
   itemsWeight: number;
   /** Berat add-on Cover & Hanger (gram) bila dipilih. */
@@ -148,13 +155,17 @@ export default function StepCart({
       <style>{ADDON_CSS}</style>
       <button
         type="button"
-        onClick={() => onToggleExtra(!extraCover)}
+        onClick={() => addonAvailable && onToggleExtra(!extraCover)}
         aria-pressed={extraCover}
-        className={`oo-addon mt-4${extraCover ? " is-on" : ""}`}
+        aria-disabled={!addonAvailable}
+        disabled={!addonAvailable}
+        className={`oo-addon mt-4${extraCover ? " is-on" : ""}${addonAvailable ? "" : " is-out"}`}
       >
         <span className="oo-addon-copy">
           <span className="oo-addon-name">{OPEN_ORDER_ADDON.name}</span>
-          <span className="oo-addon-caption">Opsional · per pesanan</span>
+          <span className="oo-addon-caption">
+            {addonAvailable ? "Opsional · per pesanan" : <span className="oo-addon-out">Habis</span>}
+          </span>
         </span>
         <span className="oo-addon-right">
           <span className="oo-addon-price">+{money(OPEN_ORDER_ADDON.price)}</span>
@@ -176,7 +187,9 @@ export default function StepCart({
           <SummaryRow label="Total" value={money(total)} strong />
         </div>
         <div className="mt-3 space-y-2.5 pt-3" style={{ borderTop: `1px solid ${LINE}` }}>
-          <SummaryRow label="Berat produk" value={formatWeightExact(itemsWeight)} />
+          {/* `itemsWeight` sudah termasuk add-on (berat varian katalognya), jadi baris "Berat
+              produk" memakai sisa setelah add-on — tidak ada berat yang dihitung dua kali. */}
+          <SummaryRow label="Berat produk" value={formatWeightExact(Math.max(0, itemsWeight - (extraCover ? addonWeight : 0)))} />
           {extraCover && (
             <SummaryRow label={OPEN_ORDER_ADDON.name} value={`+${formatWeightExact(addonWeight)}`} />
           )}

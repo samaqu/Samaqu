@@ -16,7 +16,15 @@ import Link from "next/link";
 import { Calendar, ChevronLeft, X } from "lucide-react";
 import { getCatalogProducts } from "@/lib/db";
 import type { Product } from "@/lib/katalog-data";
-import { OPEN_ORDER_ADDON, OPEN_ORDER_PERIOD, resolveAddonWeight } from "@/lib/open-order-config";
+import {
+  addonStockOf,
+  isAddonAvailable,
+  OPEN_ORDER_ADDON,
+  OPEN_ORDER_ADDON_TARGET_ID,
+  OPEN_ORDER_ADDON_VARIANT,
+  OPEN_ORDER_PERIOD,
+  resolveAddonWeightFromCatalog,
+} from "@/lib/open-order-config";
 import { sumWeightGramsBySize, variantWeightMapFromRows } from "@/lib/shipping-weight";
 import {
   buildOpenOrderProducts,
@@ -255,8 +263,35 @@ export default function OpenOrderWizard({
   const subtotal = lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
   const total = subtotal + (extraCover ? OPEN_ORDER_ADDON.price : 0) + (shipping?.cost ?? 0);
 
-  // Berat add-on Extra Cover & Hanger (gram) — diatur admin di menu "Open Order".
-  const addonWeight = resolveAddonWeight(settings.open_order_addon_weight);
+  // ── Add-on Extra Cover & Hanger = produk katalog `cover-hanger` ──
+  // Stok & berat add-on dibaca dari varian katalog yang sama dengan yang dipakai server
+  // (`Set Hanger + Cover` / ALL SIZE), jadi angka ongkir di sini = angka server = angka resi.
+  const addonCatalog = useMemo(() => {
+    const variantRow = stockRows.find(
+      (row) =>
+        row.product_id === OPEN_ORDER_ADDON_TARGET_ID &&
+        row.color === OPEN_ORDER_ADDON_VARIANT.color &&
+        row.size === OPEN_ORDER_ADDON_VARIANT.size
+    );
+    const productRow = catalog.find((row) => row.id === OPEN_ORDER_ADDON_TARGET_ID);
+    const rows = {
+      variantStock: variantRow && typeof variantRow.stock === "number" ? variantRow.stock : null,
+      variantWeight: variantRow?.weight ?? null,
+      productWeight: productRow?.weight ?? null,
+    };
+    return {
+      rows,
+      stock: addonStockOf(rows),
+      available: isAddonAvailable(rows),
+      weight: resolveAddonWeightFromCatalog(rows.variantWeight, rows.productWeight, settings.open_order_addon_weight),
+    };
+  }, [catalog, stockRows, settings.open_order_addon_weight]);
+
+  // Add-on yang sudah tidak bisa dipilih (stok habis saat halaman terbuka) dilepas dari
+  // keranjang supaya ringkasan & ongkir tidak memakai add-on yang tidak akan lolos di server.
+  useEffect(() => {
+    if (extraCover && !addonCatalog.available) setExtraCover(false);
+  }, [extraCover, addonCatalog.available]);
 
   // Berat kirim (gram) memakai FUNGSI PUSAT `sumWeightGramsBySize`: berat varian per ukuran →
   // berat produk → default wizard. Tiap series (termasuk turunan) memakai beratnya SENDIRI.
@@ -285,15 +320,25 @@ export default function OpenOrderWizard({
         quantity: line.quantity,
       };
     });
+    // Add-on memakai baris katalognya sendiri (berat varian), bukan angka setting — sama
+    // seperti yang dihitung server.
+    if (extraCover) {
+      weightLines.push({
+        productId: OPEN_ORDER_ADDON_TARGET_ID,
+        color: OPEN_ORDER_ADDON_VARIANT.color,
+        size: OPEN_ORDER_ADDON_VARIANT.size,
+        quantity: 1,
+      });
+    }
     const { grams, missingQty } = sumWeightGramsBySize(weightLines, productWeights, variantWeights);
     return grams + missingQty * 1200;
-  }, [lines, products, productWeights, variantWeights]);
+  }, [lines, products, productWeights, variantWeights, extraCover]);
 
-  // Total berat kirim = minimum 300 g + add-on bila dipilih (formula sama persis dengan server).
-  const totalWeight = useMemo(
-    () => Math.max(300, itemsWeight + (extraCover ? addonWeight : 0)),
-    [itemsWeight, extraCover, addonWeight]
-  );
+  // Berat add-on yang ditampilkan di rincian — ikut baris katalog, fallback ke setting.
+  const addonWeight = addonCatalog.weight;
+
+  // Total berat kirim = minimum 300 g (formula sama persis dengan server).
+  const totalWeight = useMemo(() => Math.max(300, itemsWeight), [itemsWeight]);
 
   /**
    * Ongkir yang sudah pernah dihitung (kunci: kota|kecamatan|berat). Menghindari menunggu
@@ -698,6 +743,7 @@ export default function OpenOrderWizard({
                 subtotal={subtotal}
                 extraCover={extraCover}
                 onToggleExtra={setExtraCover}
+                addonAvailable={addonCatalog.available}
                 itemsWeight={itemsWeight}
                 addonWeight={addonWeight}
                 totalWeight={totalWeight}

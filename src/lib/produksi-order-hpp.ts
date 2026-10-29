@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeStandardCost } from "@/lib/produksi-finished";
+import { OPEN_ORDER_ADDON, OPEN_ORDER_ADDON_TARGET_ID } from "@/lib/open-order-config";
 import {
   lineMatchesTarget,
   type ScheduleTargetInput,
@@ -124,7 +125,17 @@ function orderItemRows(rows: any[]): OrderItemRow[] {
       size: String(row.size || "").toUpperCase(),
       quantity: Number(row.quantity) || 0,
     }))
-    .filter((row) => row.product_id && row.size && row.quantity > 0);
+    .filter((row) => row.product_id && row.size && row.quantity > 0)
+    // Baris add-on "Extra Cover & Hanger" BUKAN barang produksi: nilainya sudah tercakup
+    // kemasan/komponen opsional Cover & Hanger di resep. Kalau ikut dihitung, HPP-nya dobel.
+    .filter((row) => !isAddonOrderLine(row.product_id, row.product_name));
+}
+
+/** Baris order yang merupakan add-on Open Order (id bayangan lama atau id katalog baru). */
+export function isAddonOrderLine(productId: string, productName: string): boolean {
+  const id = String(productId || "").trim();
+  const name = String(productName || "").trim();
+  return id === OPEN_ORDER_ADDON.id || (id === OPEN_ORDER_ADDON_TARGET_ID && name === OPEN_ORDER_ADDON.name);
 }
 
 /**
