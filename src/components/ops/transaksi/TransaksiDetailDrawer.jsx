@@ -427,11 +427,6 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                   Nomor resi tetap <b>{awb}</b>.
                 </div>
               ) : null}
-              {!order.can_edit && order.edit_reason ? (
-                <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 600, color: "#8a7d83", lineHeight: 1.45 }}>
-                  {order.edit_reason}
-                </p>
-              ) : null}
 
               {order.can_edit || order.can_cancel || canDelete || canPrint || isSelesai ? (
                 <div className="df">

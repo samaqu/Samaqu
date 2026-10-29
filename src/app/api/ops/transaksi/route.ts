@@ -681,9 +681,6 @@ export async function GET(req: NextRequest) {
       // Guard edit item dipakai server & UI. Website/Open Order sekarang boleh diedit
       // selama stoknya tercatat, status belum dikirim, dan pengiriman belum berjalan.
       can_edit: editReady && editGuard.canEdit,
-      edit_reason: editReady
-        ? editGuard.reason
-        : "Migrasi edit item belum dijalankan. Jalankan supabase/migrations/20261025_edit_order_items.sql dulu.",
       edit_warning: editGuard.warning,
       weight: order.weight == null ? null : Number(order.weight) || 0,
       items_edited_at: null,
