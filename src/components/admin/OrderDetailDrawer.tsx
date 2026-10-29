@@ -87,7 +87,7 @@ export default function OrderDetailDrawer({
           >
             {/* Tampilan sama dengan drawer panel admin; tema mono untuk /admin.
                 Semua logic & aksi tetap di OrderDetailContent. */}
-            <PanelDetailShell open onClose={onClose} tema={tema}>
+            <PanelDetailShell open onClose={onClose} tema={tema} embed>
               <OrderDetailContent
                 order={order}
                 onClose={onClose}

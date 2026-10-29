@@ -536,12 +536,15 @@ export function PanelDetailShell({
   open,
   onClose,
   tema = "warna",
+  embed = false,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   /** `mono` untuk dashboard /admin & ops (hitam-putih). */
   tema?: "warna" | "mono";
+  /** Dipakai saat shell ditanam di drawer lain (/admin & ops) yang sudah punya panel. */
+  embed?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -560,7 +563,7 @@ export function PanelDetailShell({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "tween", duration: 0.24, ease: "easeOut" }}
-            className={`dp-panel${tema === "mono" ? " tema-mono" : ""}`}
+            className={`dp-panel${tema === "mono" ? " tema-mono" : ""}${embed ? " is-embed" : ""}`}
             role="dialog"
             aria-label="Detail Pesanan"
           >
@@ -578,11 +581,15 @@ export function PanelDetailShell({
 const DP_CSS = `
 .dp-overlay{position:fixed;inset:0;z-index:9998;background:rgba(18,32,48,.45);backdrop-filter:blur(3px)}
 .dp-panel{position:fixed;inset-block:0;right:0;z-index:9999;display:flex;flex-direction:column;width:100%;max-width:100vw;background:#f4f7fb;color:#24324a;border-left:1px solid #e8eef5;overflow:hidden;box-shadow:-24px 0 60px -24px rgba(18,32,48,.4)}
+/* Di dalam drawer yang sudah punya panel sendiri (/admin & ops), panel ini tidak lagi fixed:
+   induknya ber-transform (framer-motion), jadi position:fixed terkurung dan area scroll mati.
+   Sekarang ia mengisi penuh wadah induk dan yang men-scroll adalah .dp-wrap. */
+.dp-panel.is-embed{position:relative;inset:auto;z-index:auto;width:100%;max-width:100%;height:100%;border-left:0;box-shadow:none}
 .dp-panel.tema-mono{background:#fff;border-left-color:#e5e7eb}
 @media (min-width:640px){.dp-panel{width:560px;max-width:560px}}
 
 /* Satu kolom scroll: header ikut ke-scroll, bukan sticky. */
-.dp-wrap{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+.dp-wrap{display:flex;flex-direction:column;flex:1;min-height:0;height:100%;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
 .dp-wrap::-webkit-scrollbar{display:none}
 
 .dp-header{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:24px 24px 72px;background:linear-gradient(135deg,#2774a8 0%,#4b9bd1 60%,#8cc5ea 100%)}

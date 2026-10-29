@@ -195,7 +195,7 @@ export default function OpsOrderDetailDrawer({ open, order, onClose, onEdit, onC
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "tween", duration: 0.22 }}
-            className="fixed inset-y-0 right-0 z-[9999] flex w-full flex-col bg-white shadow-2xl dark:bg-[#1a1d28] sm:max-w-md"
+            className="fixed inset-y-0 right-0 z-[9999] flex w-full flex-col overflow-hidden bg-white shadow-2xl dark:bg-[#1a1d28] sm:max-w-md"
             role="dialog"
             aria-label="Detail pesanan"
           >
@@ -249,6 +249,7 @@ export default function OpsOrderDetailDrawer({ open, order, onClose, onEdit, onC
             >
               {shippingContent}
             </PanelDetailPesanan>
+            {/* Panel ini mengisi sisa tinggi drawer & yang men-scroll adalah .dp-wrap. */}
           </motion.aside>
         </>
       ) : null}
