@@ -269,6 +269,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
           sumber={order.source_label}
           tahap={stage}
           createdAt={order.created_at}
+          onClose={onClose}
           nama={order.customer_name}
           telepon={order.customer_whatsapp || ""}
           alamat={[order.shipping_address, region].filter(Boolean).join(", ")}

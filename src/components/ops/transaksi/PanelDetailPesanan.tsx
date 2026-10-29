@@ -12,7 +12,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Box,
   Check,
-  XCircle,
   Clock,
   CreditCard,
   MapPin,
@@ -20,6 +19,8 @@ import {
   ShoppingBag,
   Truck,
   Wallet,
+  X,
+  XCircle,
 } from "lucide-react";
 import { localPhone } from "@/lib/whatsapp";
 
@@ -114,6 +115,7 @@ export default function PanelDetailPesanan({
   onSalinNomor,
   nomorTersalin,
   onChat,
+  onClose,
   ekstra,
   children,
 }: {
@@ -144,6 +146,8 @@ export default function PanelDetailPesanan({
   onSalinNomor: () => void;
   nomorTersalin: boolean;
   onChat: () => void;
+  /** Data & aksi tidak berubah: baris ini hanya untuk tombol tutup drawer. */
+  onClose: () => void;
   /** Peringatan / catatan tambahan di kartu terakhir. */
   ekstra?: ReactNode;
   /** Blok resi J&T asli (buat resi, cetak) — logic lama, hanya dipindah posisinya. */
@@ -168,8 +172,13 @@ export default function PanelDetailPesanan({
   return (
     <div className="dp-wrap">
       <div className="dp-header">
-        <p className="dp-sumber">{sumber}</p>
-        <h2 className="dp-judul">Detail Pesanan</h2>
+        <div className="dp-header-txt">
+          <p className="dp-sumber">{sumber}</p>
+          <h2 className="dp-judul">Detail Pesanan</h2>
+        </div>
+        <button type="button" className="dp-tutup" onClick={onClose} aria-label="Tutup">
+          <X size={18} />
+        </button>
       </div>
 
       <div className="dp-isi">
@@ -378,11 +387,14 @@ const DP_CSS = `
 @media (min-width:640px){.dp-panel{width:560px;max-width:560px}}
 
 .dp-wrap{display:flex;flex-direction:column;flex:1;min-height:0}
-.dp-header{flex:none;padding:16px 20px 30px;background:linear-gradient(135deg,#3f86b8 0%,#2f6f9e 60%,#2a628c 100%);color:#fff}
-.dp-sumber{margin:0;font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:rgba(255,255,255,.82)}
-.dp-judul{margin:2px 0 0;font-size:1.34rem;font-weight:800;letter-spacing:-.01em;color:#fff}
-.dp-tutup{display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:50%;background:#f1f4f7;color:#425466;cursor:pointer}
-.dp-tutup:hover{background:#e6ebf0}
+/* Header biru: label sumber kecil + judul besar di kiri, tombol tutup bulat di kanan.
+   Padding bawah lebih besar dari atas supaya kartu status bisa "mengambang" menimpanya. */
+.dp-header{flex:none;display:flex;align-items:flex-start;gap:12px;padding:18px 20px 34px;background:linear-gradient(135deg,#3f86b8 0%,#2f6f9e 60%,#2a628c 100%);color:#fff}
+.dp-header-txt{min-width:0;flex:1}
+.dp-sumber{margin:0;font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:rgba(255,255,255,.85)}
+.dp-judul{margin:3px 0 0;font-size:1.45rem;font-weight:800;letter-spacing:-.015em;line-height:1.15;color:#fff}
+.dp-tutup{flex:none;display:grid;place-items:center;width:36px;height:36px;border:1.5px solid rgba(255,255,255,.55);border-radius:50%;background:transparent;color:#fff;cursor:pointer;transition:background .15s}
+.dp-tutup:hover{background:rgba(255,255,255,.18)}
 
 .dp-isi{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:14px;padding:0 16px 20px;scrollbar-width:none}
 .dp-isi::-webkit-scrollbar{display:none}
