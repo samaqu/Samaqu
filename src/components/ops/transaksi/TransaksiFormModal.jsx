@@ -35,7 +35,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Check, Clock, Info, Loader2, Pencil, Plus, RotateCcw, Save, Trash2, Truck, Wand2, X } from "lucide-react";
+import { AlertCircle, Check, Clock, Info, Lightbulb, Loader2, Pencil, Plus, RotateCcw, Save, Shirt, Trash2, Truck, Wand2, X } from "lucide-react";
 import { base44 } from "@/lib/ops-api";
 import { MANUAL_PRICE_MAX, MANUAL_PRICE_MIN, MANUAL_SOURCE_KEYS, SOURCE_LABEL, manualPrice } from "@/lib/transaksi";
 import { PAKET_SIZE, isPaketKategori, variantName } from "@/lib/item-label";
@@ -58,6 +58,20 @@ const inputClass =
   "w-full px-3 py-2 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 text-sm font-semibold text-slate-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed";
 const labelClass = "text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1";
 const sectionClass = "text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500";
+
+/* ── Desain drawer panel admin (variant="panel") ─────────────────────────────────────────────
+ * Palet "Tropical Beach" yang dipakai panel Admin Operasional. Hanya dipakai saat
+ * `isPanelForm`; dashboard ops tetap memakai gaya lama (slate/putih).
+ * Warna aksi utama tetap biru tua agar teks putih tetap kontras.
+ */
+const ADMIN_NAME = "Lea";
+const PANEL_BLUE = "#4a90c2";
+const PANEL_BLUE_DEEP = "#2f6f9e";
+const PANEL_PINK = "#fdf0f4";
+const PANEL_PINK_LINE = "#f6dbe5";
+const PANEL_SKY = "#e8f3fb";
+const PANEL_INK = "#2a1a22";
+const PANEL_MUTED = "#8a7d83";
 const cmpId = (a, b) => String(a).localeCompare(String(b), "id", { sensitivity: "base" });
 
 /** Kondisi awal panel "Cek Ongkir" (tidak ada hasil). */
@@ -844,6 +858,21 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, dataset, reservedByVariant]);
+
+  /**
+   * Foto produk satu baris (panel admin). Sumber pertama: snapshot foto di pesanan
+   * (`order_items.product_image`); kalau kosong, foto katalog varian/entri dataset.
+   * Hanya untuk tampilan — tidak memengaruhi penyimpanan.
+   */
+  const openRowThumb = (index) => {
+    const row = items[index];
+    if (!row) return "";
+    const sourceItem = row.source_item_id ? recordedItemsById[row.source_item_id] : null;
+    const fromOrder = String(sourceItem?.product_image || "").trim();
+    if (fromOrder) return fromOrder;
+    const entry = resolveProduct(row);
+    return String(entry?.image || entry?.images?.[0] || "").trim();
+  };
 
   const rowInfo = items.map((row) => {
     const product = resolveProduct(row);
@@ -1686,10 +1715,58 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
             exit={{ x: "100%" }}
             transition={{ type: "tween", duration: 0.24, ease: "easeOut" }}
             className="fixed inset-y-0 right-0 z-[9999] w-full sm:w-[680px] bg-white dark:bg-[#1a1d28] shadow-2xl flex flex-col overflow-hidden"
+            style={isPanelForm ? { background: "#fffafc" } : undefined}
             role="dialog"
             aria-label={isEdit ? "Ubah transaksi" : "Tambah transaksi"}
           >
             {/* Header menempel: judul + indikator langkah */}
+            {isPanelForm && isEdit && !savedOrder ? (
+              /* Panel admin: header bergradasi biru muda → pink, sapaan + chip nomor & status bayar. */
+              <div
+                className="shrink-0 px-5 sm:px-6 pt-5 pb-4"
+                style={{
+                  background: "linear-gradient(135deg, #e8f3fb 0%, #f6f0fa 52%, #fdeef4 100%)",
+                  borderBottom: `1px solid ${PANEL_PINK_LINE}`,
+                }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-semibold" style={{ color: PANEL_BLUE_DEEP }}>
+                      Hai {ADMIN_NAME}, mau ubah apa?
+                    </p>
+                    <h3 className="mt-0.5 font-heading text-[20px] font-extrabold leading-tight" style={{ color: PANEL_INK }}>
+                      Ubah Pesanan
+                    </h3>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span
+                        className="rounded-full px-2.5 py-1 text-[11px] font-bold"
+                        style={{ background: "#fff", color: PANEL_BLUE_DEEP, border: `1px solid ${PANEL_PINK_LINE}` }}
+                      >
+                        {initialData?.order_number}
+                      </span>
+                      <span
+                        className="rounded-full px-2.5 py-1 text-[11px] font-bold"
+                        style={
+                          (form.payment_status || "paid") === "unpaid"
+                            ? { background: "#fff6e5", color: "#8a6516" }
+                            : { background: "#e9f7ef", color: "#1f6f45" }
+                        }
+                      >
+                        {(form.payment_status || "paid") === "unpaid" ? "Belum dibayar" : "Sudah dibayar"}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={requestClose}
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/80 transition-colors hover:bg-white"
+                    style={{ color: PANEL_BLUE_DEEP }}
+                    aria-label="Tutup"
+                  >
+                    <X size={17} />
+                  </button>
+                </div>
+              </div>
+            ) : (
             <div className="shrink-0 px-5 sm:px-6 py-3.5 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -1752,6 +1829,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                 })}
               </ol>
             </div>
+            )}
 
             {/* Body: boleh di-scroll (header & footer menempel), scrollbar disembunyikan total */}
             <form
@@ -1794,6 +1872,51 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                 </div>
               ) : (
                 <>
+              {/* ── Panel admin: kartu tips + ringkasan pelanggan (tampilan saja) ── */}
+              {isPanelForm && isEdit && (
+                <>
+                  <div
+                    className="flex items-start gap-2.5 rounded-[18px] px-4 py-3"
+                    style={{ background: PANEL_SKY, border: `1px solid #d6e8f5` }}
+                  >
+                    <Lightbulb size={16} className="mt-0.5 shrink-0" style={{ color: PANEL_BLUE_DEEP }} />
+                    <p className="text-[12.5px] font-semibold leading-relaxed" style={{ color: PANEL_BLUE_DEEP }}>
+                      {managedSource
+                        ? `Boleh ganti ukuran atau series ya. Totalnya tetap Rp${formatRupiah(originalTotal)} karena sudah dibayar customer.`
+                        : "Boleh ganti ukuran, series, atau harga. Total pesanan ikut menyesuaikan."}
+                    </p>
+                  </div>
+
+                  <div
+                    className="flex items-center gap-3 rounded-[18px] bg-white px-4 py-3"
+                    style={{ border: `1px solid ${PANEL_PINK_LINE}` }}
+                  >
+                    <span
+                      className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[15px] font-extrabold"
+                      style={{ background: PANEL_PINK, color: PANEL_BLUE_DEEP }}
+                    >
+                      {String(form.customer_name || "?").trim().charAt(0).toUpperCase()}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13.5px] font-bold" style={{ color: PANEL_INK }}>
+                        {form.customer_name || "Tanpa nama"}
+                      </p>
+                      <p className="truncate text-[11.5px] font-medium" style={{ color: PANEL_MUTED }}>
+                        {[form.customer_whatsapp || "nomor belum ada", form.city].filter(Boolean).join(" · ")}
+                      </p>
+                    </div>
+                    {managedSource ? (
+                      <span
+                        className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold"
+                        style={{ background: PANEL_PINK, color: PANEL_BLUE_DEEP }}
+                      >
+                        Tetap
+                      </span>
+                    ) : null}
+                  </div>
+                </>
+              )}
+
               {/* ── Langkah 1: Pelanggan (termasuk alamat & sumber/waktu) ── */}
               {step === 0 && (
                 <>
@@ -2413,7 +2536,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
               {/* Pemilih produk cepat: cari produk → series → ukuran → qty */}
               <section className="space-y-2.5">
                 <div className="flex items-center justify-between gap-2">
-                  <h4 className={sectionClass}>Produk</h4>
+                  <h4 className={sectionClass}>{isPanelForm ? "Produk di pesanan" : "Produk"}</h4>
                   <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
                     {openRowIsPaket ? "Cari produk → Paket → Qty" : "Cari produk → Series → Ukuran → Qty"}
                   </span>
@@ -2425,6 +2548,208 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                   {items.map((row, index) => {
                     const info = rowInfo[index];
                     const step = seriesStep(row.category, row.kain, row.warna);
+
+                    /* ── Tampilan panel admin: kartu produk gaya mockup (tampilan saja) ── */
+                    if (isPanelForm && isEdit && !row.editing && rowComplete(row) && info.chosen) {
+                      const group = groupOf(row);
+                      const qty = Number(row.quantity) || 1;
+                      const stockMax = info.chosen.stock;
+                      const thumb = openRowThumb(index);
+                      const hargaBerubah = row.priceManual;
+
+                      /* Add-on Open Order: kartu pink tipis, tanpa kontrol edit. */
+                      if (info.isAddon) {
+                        return (
+                          <div
+                            key={index}
+                            className="flex items-center gap-2.5 rounded-[16px] px-3.5 py-3"
+                            style={{ background: PANEL_PINK, border: `1px solid ${PANEL_PINK_LINE}` }}
+                          >
+                            <Shirt size={16} className="shrink-0" style={{ color: PANEL_BLUE_DEEP }} />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-[12.5px] font-bold" style={{ color: PANEL_INK }}>
+                                {OPEN_ORDER_ADDON.name}
+                              </p>
+                              <p className="text-[11px] font-medium" style={{ color: PANEL_MUTED }}>
+                                Add-on Open Order · ikut otomatis
+                              </p>
+                            </div>
+                            <span className="shrink-0 text-[12.5px] font-bold tabular-nums" style={{ color: PANEL_BLUE_DEEP }}>
+                              Rp {formatRupiah(info.unitPrice)}
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={index}
+                          className="space-y-2.5 rounded-[18px] bg-white p-3.5"
+                          style={{
+                            border: `1px solid ${hargaBerubah ? "#f0b8cd" : PANEL_PINK_LINE}`,
+                            boxShadow: "0 1px 2px rgba(42,26,34,.04)",
+                          }}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div
+                              className="grid h-14 w-12 shrink-0 place-items-center overflow-hidden rounded-[12px]"
+                              style={{ background: PANEL_PINK, color: PANEL_BLUE_DEEP }}
+                            >
+                              {thumb ? (
+                                <img src={thumb} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                <Shirt size={18} />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-[13.5px] font-extrabold" style={{ color: PANEL_INK }}>
+                                {group?.name || row.product}
+                              </p>
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                {row.kain ? (
+                                  <span
+                                    className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                    style={{ background: PANEL_SKY, color: PANEL_BLUE_DEEP }}
+                                  >
+                                    {row.kain}
+                                  </span>
+                                ) : null}
+                                {step.show && row.series ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => openRow(index)}
+                                    className="rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors"
+                                    style={{ background: PANEL_PINK, color: PANEL_BLUE_DEEP, border: `1px solid ${PANEL_PINK_LINE}` }}
+                                    title="Ganti series"
+                                  >
+                                    {row.series}
+                                  </button>
+                                ) : null}
+                              </div>
+                              <p className="mt-1 text-[11px] font-medium" style={{ color: PANEL_MUTED }}>
+                                {info.chosen.linkedTo ? `Stok mengikuti ${info.chosen.linkedTo} · ` : ""}
+                                Sisa stok {stockMax} · {info.unitWeight.source === "missing" ? "berat belum diisi" : formatWeightExact(info.unitWeight.grams)}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeRow(index)}
+                              className="grid h-8 w-8 shrink-0 place-items-center rounded-full transition-colors"
+                              style={{ background: "#fdeceb", color: "#c0392b" }}
+                              aria-label="Hapus produk"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+
+                          <div>
+                            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: PANEL_MUTED }}>
+                              Pilih ukuran
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {info.options.map((option) => {
+                                const active = row.variant === option.value;
+                                const habis = option.stock <= 0 && !active;
+                                return (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    disabled={habis}
+                                    onClick={() => updateRow(index, sizeChangePatch(row, option.value))}
+                                    className="rounded-full px-3 py-1.5 text-[11.5px] font-bold transition-all"
+                                    style={
+                                      active
+                                        ? { background: PANEL_BLUE_DEEP, color: "#fff", border: `1px solid ${PANEL_BLUE_DEEP}` }
+                                        : habis
+                                          ? { background: "#f4f1f2", color: "#c9bfc4", border: "1px solid #efe8eb", cursor: "not-allowed" }
+                                          : { background: "#fff", color: PANEL_INK, border: `1px solid ${PANEL_PINK_LINE}` }
+                                    }
+                                    title={habis ? `${option.size} habis` : option.size}
+                                  >
+                                    {option.size}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-end gap-3">
+                            <div>
+                              <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: PANEL_MUTED }}>
+                                Jumlah
+                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => updateRow(index, { quantity: Math.max(1, qty - 1) })}
+                                  disabled={qty <= 1}
+                                  className="grid h-8 w-8 place-items-center rounded-full text-[15px] font-black disabled:opacity-40"
+                                  style={{ background: PANEL_PINK, color: PANEL_BLUE_DEEP }}
+                                  aria-label="Kurangi jumlah"
+                                >
+                                  −
+                                </button>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={row.quantity}
+                                  onChange={(event) => updateRow(index, { quantity: clampQty(digits(event.target.value), stockMax) })}
+                                  aria-label="Jumlah"
+                                  className="w-11 rounded-full py-1.5 text-center text-[13px] font-bold outline-none"
+                                  style={{ background: "#fff", border: `1px solid ${PANEL_PINK_LINE}`, color: PANEL_INK }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => updateRow(index, { quantity: Math.min(stockMax, qty + 1) })}
+                                  disabled={qty >= stockMax}
+                                  className="grid h-8 w-8 place-items-center rounded-full text-[15px] font-black disabled:opacity-40"
+                                  style={{ background: PANEL_PINK, color: PANEL_BLUE_DEEP }}
+                                  aria-label="Tambah jumlah"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: PANEL_MUTED }}>
+                                Harga
+                              </p>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={row.price}
+                                onChange={(event) => updateRow(index, { price: digits(event.target.value), priceManual: true })}
+                                placeholder={String(info.unitPrice)}
+                                aria-label="Harga satuan"
+                                className="w-full rounded-full px-3.5 py-1.5 text-[13px] font-bold tabular-nums outline-none"
+                                style={{
+                                  background: hargaBerubah ? "#fff" : "#fbfafb",
+                                  border: `1px solid ${hargaBerubah ? "#f0b8cd" : PANEL_PINK_LINE}`,
+                                  color: PANEL_INK,
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {hargaBerubah ? (
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-[11px] font-semibold" style={{ color: PANEL_MUTED }}>
+                                Harga awalnya Rp {formatRupiah(recordedPriceFor(row) || info.chosen.price)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => updateRow(index, { price: "", priceManual: false })}
+                                className="rounded-full px-2.5 py-1 text-[10.5px] font-bold"
+                                style={{ background: PANEL_SKY, color: PANEL_BLUE_DEEP }}
+                              >
+                                Kembalikan
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    }
 
                     if (!row.editing && rowComplete(row) && info.chosen) {
                       const group = groupOf(row);
@@ -3073,11 +3398,16 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                   <button
                     type="button"
                     onClick={addRow}
-                    className={`inline-flex items-center gap-2 px-3.5 py-2 text-sm font-bold rounded-xl transition-all ${
-                      isEdit
-                        ? "border-2 border-slate-900 dark:border-slate-100 text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800"
-                        : "border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                    }`}
+                    className={
+                      isPanelForm
+                        ? "inline-flex items-center gap-2 rounded-full border-2 border-dashed px-4 py-2 text-[12.5px] font-bold transition-colors hover:bg-[#f2f8fd]"
+                        : `inline-flex items-center gap-2 px-3.5 py-2 text-sm font-bold rounded-xl transition-all ${
+                            isEdit
+                              ? "border-2 border-slate-900 dark:border-slate-100 text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800"
+                              : "border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                          }`
+                    }
+                    style={isPanelForm ? { borderColor: PANEL_BLUE, color: PANEL_BLUE_DEEP } : undefined}
                   >
                     <Plus size={15} /> Tambah produk
                   </button>
@@ -3489,6 +3819,90 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
             </form>
 
             {/* Footer menempel: Total di kiri, aksi di kanan — tidak ikut ter-scroll */}
+            {isPanelForm && isEdit && !savedOrder ? (
+              <div
+                className="shrink-0 px-5 sm:px-6 py-4"
+                style={{
+                  background: "#fff",
+                  borderTop: `1px solid ${PANEL_PINK_LINE}`,
+                  borderTopLeftRadius: 24,
+                  borderTopRightRadius: 24,
+                  boxShadow: "0 -6px 22px -18px rgba(42,26,34,.5)",
+                }}
+              >
+                {/* Pesan galat stok / simpan — tetap tampil apa adanya. */}
+                {((step === 1 && stockIssues.length > 0) || saveError) && (
+                  <p className="mb-2 flex items-start gap-1.5 text-[11.5px] font-semibold text-[#c0392b]" role="alert">
+                    <AlertCircle size={13} className="mt-px shrink-0" />
+                    <span className="line-clamp-2">
+                      {saveError || stockIssues[0]}
+                      {!saveError && stockIssues.length > 1 ? ` (+${stockIssues.length - 1} lainnya)` : ""}
+                    </span>
+                  </p>
+                )}
+
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: PANEL_MUTED }}>
+                      Total pesanan
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-[26px] font-extrabold leading-tight tabular-nums" style={{ color: PANEL_INK }}>
+                        Rp {formatRupiah(total)}
+                      </p>
+                      {totalChanged ? (
+                        <span className="rounded-full px-2.5 py-1 text-[10.5px] font-bold" style={{ background: PANEL_PINK, color: "#b02a5b" }}>
+                          {Math.round(total) < Math.round(originalTotal) ? "Kurang" : "Lebih"} Rp{" "}
+                          {formatRupiah(Math.abs(Math.round(total) - Math.round(originalTotal)))}
+                        </span>
+                      ) : (
+                        <span className="rounded-full px-2.5 py-1 text-[10.5px] font-bold" style={{ background: "#e9f7ef", color: "#1f6f45" }}>
+                          Total pas
+                        </span>
+                      )}
+                    </div>
+                    {totalChanged ? (
+                      <p className="text-[11.5px] font-semibold line-through" style={{ color: PANEL_MUTED }}>
+                        Rp {formatRupiah(originalTotal)}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={requestClose}
+                      className="rounded-full px-5 py-2.5 text-[12.5px] font-bold transition-colors"
+                      style={{ background: "#f4f1f2", color: PANEL_INK }}
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={save}
+                      disabled={mutation.isPending || Boolean(editBlockedReason)}
+                      className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[12.5px] font-bold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
+                      style={{ background: PANEL_BLUE_DEEP, boxShadow: "0 6px 16px -10px rgba(47,111,158,.9)" }}
+                    >
+                      {mutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                      Simpan Perubahan
+                    </button>
+                  </div>
+                </div>
+
+                {editBlockedReason ? (
+                  <div
+                    className="mt-3 rounded-[14px] px-3.5 py-2.5"
+                    style={{ background: PANEL_PINK, border: `1px solid ${PANEL_PINK_LINE}` }}
+                  >
+                    <p className="text-[11.5px] font-semibold leading-relaxed" style={{ color: "#b02a5b" }}>
+                      Totalnya harus sama kayak yang dibayar customer ya. Kalau memang perlu diubah, batalkan
+                      pesanan ini lalu buat pesanan baru.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
             <div className="shrink-0 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a1d28] px-5 sm:px-6 py-3.5">
               {(step === 1 && stockIssues.length > 0) || saveError ? (
                 <p className="flex items-start gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400 mb-2" role="alert">
@@ -3604,6 +4018,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                 </div>
               </div>
             </div>
+            )}
 
             {/* Konfirmasi tutup: isian belum disimpan tidak hilang karena salah klik */}
             <AnimatePresence>
