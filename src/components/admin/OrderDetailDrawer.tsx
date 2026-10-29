@@ -77,44 +77,34 @@ export default function OrderDetailDrawer({
           transition={{ duration: 0.2 }}
           onClick={onClose}
         >
-          <motion.div
-            className="odr-panel"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "tween", duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Tampilan sama dengan drawer panel admin; tema mono untuk /admin.
-                Semua logic & aksi tetap di OrderDetailContent. */}
-            <PanelDetailShell open onClose={onClose} tema={tema} embed>
-              <OrderDetailContent
-                order={order}
-                onClose={onClose}
-                tampilan="baru"
-                tema={tema}
-                onStatusChange={onStatusChange}
-                onCancelJnt={onCancelJnt}
-                onDelete={onDelete}
-                onArrangeOrder={onArrangeOrder}
-                onSynced={onSynced}
-              />
-            </PanelDetailShell>
+          {/* Drawer menggeser dirinya sendiri; isinya shell dalam mode `embed` supaya
+              tingginya pasti dan scroll jalan. */}
+          <PanelDetailShell open onClose={onClose} tema={tema} embed>
+            <OrderDetailContent
+              order={order}
+              onClose={onClose}
+              tampilan="baru"
+              tema={tema}
+              onStatusChange={onStatusChange}
+              onCancelJnt={onCancelJnt}
+              onDelete={onDelete}
+              onArrangeOrder={onArrangeOrder}
+              onSynced={onSynced}
+            />
+          </PanelDetailShell>
 
-            {/* z-index 50: ConfirmModal (Hapus Pesanan / Batalkan J&T) memakai z-50 dan
-                dirender setelah drawer, jadi konfirmasinya tetap muncul di atas. */}
-            <style>{ODR_CSS}</style>
-          </motion.div>
+          {/* z-index 50: ConfirmModal (Hapus Pesanan / Batalkan J&T) memakai z-50 dan
+              dirender setelah drawer, jadi konfirmasinya tetap muncul di atas. */}
+          <style>{ODR_CSS}</style>
         </motion.div>
       )}
     </AnimatePresence>
   );
 }
 
-/* Kerangka drawer: overlay + panel geser. Isinya PanelDetailShell (gaya drawer panel admin).
-   z-index 50: ConfirmModal memakai z-50 dan dirender setelah drawer. */
+/* Kerangka drawer: overlay gelap (layar penuh) + panel yang menempel kanan.
+   Panelnya sendiri dimiliki PanelDetailShell mode `embed`; di sini cukup lebar + bayangan. */
 const ODR_CSS = `
-.odr-overlay{position:fixed;inset:0;z-index:50;display:flex;justify-content:flex-end}
-.odr-panel{width:100%;height:100%;display:flex;flex-direction:column;min-width:0}
-.odr-panel.is-mono{background:#fff}
+.odr-overlay{position:fixed;inset:0;z-index:50;display:flex;justify-content:flex-end;align-items:stretch;background:rgba(17,24,39,.5);backdrop-filter:blur(3px)}
+.odr-overlay .dp-panel.is-embed{height:100%;box-shadow:-24px 0 60px -24px rgba(17,24,39,.45)}
 `;

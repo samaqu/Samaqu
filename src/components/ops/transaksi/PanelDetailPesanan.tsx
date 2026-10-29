@@ -543,10 +543,32 @@ export function PanelDetailShell({
   onClose: () => void;
   /** `mono` untuk dashboard /admin & ops (hitam-putih). */
   tema?: "warna" | "mono";
-  /** Dipakai saat shell ditanam di drawer lain (/admin & ops) yang sudah punya panel. */
+  /**
+   * `embed` = shell dipakai DI DALAM drawer lain (/admin & ops) yang sudah punya overlay dan
+   * animasi geser sendiri. Saat embed, overlay tidak dirender ulang dan panel tidak `fixed`,
+   * jadi tingginya mengikuti induk dan `.dp-wrap` bisa di-scroll.
+   */
   embed?: boolean;
   children: ReactNode;
 }) {
+  const panel = (
+    <motion.aside
+      initial={embed ? false : { x: "100%" }}
+      animate={{ x: 0 }}
+      exit={embed ? undefined : { x: "100%" }}
+      transition={{ type: "tween", duration: 0.24, ease: "easeOut" }}
+      className={`dp-panel${tema === "mono" ? " tema-mono" : ""}${embed ? " is-embed" : ""}`}
+      role="dialog"
+      aria-label="Detail Pesanan"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {children}
+      <style>{DP_CSS}</style>
+    </motion.aside>
+  );
+
+  if (embed) return open ? panel : null;
+
   return (
     <AnimatePresence>
       {open ? (
@@ -558,18 +580,7 @@ export function PanelDetailShell({
             className="dp-overlay"
             onClick={onClose}
           />
-          <motion.aside
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "tween", duration: 0.24, ease: "easeOut" }}
-            className={`dp-panel${tema === "mono" ? " tema-mono" : ""}${embed ? " is-embed" : ""}`}
-            role="dialog"
-            aria-label="Detail Pesanan"
-          >
-            {children}
-            <style>{DP_CSS}</style>
-          </motion.aside>
+          {panel}
         </>
       ) : null}
     </AnimatePresence>
@@ -581,10 +592,10 @@ export function PanelDetailShell({
 const DP_CSS = `
 .dp-overlay{position:fixed;inset:0;z-index:9998;background:rgba(18,32,48,.45);backdrop-filter:blur(3px)}
 .dp-panel{position:fixed;inset-block:0;right:0;z-index:9999;display:flex;flex-direction:column;width:100%;max-width:100vw;background:#f4f7fb;color:#24324a;border-left:1px solid #e8eef5;overflow:hidden;box-shadow:-24px 0 60px -24px rgba(18,32,48,.4)}
-/* Di dalam drawer yang sudah punya panel sendiri (/admin & ops), panel ini tidak lagi fixed:
-   induknya ber-transform (framer-motion), jadi position:fixed terkurung dan area scroll mati.
-   Sekarang ia mengisi penuh wadah induk dan yang men-scroll adalah .dp-wrap. */
-.dp-panel.is-embed{position:relative;inset:auto;z-index:auto;width:100%;max-width:100%;height:100%;border-left:0;box-shadow:none}
+/* Mode embed (/admin & ops): panel ini ANAK drawer lain yang sudah overlay + animasi geser.
+   Tidak fixed, tidak punya overlay sendiri, lebarnya mengikuti induk (560px) — tingginya
+   penuh supaya area dp-wrap yang men-scroll. */
+.dp-panel.is-embed{position:relative;inset:auto;z-index:1;flex:1;min-height:0;width:100%;max-width:100%;border-left:0;box-shadow:none}
 .dp-panel.tema-mono{background:#fff;border-left-color:#e5e7eb}
 @media (min-width:640px){.dp-panel{width:560px;max-width:560px}}
 
