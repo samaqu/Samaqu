@@ -317,16 +317,20 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
             if (canHubungiCustomer) window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
           }}
           ekstra={
-            <>
-              {order.items_edited_after_resi && awb ? (
-                <div className="dp-warning" role="status">
-                  Item diubah setelah resi terbit. Cetak ulang label dan beri tahu tim packing. Label lama jangan dipakai.
-                  Nomor resi tetap <b>{awb}</b>.
-                </div>
-              ) : null}
-              {order.notes ? <p className="dp-catatan">Catatan pembeli: {order.notes}</p> : null}
-              {statusError ? <p className="dp-error">{statusError}</p> : null}
-            </>
+            /* Hanya dikirim kalau memang ada isinya — fragment kosong membuat kartu putih
+               kosong menggantung di atas footer. */
+            order.items_edited_after_resi || order.notes || statusError ? (
+              <>
+                {order.items_edited_after_resi && awb ? (
+                  <div className="dp-warning" role="status">
+                    Item diubah setelah resi terbit. Cetak ulang label dan beri tahu tim packing. Label lama jangan dipakai.
+                    Nomor resi tetap <b>{awb}</b>.
+                  </div>
+                ) : null}
+                {order.notes ? <p className="dp-catatan">Catatan pembeli: {order.notes}</p> : null}
+                {statusError ? <p className="dp-error">{statusError}</p> : null}
+              </>
+            ) : null
           }
         >
           {/* Panel resi asli: buat resi, resi HBO, tandai dikirim, cetak (logic lama, tidak diubah).
