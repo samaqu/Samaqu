@@ -143,6 +143,34 @@ export default function Transaksi({ variant = "ops" }) {
     const fresh = orders.find((o) => o.order_number === detail.order_number);
     if (fresh && fresh !== detail) setDetail(fresh);
   }, [orders, detail]);
+
+  /**
+   * Buka detail langsung dari tautan `?order=NOMOR-PESANAN`.
+   *
+   * Dipakai menu Retur (`ReturnsView`) supaya "No. Pesanan" pada detail retur bisa diklik dan
+   * membuka pesanan aslinya di sini. Tanpa ini parameter diabaikan dan admin mendarat di daftar
+   * tanpa tahu pesanan mana yang dimaksud.
+   *
+   * Dibaca sekali saat halaman dibuka. `getOrder` membaca langsung ke database (bukan menunggu
+   * daftar bulan berjalan), jadi pesanan lama tetap terbuka walau bulannya sudah berganti.
+   */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const wanted = String(new URLSearchParams(window.location.search).get("order") || "").trim();
+    if (!wanted) return;
+    let cancelled = false;
+    base44.entities.Transaction.getOrder(wanted)
+      .then((found) => {
+        if (!cancelled && found) setDetail(found);
+      })
+      .catch(() => {
+        // Pesanan tidak ditemukan / gagal dibaca: daftar tetap tampil normal tanpa drawer.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const [cancelTarget, setCancelTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 

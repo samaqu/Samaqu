@@ -1944,7 +1944,17 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
             <div className="min-w-0">
               <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">No. Pesanan</dt>
               <dd className="mt-0.5 truncate font-mono text-xs font-bold text-slate-800 dark:text-slate-100" title={record.order_number || undefined}>
-                {record.order_number || "—"}
+                {record.order_id ? (
+                  <a
+                    href={`${isPanel ? "/panel-admin" : "/ops"}/transaksi?order=${encodeURIComponent(record.order_number)}`}
+                    title="Buka pesanan asal di Transaksi"
+                    className={`underline decoration-dotted underline-offset-2 hover:no-underline ${isPanel ? "text-[#c2255c]" : "text-slate-900 dark:text-white"}`}
+                  >
+                    {record.order_number}
+                  </a>
+                ) : (
+                  record.order_number || "—"
+                )}
               </dd>
             </div>
             <div className="min-w-0">
