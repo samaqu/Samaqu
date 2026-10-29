@@ -484,11 +484,23 @@ export default function PanelDetailPesanan({
 
 export function PanelDetailFooter({ aksi }: { aksi: AksiFooter[] }) {
   if (!aksi || aksi.length === 0) return null;
-  // Semua aksi ditumpuk satu per baris, sama lebar. Urutannya sudah diatur pemanggil:
-  // bahaya (Batalkan) → sekunder (Ubah) → utama (Ingatkan Bayar) paling bawah.
+  // Aksi utama turun ke barisnya sendiri selebar drawer (paling gampang ditekan), aksi
+  // pendamping (bahaya/sekunder) berbagi satu baris di atasnya — pola yang sama dengan
+  // bottom bar aplikasi. Urutan array tetap diatur pemanggil.
+  const pendamping = aksi.filter((a) => a.jenis !== "utama");
+  const utama = aksi.filter((a) => a.jenis === "utama");
   return (
     <div className="dp-footer">
-      {aksi.map((a) => (
+      {pendamping.length > 0 ? (
+        <div className="dp-footer-baris">
+          {pendamping.map((a) => (
+            <button key={a.key} type="button" className={`dp-tombol ${a.jenis}`} onClick={a.onClick} disabled={a.disabled}>
+              {a.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {utama.map((a) => (
         <button key={a.key} type="button" className={`dp-tombol ${a.jenis}`} onClick={a.onClick} disabled={a.disabled}>
           {a.label}
         </button>
@@ -669,15 +681,23 @@ const DP_CSS = `
 .dp-kv-baris b{min-width:0;font-weight:900;text-align:right;overflow-wrap:anywhere}
 .dp-kv-baris b.kosong{color:#9aa6b4;font-weight:800}
 
-/* Footer: semua aksi ditumpuk satu per baris, lebar sama — tombolnya jadi seimbang. */
-.dp-footer{flex:none;display:flex;flex-direction:column;gap:8px;padding:16px 20px 22px;background:#fff;border-radius:28px 28px 0 0;box-shadow:0 -10px 30px rgba(36,50,74,.08)}
-.dp-tombol{flex:0 0 auto;width:100%;height:46px;padding:0 16px;border:0;border-radius:999px;font:inherit;font-size:14px;font-weight:900;line-height:1;cursor:pointer;transition:filter .15s}
+/* Footer gaya bottom bar aplikasi: lembar putih yang mengambang, aksi pendamping
+   berbagi satu baris (outline lembut), aksi utama satu baris penuh dengan gradient. */
+.dp-footer{flex:none;display:flex;flex-direction:column;gap:10px;padding:14px 20px 20px;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-top:1px solid #eaf0f6;border-radius:26px 26px 0 0;box-shadow:0 -14px 34px -18px rgba(36,50,74,.28)}
+.dp-footer-baris{display:flex;gap:10px}
+.dp-tombol{flex:1 1 0;min-width:0;height:46px;padding:0 16px;border:0;border-radius:14px;font:inherit;font-size:14px;font-weight:800;line-height:1;letter-spacing:-.01em;cursor:pointer;transition:transform .12s,filter .15s,box-shadow .15s}
 .dp-tombol:hover:not(:disabled){filter:brightness(.97)}
-.dp-tombol:disabled{opacity:.5;cursor:not-allowed}
-.dp-tombol.bahaya{background:#fdf0f0;color:#b42f2f}
-.dp-tombol.sekunder{background:#e8f3fb;color:#2774a8}
-/* Aksi utama tetap menonjol: sedikit lebih tinggi + bayangan biru. */
-.dp-tombol.utama{height:54px;font-size:15px;background:linear-gradient(135deg,#2774a8,#3a8fc6);color:#fff;box-shadow:0 10px 22px rgba(39,116,168,.3)}
+.dp-tombol:active:not(:disabled){transform:scale(.985)}
+.dp-tombol:disabled{opacity:.45;cursor:not-allowed}
+/* Batalkan: teks merah di atas dasar netral — tidak berteriak, tapi jelas berbeda. */
+.dp-tombol.bahaya{background:#fff;color:#b42f2f;box-shadow:inset 0 0 0 1px #f2dcdc}
+.dp-tombol.bahaya:hover:not(:disabled){background:#fef7f7}
+/* Ubah: biru muda lembut. */
+.dp-tombol.sekunder{background:#eef6fc;color:#2774a8}
+.dp-tombol.sekunder:hover:not(:disabled){background:#e3f0fa}
+/* Aksi utama: satu-satunya bidang berwarna penuh, selebar drawer. */
+.dp-tombol.utama{flex:0 0 auto;width:100%;height:52px;font-size:15px;font-weight:900;border-radius:16px;background:linear-gradient(135deg,#2774a8,#3a8fc6);color:#fff;box-shadow:0 8px 20px -6px rgba(39,116,168,.55)}
+.dp-tombol.utama:hover:not(:disabled){filter:brightness(1.03)}
 
 /* Catatan & peringatan di kartu ekstra. */
 .dp-warning{padding:10px 12px;border-radius:12px;border:1px solid #f3dfae;background:#fff8e6;color:#7a5200;font-size:12.5px;font-weight:700;line-height:1.5}
@@ -724,8 +744,8 @@ const DP_CSS = `
   .dp-resi{flex-wrap:wrap}
   .dp-kv-baris{font-size:13.5px}
   .dp-langkah-label{font-size:11px}
-  .dp-footer{padding:12px 14px 18px;border-radius:24px 24px 0 0}
-  .dp-tombol{height:44px;padding:0 14px;font-size:14px}
+  .dp-footer{padding:12px 14px 16px;border-radius:22px 22px 0 0}
+  .dp-tombol{height:44px;padding:0 12px;font-size:13.5px}
   .dp-tombol.utama{height:50px}
 }
 `;
