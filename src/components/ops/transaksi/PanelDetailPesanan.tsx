@@ -209,6 +209,7 @@ export default function PanelDetailPesanan({
   nomorTersalin,
   onChat,
   onClose,
+  aksi = [],
   ekstra,
   children,
 }: {
@@ -243,6 +244,8 @@ export default function PanelDetailPesanan({
   onChat: () => void;
   /** Tombol tutup drawer (perilaku sama dengan tombol tutup sebelumnya). */
   onClose: () => void;
+  /** Aksi bawah (bahaya → sekunder → utama). Ikut ke-scroll bersama isi, tidak menempel. */
+  aksi?: AksiFooter[];
   /** Peringatan / catatan tambahan di kartu terakhir. */
   ekstra?: ReactNode;
   /** Blok resi J&T asli (buat resi, cetak) — logic lama, hanya dipindah posisinya. */
@@ -477,6 +480,10 @@ export default function PanelDetailPesanan({
         </section>
 
         {ekstra ? <section className="dp-kartu dp-ekstra">{ekstra}</section> : null}
+
+        {/* Footer duduk di ujung isi dan ikut ke-scroll (position static), sama seperti
+            tombol-tombol di drawer /admin — bukan menempel di bawah layar. */}
+        <PanelDetailFooter aksi={aksi} />
       </div>
     </div>
   );
@@ -681,9 +688,9 @@ const DP_CSS = `
 .dp-kv-baris b{min-width:0;font-weight:900;text-align:right;overflow-wrap:anywhere}
 .dp-kv-baris b.kosong{color:#9aa6b4;font-weight:800}
 
-/* Footer gaya bottom bar aplikasi: lembar putih yang mengambang, aksi pendamping
-   berbagi satu baris (outline lembut), aksi utama satu baris penuh dengan gradient. */
-.dp-footer{flex:none;display:flex;flex-direction:column;gap:10px;padding:14px 20px 20px;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-top:1px solid #eaf0f6;border-radius:26px 26px 0 0;box-shadow:0 -14px 34px -18px rgba(36,50,74,.28)}
+/* Footer duduk di ujung isi (ikut ke-scroll, position static) seperti tombol di drawer
+   /admin — bukan menempel di bawah layar. Gaya tetap bottom bar: kartu putih membulat. */
+.dp-footer{flex:none;display:flex;flex-direction:column;gap:10px;margin-top:4px;padding:14px 16px 16px;background:#fff;border-radius:20px;box-shadow:0 6px 20px rgba(36,50,74,.06)}
 .dp-footer-baris{display:flex;gap:10px}
 .dp-tombol{flex:1 1 0;min-width:0;height:46px;padding:0 16px;border:0;border-radius:14px;font:inherit;font-size:14px;font-weight:800;line-height:1;letter-spacing:-.01em;cursor:pointer;transition:transform .12s,filter .15s,box-shadow .15s}
 .dp-tombol:hover:not(:disabled){filter:brightness(.97)}
@@ -744,7 +751,7 @@ const DP_CSS = `
   .dp-resi{flex-wrap:wrap}
   .dp-kv-baris{font-size:13.5px}
   .dp-langkah-label{font-size:11px}
-  .dp-footer{padding:12px 14px 16px;border-radius:22px 22px 0 0}
+  .dp-footer{padding:12px;border-radius:18px}
   .dp-tombol{height:44px;padding:0 12px;font-size:13.5px}
   .dp-tombol.utama{height:50px}
 }

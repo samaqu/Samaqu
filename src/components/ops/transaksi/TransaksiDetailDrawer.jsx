@@ -25,11 +25,7 @@ import { jntServiceTag } from "@/lib/jnt/layanan";
 import JntBadge from "@/components/JntBadge";
 import { SOURCE_STYLES, STATUS_STYLES, formatRupiah, formatTanggalJamID } from "@/components/ops/transaksi/transaksi-format";
 import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
-import PanelDetailPesanan, {
-  PanelDetailFooter,
-  PanelDetailShell,
-  jamWIB,
-} from "@/components/ops/transaksi/PanelDetailPesanan";
+import PanelDetailPesanan, { PanelDetailShell, jamWIB } from "@/components/ops/transaksi/PanelDetailPesanan";
 
 export default function TransaksiDetailDrawer({ open, order, variant = "ops", onClose, onEdit, onCancel, onDelete, onResiCreated }) {
   const isPanel = variant === "panel";
@@ -316,6 +312,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
           onChat={() => {
             if (canHubungiCustomer) window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
           }}
+          aksi={aksi}
           ekstra={
             /* Hanya dikirim kalau memang ada isinya — fragment kosong membuat kartu putih
                kosong menggantung di atas footer. */
@@ -345,8 +342,6 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
             trackingState={track.status}
           />
         </PanelDetailPesanan>
-
-        <PanelDetailFooter aksi={aksi} />
 
         {trackModal ? (
           <div
