@@ -11,7 +11,7 @@ import {
   trackingSummary,
 } from "@/lib/jnt/track-status";
 import { orderStatusKey, shippingStatusOf, SHIPPING_STATUS_LABEL, orderStage } from "@/lib/order-flow";
-import PanelDetailPesanan, { jamWIB, type AksiFooter } from "@/components/ops/transaksi/PanelDetailPesanan";
+import PanelDetailPesanan, { DP_STYLE, jamWIB, type AksiFooter } from "@/components/ops/transaksi/PanelDetailPesanan";
 import { orderSourceLabel } from "@/lib/transaksi";
 import { jntServiceCodeFromShippingMethod } from "@/lib/jnt/layanan";
 import { useSafeTranslations } from "@/lib/safe-i18n";
@@ -767,6 +767,9 @@ export default function OrderDetailContent({
 
       {tampilan === "baru" ? (
         <div style={{ display: "flex", height: "100%", minHeight: 0, width: "100%" }}>
+          {/* Rendernya langsung (tanpa PanelDetailShell), jadi stylesheet drawer harus
+              dipasang di sini — kalau tidak, drawer tampil sebagai teks polos. */}
+          <style>{DP_STYLE}</style>
           <PanelDetailPesanan {...viewProps} />
         </div>
       ) : (

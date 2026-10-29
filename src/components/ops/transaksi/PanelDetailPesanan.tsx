@@ -868,3 +868,10 @@ const DP_CSS = `
   .dp-tombol.utama{height:50px}
 }
 `;
+
+/**
+ * Stylesheet drawer, diekspor untuk pemakai yang merender `PanelDetailPesanan` LANGSUNG
+ * (tanpa `PanelDetailShell`). Dulu `<style>` hanya ada di dalam shell, sehingga /admin —
+ * yang merender panel secara langsung — tampil sebagai teks polos tanpa gaya.
+ */
+export const DP_STYLE = DP_CSS;
