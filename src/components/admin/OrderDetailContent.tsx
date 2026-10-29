@@ -647,12 +647,23 @@ export default function OrderDetailContent({
     } else if (resi && !resiVoided) {
       list.push({
         key: "cetak",
-        label: "Cetak Label",
+        label: "Cetak Resi",
         jenis: "utama",
         onClick: () => window.open(`/admin/label/${order.order_number}`, "_blank", "noopener,noreferrer"),
       });
     } else if (canArrange) {
       list.push({ key: "atur", label: arranging ? "Memproses…" : "Atur Pesanan", jenis: "utama", disabled: arranging, onClick: handleArrange });
+    } else if (order.status !== "dibatalkan") {
+      // Belum ada resi dan tidak bisa dibuat otomatis (mis. HBO): beri jalan ke tombol cetak
+      // supaya admin tidak buntu — halaman label sendiri yang menolak kalau resi belum ada.
+      list.push({
+        key: "cetak",
+        label: "Cetak Resi",
+        jenis: "utama",
+        disabled: true,
+        hint: "Resi belum dibuat. Terbitkan resi dulu (Atur Pesanan / input resi HBO).",
+        onClick: () => {},
+      });
     }
     return list;
   })();

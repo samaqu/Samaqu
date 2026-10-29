@@ -295,6 +295,7 @@ export default function Transaksi({ variant = "ops" }) {
         open={!!detail}
         order={detail}
         variant="panel"
+        owner={isPanel ? "panel" : "ops"}
         onResiCreated={handleResiCreated}
         onClose={() => setDetail(null)}
         onEdit={(order) => {

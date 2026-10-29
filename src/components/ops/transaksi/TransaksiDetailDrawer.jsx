@@ -27,8 +27,11 @@ import { SOURCE_STYLES, STATUS_STYLES, formatRupiah, formatTanggalJamID } from "
 import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
 import PanelDetailPesanan, { PanelDetailShell, jamWIB } from "@/components/ops/transaksi/PanelDetailPesanan";
 
-export default function TransaksiDetailDrawer({ open, order, variant = "ops", onClose, onEdit, onCancel, onDelete, onResiCreated }) {
+export default function TransaksiDetailDrawer({ open, order, variant = "ops", owner = "panel", onClose, onEdit, onCancel, onDelete, onResiCreated }) {
   const isPanel = variant === "panel";
+  // Tema tampilan baru: panel admin (default) memakai warna pastel, dashboard ops memakai
+  // mono hitam-putih supaya sama dengan /admin. Ditentukan pemanggil, bukan ditebak.
+  const tema = owner === "ops" ? "mono" : "warna";
   const [statusBusy, setStatusBusy] = useState(false);
   const [statusError, setStatusError] = useState("");
   const status = order ? STATUS_STYLES[order.status] : null;
@@ -303,6 +306,17 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
       });
     } else if (canPrint) {
       aksi.push({ key: "cetak", label: "Cetak Resi", jenis: "utama", onClick: () => resiPanelRef.current?.print() });
+    } else if (order.status !== "dibatalkan") {
+      // Resi belum ada: tombol tetap ditampilkan (mati) supaya admin tidak mengira fiturnya
+      // hilang — alasannya muncul sebagai tooltip.
+      aksi.push({
+        key: "cetak",
+        label: "Cetak Resi",
+        jenis: "utama",
+        disabled: true,
+        hint: "Resi belum dibuat. Terbitkan resi dulu (Atur Pesanan / input resi HBO).",
+        onClick: () => {},
+      });
     }
     if (canDelete) aksi.push({ key: "hapus", label: "Hapus", jenis: "sekunder", onClick: () => onDelete?.(order) });
 
@@ -318,8 +332,9 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
     }
 
     return (
-      <PanelDetailShell open={open} onClose={onClose}>
+      <PanelDetailShell open={open} onClose={onClose} tema={tema}>
         <PanelDetailPesanan
+          tema={tema}
           sumber={order.source_label}
           tahap={stage}
           createdAt={order.created_at}
