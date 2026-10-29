@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { strukStatus, strukSteps, tglJamID, rupiah } from "@/lib/akun-format";
@@ -694,68 +694,81 @@ export default function OrderDetailContent({
         }
       : null;
 
+  /**
+   * Semua props tampilan baru dirakit sekali di sini, lalu dipakai DUA cara:
+   * - `tampilan="baru"`: dirender langsung di file ini (dipakai /admin lewat OrderDetailDrawer).
+   * - `onViewProps`: dikirim ke induk yang mau merender panelnya sendiri (mis. agar posisinya
+   *   sama persis dengan drawer lain). Tidak ada logic yang diduplikasi.
+   */
+  const viewProps: React.ComponentProps<typeof PanelDetailPesanan> = {
+    tema,
+    onClose: onClose || (() => {}),
+    sumber: orderSourceLabel(order),
+    tahap: orderStage(order),
+    createdAt: order.created_at,
+    nama: order.customer_name || "Tanpa nama",
+    telepon: order.customer_whatsapp || "",
+    alamat,
+    kurir: "J&T Express",
+    layanan: (serviceCode || "").toUpperCase() || "—",
+    resi,
+    resiKosong: resi ? "" : "Resi belum dibuat",
+    resiCatatan: resi ? "Resi sudah terbit" : "Resi otomatis setelah bayar",
+    onLacak: () => openTrack(!showTrack),
+    onSalinResi: () => salin("resi", resi),
+    resiTersalin: tersalin === "resi",
+    berat: `Berat ${totalWeight.grams ? formatWeightExact(totalWeight.grams) : "-"}`,
+    items: itemsWithPhotos.map((item) => ({
+      key: `${item.product_id}-${item.color}-${item.size}`,
+      nama: item.product_name,
+      chips: [
+        item.kain ? { teks: `Kain ${item.kain}`, jenis: "kain" as const } : null,
+        variantName(item.series) ? { teks: variantName(item.series), jenis: "kain" as const } : null,
+        { teks: `${item.size || ""}${item.size ? " · " : ""}x${item.quantity}`, jenis: "netral" as const },
+      ].filter((c): c is { teks: string; jenis: "kain" | "netral" } => !!c),
+      harga: `Rp ${Number(item.price * item.quantity).toLocaleString("id-ID")}`,
+      foto: item.product_image || NEUTRAL_ITEM_PHOTO,
+    })),
+    subtotal: order.subtotal,
+    ongkir: order.shipping_cost,
+    diskon: order.discount,
+    total: order.total,
+    metodeBayar: paymentDetail,
+    waktuPesan: jamWIB(order.created_at),
+    waktuBayar: order.paid_at ? jamWIB(order.paid_at) : null,
+    nomorPesanan: order.order_number,
+    onSalinNomor: () => salin("nomor", order.order_number),
+    nomorTersalin: tersalin === "nomor",
+    onChat: () => {
+      if (order.customer_whatsapp) window.open(waLink(order.customer_whatsapp, waPesan), "_blank", "noopener,noreferrer");
+    },
+    aksi: aksiBaru,
+    ekstra: (
+      <>
+        {order.items_edited_after_resi && resi ? (
+          <p className="dp-warning" role="status">
+            Item diubah setelah resi terbit. Cetak ulang label dan beri tahu tim packing. Label lama jangan dipakai.
+            Nomor resi tetap <b>{resi}</b>.
+          </p>
+        ) : null}
+        {order.shipping_notes ? <p className="dp-catatan">Catatan pembeli: {order.shipping_notes}</p> : null}
+        {showTrack ? <div className="dp-catatan">{trackPanel}</div> : null}
+      </>
+    ),
+  };
+
   return (
-    <div className="od-root">
+    <div
+      className="od-root"
+      style={tampilan === "baru" ? { display: "flex", height: "100%", minHeight: 0, width: "100%" } : undefined}
+    >
       <style>{RINCIAN_CSS}</style>
       <style>{OD_CSS}</style>
 
       {tampilan === "baru" ? (
-        <PanelDetailPesanan
-          tema={tema}
-          onClose={onClose || (() => {})}
-          sumber={orderSourceLabel(order)}
-          tahap={orderStage(order)}
-          createdAt={order.created_at}
-          nama={order.customer_name || "Tanpa nama"}
-          telepon={order.customer_whatsapp || ""}
-          alamat={alamat}
-          kurir="J&T Express"
-          layanan={(serviceCode || "").toUpperCase() || "—"}
-          resi={resi}
-          resiKosong={resi ? "" : "Resi belum dibuat"}
-          resiCatatan={resi ? "Resi sudah terbit" : "Resi otomatis setelah bayar"}
-          onLacak={() => openTrack(!showTrack)}
-          onSalinResi={() => salin("resi", resi)}
-          resiTersalin={tersalin === "resi"}
-          berat={`Berat ${totalWeight.grams ? formatWeightExact(totalWeight.grams) : "-"}`}
-          items={itemsWithPhotos.map((item) => ({
-            key: `${item.product_id}-${item.color}-${item.size}`,
-            nama: item.product_name,
-            chips: [
-              item.kain ? { teks: `Kain ${item.kain}`, jenis: "kain" as const } : null,
-              variantName(item.series) ? { teks: variantName(item.series), jenis: "kain" as const } : null,
-              { teks: `${item.size || ""}${item.size ? " · " : ""}x${item.quantity}`, jenis: "netral" as const },
-            ].filter((c): c is { teks: string; jenis: "kain" | "netral" } => !!c),
-            harga: `Rp ${Number(item.price * item.quantity).toLocaleString("id-ID")}`,
-            foto: item.product_image || NEUTRAL_ITEM_PHOTO,
-          }))}
-          subtotal={order.subtotal}
-          ongkir={order.shipping_cost}
-          diskon={order.discount}
-          total={order.total}
-          metodeBayar={paymentDetail}
-          waktuPesan={jamWIB(order.created_at)}
-          waktuBayar={order.paid_at ? jamWIB(order.paid_at) : null}
-          nomorPesanan={order.order_number}
-          onSalinNomor={() => salin("nomor", order.order_number)}
-          nomorTersalin={tersalin === "nomor"}
-          onChat={() => {
-            if (order.customer_whatsapp) window.open(waLink(order.customer_whatsapp, waPesan), "_blank", "noopener,noreferrer");
-          }}
-          aksi={aksiBaru}
-          ekstra={
-            <>
-              {order.items_edited_after_resi && resi ? (
-                <p className="dp-warning" role="status">
-                  Item diubah setelah resi terbit. Cetak ulang label dan beri tahu tim packing. Label lama jangan dipakai.
-                  Nomor resi tetap <b>{resi}</b>.
-                </p>
-              ) : null}
-              {order.shipping_notes ? <p className="dp-catatan">Catatan pembeli: {order.shipping_notes}</p> : null}
-              {showTrack ? <div className="dp-catatan">{trackPanel}</div> : null}
-            </>
-          }
-        />
+        <div style={{ display: "flex", height: "100%", minHeight: 0, width: "100%" }}>
+          <PanelDetailPesanan {...viewProps} />
+        </div>
       ) : (
         <>
       {/* Sama seperti drawer ops: panel langsung di body, tanpa wrapper struk customer. */}

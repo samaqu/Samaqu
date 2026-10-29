@@ -581,8 +581,9 @@ export function PanelDetailShell({
             exit={{ opacity: 0 }}
             className="dp-overlay"
             onClick={onClose}
-          />
-          {panel}
+          >
+            {panel}
+          </motion.div>
         </>
       ) : null}
     </AnimatePresence>
@@ -592,14 +593,13 @@ export function PanelDetailShell({
 /* Nilai di bawah ini disalin dari mockup-detail-pesanan.html (ukuran, jarak, warna, radius,
    bayangan, ketebalan huruf). Kalau mockup berubah, ubah di sini juga. */
 const DP_CSS = `
-.dp-overlay{position:fixed;inset:0;z-index:9998;background:rgba(18,32,48,.45);backdrop-filter:blur(3px)}
-/* Panel = tinggi layar penuh. Isi (.dp-wrap) mengisi sisa ruang dan di-scroll DI DALAM panel.
-   min-height:0 penting: tanpa itu flex item menolak menyusut dan isinya memanjang keluar
-   layar (tidak ada scrollbar). */
-.dp-panel{position:fixed;inset-block:0;right:0;z-index:9999;display:flex;flex-direction:column;width:100%;max-width:100vw;height:100vh;max-height:100vh;min-height:0;background:#f4f7fb;color:#24324a;border-left:1px solid #e8eef5;overflow:hidden;box-shadow:-24px 0 60px -24px rgba(18,32,48,.4)}
-/* Mode embed (/admin & ops): kerangkanya sama; induk hanya menyediakan overlay. */
+.dp-overlay{position:fixed;inset:0;z-index:9998;display:flex;justify-content:flex-end;background:rgba(18,32,48,.45);backdrop-filter:blur(3px)}
+/* Panel mengikuti pola drawer lain di /admin (ProductDetailDrawer): induk = overlay fixed
+   ber-flex, panel = anak dengan height:100%. Jangan pakai position:fixed di panel — di dalam
+   induk ber-transform/flex nilainya terkurung dan area scroll jadi mati. */
+.dp-panel{position:relative;z-index:1;display:flex;flex-direction:column;width:100%;max-width:100vw;height:100%;min-height:0;background:#f4f7fb;color:#24324a;overflow:hidden;box-shadow:-24px 0 60px -24px rgba(18,32,48,.4)}
 .dp-panel.is-embed{border-left:0}
-.dp-panel.tema-mono{background:#fff;border-left-color:#e5e7eb}
+.dp-panel.tema-mono{background:#fff}
 @media (min-width:640px){.dp-panel{width:560px;max-width:560px}}
 
 /* Satu kolom scroll: header ikut ke-scroll, bukan sticky.

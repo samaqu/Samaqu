@@ -22,8 +22,11 @@
 import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import OrderDetailContent, { AdminDetailOrder } from "@/components/admin/OrderDetailContent";
-import { PanelDetailShell } from "@/components/ops/transaksi/PanelDetailPesanan";
+import PanelDetailPesanan from "@/components/ops/transaksi/PanelDetailPesanan";
 import { useBodyScrollLock } from "@/lib/use-scroll-lock";
+
+/** Props yang dibutuhkan PanelDetailPesanan, dihitung oleh OrderDetailContent (satu sumber). */
+export type AdminViewProps = React.ComponentProps<typeof PanelDetailPesanan>;
 
 export default function OrderDetailDrawer({
   order,
@@ -69,19 +72,19 @@ export default function OrderDetailDrawer({
     <>
       <AnimatePresence>
         {order ? (
-          <>
-            {/* Overlay gelap saja. Panel milik PanelDetailShell (fixed, kanan, 560px, tinggi
-                layar penuh) — kerangkanya sama dengan drawer panel admin. */}
-            <motion.div
-              key="order-detail-overlay"
-              className="odr-overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={onClose}
-            />
-            <PanelDetailShell open onClose={onClose} tema={tema} embed>
+          <motion.div
+            key="order-detail-overlay"
+            className="odr-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={onClose}
+          >
+            {/* Overlay = induk flex (pola ProductDetailDrawer). Panel dirender
+                OrderDetailContent → PanelDetailPesanan dengan height:100%, jadi area isi
+                benar-benar dibatasi dan bisa di-scroll. */}
+            <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", height: "100%" }}>
               <OrderDetailContent
                 order={order}
                 onClose={onClose}
@@ -93,8 +96,8 @@ export default function OrderDetailDrawer({
                 onArrangeOrder={onArrangeOrder}
                 onSynced={onSynced}
               />
-            </PanelDetailShell>
-          </>
+            </div>
+          </motion.div>
         ) : null}
       </AnimatePresence>
       <style>{ODR_CSS}</style>
@@ -104,5 +107,5 @@ export default function OrderDetailDrawer({
 
 /* Overlay drawer /admin. z-index 50: ConfirmModal memakai z-50 dan dirender setelah drawer. */
 const ODR_CSS = `
-.odr-overlay{position:fixed;inset:0;z-index:50;background:rgba(17,24,39,.5);backdrop-filter:blur(3px)}
+.odr-overlay{position:fixed;inset:0;z-index:50;display:flex;justify-content:flex-end;align-items:stretch;background:rgba(17,24,39,.5);backdrop-filter:blur(3px)}
 `;

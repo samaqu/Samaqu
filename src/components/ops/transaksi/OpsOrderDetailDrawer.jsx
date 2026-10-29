@@ -187,11 +187,12 @@ export default function OpsOrderDetailDrawer({ open, order, onClose, onEdit, onC
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-[9999] flex justify-end items-stretch bg-black/50 backdrop-blur-sm"
             onClick={onClose}
-          />
+          >
           {/* Panel menggeser & fixed sendiri (sama dengan panel admin); di sini hanya overlay.
               Semua logic & aksi tetap dikirim dari file ini. */}
+          <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", height: "100%" }}>
           <PanelDetailPesanan
             tema="mono"
             onClose={onClose}
@@ -240,6 +241,8 @@ export default function OpsOrderDetailDrawer({ open, order, onClose, onEdit, onC
           >
             {shippingContent}
           </PanelDetailPesanan>
+          </div>
+          </motion.div>
         </>
       ) : null}
     </AnimatePresence>
