@@ -106,9 +106,11 @@ export default function OrderDetailDrawer({
 }
 
 /* Overlay drawer /admin — pola ProductDetailDrawer: overlay fixed ber-flex, panel anak
-   dengan lebar tetap & tinggi penuh. z-index 50 (ConfirmModal memakai z-50). */
+   dengan lebar tetap & tinggi penuh. z-index 50 (ConfirmModal memakai z-50).
+   Lebar 480px: cukup untuk 3 kolom info & nama metode pembayaran panjang, tapi tidak
+   selebar 560px (panel admin) karena /admin harus terasa ringkas. */
 const ODR_CSS = `
 .odr-overlay{position:fixed;inset:0;z-index:50;display:flex;justify-content:flex-end;align-items:stretch;background:rgba(17,24,39,.5);backdrop-filter:blur(3px)}
 .odr-panel{width:100%;max-width:100vw;height:100%;display:flex;min-width:0;overflow:hidden;background:#fff;box-shadow:-24px 0 60px -24px rgba(17,24,39,.45)}
-@media (min-width:640px){.odr-panel{width:560px;max-width:560px}}
+@media (min-width:640px){.odr-panel{width:480px;max-width:480px}}
 `;

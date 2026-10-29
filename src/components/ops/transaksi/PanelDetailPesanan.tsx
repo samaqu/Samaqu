@@ -688,6 +688,30 @@ const DP_CSS = `
    (PanelDetailShell non-embed) induknya .dp-overlay yang juga flex. */
 .dp-panel{position:relative;z-index:1;display:flex;flex-direction:column;flex:1 1 auto;width:100%;max-width:100%;height:100%;min-width:0;min-height:0;background:#f4f7fb;color:#24324a;overflow:hidden;box-shadow:-24px 0 60px -24px rgba(18,32,48,.4)}
 .dp-panel.is-embed{box-shadow:none}
+/* Mode embed (/admin & ops): lebih rapat daripada panel admin — drawer-nya lebih sempit
+   jadi jarak, radius, dan huruf dikecilkan supaya terasa padat seperti sebelum redesign. */
+.dp-panel.is-embed .dp-header{padding:20px 20px 60px}
+.dp-panel.is-embed .dp-judul{font-size:23px}
+.dp-panel.is-embed .dp-isi{padding:0 16px 16px;margin-top:-48px;gap:12px}
+.dp-panel.is-embed .dp-kartu{padding:16px;border-radius:20px;gap:12px}
+.dp-panel.is-embed .dp-status-kartu{padding:17px;border-radius:22px;gap:15px}
+.dp-panel.is-embed .dp-blok{padding:15px 16px;gap:12px}
+.dp-panel.is-embed .dp-garis{margin:0 16px}
+.dp-panel.is-embed .dp-status-ikon{width:40px;height:40px}
+.dp-panel.is-embed .dp-status-judul{font-size:15.5px}
+.dp-panel.is-embed .dp-hitung{font-size:15.5px;padding:7px 10px}
+.dp-panel.is-embed .dp-kepala-ikon{width:32px;height:32px}
+.dp-panel.is-embed .dp-kepala-judul{font-size:15px}
+.dp-panel.is-embed .dp-resi{padding:12px 14px}
+.dp-panel.is-embed .dp-resi-nomor{font-size:16px}
+.dp-panel.is-embed .dp-ringkas{padding:12px 14px}
+.dp-panel.is-embed .dp-ringkas-total span:last-child{font-size:20px}
+.dp-panel.is-embed .dp-item-foto{width:56px;height:68px}
+.dp-panel.is-embed .dp-footer{padding:12px}
+.dp-panel.is-embed .dp-langkah-dot{width:30px;height:30px}
+.dp-panel.is-embed .dp-langkah-label{font-size:11.5px}
+/* Garis stepper lebih pendek di drawer sempit supaya tidak melebar ke tepi. */
+.dp-panel.is-embed .dp-langkah{gap:2px}
 .dp-panel.tema-mono{background:#fff}
 /* Dipakai sendiri (bukan embed): beri lebar 560px di layar lebar. */
 .dp-overlay > .dp-panel{flex:0 0 auto}
