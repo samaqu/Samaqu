@@ -155,17 +155,36 @@ export async function POST(req: NextRequest) {
       return bad("Nama pelanggan wajib diisi");
     }
 
+    /**
+     * Nomor pesanan SAMAQU (SMQ-/CYO-/OPS-) SELALU ada di tabel `orders`. Kalau admin mengirim
+     * nomor seperti itu sambil menandai `manual`, artinya pesanannya sebenarnya ada tapi belum
+     * ditemukan di layar — dulu retur tersimpan `order_id = null` dan nomornya diganti nomor
+     * retur. Tolak di sini supaya datanya tidak terlanjur salah: pemanggil harus mencari ulang
+     * pesanan aslinya.
+     */
+    const SAMAQU_ORDER_RE = /^(?:SMQ|CYO|OPS)-[A-Z0-9]+-[A-Z0-9]+$/i;
+    const orderNumberIsSamaqu = SAMAQU_ORDER_RE.test(orderNumber);
+    if (manual && orderNumberIsSamaqu) {
+      return bad(
+        `${orderNumber} adalah nomor pesanan SAMAQU. Cari pesanannya (bukan input manual) supaya retur terhubung ke pesanan aslinya.`,
+      );
+    }
+
     let order: any = null;
-    if (!manual) {
+    if (!manual || orderNumberIsSamaqu) {
       const { data, error: orderError } = await admin
         .from("orders")
         .select("id, order_number, customer_id, customer_name, customer_whatsapp, status, order_items(*)")
         .eq("order_number", orderNumber)
         .maybeSingle();
       if (orderError) return bad(orderError.message, 500);
-      if (!data) return bad("Pesanan tidak ditemukan", 404);
-      if (data.status === "dibatalkan") return bad("Pesanan yang dibatalkan tidak bisa diretur");
-      order = data;
+      if (!data) {
+        // Nomor resmi wajib ada; referensi bebas (marketplace/IG) tetap boleh tidak ada.
+        if (orderNumberIsSamaqu || !manual) return bad("Pesanan tidak ditemukan", 404);
+      } else {
+        if (data.status === "dibatalkan") return bad("Pesanan yang dibatalkan tidak bisa diretur");
+        order = data;
+      }
     }
 
     const rows: Record<string, unknown>[] = [];
