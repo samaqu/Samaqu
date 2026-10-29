@@ -161,17 +161,23 @@ export default function PesananPage() {
         </>
       ) : filtered.length > 0 ? (
         <>
-          {/* ═══ DESKTOP: TABEL ═══ */}
+          {/* ═══ DESKTOP: TABEL ═══ table-layout fixed, tanpa scroll horizontal. */}
           <div className="hidden md:block akun-card overflow-hidden">
-            <table className="w-full text-left border-collapse">
+            <table className="akun-table">
+              <colgroup>
+                <col style={{ width: "24%" }} />
+                <col />
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "17%" }} />
+                <col style={{ width: "56px" }} />
+              </colgroup>
               <thead>
-                <tr className="border-b border-[#e6dfd2] text-[11px] uppercase tracking-[0.12em] text-[#8a8a8a]">
-                  <th className="px-5 py-3.5 font-bold">No. Pesanan</th>
-                  <th className="px-5 py-3.5 font-bold">Produk</th>
-                  <th className="px-5 py-3.5 font-bold">Tanggal</th>
-                  <th className="px-5 py-3.5 font-bold text-right">Total</th>
-                  <th className="px-5 py-3.5 font-bold">Status</th>
-                  <th className="px-5 py-3.5" />
+                <tr>
+                  <th>No. Pesanan</th>
+                  <th>Produk</th>
+                  <th className="is-right">Total</th>
+                  <th>Status</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -182,52 +188,50 @@ export default function PesananPage() {
                     <tr
                       key={o.id}
                       onClick={() => setSelectedOrder(o)}
-                      className="cursor-pointer border-b border-[#f0f0f0] last:border-0 transition-colors hover:bg-[#fafafa]"
+                      className="cursor-pointer"
                     >
-                      <td className="px-5 py-4 align-middle whitespace-nowrap">
+                      <td>
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
                             setSelectedOrder(o);
                           }}
-                          className="font-bold text-sm hover:underline"
-                          style={{ color: "#000000" }}
+                          className="akun-order-no"
                         >
                           #{o.order_number}
                         </button>
+                        <span className="akun-order-date">{tglID(o.created_at)}</span>
                       </td>
-                      <td className="px-5 py-4 align-middle">
-                        <div className="flex items-center gap-3">
-                          <div className="akun-thumb w-11 h-11 shrink-0 overflow-hidden">
+                      <td>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="akun-cell-thumb shrink-0 overflow-hidden">
                             <OrderItemThumb
                               item={item || {}}
                               lookup={photoLookup}
                               className="w-full h-full"
-                              fallback={<svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.2"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>}
+                              fallback={<svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="#000000" strokeWidth="1.2"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>}
                             />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-sm truncate" style={{ color: "#000000" }}>{item?.product_name || "Produk"}</p>
-                            <p className="text-xs text-[#6c7a75] mt-0.5">{o.order_items?.length || 0} item</p>
+                            <p className="akun-cell-name">{item?.product_name || "Produk"}</p>
+                            <p className="akun-cell-sub">{o.order_items?.length || 0} item</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-4 align-middle text-sm text-[#6c7a75] whitespace-nowrap">{tglID(o.created_at)}</td>
-                      <td className="px-5 py-4 align-middle text-sm font-bold text-right whitespace-nowrap" style={{ color: "#000000" }}>{rupiah(o.total)}</td>
-                      <td className="px-5 py-4 align-middle"><span className={sc.pill}>{sc.label}</span></td>
-                      <td className="px-5 py-4 align-middle text-right whitespace-nowrap">
+                      <td className="is-right"><span className="akun-cell-total">{rupiah(o.total)}</span></td>
+                      <td><span className={`akun-pill ${sc.pill}`}>{sc.label}</span></td>
+                      <td className="is-right">
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
                             setSelectedOrder(o);
                           }}
-                          className="inline-flex items-center gap-1 text-[12px] font-bold hover:underline"
-                          style={{ color: "#000000" }}
+                          aria-label={`Buka pesanan ${o.order_number}`}
+                          className="akun-row-go"
                         >
-                          Detail
-                          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 6 6 6-6 6" /></svg>
+                          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
                         </button>
                       </td>
                     </tr>

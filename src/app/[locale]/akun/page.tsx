@@ -182,27 +182,33 @@ export default function DashboardAkunPage() {
           <div className="text-center text-sm text-[#777777] py-8">Memuat…</div>
         ) : (
           <>
-            <div className="hidden sm:grid grid-cols-3 gap-4 mb-6">
-              <div className="bg-white rounded-[20px] border border-[rgba(0,0,0,0.06)] shadow-[rgba(0,0,0,0.02)_0px_0px_0px_1px,rgba(0,0,0,0.04)_0px_2px_6px,rgba(0,0,0,0.06)_0px_4px_8px] p-5">
-                <div className="w-10 h-10 rounded-[12px] flex items-center justify-center mb-3" style={{ background: "#f2f2f2" }}>
-                  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>
+            <div className="hidden sm:grid grid-cols-3 gap-3.5 mb-5">
+              <div className="bg-white rounded-[16px] border border-[rgba(0,0,0,0.07)] px-[18px] py-4 flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-[12px] grid place-items-center shrink-0" style={{ background: "#f1f0ec" }}>
+                  <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="none" stroke="#000000" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>
                 </div>
-                <p className="text-2xl font-black" style={{ color: "#000000" }}>{activeOrders}</p>
-                <p className="text-xs text-[#8b9793] mt-1">Pesanan Aktif</p>
+                <div className="min-w-0">
+                  <p className="text-[22px] font-black leading-none" style={{ color: "#000000" }}>{activeOrders}</p>
+                  <p className="text-[12px] text-[#8b9793] mt-1.5 font-semibold">Pesanan Aktif</p>
+                </div>
               </div>
-              <div className="bg-white rounded-[20px] border border-[rgba(0,0,0,0.06)] shadow-[rgba(0,0,0,0.02)_0px_0px_0px_1px,rgba(0,0,0,0.04)_0px_2px_6px,rgba(0,0,0,0.06)_0px_4px_8px] p-5">
-                <div className="w-10 h-10 rounded-[12px] flex items-center justify-center mb-3" style={{ background: "#f2f2f2" }}>
-                  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20s-7-4.35-7-9a4 4 0 0 1 7-2.65A4 4 0 0 1 19 11c0 4.65-7 9-7 9Z" /></svg>
+              <div className="bg-white rounded-[16px] border border-[rgba(0,0,0,0.07)] px-[18px] py-4 flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-[12px] grid place-items-center shrink-0" style={{ background: "#f1f0ec" }}>
+                  <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="none" stroke="#000000" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20s-7-4.35-7-9a4 4 0 0 1 7-2.65A4 4 0 0 1 19 11c0 4.65-7 9-7 9Z" /></svg>
                 </div>
-                <p className="text-2xl font-black" style={{ color: "#000000" }}>{wishCount}</p>
-                <p className="text-xs text-[#8b9793] mt-1">Wishlist</p>
+                <div className="min-w-0">
+                  <p className="text-[22px] font-black leading-none" style={{ color: "#000000" }}>{wishCount}</p>
+                  <p className="text-[12px] text-[#8b9793] mt-1.5 font-semibold">Wishlist</p>
+                </div>
               </div>
-              <div className="bg-white rounded-[20px] border border-[rgba(0,0,0,0.06)] shadow-[rgba(0,0,0,0.02)_0px_0px_0px_1px,rgba(0,0,0,0.04)_0px_2px_6px,rgba(0,0,0,0.06)_0px_4px_8px] p-5">
-                <div className="w-10 h-10 rounded-[12px] flex items-center justify-center mb-3" style={{ background: "#f2f2f2" }}>
-                  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
+              <div className="bg-white rounded-[16px] border border-[rgba(0,0,0,0.07)] px-[18px] py-4 flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-[12px] grid place-items-center shrink-0" style={{ background: "#f1f0ec" }}>
+                  <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="none" stroke="#000000" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
                 </div>
-                <p className="text-2xl font-black" style={{ color: "#000000" }}>Rp{totalSpend.toLocaleString("id-ID")}</p>
-                <p className="text-xs text-[#8b9793] mt-1">Total Belanja</p>
+                <div className="min-w-0">
+                  <p className="text-[22px] font-black leading-none truncate" style={{ color: "#000000" }}>Rp{totalSpend.toLocaleString("id-ID")}</p>
+                  <p className="text-[12px] text-[#8b9793] mt-1.5 font-semibold">Total Belanja</p>
+                </div>
               </div>
             </div>
 
@@ -231,17 +237,24 @@ export default function DashboardAkunPage() {
                 </div>
               ) : (
                 <>
-                  {/* Desktop: tabel transaksi */}
-                  <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                  {/* Desktop: tabel pesanan — table-layout fixed, TANPA scroll horizontal.
+                      Tanggal pindah jadi baris kecil di bawah nomor pesanan. */}
+                  <div className="hidden md:block">
+                    <table className="akun-table">
+                      <colgroup>
+                        <col style={{ width: "24%" }} />
+                        <col />
+                        <col style={{ width: "15%" }} />
+                        <col style={{ width: "17%" }} />
+                        <col style={{ width: "56px" }} />
+                      </colgroup>
                       <thead>
-                        <tr className="border-b border-[#e6dfd2] text-[11px] uppercase tracking-[0.12em] text-[#8a8a8a]">
-                          <th className="px-5 py-3.5 font-bold">No. Pesanan</th>
-                          <th className="px-5 py-3.5 font-bold">Produk</th>
-                          <th className="px-5 py-3.5 font-bold">Tanggal</th>
-                          <th className="px-5 py-3.5 font-bold text-right">Total</th>
-                          <th className="px-5 py-3.5 font-bold">Status</th>
-                          <th className="px-5 py-3.5" />
+                        <tr>
+                          <th>No. Pesanan</th>
+                          <th>Produk</th>
+                          <th className="is-right">Total</th>
+                          <th>Status</th>
+                          <th />
                         </tr>
                       </thead>
                       <tbody>
@@ -252,52 +265,50 @@ export default function DashboardAkunPage() {
                             <tr
                               key={order.id}
                               onClick={() => setSelectedOrder(order)}
-                              className="cursor-pointer border-b border-[#f0f0f0] last:border-0 transition-colors hover:bg-[#fafafa]"
+                              className="cursor-pointer"
                             >
-                              <td className="px-5 py-4 align-middle whitespace-nowrap">
+                              <td>
                                 <button
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
                                     setSelectedOrder(order);
                                   }}
-                                  className="font-bold text-sm hover:underline"
-                                  style={{ color: "#000000" }}
+                                  className="akun-order-no"
                                 >
                                   #{order.order_number}
                                 </button>
+                                <span className="akun-order-date">{tglID(order.created_at)}</span>
                               </td>
-                              <td className="px-5 py-4 align-middle">
-                                <div className="flex items-center gap-3">
-                                  <div className="akun-thumb w-11 h-11 shrink-0 overflow-hidden">
+                              <td>
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="akun-cell-thumb shrink-0 overflow-hidden">
                                     <OrderItemThumb
                                       item={item || {}}
                                       lookup={photoLookup}
                                       className="w-full h-full"
-                                      fallback={<svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.2"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>}
+                                      fallback={<svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="#000000" strokeWidth="1.2"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>}
                                     />
                                   </div>
                                   <div className="min-w-0">
-                                    <p className="font-semibold text-sm truncate" style={{ color: "#000000" }}>{item?.product_name || "Produk"}</p>
-                                    <p className="text-xs text-[#6c7a75] mt-0.5">{order.order_items?.length || 0} item</p>
+                                    <p className="akun-cell-name">{item?.product_name || "Produk"}</p>
+                                    <p className="akun-cell-sub">{order.order_items?.length || 0} item</p>
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-5 py-4 align-middle text-sm text-[#6c7a75] whitespace-nowrap">{tglID(order.created_at)}</td>
-                              <td className="px-5 py-4 align-middle text-sm font-bold text-right whitespace-nowrap" style={{ color: "#000000" }}>{rupiah(order.total)}</td>
-                              <td className="px-5 py-4 align-middle"><span className={sc.pill}>{sc.label}</span></td>
-                              <td className="px-5 py-4 align-middle text-right whitespace-nowrap">
+                              <td className="is-right"><span className="akun-cell-total">{rupiah(order.total)}</span></td>
+                              <td><span className={`akun-pill ${sc.pill}`}>{sc.label}</span></td>
+                              <td className="is-right">
                                 <button
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
                                     setSelectedOrder(order);
                                   }}
-                                  className="inline-flex items-center gap-1 text-[12px] font-bold hover:underline"
-                                  style={{ color: "#000000" }}
+                                  aria-label={`Buka pesanan ${order.order_number}`}
+                                  className="akun-row-go"
                                 >
-                                  Detail
-                                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 6 6 6-6 6" /></svg>
+                                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
                                 </button>
                               </td>
                             </tr>
