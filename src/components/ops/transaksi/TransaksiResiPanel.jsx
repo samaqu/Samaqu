@@ -19,7 +19,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertCircle, Clipboard, ClipboardCheck, Truck } from "lucide-react";
+import { AlertCircle, ChevronRight, Clipboard, ClipboardCheck, RefreshCw, Truck } from "lucide-react";
 import { base44 } from "@/lib/ops-api";
 import { formatWeightExact } from "@/lib/shipping-weight";
 import { formatRupiah } from "@/components/ops/transaksi/transaksi-format";
@@ -520,9 +520,11 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
                   // Pesanan yang paketnya sudah jalan jangan dimundurkan saat resinya diedit.
                   setManualShipped(shippingStatus === "dikirim" || shippingStatus === "selesai" ? "sudah" : "belum");
                 }}
-                className="w-full text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 transition-colors"
+                className="od-link-hbo"
               >
-                {isHbo || isDikirim ? "Ubah nomor resi" : "Ganti ke resi HBO (input manual)"}
+                <RefreshCw size={12} />
+                <span>{isHbo || isDikirim ? "Ubah nomor resi" : "Ganti ke resi HBO (input manual)"}</span>
+                <ChevronRight size={12} />
               </button>
             )
           ) : null}
@@ -531,16 +533,12 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
             <p className="text-xs font-semibold text-red-600 dark:text-red-400">{manualError}</p>
           ) : null}
 
-          {bisaTandaiDikirim ? (
-            <button
-              type="button"
-              onClick={tandaiDikirim}
-              disabled={shippingBusy}
-              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl text-sm hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-60 transition-all"
-            >
-              <Truck size={15} /> {shippingBusy ? "Memproses…" : "Tandai Dikirim"}
-            </button>
-          ) : null}
+          {/*
+            Tombol "Tandai Dikirim" sengaja TIDAK dirender lagi di semua tampilan (ops, panel
+            admin, /admin). Status dikirim/selesai hanya boleh datang dari scan J&T lewat cron
+            sync-tracking, supaya status tidak bisa dimundurkan/dimajukan manual.
+            Fungsi `tandaiDikirim`/`markShipped` dan API-nya tetap ada (tidak dihapus).
+          */}
         </>
       ) : cancelled ? (
         <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">

@@ -732,12 +732,20 @@ export default function OrderDetailContent({
     layanan: (serviceCode || "").toUpperCase() || "—",
     resi,
     resiKosong: resi ? "" : "Resi belum dibuat",
-    resiCatatan: resi ? "Resi sudah terbit" : "Resi otomatis setelah bayar",
     onLacak: () => openTrack(),
     trackAktif: showTrack,
     onSalinResi: () => salin("resi", resi),
     resiTersalin: tersalin === "resi",
-    berat: `Berat ${totalWeight.grams ? formatWeightExact(totalWeight.grams) : "-"}`,
+    berat: totalWeight.grams ? formatWeightExact(totalWeight.grams) : "-",
+    statusKirim: trackUpdates.length > 0 ? trackingRow(trackUpdates[0]).status : panelTracking?.status || "",
+    statusKirimMeta:
+      trackUpdates.length > 0
+        ? [trackingRow(trackUpdates[0]).location, formatTrackingTime(trackingRow(trackUpdates[0]).dateTime)]
+            .filter(Boolean)
+            .join(" · ")
+        : panelTracking
+          ? [panelTracking.location, panelTracking.dateTime ? formatTrackingTime(panelTracking.dateTime) : ""].filter(Boolean).join(" · ")
+          : "",
     items: itemsWithPhotos.map((item) => ({
       key: `${item.product_id}-${item.color}-${item.size}`,
       nama: item.product_name,

@@ -206,13 +206,16 @@ export default function OpsOrderDetailDrawer({ open, order, onClose, onEdit, onC
             layanan={order.shipping_method || "—"}
             resi={awb}
             resiKosong="Resi belum dibuat"
-            resiCatatan={awb ? "Resi sudah terbit" : "Resi otomatis setelah bayar"}
             onLacak={toggleTrack}
             onSalinResi={() => {
               if (awb) navigator.clipboard?.writeText(awb).catch(() => {});
             }}
             resiTersalin={false}
-            berat={order.weight > 0 ? `Berat ${formatWeightExact(order.weight)}` : "Berat belum diisi"}
+            berat={order.weight > 0 ? formatWeightExact(order.weight) : "-"}
+            statusKirim={lastScan?.status}
+            statusKirimMeta={
+              lastScan ? [lastScan.location, lastScan.dateTime ? formatTrackingTime(lastScan.dateTime) : ""].filter(Boolean).join(" · ") : ""
+            }
             items={(order.items || []).map((item, index) => ({
               key: `${item.product_id}-${item.color}-${item.size}-${index}`,
               nama: item.product_name,

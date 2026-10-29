@@ -25,7 +25,7 @@ import { jntServiceTag } from "@/lib/jnt/layanan";
 import JntBadge from "@/components/JntBadge";
 import { SOURCE_STYLES, STATUS_STYLES, formatRupiah, formatTanggalJamID } from "@/components/ops/transaksi/transaksi-format";
 import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
-import PanelDetailPesanan, { PanelDetailShell, jamWIB } from "@/components/ops/transaksi/PanelDetailPesanan";
+import PanelDetailPesanan, { PanelDetailShell, PanelLacakModal, jamWIB } from "@/components/ops/transaksi/PanelDetailPesanan";
 
 export default function TransaksiDetailDrawer({ open, order, variant = "ops", owner = "panel", onClose, onEdit, onCancel, onDelete, onResiCreated }) {
   const isPanel = variant === "panel";
@@ -244,14 +244,6 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
       };
     });
 
-    // Keterangan chip di samping berat. "Resi otomatis setelah bayar" hanya untuk pesanan
-    // website/Open Order yang resinya memang dibuat otomatis; transaksi manual tidak.
-    const resiCatatan = awb
-      ? "Resi sudah terbit"
-      : order.source === "website" || String(order.order_number || "").startsWith("CYO-")
-        ? "Resi otomatis setelah bayar"
-        : "Resi dibuat manual";
-
     // Alasan tombol Ubah mati. Server hanya mengirim `can_edit` (tanpa alasannya), jadi
     // diturunkan dari status yang terlihat. Hanya dipakai untuk pesan; keputusan tetap
     // milik `can_edit` dari server.
@@ -320,6 +312,25 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
     }
     if (canDelete) aksi.push({ key: "hapus", label: "Hapus", jenis: "sekunder", onClick: () => onDelete?.(order) });
 
+    // Pop-up Lacak: pakai komponen bersama (sama dengan /admin), bukan markup lokal lagi.
+    const lacakModal = (
+      <PanelLacakModal
+        open={trackModal}
+        onClose={() => setTrackModal(false)}
+        resi={awb}
+        loading={track.status === "loading"}
+        error={track.status === "error" ? track.error : ""}
+        riwayat={historyRows.map((row, index) => ({
+          key: `${row.dateTime}-${index}`,
+          status: row.status,
+          meta: [row.location, formatTrackingTime(row.dateTime)].filter(Boolean).join(" · "),
+          note: row.note,
+          receiver: row.receiver,
+          terbaru: index === 0,
+        }))}
+      />
+    );
+
     // Khusus belum bayar: aksi utama "Ingatkan Bayar" (WhatsApp berisi nomor pesanan & total).
     if (stage === "belum_bayar" && canHubungiPanel) {
       const pesan = `Halo Kak, pesanan ${order.order_number} di SAMAQU sudah masuk. Totalnya Rp ${formatRupiah(order.total)}. Yuk diselesaikan pembayarannya supaya bisa segera kami proses. Terima kasih!`;
@@ -346,11 +357,14 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
           layanan={jntServiceTag(track.serviceCode || order.shipping_method).replace(/^Service\s+/i, "")}
           resi={awb}
           resiKosong={resiKosong}
-          resiCatatan={resiCatatan}
           onLacak={openTrackModal}
           onSalinResi={copyResi}
           resiTersalin={copied === "resi"}
-          berat={`Berat ${totalWeight > 0 ? formatWeightExact(totalWeight) : "-"}`}
+          berat={totalWeight > 0 ? formatWeightExact(totalWeight) : "-"}
+          statusKirim={lastScan?.status}
+          statusKirimMeta={
+            lastScan ? [lastScan.location, lastScan.dateTime ? formatTrackingTime(lastScan.dateTime) : ""].filter(Boolean).join(" · ") : ""
+          }
           items={itemsTampilan}
           subtotal={order.subtotal}
           ongkir={order.shipping_cost}
@@ -398,48 +412,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
             trackingState={track.status}
           />
         </PanelDetailPesanan>
-
-        {trackModal ? (
-          <div
-            className="dp-md"
-            onClick={(event) => {
-              if (event.target === event.currentTarget) setTrackModal(false);
-            }}
-          >
-            <div className="dp-mc">
-              <div className="dp-mh">
-                <div>
-                  <small>J&amp;T Express</small>
-                  <h3>Lacak Pengiriman</h3>
-                  <small>
-                    No. Resi <b>{awb}</b>
-                  </small>
-                </div>
-                <button type="button" className="dp-tutup" onClick={() => setTrackModal(false)} aria-label="Tutup">
-                  <X size={17} />
-                </button>
-              </div>
-              {track.status === "loading" ? (
-                <p className="dp-md-note">Memuat riwayat dari J&amp;T…</p>
-              ) : track.status === "error" ? (
-                <p className="dp-md-note is-error">{track.error}</p>
-              ) : historyRows.length === 0 ? (
-                <p className="dp-md-note">Belum ada riwayat dari J&amp;T.</p>
-              ) : (
-                <ul className="dp-trk">
-                  {historyRows.map((row, index) => (
-                    <li key={`${row.dateTime}-${index}`} className={index === 0 ? "is-latest" : ""}>
-                      <b>{row.status}</b>
-                      <small>{[row.location, formatTrackingTime(row.dateTime)].filter(Boolean).join(" · ")}</small>
-                      {row.note ? <small>Catatan: {row.note}</small> : null}
-                      {row.receiver ? <small>Diterima oleh: {row.receiver}</small> : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        ) : null}
+        {lacakModal}
       </PanelDetailShell>
     );
   }
