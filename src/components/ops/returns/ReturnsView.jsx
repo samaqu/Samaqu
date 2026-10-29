@@ -29,6 +29,13 @@ import { base44 } from "@/lib/ops-api";
 import { resolveColorName } from "@/lib/sku";
 import { formatRupiah, formatTanggalJamID, formatTanggalSingkatID } from "@/components/ops/transaksi/transaksi-format";
 
+/**
+ * Format nomor pesanan SAMAQU (SMQ-… website, CYO-… Open Order, OPS-… transaksi manual).
+ * Nomor berformat ini PASTI ada di tabel `orders`, jadi tidak boleh diperlakukan sebagai
+ * "pesanan manual/referensi bebas" — itu yang dulu membuat retur tersimpan tanpa order_id.
+ */
+const ORDER_NUMBER_FORMAT = /^(?:SMQ|CYO|OPS)-[A-Z0-9]+-[A-Z0-9]+$/i;
+
 /** Warna ops: warna asli, atau turunan dari nama produk (tanpa teks "default"). */
 const titleCaseColor = (value) =>
   String(value || "").toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
@@ -625,7 +632,24 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
     return matched.slice(0, 8);
   }, [orders, query]);
 
+  /** Ketikan sekarang berformat nomor pesanan SAMAQU → wajib dicari ke DB, bukan input manual. */
+  const canLookupTyped = ORDER_NUMBER_FORMAT.test(query.trim());
+
   const startManual = (orderNo = "") => {
+    // Nomor pesanan resmi (SMQ-/CYO-/OPS-) harus dicari ke database, bukan dicatat sebagai
+    // retur "tanpa pesanan asal". Tanpa penjagaan ini admin mudah menekan "Input manual" saat
+    // daftar 60 pesanan terakhir belum memuat pesanannya — padahal nomornya valid.
+    const candidate = String(orderNo || "").trim();
+    if (ORDER_NUMBER_FORMAT.test(candidate)) {
+      setOrder(null);
+      setSelected({});
+      setPickerOpen(false);
+      setError("");
+      setQuery(candidate.toUpperCase());
+      setNotFound("");
+      lookupOrder(candidate.toUpperCase());
+      return;
+    }
     setManual(true);
     setOrder(null);
     setSelected({});
@@ -658,8 +682,14 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
     setSelected(next);
   };
 
-  const loadOrder = async () => {
-    const value = query.trim();
+  /**
+   * Cari satu pesanan ke database. Nomor resmi (SMQ-/CYO-/OPS-) dinormalisasi ke huruf besar
+   * dan dicari LANGSUNG lewat `getOrder` (bukan dari daftar 60 pesanan terakhir), supaya
+   * pesanan lama tetap ditemukan dan retur tidak tercatat "tanpa pesanan asal".
+   */
+  const lookupOrder = async (rawValue) => {
+    const raw = String(rawValue ?? query).trim();
+    const value = ORDER_NUMBER_FORMAT.test(raw) ? raw.toUpperCase() : raw;
     if (!value) return;
 
     const local = orders.find(
@@ -676,6 +706,12 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
     try {
       const found = await base44.entities.Transaction.getOrder(value);
       if (found) {
+        if (found.status === "dibatalkan") {
+          setOrder(null);
+          setPickerOpen(false);
+          setError("Pesanan yang dibatalkan tidak bisa diretur.");
+          return;
+        }
         selectOrder(found);
       } else {
         setOrder(null);
@@ -690,6 +726,8 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
       setOrderBusy(false);
     }
   };
+
+  const loadOrder = () => lookupOrder(query);
 
   const updateItem = (id, patch) => {
     setSelected((current) => ({ ...current, [id]: { ...current[id], ...patch } }));
@@ -938,10 +976,16 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
 
                   {!ordersBusy && filteredOrders.length === 0 ? (
                     <div className="border-t border-slate-100 px-3 py-3 dark:border-slate-800">
-                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Pesanan tidak ditemukan.</p>
-                      <button type="button" onClick={() => startManual(query.trim())} className={`mt-2 rounded-lg px-3 py-1.5 text-xs font-bold ${accent}`}>
-                        + Input pesanan manual
-                      </button>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Tidak ada di daftar 60 pesanan terakhir.</p>
+                      {canLookupTyped ? (
+                        <button
+                          type="button"
+                          onClick={() => lookupOrder(query)}
+                          className={`mt-2 rounded-lg px-3 py-1.5 text-xs font-bold ${accent}`}
+                        >
+                          Cari langsung ke database
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
 
@@ -962,15 +1006,21 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
                     </button>
                   ))}
 
-                  <button
-                    type="button"
-                    onClick={() => startManual(query.trim())}
-                    className={`flex w-full items-center gap-1.5 border-t border-slate-100 px-3 py-2.5 text-left text-xs font-bold dark:border-slate-800 ${
-                      isPanel ? "text-[#c2255c]" : "text-slate-700 dark:text-slate-200"
-                    }`}
-                  >
-                    <Plus size={13} /> Pesanan belum tercatat — input manual
-                  </button>
+                  {!canLookupTyped ? (
+                    <button
+                      type="button"
+                      onClick={() => startManual(query.trim())}
+                      className={`flex w-full items-center gap-1.5 border-t border-slate-100 px-3 py-2.5 text-left text-xs font-bold dark:border-slate-800 ${
+                        isPanel ? "text-[#c2255c]" : "text-slate-700 dark:text-slate-200"
+                      }`}
+                    >
+                      <Plus size={13} /> Pesanan belum tercatat — input manual
+                    </button>
+                  ) : (
+                    <p className="border-t border-slate-100 px-3 py-2 text-[11px] font-semibold text-amber-700 dark:border-slate-800 dark:text-amber-400">
+                      Nomor pesanan SAMAQU wajib dicari ke database — retur tanpa pesanan asal hanya untuk penjualan di luar sistem.
+                    </p>
+                  )}
                 </div>
               ) : null}
 
@@ -1893,8 +1943,8 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
           <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
             <div className="min-w-0">
               <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">No. Pesanan</dt>
-              <dd className="mt-0.5 truncate font-mono text-xs font-bold text-slate-800 dark:text-slate-100" title={record.order_number}>
-                {!record.order_id ? "—" : record.order_number}
+              <dd className="mt-0.5 truncate font-mono text-xs font-bold text-slate-800 dark:text-slate-100" title={record.order_number || undefined}>
+                {record.order_number || "—"}
               </dd>
             </div>
             <div className="min-w-0">
