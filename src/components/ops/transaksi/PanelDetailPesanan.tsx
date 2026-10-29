@@ -310,18 +310,18 @@ export default function PanelDetailPesanan({
               {nomorTersalin ? "Tersalin" : "Salin"}
             </button>
           </div>
-          <div className="dp-fakta">
-            <div className="dp-fakta-item">
+          <div className="dp-info">
+            <div className="dp-info-baris">
               <span>Pembayaran</span>
               <b>
                 <CreditCard size={13} /> {metodeBayar}
               </b>
             </div>
-            <div className="dp-fakta-item">
+            <div className="dp-info-baris">
               <span>Dipesan</span>
               <b>{waktuPesan}</b>
             </div>
-            <div className="dp-fakta-item">
+            <div className="dp-info-baris">
               <span>Dibayar</span>
               <b>{waktuBayar || <em>Belum</em>}</b>
             </div>
@@ -460,11 +460,14 @@ const DP_CSS = `
 .dp-nomor > div{flex:1;min-width:0}
 .dp-nomor span{display:block;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#9aa4b0}
 .dp-nomor b{display:block;margin-top:2px;font-size:13.5px;font-weight:800;color:#2a1a22;overflow-wrap:anywhere}
-.dp-fakta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
-.dp-fakta-item{background:#f7f9fb;border-radius:12px;padding:10px 11px;min-width:0}
-.dp-fakta-item span{display:block;font-size:9.5px;font-weight:700;color:#9aa4b0}
-.dp-fakta-item b{display:flex;align-items:center;gap:4px;margin-top:3px;font-size:11.5px;font-weight:800;color:#2a1a22;line-height:1.25;overflow-wrap:anywhere}
-.dp-fakta-item b em{font-style:normal;font-weight:600;color:#8a7d83}
+/* Info pesanan ditumpuk ke bawah (bukan tiga kotak ke samping) supaya No. Pesanan tidak
+   berdesakan dengan metode pembayaran yang namanya panjang. */
+.dp-info{margin-top:12px;display:flex;flex-direction:column;gap:2px}
+.dp-info-baris{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #f1f4f7}
+.dp-info-baris:last-child{border-bottom:0;padding-bottom:0}
+.dp-info-baris span{flex:none;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#9aa4b0}
+.dp-info-baris b{display:flex;align-items:center;gap:5px;min-width:0;font-size:12.5px;font-weight:800;color:#2a1a22;line-height:1.3;text-align:right;overflow-wrap:anywhere}
+.dp-info-baris b em{font-style:normal;font-weight:600;color:#8a7d83}
 
 .dp-footer{flex:none;display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px 16px;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -12px 28px -20px rgba(34,58,86,.4)}
 .dp-tombol{display:inline-flex;align-items:center;justify-content:center;flex:1 1 0;min-width:0;min-height:42px;padding:10px 12px;border:0;border-radius:999px;font-size:12.5px;font-weight:800;line-height:1.2;cursor:pointer;transition:filter .15s}
@@ -509,7 +512,6 @@ const DP_CSS = `
   .dp-header{padding:14px 16px 28px}
   .dp-isi{padding:0 12px 18px}
   .dp-kartu{padding:14px 15px;border-radius:16px}
-  .dp-fakta{grid-template-columns:1fr 1fr}
   .dp-footer{padding:10px 12px 14px;border-radius:18px 18px 0 0}
 }
 `;
