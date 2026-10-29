@@ -11,7 +11,7 @@ import {
   trackingSummary,
 } from "@/lib/jnt/track-status";
 import { orderStatusKey, shippingStatusOf, SHIPPING_STATUS_LABEL, orderStage } from "@/lib/order-flow";
-import PanelDetailPesanan, { DP_STYLE, jamWIB, type AksiFooter } from "@/components/ops/transaksi/PanelDetailPesanan";
+import PanelDetailPesanan, { DP_STYLE, PanelLacakModal, jamWIB, type AksiFooter } from "@/components/ops/transaksi/PanelDetailPesanan";
 import { orderSourceLabel } from "@/lib/transaksi";
 import { jntServiceCodeFromShippingMethod } from "@/lib/jnt/layanan";
 import { useSafeTranslations } from "@/lib/safe-i18n";
@@ -668,33 +668,27 @@ export default function OrderDetailContent({
     return list;
   })();
 
-  /** Riwayat J&T untuk tampilan baru (dibuka dari tombol "Lacak"). */
-  const trackPanel =
-    tracking ? (
-      <p className="dp-catatan">Memuat riwayat dari J&amp;T…</p>
-    ) : trackError ? (
-      <p className="dp-error">{trackError}</p>
-    ) : trackUpdates.length > 0 ? (
-      <div className="dp-riwayat">
-        <p className="dp-riwayat-judul">Riwayat Pengiriman</p>
-        {trackUpdates.map((u, i) => {
-          const row = trackingRow(u);
-          return (
-            <div key={`${row.dateTime}-${i}`} className={`dp-riwayat-item${i === 0 ? " terbaru" : ""}`}>
-              <span className="dp-riwayat-dot" />
-              <div>
-                <b>{row.status}</b>
-                <i>{[row.location, formatTrackingTime(row.dateTime)].filter(Boolean).join(" · ")}</i>
-                {row.note ? <i>Catatan: {row.note}</i> : null}
-                {row.receiver ? <i>Diterima oleh: {row.receiver}</i> : null}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    ) : (
-      <p className="dp-catatan">Belum ada riwayat dari J&amp;T.</p>
-    );
+  /** Riwayat J&T: ditampilkan sebagai POP-UP "Lacak Pengiriman" (sama seperti di ops). */
+  const trackModal = (
+    <PanelLacakModal
+      open={showTrack}
+      onClose={() => setShowTrack(false)}
+      resi={resi}
+      loading={tracking}
+      error={trackError || ""}
+      riwayat={trackUpdates.map((u, i) => {
+        const row = trackingRow(u);
+        return {
+          key: `${row.dateTime}-${i}`,
+          status: row.status,
+          meta: [row.location, formatTrackingTime(row.dateTime)].filter(Boolean).join(" · "),
+          note: row.note,
+          receiver: row.receiver,
+          terbaru: i === 0,
+        };
+      })}
+    />
+  );
 
   // Layout detail disamakan dengan panel admin. Dashboard admin memakai tema mono
   // (hitam/slate), bukan pink.
@@ -780,7 +774,6 @@ export default function OrderDetailContent({
             </p>
           ) : null}
           {order.shipping_notes ? <p className="dp-catatan">Catatan pembeli: {order.shipping_notes}</p> : null}
-          {showTrack ? trackPanel : null}
         </>
       ) : null,
   };
@@ -790,7 +783,7 @@ export default function OrderDetailContent({
       className="od-root"
       style={
         tampilan === "baru"
-          ? { display: "flex", height: "100%", minHeight: 0, width: "100%", minWidth: 0 }
+          ? { display: "flex", height: "100%", minHeight: 0, width: "100%", minWidth: 0, position: "relative" as const }
           : undefined
       }
     >
@@ -800,7 +793,11 @@ export default function OrderDetailContent({
       {tampilan === "baru" ? <style>{DP_STYLE}</style> : null}
 
       {tampilan === "baru" ? (
-        <PanelDetailPesanan {...viewProps} />
+        <>
+          <PanelDetailPesanan {...viewProps} />
+          {/* Pop-up lacak dirender di dalam panel supaya overlay-nya menutupi drawer. */}
+          {trackModal}
+        </>
       ) : (
         <>
       {/* Sama seperti drawer ops: panel langsung di body, tanpa wrapper struk customer. */}

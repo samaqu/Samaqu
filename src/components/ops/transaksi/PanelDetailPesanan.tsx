@@ -540,6 +540,86 @@ export function PanelDetailFooter({ aksi }: { aksi: AksiFooter[] }) {
   );
 }
 
+/**
+ * Pop-up "Lacak Pengiriman" — dipakai drawer /admin dan dashboard ops. Isinya riwayat
+ * pelacakan J&T apa adanya (status, lokasi · waktu, catatan, penerima).
+ * Dirender di dalam panel (position:absolute) supaya ikut menutup area drawer.
+ */
+export function PanelLacakModal({
+  open,
+  onClose,
+  resi,
+  loading = false,
+  error = "",
+  riwayat,
+}: {
+  open: boolean;
+  onClose: () => void;
+  resi: string;
+  loading?: boolean;
+  error?: string;
+  riwayat: { key: string; status: string; meta: string; note?: string | null; receiver?: string | null; terbaru?: boolean }[];
+}) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="dp-md"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Lacak Pengiriman"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="dp-mc">
+        <div className="dp-mh">
+          <div>
+            <small>J&amp;T Express</small>
+            <h3>Lacak Pengiriman</h3>
+            <small>
+              No. Resi <b>{resi || "-"}</b>
+            </small>
+          </div>
+          <button type="button" className="dp-tutup" onClick={onClose} aria-label="Tutup">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+
+        {loading ? (
+          <p className="dp-md-note">Memuat riwayat dari J&amp;T…</p>
+        ) : error ? (
+          <p className="dp-md-note is-error">{error}</p>
+        ) : riwayat.length === 0 ? (
+          <p className="dp-md-note">Belum ada riwayat dari J&amp;T.</p>
+        ) : (
+          <ul className="dp-trk">
+            {riwayat.map((r) => (
+              <li key={r.key} className={r.terbaru ? "is-latest" : undefined}>
+                <b>{r.status}</b>
+                {r.meta ? <small>{r.meta}</small> : null}
+                {r.note ? <small>Catatan: {r.note}</small> : null}
+                {r.receiver ? <small>Diterima oleh: {r.receiver}</small> : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Kerangka drawer: overlay + panel geser. Header/isi/footer dirender oleh anak. */
 export function PanelDetailShell({
   open,
@@ -763,20 +843,6 @@ const DP_CSS = `
 .dp-tombol.utama:hover:not(:disabled){filter:brightness(1.03)}
 
 /* Catatan & peringatan di kartu ekstra. */
-.dp-riwayat{display:flex;flex-direction:column;gap:2px;margin-top:10px}
-.dp-riwayat-judul{margin:0 0 6px;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#5a6b80}
-.dp-riwayat-item{display:flex;gap:10px;padding:8px 0;border-top:1px solid #eef2f6}
-.dp-riwayat-item:first-of-type{border-top:0;padding-top:0}
-.dp-riwayat-dot{flex:none;width:8px;height:8px;margin-top:6px;border-radius:50%;background:#cfd8e3}
-.dp-riwayat-item.terbaru .dp-riwayat-dot{background:#2774a8;box-shadow:0 0 0 3px rgba(39,116,168,.16)}
-.dp-riwayat-item b{display:block;font-size:12.5px;font-weight:800;color:#24324a;line-height:1.35}
-.dp-riwayat-item i{display:block;margin-top:2px;font-size:11.5px;font-style:normal;font-weight:600;color:#5a6b80;line-height:1.4}
-.tema-mono .dp-riwayat-judul{color:#6b7280}
-.tema-mono .dp-riwayat-item{border-top-color:#e5e7eb}
-.tema-mono .dp-riwayat-dot{background:#d1d5db}
-.tema-mono .dp-riwayat-item.terbaru .dp-riwayat-dot{background:#111827;box-shadow:0 0 0 3px rgba(17,24,39,.12)}
-.tema-mono .dp-riwayat-item b{color:#111827}
-.tema-mono .dp-riwayat-item i{color:#6b7280}
 .dp-warning{padding:10px 12px;border-radius:12px;border:1px solid #f3dfae;background:#fff8e6;color:#7a5200;font-size:12.5px;font-weight:700;line-height:1.5}
 .dp-catatan{margin:8px 0 0;font-size:12.5px;font-weight:700;color:#5a6b80;line-height:1.5}
 .dp-error{margin:8px 0 0;font-size:12.5px;font-weight:800;color:#b42f2f}
