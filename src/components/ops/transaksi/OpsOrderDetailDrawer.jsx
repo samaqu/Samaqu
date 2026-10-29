@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 /**
  * Detail pesanan dashboard ops — layout SAMA dengan panel admin (OrderDetailPanel),
@@ -190,67 +190,56 @@ export default function OpsOrderDetailDrawer({ open, order, onClose, onEdit, onC
             className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm"
             onClick={onClose}
           />
-          <motion.aside
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "tween", duration: 0.22 }}
-            className="fixed inset-y-0 right-0 z-[9999] flex w-full flex-col overflow-hidden bg-white shadow-2xl dark:bg-[#1a1d28] sm:max-w-md"
-            role="dialog"
-            aria-label="Detail pesanan"
+          {/* Panel menggeser & fixed sendiri (sama dengan panel admin); di sini hanya overlay.
+              Semua logic & aksi tetap dikirim dari file ini. */}
+          <PanelDetailPesanan
+            tema="mono"
+            onClose={onClose}
+            sumber={order.source_label}
+            tahap={orderStage(order)}
+            createdAt={order.created_at}
+            nama={order.customer_name || "Tanpa nama"}
+            telepon={order.customer_whatsapp || ""}
+            alamat={[order.shipping_address, order.shipping_kecamatan, order.kota, order.shipping_province, order.shipping_postal_code].filter(Boolean).join(", ")}
+            kurir={order.shipping_method || "J&T Express"}
+            layanan={order.shipping_method || "—"}
+            resi={awb}
+            resiKosong="Resi belum dibuat"
+            resiCatatan={awb ? "Resi sudah terbit" : "Resi otomatis setelah bayar"}
+            onLacak={toggleTrack}
+            onSalinResi={() => {
+              if (awb) navigator.clipboard?.writeText(awb).catch(() => {});
+            }}
+            resiTersalin={false}
+            berat={order.weight > 0 ? `Berat ${formatWeightExact(order.weight)}` : "Berat belum diisi"}
+            items={(order.items || []).map((item, index) => ({
+              key: `${item.product_id}-${item.color}-${item.size}-${index}`,
+              nama: item.product_name,
+              chips: [
+                item.kain ? { teks: `Kain ${item.kain}`, jenis: "kain" } : null,
+                item.series ? { teks: item.series, jenis: "kain" } : null,
+                { teks: `${item.size || ""}${item.size ? " · " : ""}x${item.quantity}`, jenis: "netral" },
+              ].filter(Boolean),
+              harga: `Rp ${formatRupiah(item.price * item.quantity)}`,
+              foto: item.product_image || NEUTRAL_ITEM_PHOTO,
+            }))}
+            subtotal={order.subtotal}
+            ongkir={order.shipping_cost}
+            diskon={order.discount}
+            total={order.total}
+            metodeBayar={paymentDetail}
+            waktuPesan={jamWIB(order.created_at)}
+            waktuBayar={order.paid_at ? jamWIB(order.paid_at) : null}
+            nomorPesanan={order.order_number}
+            onSalinNomor={() => navigator.clipboard?.writeText(order.order_number).catch(() => {})}
+            nomorTersalin={false}
+            onChat={() => {
+              if (canHubungiCustomer) window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
+            }}
+            aksi={aksiOps}
           >
-            {/* Tampilan sama dengan panel admin, tema mono (hitam-putih). Logic & aksi tetap
-                dikirim dari sini; isi resi J&T/lacak tetap memakai blok lama (`shippingContent`). */}
-            <PanelDetailPesanan
-              tema="mono"
-              onClose={onClose}
-              sumber={order.source_label}
-              tahap={orderStage(order)}
-              createdAt={order.created_at}
-              nama={order.customer_name || "Tanpa nama"}
-              telepon={order.customer_whatsapp || ""}
-              alamat={[order.shipping_address, order.shipping_kecamatan, order.kota, order.shipping_province, order.shipping_postal_code].filter(Boolean).join(", ")}
-              kurir={order.shipping_method || "J&T Express"}
-              layanan={order.shipping_method || "—"}
-              resi={awb}
-              resiKosong="Resi belum dibuat"
-              resiCatatan={awb ? "Resi sudah terbit" : "Resi otomatis setelah bayar"}
-              onLacak={toggleTrack}
-              onSalinResi={() => {
-                if (awb) navigator.clipboard?.writeText(awb).catch(() => {});
-              }}
-              resiTersalin={false}
-              berat={order.weight > 0 ? `Berat ${formatWeightExact(order.weight)}` : "Berat belum diisi"}
-              items={(order.items || []).map((item, index) => ({
-                key: `${item.product_id}-${item.color}-${item.size}-${index}`,
-                nama: item.product_name,
-                chips: [
-                  item.kain ? { teks: `Kain ${item.kain}`, jenis: "kain" } : null,
-                  item.series ? { teks: item.series, jenis: "kain" } : null,
-                  { teks: `${item.size || ""}${item.size ? " · " : ""}x${item.quantity}`, jenis: "netral" },
-                ].filter(Boolean),
-                harga: `Rp ${formatRupiah(item.price * item.quantity)}`,
-                foto: item.product_image || NEUTRAL_ITEM_PHOTO,
-              }))}
-              subtotal={order.subtotal}
-              ongkir={order.shipping_cost}
-              diskon={order.discount}
-              total={order.total}
-              metodeBayar={paymentDetail}
-              waktuPesan={jamWIB(order.created_at)}
-              waktuBayar={order.paid_at ? jamWIB(order.paid_at) : null}
-              nomorPesanan={order.order_number}
-              onSalinNomor={() => navigator.clipboard?.writeText(order.order_number).catch(() => {})}
-              nomorTersalin={false}
-              onChat={() => {
-                if (canHubungiCustomer) window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
-              }}
-              aksi={aksiOps}
-            >
-              {shippingContent}
-            </PanelDetailPesanan>
-            {/* Panel ini mengisi sisa tinggi drawer & yang men-scroll adalah .dp-wrap. */}
-          </motion.aside>
+            {shippingContent}
+          </PanelDetailPesanan>
         </>
       ) : null}
     </AnimatePresence>

@@ -68,17 +68,18 @@ export default function OrderDetailDrawer({
   return (
     <AnimatePresence>
       {order && (
-        <motion.div
-          key="order-detail-drawer"
-          className="odr-overlay"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          onClick={onClose}
-        >
-          {/* Drawer menggeser dirinya sendiri; isinya shell dalam mode `embed` supaya
-              tingginya pasti dan scroll jalan. */}
+        <>
+          {/* Overlay gelap saja. Panelnya milik PanelDetailShell (fixed, nempel kanan, 560px)
+              supaya identik dengan drawer panel admin. */}
+          <motion.div
+            key="order-detail-overlay"
+            className="odr-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={onClose}
+          />
           <PanelDetailShell open onClose={onClose} tema={tema} embed>
             <OrderDetailContent
               order={order}
@@ -92,19 +93,14 @@ export default function OrderDetailDrawer({
               onSynced={onSynced}
             />
           </PanelDetailShell>
-
-          {/* z-index 50: ConfirmModal (Hapus Pesanan / Batalkan J&T) memakai z-50 dan
-              dirender setelah drawer, jadi konfirmasinya tetap muncul di atas. */}
           <style>{ODR_CSS}</style>
-        </motion.div>
+        </>
       )}
     </AnimatePresence>
   );
 }
 
-/* Kerangka drawer: overlay gelap (layar penuh) + panel yang menempel kanan.
-   Panelnya sendiri dimiliki PanelDetailShell mode `embed`; di sini cukup lebar + bayangan. */
+/* Overlay drawer /admin. z-index 50: ConfirmModal memakai z-50 dan dirender setelah drawer. */
 const ODR_CSS = `
-.odr-overlay{position:fixed;inset:0;z-index:50;display:flex;justify-content:flex-end;align-items:stretch;background:rgba(17,24,39,.5);backdrop-filter:blur(3px)}
-.odr-overlay .dp-panel.is-embed{height:100%;box-shadow:-24px 0 60px -24px rgba(17,24,39,.45)}
+.odr-overlay{position:fixed;inset:0;z-index:50;background:rgba(17,24,39,.5);backdrop-filter:blur(3px)}
 `;
