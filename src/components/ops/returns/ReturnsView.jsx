@@ -1942,7 +1942,7 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
           </div>
           <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
             <div className="min-w-0">
-              <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">No. Pesanan</dt>
+              <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Pesanan Asal</dt>
               <dd className="mt-0.5 truncate font-mono text-xs font-bold text-slate-800 dark:text-slate-100" title={record.order_number || undefined}>
                 {record.order_id ? (
                   <a

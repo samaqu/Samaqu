@@ -3,6 +3,9 @@
 # scripts (local use only, may contain credentials)
 /scripts
 
+# supabase CLI state lokal (project link / kredensial)
+/supabase/.temp
+
 # dependencies
 /node_modules
 /.pnp

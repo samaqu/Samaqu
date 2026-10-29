@@ -336,7 +336,11 @@ begin
     update orders set
       customer_name = coalesce(nullif(trim(p_header->>'customer_name'), ''), customer_name),
       customer_whatsapp = coalesce(nullif(trim(p_header->>'customer_whatsapp'), ''), customer_whatsapp),
-      customer_id = coalesce(nullif(trim(p_header->>'customer_id'), ''), customer_id),
+      -- `orders.customer_id` bertipe uuid, sedangkan `trim(p_header->>'customer_id')` bertipe
+      -- text. Tanpa cast eksplisit, Postgres menolak seluruh UPDATE dengan
+      -- "COALESCE types text and uuid cannot be matched" — itulah yang membuat tombol simpan
+      -- di form Ubah Transaksi gagal total.
+      customer_id = coalesce(nullif(trim(p_header->>'customer_id'), '')::uuid, customer_id),
       source = coalesce(nullif(trim(p_header->>'source'), ''), source),
       shipping_address = coalesce(nullif(trim(p_header->>'shipping_address'), ''), shipping_address),
       shipping_city = coalesce(nullif(trim(p_header->>'shipping_city'), ''), shipping_city),
