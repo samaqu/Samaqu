@@ -66,37 +66,39 @@ export default function OrderDetailDrawer({
   useBodyScrollLock(!!order);
 
   return (
-    <AnimatePresence>
-      {order && (
-        <>
-          {/* Overlay gelap saja. Panelnya milik PanelDetailShell (fixed, nempel kanan, 560px)
-              supaya identik dengan drawer panel admin. */}
-          <motion.div
-            key="order-detail-overlay"
-            className="odr-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={onClose}
-          />
-          <PanelDetailShell open onClose={onClose} tema={tema} embed>
-            <OrderDetailContent
-              order={order}
-              onClose={onClose}
-              tampilan="baru"
-              tema={tema}
-              onStatusChange={onStatusChange}
-              onCancelJnt={onCancelJnt}
-              onDelete={onDelete}
-              onArrangeOrder={onArrangeOrder}
-              onSynced={onSynced}
+    <>
+      <AnimatePresence>
+        {order ? (
+          <>
+            {/* Overlay gelap saja. Panel milik PanelDetailShell (fixed, kanan, 560px, tinggi
+                layar penuh) — kerangkanya sama dengan drawer panel admin. */}
+            <motion.div
+              key="order-detail-overlay"
+              className="odr-overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={onClose}
             />
-          </PanelDetailShell>
-          <style>{ODR_CSS}</style>
-        </>
-      )}
-    </AnimatePresence>
+            <PanelDetailShell open onClose={onClose} tema={tema} embed>
+              <OrderDetailContent
+                order={order}
+                onClose={onClose}
+                tampilan="baru"
+                tema={tema}
+                onStatusChange={onStatusChange}
+                onCancelJnt={onCancelJnt}
+                onDelete={onDelete}
+                onArrangeOrder={onArrangeOrder}
+                onSynced={onSynced}
+              />
+            </PanelDetailShell>
+          </>
+        ) : null}
+      </AnimatePresence>
+      <style>{ODR_CSS}</style>
+    </>
   );
 }
 

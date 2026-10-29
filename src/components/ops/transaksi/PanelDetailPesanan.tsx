@@ -567,19 +567,9 @@ export function PanelDetailShell({
     </motion.aside>
   );
 
-  // `embed`: induk (drawer /admin & ops) yang menyediakan overlay; panel tetap menggeser
-  // dari kanan supaya rasanya sama dengan drawer panel admin.
-  if (embed) {
-    return (
-      <AnimatePresence>
-        {open ? (
-          <>
-            {panel}
-          </>
-        ) : null}
-      </AnimatePresence>
-    );
-  }
+  // `embed`: induk (drawer /admin & ops) yang menyediakan overlay. Panel tetap dirender
+  // apa adanya (tanpa pembungkus) supaya rantai flex panel → .dp-wrap tidak terputus.
+  if (embed) return open ? panel : null;
 
   return (
     <AnimatePresence>
@@ -603,15 +593,20 @@ export function PanelDetailShell({
    bayangan, ketebalan huruf). Kalau mockup berubah, ubah di sini juga. */
 const DP_CSS = `
 .dp-overlay{position:fixed;inset:0;z-index:9998;background:rgba(18,32,48,.45);backdrop-filter:blur(3px)}
-.dp-panel{position:fixed;inset-block:0;right:0;z-index:9999;display:flex;flex-direction:column;width:100%;max-width:100vw;background:#f4f7fb;color:#24324a;border-left:1px solid #e8eef5;overflow:hidden;box-shadow:-24px 0 60px -24px rgba(18,32,48,.4)}
-/* Mode embed (/admin & ops): induk hanya menyediakan overlay gelap. Panel tetap seperti
-   panel admin — fixed, nempel kanan, 560px — supaya rasa & lebarnya sama persis. */
-.dp-panel.is-embed{border-left:0;box-shadow:none}
+/* Panel = tinggi layar penuh. Isi (.dp-wrap) mengisi sisa ruang dan di-scroll DI DALAM panel.
+   min-height:0 penting: tanpa itu flex item menolak menyusut dan isinya memanjang keluar
+   layar (tidak ada scrollbar). */
+.dp-panel{position:fixed;inset-block:0;right:0;z-index:9999;display:flex;flex-direction:column;width:100%;max-width:100vw;height:100vh;max-height:100vh;min-height:0;background:#f4f7fb;color:#24324a;border-left:1px solid #e8eef5;overflow:hidden;box-shadow:-24px 0 60px -24px rgba(18,32,48,.4)}
+/* Mode embed (/admin & ops): kerangkanya sama; induk hanya menyediakan overlay. */
+.dp-panel.is-embed{border-left:0}
 .dp-panel.tema-mono{background:#fff;border-left-color:#e5e7eb}
 @media (min-width:640px){.dp-panel{width:560px;max-width:560px}}
 
-/* Satu kolom scroll: header ikut ke-scroll, bukan sticky. */
-.dp-wrap{display:flex;flex-direction:column;flex:1;min-height:0;height:100%;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+/* Satu kolom scroll: header ikut ke-scroll, bukan sticky.
+   flex:1 + min-height:0 wajib supaya kotak ini benar-benar dibatasi tinggi panel; height:100%
+   TIDAK dipakai karena induknya flex (bukan tinggi pasti) → nilainya jatuh ke auto dan
+   isi memanjang tanpa scrollbar. */
+.dp-wrap{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:none}
 .dp-wrap::-webkit-scrollbar{display:none}
 
 .dp-header{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:24px 24px 72px;background:linear-gradient(135deg,#2774a8 0%,#4b9bd1 60%,#8cc5ea 100%)}
