@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 /**
  * Detail transaksi (panel samping) untuk menu Transaksi.
@@ -25,6 +25,7 @@ import { jntServiceTag } from "@/lib/jnt/layanan";
 import JntBadge from "@/components/JntBadge";
 import { SOURCE_STYLES, STATUS_STYLES, formatRupiah, formatTanggalJamID } from "@/components/ops/transaksi/transaksi-format";
 import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
+import PanelDetailPesanan, { PanelDetailFooter, PanelDetailShell } from "@/components/ops/transaksi/PanelDetailPesanan";
 
 export default function TransaksiDetailDrawer({ open, order, variant = "ops", onClose, onEdit, onCancel, onDelete, onResiCreated }) {
   const isPanel = variant === "panel";
@@ -32,6 +33,21 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
   const [statusError, setStatusError] = useState("");
   const status = order ? STATUS_STYLES[order.status] : null;
   const source = order ? SOURCE_STYLES[order.source_key || order.source] : null;
+
+  // Salin nomor (resi / pesanan) di tampilan panel — hanya umpan balik "Tersalin" sesaat.
+  const [copied, setCopied] = useState("");
+  const salin = async (jenis, nilai) => {
+    if (!nilai) return;
+    try {
+      await navigator.clipboard.writeText(nilai);
+      setCopied(jenis);
+      window.setTimeout(() => setCopied(""), 1600);
+    } catch {
+      /* clipboard bisa diblokir browser */
+    }
+  };
+  const copyResi = () => salin("resi", order?.awb_no || "");
+  const copyNomor = () => salin("nomor", order?.order_number || "");
 
   // Nama metode pembayaran: `orders.payment_method` bisa berupa id ke tabel `payment_methods`
   // (pesanan baru) atau string lama ('bank'/'qris'/'cod'/'cash'). Hook ini yang menerjemahkannya.
@@ -182,335 +198,170 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
     };
   }, [open]);
 
-  // ── Tampilan PANEL (ala mockup) ──
+  // ── Tampilan PANEL (ala marketplace) ──
+  // Semua data & aksi di blok ini SAMA dengan tampilan lama; yang berubah hanya markah/gayanya.
   if (isPanel && order) {
     const stage = orderStage(order);
     const panelWa = waNumber(order.customer_whatsapp || "");
     const canHubungiPanel = /^628[1-9][0-9]{6,10}$/.test(panelWa);
-    const canDeletePanel = Boolean(onDelete) && (!order.awb_no || order.status === "dibatalkan") && order.source !== "website";
-    const panelKey =
-      { belum_bayar: "bayar", belum_dipacking: "packing", sudah_dipacking: "siap", dikirim: "kirim", selesai: "selesai", dibatalkan: "batal" }[stage] || "batal";
-    const banner =
-      {
-        belum_bayar: ["Menunggu pembayaran", "Pesanan akan dibatalkan otomatis jika belum dibayar dalam 24 jam."],
-        belum_dipacking: ["Pesanan perlu dipacking", "Kemas pesanan, lalu buat resi supaya paket siap diserahkan ke kurir."],
-        sudah_dipacking: ["Menunggu pickup", "Resi sudah dibuat — paket menunggu dijemput kurir J&T."],
-        dikirim: ["Pesanan dalam perjalanan", "Paket sedang diantar oleh kurir ke alamat pembeli."],
-        selesai: ["Pesanan selesai", "Pesanan telah diterima oleh pembeli."],
-        dibatalkan: ["Pesanan dibatalkan", order.notes || "Pesanan dibatalkan."],
-      }[stage] || ["Pesanan", ""];
-    const stepLevel = { belum_bayar: 0, belum_dipacking: 1, sudah_dipacking: 2, dikirim: 3, selesai: 4 }[stage] ?? 0;
-    const region = [order.shipping_kecamatan, order.kota, order.shipping_province, order.shipping_postal_code].filter(Boolean).join(", ");
     const canDelete = (!order.awb_no || order.status === "dibatalkan") && order.source !== "website";
-    // Tombol "Cetak Resi" ikut pindah ke footer, jadi footer juga harus tampil walau
-    // pesanan tidak punya aksi lain (mis. pesanan website yang sudah dikirim).
     const canPrint = Boolean(awb) && order.status !== "dibatalkan";
-    // Khusus pesanan Selesai: tombol "Cetak Resi" di footer diganti "Hubungi Customer".
-    // Nomor dinormalkan ke 62... dan tombol nonaktif kalau nomor kosong/tidak valid.
     const isSelesai = order.status === "selesai" || order.shipping_status === "selesai";
     const customerWa = waNumber(order.customer_whatsapp || "");
     const canHubungiCustomer = /^628[1-9][0-9]{6,10}$/.test(customerWa);
+    const region = [order.shipping_kecamatan, order.kota, order.shipping_province, order.shipping_postal_code].filter(Boolean).join(", ");
+
+    // Resi kosong: keterangan yang sesuai tahap.
+    const resiKosong =
+      stage === "belum_bayar"
+        ? "Menunggu pembayaran"
+        : stage === "dibatalkan"
+          ? "Resi tidak tersedia"
+          : "Resi belum dibuat";
+
+    const itemsTampilan = (order.items || []).map((item, index) => ({
+      key: `${item.product_id}-${item.color}-${item.size}-${index}`,
+      nama: item.product_name,
+      chips: (
+        isPaketItem(item)
+          ? [item.kain ? `Kain ${item.kain}` : null, variantName(item.color) || variantName(item.series) || null]
+          : [item.kain ? `Kain ${item.kain}` : null, item.series, item.color && item.color !== "default" ? item.color : null, item.size]
+      )
+        .filter(Boolean)
+        .concat([`× ${item.quantity}`]),
+      harga: `Rp ${formatRupiah(item.price * item.quantity)}`,
+      foto: item.product_image || NEUTRAL_ITEM_PHOTO,
+    }));
+
+    // Footer: aturan tombol sama dengan tampilan lama (termasuk khusus Selesai).
+    const aksi = [];
+    if (canDelete) aksi.push({ key: "hapus", label: "Hapus", jenis: "bahaya", onClick: () => onDelete?.(order) });
+    if (order.can_edit) aksi.push({ key: "ubah", label: "Ubah", jenis: "sekunder", onClick: () => onEdit?.(order) });
+    if (isSelesai) {
+      aksi.push({
+        key: "hubungi",
+        label: "Hubungi Customer",
+        jenis: "sekunder",
+        disabled: !canHubungiCustomer,
+        onClick: () => {
+          if (canHubungiCustomer) window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
+        },
+      });
+    } else if (canPrint) {
+      aksi.push({ key: "cetak", label: "Cetak Resi", jenis: "sekunder", onClick: () => resiPanelRef.current?.print() });
+    }
+    if (order.can_cancel) aksi.push({ key: "batal", label: "Batalkan", jenis: "bahaya", onClick: () => onCancel?.(order) });
+
+    // Khusus belum bayar: aksi utama "Ingatkan Bayar" (WhatsApp berisi nomor pesanan & total).
+    if (stage === "belum_bayar" && canHubungiPanel) {
+      const pesan = `Halo Kak, pesanan ${order.order_number} di SAMAQU sudah masuk. Totalnya Rp ${formatRupiah(order.total)}. Yuk diselesaikan pembayarannya supaya bisa segera kami proses. Terima kasih!`;
+      aksi.push({
+        key: "ingatkan",
+        label: "Ingatkan Bayar",
+        jenis: "utama",
+        onClick: () => window.open(`https://wa.me/${panelWa}?text=${encodeURIComponent(pesan)}`, "_blank", "noopener,noreferrer"),
+      });
+    }
 
     return (
-      <AnimatePresence>
-        {open && order && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="ov" style={{ zIndex: 9998 }} onClick={onClose} />
-            <motion.aside
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "tween", duration: 0.22 }}
-              className="dr"
-              style={{ zIndex: 9999 }}
-              role="dialog"
-              aria-label="Detail Transaksi"
-            >
-              <div className="dh">
-                <div>
-                  <small>{order.source_label}</small>
-                  <h3>Detail Pesanan</h3>
-                </div>
-                <button type="button" className="x" onClick={onClose} aria-label="Tutup">
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="db">
-                <div className={`ban b-${panelKey}`}>
-                  <div className="bt">
-                    <div>
-                      <b>{banner[0]}</b>
-                      <p>{banner[1]}</p>
-                    </div>
-                    <span className={`bd s-${panelKey}`}>{ORDER_STAGE_LABEL[stage]}</span>
-                  </div>
-                  {stage !== "dibatalkan" ? (
-                    <div className="stp">
-                      {["Dibayar", "Dikemas", "Dikirim", "Selesai"].map((label, index) => (
-                        <div key={label} className={index < stepLevel ? "d" : ""}>
-                          <i />
-                          <span>{label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="sec2">
-                  <div className="sh">
-                    <Truck />
-                    <b>Informasi Pengiriman</b>
-                    {awb ? (
-                      <a onClick={openTrackModal} role="button" tabIndex={0}>
-                        Lihat ›
-                      </a>
-                    ) : null}
-                  </div>
-                  <div className="kv">
-                    <span>Kurir</span>
-                    <b style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-                      <JntBadge label="J&T Express" />
-                    </b>
-                  </div>
-                  <div className="kv">
-                    <span>Layanan</span>
-                    <b>
-                      <span className="bd s-siap">{serviceTag}</span>
-                    </b>
-                  </div>
-                  <div className="kv">
-                    <span>Berat kirim</span>
-                    <b>{totalWeight > 0 ? formatWeightExact(totalWeight) : "-"}</b>
-                  </div>
-                  {/* Panel resi (nomor + salin + buat resi) — komponen bersama. Tombol cetak
-                      dipindah ke footer drawer lewat ref supaya berdampingan dengan "Ubah". */}
-                  <TransaksiResiPanel
-                    ref={resiPanelRef}
-                    order={order}
-                    onResiCreated={onResiCreated}
-                    hidePrintButton
-                    latestTracking={lastScan}
-                    trackingState={track.status}
-                  />
-                </div>
-
-                {order.shipping_address ? (
-                  <div className="sec2">
-                    <div className="sh">
-                      <MapPin />
-                      <b>Alamat Pengiriman</b>
-                    </div>
-                    <p className="adr">
-                      <b>{order.customer_name}</b> {order.customer_whatsapp ? <span>({order.customer_whatsapp})</span> : null}
-                      <br />
-                      {order.shipping_address}
-                      {region ? (
-                        <>
-                          <br />
-                          {region}
-                        </>
-                      ) : null}
-                    </p>
-                  </div>
-                ) : null}
-
-                <div className="sec2">
-                  <div className="sh">
-                    <ShoppingBag />
-                    <b>SAMAQU Official</b>
-                  </div>
-                  {(order.items || []).map((item, index) => (
-                    <div className="it" key={`${item.product_id}-${item.color}-${item.size}-${index}`}>
-                      <div className="th">
-                        <img src={item.product_image || NEUTRAL_ITEM_PHOTO} alt={item.product_name} loading="lazy" decoding="async" />
-                      </div>
-                      <div>
-                        <b>{item.product_name}</b>
-                        <small>
-                          {isPaketItem(item)
-                            ? [item.kain ? `Kain ${item.kain}` : null, variantName(item.color) || variantName(item.series) || null]
-                                .filter(Boolean)
-                                .join(" · ")
-                            : [item.kain ? `Kain ${item.kain}` : null, item.series, item.color && item.color !== "default" ? item.color : null, item.size]
-                                .filter(Boolean)
-                                .join(" · ")}
-                        </small>
-                        <small>× {item.quantity}</small>
-                        {item.weight ? (
-                          <small>
-                            Berat:{" "}
-                            <b style={{ color: "inherit" }}>
-                              {item.weight.source === "missing" ? "-" : formatWeightExact(item.weight.grams)}
-                            </b>
-                            {item.weight.source !== "variant" ? (
-                              <span style={{ color: "#b45309", fontWeight: 700 }}>
-                                {" "}· {item.weight.source === "product" ? "fallback berat produk" : "berat per ukuran belum diisi"}
-                              </span>
-                            ) : null}
-                          </small>
-                        ) : null}
-                      </div>
-                      <b className="mono">Rp {formatRupiah(item.price * item.quantity)}</b>
-                    </div>
-                  ))}
-                  {(order.items || []).length === 0 ? <p className="adr">Tidak ada produk tercatat.</p> : null}
-                  <div className="rw">
-                    <span>Subtotal Produk</span>
-                    <span>Rp {formatRupiah(order.subtotal)}</span>
-                  </div>
-                  <div className="rw">
-                    <span>Subtotal Pengiriman</span>
-                    <span>Rp {formatRupiah(order.shipping_cost)}</span>
-                  </div>
-                  {order.discount > 0 ? (
-                    <div className="rw">
-                      <span>Voucher Toko</span>
-                      <span style={{ color: "#2f9e5b" }}>- Rp {formatRupiah(order.discount)}</span>
-                    </div>
-                  ) : null}
-                  <div className="rw t">
-                    <span>Total Pesanan</span>
-                    <span style={{ color: "var(--panel-accent, #c2255c)" }}>Rp {formatRupiah(order.total)}</span>
-                  </div>
-                </div>
-
-                {/* HPP & peringatan kemasan sengaja TIDAK ditampilkan di sini.
-                    Detail pesanan disamakan dengan /admin (OrderDetailPanel): hanya
-                    data pesanan, tanpa kartu HPP internal. Snapshot HPP tetap ada di
-                    database dan dipakai laporan/produksi. */}
-                <div className="sec2">
-                  <div className="sh">
-                    <CreditCard />
-                    <b>Metode Pembayaran</b>
-                    <span style={{ marginLeft: "auto", color: "#6b4b5a", fontWeight: 600 }}>{paymentDetail}</span>
-                  </div>
-                </div>
-
-                {order.notes ? <div className="note">Catatan pembeli: {order.notes}</div> : null}
-
-                <div className="sec2">
-                  <div className="kv">
-                    <span>No. Pesanan</span>
-                    <b style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                      {order.order_number}
-                      <CopyButton value={order.order_number} label="nomor pesanan" />
-                    </b>
-                  </div>
-                  <div className="kv">
-                    <span>Waktu Pemesanan</span>
-                    <b>{formatTanggalJamID(order.created_at)}</b>
-                  </div>
-                  <div className="kv">
-                    <span>Waktu Pembayaran</span>
-                    <b>{order.paid_at ? formatTanggalJamID(order.paid_at) : "-"}</b>
-                  </div>
-                </div>
-              </div>
-
+      <PanelDetailShell open={open} onClose={onClose}>
+        <PanelDetailPesanan
+          sumber={order.source_label}
+          tahap={stage}
+          createdAt={order.created_at}
+          nama={order.customer_name}
+          telepon={order.customer_whatsapp || ""}
+          alamat={[order.shipping_address, region].filter(Boolean).join(", ")}
+          kurir="J&T Express"
+          layanan={jntServiceTag(track.serviceCode || order.shipping_method).replace(/^Service\s+/i, "")}
+          resi={awb}
+          resiKosong={resiKosong}
+          onLacak={openTrackModal}
+          onSalinResi={copyResi}
+          resiTersalin={copied === "resi"}
+          berat={`Berat ${totalWeight > 0 ? formatWeightExact(totalWeight) : "-"}`}
+          items={itemsTampilan}
+          subtotal={order.subtotal}
+          ongkir={order.shipping_cost}
+          diskon={order.discount}
+          total={order.total}
+          metodeBayar={paymentDetail}
+          waktuPesan={formatTanggalJamID(order.created_at)}
+          waktuBayar={order.paid_at ? formatTanggalJamID(order.paid_at) : null}
+          nomorPesanan={order.order_number}
+          onSalinNomor={copyNomor}
+          nomorTersalin={copied === "nomor"}
+          onChat={() => {
+            if (canHubungiCustomer) window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
+          }}
+          ekstra={
+            <>
               {order.items_edited_after_resi && awb ? (
-                <div
-                  role="status"
-                  style={{
-                    margin: "0 0 10px",
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    border: "1px solid #f0c36d",
-                    background: "#fff8e6",
-                    color: "#7a5200",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    lineHeight: 1.5,
-                  }}
-                >
+                <div className="dp-warning" role="status">
                   Item diubah setelah resi terbit. Cetak ulang label dan beri tahu tim packing. Label lama jangan dipakai.
                   Nomor resi tetap <b>{awb}</b>.
                 </div>
               ) : null}
+              {order.notes ? <p className="dp-catatan">Catatan pembeli: {order.notes}</p> : null}
+              {statusError ? <p className="dp-error">{statusError}</p> : null}
+            </>
+          }
+        >
+          {/* Panel resi asli: buat resi, resi HBO, cetak (logic lama, tidak diubah). */}
+          <TransaksiResiPanel
+            ref={resiPanelRef}
+            order={order}
+            onResiCreated={onResiCreated}
+            hidePrintButton
+            latestTracking={lastScan}
+            trackingState={track.status}
+          />
+        </PanelDetailPesanan>
 
-              {order.can_edit || order.can_cancel || canDelete || canPrint || isSelesai ? (
-                <div className="df">
-                  {canDelete ? (
-                    <button type="button" className="b-danger" onClick={() => onDelete?.(order)}>
-                      Hapus
-                    </button>
-                  ) : null}
-                  {order.can_edit ? (
-                    <button type="button" className="b2" onClick={() => onEdit?.(order)}>
-                      Ubah
-                    </button>
-                  ) : null}
-                  {isSelesai ? (
-                    <button
-                      type="button"
-                      className="b2"
-                      disabled={!canHubungiCustomer}
-                      onClick={() => {
-                        if (canHubungiCustomer) {
-                          window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
-                        }
-                      }}
-                    >
-                      Hubungi Customer
-                    </button>
-                  ) : canPrint ? (
-                    <button type="button" className="b2" onClick={() => resiPanelRef.current?.print()}>
-                      Cetak Resi
-                    </button>
-                  ) : null}
-                  {order.can_cancel ? (
-                    <button type="button" className="b1" onClick={() => onCancel?.(order)}>
-                      Batalkan
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-            </motion.aside>
+        <PanelDetailFooter aksi={aksi} />
 
-            {trackModal ? (
-              <div
-                className="md"
-                onClick={(event) => {
-                  if (event.target === event.currentTarget) setTrackModal(false);
-                }}
-              >
-                <div className="mc">
-                  <div className="dh">
-                    <div>
-                      <small>J&amp;T Express</small>
-                      <h3>Lacak Pengiriman</h3>
-                      <small>
-                        No. Resi <b style={{ color: "#2a1a22" }}>{awb}</b>
-                      </small>
-                    </div>
-                    <button type="button" className="x" onClick={() => setTrackModal(false)} aria-label="Tutup">
-                      <X size={18} />
-                    </button>
-                  </div>
-                  {track.status === "loading" ? (
-                    <p style={{ padding: "20px 24px", color: "#8a7d83", fontSize: 13 }}>Memuat riwayat dari J&amp;T…</p>
-                  ) : track.status === "error" ? (
-                    <p style={{ padding: "20px 24px", color: "#d63340", fontSize: 13, fontWeight: 600 }}>{track.error}</p>
-                  ) : historyRows.length === 0 ? (
-                    <p style={{ padding: "20px 24px", color: "#8a7d83", fontSize: 13 }}>Belum ada riwayat dari J&amp;T.</p>
-                  ) : (
-                    <ul className="trk">
-                      {historyRows.map((row, index) => (
-                        <li key={`${row.dateTime}-${index}`} className={index === 0 ? "d" : ""}>
-                          <b>{row.status}</b>
-                          <small>{[row.location, formatTrackingTime(row.dateTime)].filter(Boolean).join(" · ")}</small>
-                          {row.note ? <small className="full">Catatan: {row.note}</small> : null}
-                          {row.receiver ? <small className="full">Diterima oleh: {row.receiver}</small> : null}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+        {trackModal ? (
+          <div
+            className="dp-md"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setTrackModal(false);
+            }}
+          >
+            <div className="dp-mc">
+              <div className="dp-mh">
+                <div>
+                  <small>J&amp;T Express</small>
+                  <h3>Lacak Pengiriman</h3>
+                  <small>
+                    No. Resi <b>{awb}</b>
+                  </small>
                 </div>
+                <button type="button" className="dp-tutup" onClick={() => setTrackModal(false)} aria-label="Tutup">
+                  <X size={17} />
+                </button>
               </div>
-            ) : null}
-          </>
-        )}
-      </AnimatePresence>
+              {track.status === "loading" ? (
+                <p className="dp-md-note">Memuat riwayat dari J&amp;T…</p>
+              ) : track.status === "error" ? (
+                <p className="dp-md-note is-error">{track.error}</p>
+              ) : historyRows.length === 0 ? (
+                <p className="dp-md-note">Belum ada riwayat dari J&amp;T.</p>
+              ) : (
+                <ul className="dp-trk">
+                  {historyRows.map((row, index) => (
+                    <li key={`${row.dateTime}-${index}`} className={index === 0 ? "is-latest" : ""}>
+                      <b>{row.status}</b>
+                      <small>{[row.location, formatTrackingTime(row.dateTime)].filter(Boolean).join(" · ")}</small>
+                      {row.note ? <small>Catatan: {row.note}</small> : null}
+                      {row.receiver ? <small>Diterima oleh: {row.receiver}</small> : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </PanelDetailShell>
     );
   }
 
