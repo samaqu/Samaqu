@@ -484,22 +484,11 @@ export default function PanelDetailPesanan({
 
 export function PanelDetailFooter({ aksi }: { aksi: AksiFooter[] }) {
   if (!aksi || aksi.length === 0) return null;
-  // Aksi sekunder/bahaya berbagi satu baris (kalau lebih dari satu), aksi utama selalu
-  // dapat barisnya sendiri di bawah — supaya lebarnya tidak berebut di drawer 560px.
-  const pendamping = aksi.filter((a) => a.jenis !== "utama");
-  const utama = aksi.filter((a) => a.jenis === "utama");
+  // Semua aksi ditumpuk satu per baris, sama lebar. Urutannya sudah diatur pemanggil:
+  // bahaya (Batalkan) → sekunder (Ubah) → utama (Ingatkan Bayar) paling bawah.
   return (
     <div className="dp-footer">
-      {pendamping.length > 0 ? (
-        <div className="dp-footer-baris">
-          {pendamping.map((a) => (
-            <button key={a.key} type="button" className={`dp-tombol ${a.jenis}`} onClick={a.onClick} disabled={a.disabled}>
-              {a.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
-      {utama.map((a) => (
+      {aksi.map((a) => (
         <button key={a.key} type="button" className={`dp-tombol ${a.jenis}`} onClick={a.onClick} disabled={a.disabled}>
           {a.label}
         </button>
@@ -680,16 +669,15 @@ const DP_CSS = `
 .dp-kv-baris b{min-width:0;font-weight:900;text-align:right;overflow-wrap:anywhere}
 .dp-kv-baris b.kosong{color:#9aa6b4;font-weight:800}
 
-/* Footer ditumpuk: baris aksi sekunder/bahaya di atas, aksi utama selebar drawer di bawah. */
+/* Footer: semua aksi ditumpuk satu per baris, lebar sama — tombolnya jadi seimbang. */
 .dp-footer{flex:none;display:flex;flex-direction:column;gap:8px;padding:16px 20px 22px;background:#fff;border-radius:28px 28px 0 0;box-shadow:0 -10px 30px rgba(36,50,74,.08)}
-.dp-footer-baris{display:flex;gap:8px}
-.dp-tombol{flex:1 1 0;min-width:0;height:46px;padding:0 16px;border:0;border-radius:999px;font:inherit;font-size:14px;font-weight:900;line-height:1;cursor:pointer;transition:filter .15s}
+.dp-tombol{flex:0 0 auto;width:100%;height:46px;padding:0 16px;border:0;border-radius:999px;font:inherit;font-size:14px;font-weight:900;line-height:1;cursor:pointer;transition:filter .15s}
 .dp-tombol:hover:not(:disabled){filter:brightness(.97)}
 .dp-tombol:disabled{opacity:.5;cursor:not-allowed}
 .dp-tombol.bahaya{background:#fdf0f0;color:#b42f2f}
 .dp-tombol.sekunder{background:#e8f3fb;color:#2774a8}
-/* Aksi utama: satu-satunya tombol di barisnya, lebar penuh, lebih tinggi dari yang lain. */
-.dp-tombol.utama{flex:0 0 auto;width:100%;height:54px;font-size:15px;background:linear-gradient(135deg,#2774a8,#3a8fc6);color:#fff;box-shadow:0 10px 22px rgba(39,116,168,.3)}
+/* Aksi utama tetap menonjol: sedikit lebih tinggi + bayangan biru. */
+.dp-tombol.utama{height:54px;font-size:15px;background:linear-gradient(135deg,#2774a8,#3a8fc6);color:#fff;box-shadow:0 10px 22px rgba(39,116,168,.3)}
 
 /* Catatan & peringatan di kartu ekstra. */
 .dp-warning{padding:10px 12px;border-radius:12px;border:1px solid #f3dfae;background:#fff8e6;color:#7a5200;font-size:12.5px;font-weight:700;line-height:1.5}
@@ -737,6 +725,7 @@ const DP_CSS = `
   .dp-kv-baris{font-size:13.5px}
   .dp-langkah-label{font-size:11px}
   .dp-footer{padding:12px 14px 18px;border-radius:24px 24px 0 0}
-  .dp-tombol{height:50px;padding:0 16px;font-size:14px}
+  .dp-tombol{height:44px;padding:0 14px;font-size:14px}
+  .dp-tombol.utama{height:50px}
 }
 `;
