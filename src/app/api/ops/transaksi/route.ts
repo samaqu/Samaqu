@@ -479,8 +479,6 @@ async function restoreStock(admin: Admin, items: Snapshot[]) {
 /** Daftar transaksi per PESANAN (bukan per item) untuk bulan terpilih. */
 export async function GET(req: NextRequest) {
   if (!(await isOpsAdmin(req))) return unauthorized();
-  const identity = await opsIdentity(req);
-  const hppVisible = identity?.role === "owner";
 
   const sp = new URL(req.url).searchParams;
   const start = String(sp.get("start") || "").trim();
@@ -529,25 +527,12 @@ export async function GET(req: NextRequest) {
     editReady = false;
   }
 
+  // Hanya dipakai untuk status/peringatan kemasan — nilai HPP tidak dikirim ke layar.
   const { data: hppHeaders } = await admin
     .from("production_order_hpp")
-    .select("order_id, hpp_goods, packaging_cost, total_hpp, packaging_status, packaging_warning, packaged_at, returned_at")
+    .select("order_id, packaging_status, packaging_warning")
     .in("order_id", orderIds);
   const hppByOrder = new Map((hppHeaders || []).map((row: any) => [String(row.order_id), row]));
-
-  let hppItemsByOrder = new Map<string, any[]>();
-  if (hppVisible) {
-    const { data: hppItems } = await admin
-      .from("production_order_hpp_items")
-      .select("order_id, product_id, product_name, color, size, quantity, hpp_unit, hpp_total, source, hpp_warning")
-      .in("order_id", orderIds);
-    for (const row of hppItems || []) {
-      const key = String(row.order_id);
-      const current = hppItemsByOrder.get(key) || [];
-      current.push(row);
-      hppItemsByOrder.set(key, current);
-    }
-  }
 
   const { data: lineItems } = await admin
     .from("order_items")
@@ -650,34 +635,9 @@ export async function GET(req: NextRequest) {
       // Peringatan kemasan boleh dilihat semua admin (tanpa harga/HPP).
       packaging_warning: Boolean(hppByOrder.get(order.id)?.packaging_warning),
       packaging_status: hppByOrder.get(order.id)?.packaging_status || null,
-      hpp_visible: hppVisible,
-      ...(hppVisible
-        ? {
-            hpp: (() => {
-              const header = hppByOrder.get(order.id);
-              if (!header) return null;
-              return {
-                hpp_goods: Number(header.hpp_goods) || 0,
-                packaging_cost: Number(header.packaging_cost) || 0,
-                total_hpp: Number(header.total_hpp) || 0,
-                packaging_status: header.packaging_status || null,
-                packaged_at: header.packaged_at || null,
-                returned_at: header.returned_at || null,
-                items: (hppItemsByOrder.get(order.id) || []).map((item: any) => ({
-                  product_id: item.product_id,
-                  product_name: item.product_name,
-                  color: item.color || "default",
-                  size: item.size,
-                  quantity: Number(item.quantity) || 0,
-                  hpp_unit: item.hpp_unit == null ? null : Number(item.hpp_unit) || 0,
-                  hpp_total: item.hpp_total == null ? null : Number(item.hpp_total) || 0,
-                  source: item.source,
-                  hpp_warning: item.hpp_warning || null,
-                })),
-              };
-            })(),
-          }
-        : {}),
+      // HPP sengaja TIDAK dikirim ke daftar/drawer Transaksi ops — disamakan dengan
+      // dashboard /admin yang hanya menampilkan data pesanan. Snapshot HPP tetap tersimpan
+      // di database dan dipakai laporan/produksi.
       // Guard edit item dipakai server & UI. Website/Open Order sekarang boleh diedit
       // selama stoknya tercatat, status belum dikirim, dan pengiriman belum berjalan.
       can_edit: editReady && editGuard.canEdit,
