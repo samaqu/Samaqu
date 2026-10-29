@@ -195,6 +195,7 @@ export default function PanelDetailPesanan({
   resiKosong,
   resiCatatan,
   onLacak,
+  trackAktif = false,
   onSalinResi,
   resiTersalin,
   berat,
@@ -235,6 +236,8 @@ export default function PanelDetailPesanan({
   /** Chip keterangan resi di sebelah chip berat (mis. "Resi otomatis setelah bayar"). */
   resiCatatan: string;
   onLacak: () => void;
+  /** Riwayat pelacakan sedang terbuka → tombol berubah jadi "Tutup" dan tampil aktif. */
+  trackAktif?: boolean;
   onSalinResi: () => void;
   resiTersalin: boolean;
   berat: string;
@@ -366,8 +369,14 @@ export default function PanelDetailPesanan({
                 <button type="button" className="dp-pil" onClick={onSalinResi} disabled={!resi}>
                   {resiTersalin ? "Tersalin" : "Salin"}
                 </button>
-                <button type="button" className="dp-pil" onClick={onLacak} disabled={!resi}>
-                  Lacak
+                <button
+                  type="button"
+                  className={`dp-pil${trackAktif ? " aktif" : ""}`}
+                  onClick={onLacak}
+                  disabled={!resi}
+                  aria-expanded={trackAktif}
+                >
+                  {trackAktif ? "Tutup" : "Lacak"}
                 </button>
               </div>
             </div>
@@ -681,6 +690,8 @@ const DP_CSS = `
 .dp-pil{height:38px;padding:0 12px;border:0;border-radius:999px;background:#fff;font:inherit;font-size:12px;font-weight:800;color:#5a6b80;cursor:pointer}
 .dp-pil:hover:not(:disabled){color:#2774a8}
 .dp-pil:disabled{cursor:not-allowed;color:#5a6b80}
+.dp-pil.aktif{background:#e8f3fb;color:#2774a8;font-weight:900}
+.tema-mono .dp-pil.aktif{background:#111827;color:#fff}
 .dp-pil.biru{padding:0 14px;background:#e8f3fb;font-size:13px;color:#2774a8}
 
 .dp-chip-baris{display:flex;gap:8px;flex-wrap:wrap}
@@ -752,6 +763,20 @@ const DP_CSS = `
 .dp-tombol.utama:hover:not(:disabled){filter:brightness(1.03)}
 
 /* Catatan & peringatan di kartu ekstra. */
+.dp-riwayat{display:flex;flex-direction:column;gap:2px;margin-top:10px}
+.dp-riwayat-judul{margin:0 0 6px;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#5a6b80}
+.dp-riwayat-item{display:flex;gap:10px;padding:8px 0;border-top:1px solid #eef2f6}
+.dp-riwayat-item:first-of-type{border-top:0;padding-top:0}
+.dp-riwayat-dot{flex:none;width:8px;height:8px;margin-top:6px;border-radius:50%;background:#cfd8e3}
+.dp-riwayat-item.terbaru .dp-riwayat-dot{background:#2774a8;box-shadow:0 0 0 3px rgba(39,116,168,.16)}
+.dp-riwayat-item b{display:block;font-size:12.5px;font-weight:800;color:#24324a;line-height:1.35}
+.dp-riwayat-item i{display:block;margin-top:2px;font-size:11.5px;font-style:normal;font-weight:600;color:#5a6b80;line-height:1.4}
+.tema-mono .dp-riwayat-judul{color:#6b7280}
+.tema-mono .dp-riwayat-item{border-top-color:#e5e7eb}
+.tema-mono .dp-riwayat-dot{background:#d1d5db}
+.tema-mono .dp-riwayat-item.terbaru .dp-riwayat-dot{background:#111827;box-shadow:0 0 0 3px rgba(17,24,39,.12)}
+.tema-mono .dp-riwayat-item b{color:#111827}
+.tema-mono .dp-riwayat-item i{color:#6b7280}
 .dp-warning{padding:10px 12px;border-radius:12px;border:1px solid #f3dfae;background:#fff8e6;color:#7a5200;font-size:12.5px;font-weight:700;line-height:1.5}
 .dp-catatan{margin:8px 0 0;font-size:12.5px;font-weight:700;color:#5a6b80;line-height:1.5}
 .dp-error{margin:8px 0 0;font-size:12.5px;font-weight:800;color:#b42f2f}

@@ -668,19 +668,33 @@ export default function OrderDetailContent({
     return list;
   })();
 
-  /** Ringkasan riwayat J&T untuk tampilan baru (dibuka dari tombol "Lacak"). */
-  const trackPanel = tracking ? (
-    <span>Memuat riwayat dari J&amp;T…</span>
-  ) : trackError ? (
-    <span>{trackError}</span>
-  ) : trackUpdates.length > 0 ? (
-    <span>
-      {trackingRow(trackUpdates[0]).status}
-      {trackingRow(trackUpdates[0]).location ? ` · ${trackingRow(trackUpdates[0]).location}` : ""}
-    </span>
-  ) : (
-    <span>Belum ada riwayat dari J&amp;T.</span>
-  );
+  /** Riwayat J&T untuk tampilan baru (dibuka dari tombol "Lacak"). */
+  const trackPanel =
+    tracking ? (
+      <p className="dp-catatan">Memuat riwayat dari J&amp;T…</p>
+    ) : trackError ? (
+      <p className="dp-error">{trackError}</p>
+    ) : trackUpdates.length > 0 ? (
+      <div className="dp-riwayat">
+        <p className="dp-riwayat-judul">Riwayat Pengiriman</p>
+        {trackUpdates.map((u, i) => {
+          const row = trackingRow(u);
+          return (
+            <div key={`${row.dateTime}-${i}`} className={`dp-riwayat-item${i === 0 ? " terbaru" : ""}`}>
+              <span className="dp-riwayat-dot" />
+              <div>
+                <b>{row.status}</b>
+                <i>{[row.location, formatTrackingTime(row.dateTime)].filter(Boolean).join(" · ")}</i>
+                {row.note ? <i>Catatan: {row.note}</i> : null}
+                {row.receiver ? <i>Diterima oleh: {row.receiver}</i> : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    ) : (
+      <p className="dp-catatan">Belum ada riwayat dari J&amp;T.</p>
+    );
 
   // Layout detail disamakan dengan panel admin. Dashboard admin memakai tema mono
   // (hitam/slate), bukan pink.
@@ -725,7 +739,8 @@ export default function OrderDetailContent({
     resi,
     resiKosong: resi ? "" : "Resi belum dibuat",
     resiCatatan: resi ? "Resi sudah terbit" : "Resi otomatis setelah bayar",
-    onLacak: () => openTrack(!showTrack),
+    onLacak: () => openTrack(),
+    trackAktif: showTrack,
     onSalinResi: () => salin("resi", resi),
     resiTersalin: tersalin === "resi",
     berat: `Berat ${totalWeight.grams ? formatWeightExact(totalWeight.grams) : "-"}`,
@@ -754,18 +769,20 @@ export default function OrderDetailContent({
       if (order.customer_whatsapp) window.open(waLink(order.customer_whatsapp, waPesan), "_blank", "noopener,noreferrer");
     },
     aksi: aksiBaru,
-    ekstra: (
-      <>
-        {order.items_edited_after_resi && resi ? (
-          <p className="dp-warning" role="status">
-            Item diubah setelah resi terbit. Cetak ulang label dan beri tahu tim packing. Label lama jangan dipakai.
-            Nomor resi tetap <b>{resi}</b>.
-          </p>
-        ) : null}
-        {order.shipping_notes ? <p className="dp-catatan">Catatan pembeli: {order.shipping_notes}</p> : null}
-        {showTrack ? <div className="dp-catatan">{trackPanel}</div> : null}
-      </>
-    ),
+    // Kartu ekstra hanya dikirim kalau ada isinya — fragment kosong bikin kartu putih kosong.
+    ekstra:
+      order.items_edited_after_resi || order.shipping_notes || showTrack ? (
+        <>
+          {order.items_edited_after_resi && resi ? (
+            <p className="dp-warning" role="status">
+              Item diubah setelah resi terbit. Cetak ulang label dan beri tahu tim packing. Label lama jangan dipakai.
+              Nomor resi tetap <b>{resi}</b>.
+            </p>
+          ) : null}
+          {order.shipping_notes ? <p className="dp-catatan">Catatan pembeli: {order.shipping_notes}</p> : null}
+          {showTrack ? trackPanel : null}
+        </>
+      ) : null,
   };
 
   return (
