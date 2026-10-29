@@ -594,13 +594,15 @@ export function PanelDetailShell({
    bayangan, ketebalan huruf). Kalau mockup berubah, ubah di sini juga. */
 const DP_CSS = `
 .dp-overlay{position:fixed;inset:0;z-index:9998;display:flex;justify-content:flex-end;background:rgba(18,32,48,.45);backdrop-filter:blur(3px)}
-/* Panel mengikuti pola drawer lain di /admin (ProductDetailDrawer): induk = overlay fixed
-   ber-flex, panel = anak dengan height:100%. Jangan pakai position:fixed di panel — di dalam
-   induk ber-transform/flex nilainya terkurung dan area scroll jadi mati. */
-.dp-panel{position:relative;z-index:1;display:flex;flex-direction:column;width:100%;max-width:100vw;height:100%;min-height:0;background:#f4f7fb;color:#24324a;overflow:hidden;box-shadow:-24px 0 60px -24px rgba(18,32,48,.4)}
-.dp-panel.is-embed{border-left:0}
+/* Panel = isi drawer. Lebarnya ditentukan INDUK (overlay/panel milik pemanggil), tingginya
+   memenuhi induk; yang men-scroll adalah .dp-wrap di dalamnya. Saat dipakai sendiri
+   (PanelDetailShell non-embed) induknya .dp-overlay yang juga flex. */
+.dp-panel{position:relative;z-index:1;display:flex;flex-direction:column;flex:1 1 auto;width:100%;max-width:100%;height:100%;min-width:0;min-height:0;background:#f4f7fb;color:#24324a;overflow:hidden;box-shadow:-24px 0 60px -24px rgba(18,32,48,.4)}
+.dp-panel.is-embed{box-shadow:none}
 .dp-panel.tema-mono{background:#fff}
-@media (min-width:640px){.dp-panel{width:560px;max-width:560px}}
+/* Dipakai sendiri (bukan embed): beri lebar 560px di layar lebar. */
+.dp-overlay > .dp-panel{flex:0 0 auto}
+@media (min-width:640px){.dp-overlay > .dp-panel{width:560px;max-width:560px}}
 
 /* Satu kolom scroll: header ikut ke-scroll, bukan sticky.
    flex:1 + min-height:0 wajib supaya kotak ini benar-benar dibatasi tinggi panel; height:100%

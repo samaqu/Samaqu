@@ -81,10 +81,10 @@ export default function OrderDetailDrawer({
             transition={{ duration: 0.2 }}
             onClick={onClose}
           >
-            {/* Overlay = induk flex (pola ProductDetailDrawer). Panel dirender
-                OrderDetailContent → PanelDetailPesanan dengan height:100%, jadi area isi
-                benar-benar dibatasi dan bisa di-scroll. */}
-            <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", height: "100%" }}>
+            {/* Struktur sama PERSIS dengan ProductDetailDrawer:
+                overlay (fixed, flex, justify-end) ──▶ .odr-panel (width 560, height 100%)
+                ──▶ isi drawer yang mengisi sisa tinggi & men-scroll sendiri. */}
+            <div className="odr-panel" onClick={(e) => e.stopPropagation()}>
               <OrderDetailContent
                 order={order}
                 onClose={onClose}
@@ -105,7 +105,10 @@ export default function OrderDetailDrawer({
   );
 }
 
-/* Overlay drawer /admin. z-index 50: ConfirmModal memakai z-50 dan dirender setelah drawer. */
+/* Overlay drawer /admin — pola ProductDetailDrawer: overlay fixed ber-flex, panel anak
+   dengan lebar tetap & tinggi penuh. z-index 50 (ConfirmModal memakai z-50). */
 const ODR_CSS = `
 .odr-overlay{position:fixed;inset:0;z-index:50;display:flex;justify-content:flex-end;align-items:stretch;background:rgba(17,24,39,.5);backdrop-filter:blur(3px)}
+.odr-panel{width:100%;max-width:100vw;height:100%;display:flex;min-width:0;overflow:hidden;background:#fff;box-shadow:-24px 0 60px -24px rgba(17,24,39,.45)}
+@media (min-width:640px){.odr-panel{width:560px;max-width:560px}}
 `;

@@ -771,18 +771,19 @@ export default function OrderDetailContent({
   return (
     <div
       className="od-root"
-      style={tampilan === "baru" ? { display: "flex", height: "100%", minHeight: 0, width: "100%" } : undefined}
+      style={
+        tampilan === "baru"
+          ? { display: "flex", height: "100%", minHeight: 0, width: "100%", minWidth: 0 }
+          : undefined
+      }
     >
       <style>{RINCIAN_CSS}</style>
       <style>{OD_CSS}</style>
+      {/* Rendernya langsung (tanpa PanelDetailShell), jadi stylesheet drawer dipasang di sini. */}
+      {tampilan === "baru" ? <style>{DP_STYLE}</style> : null}
 
       {tampilan === "baru" ? (
-        <div style={{ display: "flex", height: "100%", minHeight: 0, width: "100%" }}>
-          {/* Rendernya langsung (tanpa PanelDetailShell), jadi stylesheet drawer harus
-              dipasang di sini — kalau tidak, drawer tampil sebagai teks polos. */}
-          <style>{DP_STYLE}</style>
-          <PanelDetailPesanan {...viewProps} />
-        </div>
+        <PanelDetailPesanan {...viewProps} />
       ) : (
         <>
       {/* Sama seperti drawer ops: panel langsung di body, tanpa wrapper struk customer. */}
