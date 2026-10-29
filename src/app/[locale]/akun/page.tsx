@@ -5,6 +5,8 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getCustomerOrders } from "@/lib/customer-auth";
 import { resolveItemPhotos } from "@/lib/order-photo";
+import type { OrderPhotoLookup } from "@/lib/order-photo";
+import OrderItemThumb from "@/components/akun/OrderItemThumb";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { useAkunCustomer } from "@/components/akun/AkunContext";
 import { useSafeLocale } from "@/lib/safe-i18n";
@@ -67,6 +69,8 @@ export default function DashboardAkunPage() {
   const [wishCount, setWishCount] = useState(0);
   // status ulasan per item pesanan: pending / published / rejected
   const [reviewStatus, setReviewStatus] = useState<Map<string, string>>(new Map());
+  /** Lookup foto katalog untuk thumbnail 5 pesanan terakhir (dipakai OrderItemThumb). */
+  const [photoLookup, setPhotoLookup] = useState<OrderPhotoLookup | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   // Langsung buka form ulasan dari dashboard (tanpa pindah halaman / fetch ulang).
@@ -91,11 +95,13 @@ export default function DashboardAkunPage() {
         const list = (o as Order[]) || [];
         // Dashboard cuma menampilkan 5 pesanan terakhir — jangan resolve foto semua order.
         const recent = list.slice(0, 5);
-        const missing = recent.flatMap((order) =>
-          (order.order_items || []).filter((item) => !item.product_image)
-        );
-        const lookup = missing.length ? await loadOrderPhotoLookup(itemProductIds(missing)) : null;
+        // Lookup dimuat untuk SEMUA item di 5 pesanan itu (bukan hanya yang snapshot-nya kosong):
+        // snapshot bisa menunjuk aset yang sudah dihapus (404), dan thumb butuh kandidat cadangan
+        // untuk pindah saat <img> gagal. Tetap SATU query batch per tabel.
+        const visible = recent.flatMap((order) => order.order_items || []);
+        const lookup = visible.length ? await loadOrderPhotoLookup(itemProductIds(visible)) : null;
         if (!alive) return;
+        setPhotoLookup(lookup);
         setOrders(
           list.map((order, index) =>
             index < 5
@@ -264,11 +270,12 @@ export default function DashboardAkunPage() {
                               <td className="px-5 py-4 align-middle">
                                 <div className="flex items-center gap-3">
                                   <div className="akun-thumb w-11 h-11 shrink-0 overflow-hidden">
-                                    {item?.product_image ? (
-                                      <img src={item.product_image} alt={item.product_name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                                    ) : (
-                                      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.2"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>
-                                    )}
+                                    <OrderItemThumb
+                                      item={item || {}}
+                                      lookup={photoLookup}
+                                      className="w-full h-full"
+                                      fallback={<svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.2"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>}
+                                    />
                                   </div>
                                   <div className="min-w-0">
                                     <p className="font-semibold text-sm truncate" style={{ color: "#000000" }}>{item?.product_name || "Produk"}</p>
@@ -321,11 +328,12 @@ export default function DashboardAkunPage() {
                           >
                             <div className="flex items-center gap-3">
                               <div className="w-11 h-11 rounded-[10px] overflow-hidden shrink-0 flex items-center justify-center" style={{ background: "#f2f2f2" }}>
-                                {order.order_items?.[0]?.product_image ? (
-                                  <img src={order.order_items[0].product_image} alt={order.order_items[0].product_name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                                ) : (
-                                  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.5"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>
-                                )}
+                                <OrderItemThumb
+                                  item={order.order_items?.[0] || {}}
+                                  lookup={photoLookup}
+                                  className="w-full h-full flex items-center justify-center"
+                                  fallback={<svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.5"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>}
+                                />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-[13.5px] font-bold truncate" style={{ color: "#000000" }}>{order.order_items?.[0]?.product_name || "Produk"}</p>

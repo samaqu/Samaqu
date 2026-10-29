@@ -7,6 +7,8 @@ import { getCustomerOrders } from "@/lib/customer-auth";
 import { getMyReviews } from "@/lib/ulasan-client";
 import { useAkunCustomer } from "@/components/akun/AkunContext";
 import { resolveItemPhotos } from "@/lib/order-photo";
+import type { OrderPhotoLookup } from "@/lib/order-photo";
+import OrderItemThumb from "@/components/akun/OrderItemThumb";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { useSafeLocale } from "@/lib/safe-i18n";
 import { AkunHeader } from "@/components/akun/AkunShell";
@@ -52,6 +54,8 @@ export default function PesananPage() {
   const [tab, setTab] = useState("semua");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [reviewPending, setReviewPending] = useState(0);
+  /** Lookup foto katalog untuk thumbnail (dipakai OrderItemThumb). */
+  const [photoLookup, setPhotoLookup] = useState<OrderPhotoLookup | null>(null);
   const { customer, ready } = useAkunCustomer();
 
   useEffect(() => {
@@ -70,13 +74,13 @@ export default function PesananPage() {
           getMyReviews(),
         ]);
         const list = (o as Order[]) || [];
-        // Foto item: snapshot di baris pesanan dipakai lebih dulu; query katalog hanya untuk
-        // item yang fotonya memang kosong.
-        const missing = list.flatMap((order) =>
-          (order.order_items || []).filter((item) => !item.product_image)
-        );
-        const lookup = missing.length ? await loadOrderPhotoLookup(itemProductIds(missing)) : null;
+        // Foto item: snapshot dipakai lebih dulu; lookup katalog dimuat untuk SEMUA item karena
+        // snapshot bisa menunjuk aset yang sudah dihapus (404) dan thumb butuh kandidat cadangan.
+        // Tetap satu query batch per tabel.
+        const visible = list.flatMap((order) => order.order_items || []);
+        const lookup = visible.length ? await loadOrderPhotoLookup(itemProductIds(visible)) : null;
         if (!alive) return;
+        setPhotoLookup(lookup);
         const reviewed = new Set(
           (myReviews || []).map((review) => review.order_item_id).filter(Boolean) as string[],
         );
@@ -196,11 +200,12 @@ export default function PesananPage() {
                       <td className="px-5 py-4 align-middle">
                         <div className="flex items-center gap-3">
                           <div className="akun-thumb w-11 h-11 shrink-0 overflow-hidden">
-                            {item?.product_image ? (
-                              <img src={item.product_image} alt={item.product_name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                            ) : (
-                              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.2"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>
-                            )}
+                            <OrderItemThumb
+                              item={item || {}}
+                              lookup={photoLookup}
+                              className="w-full h-full"
+                              fallback={<svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="#000000" strokeWidth="1.2"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>}
+                            />
                           </div>
                           <div className="min-w-0">
                             <p className="font-semibold text-sm truncate" style={{ color: "#000000" }}>{item?.product_name || "Produk"}</p>
@@ -244,11 +249,12 @@ export default function PesananPage() {
                   </div>
                   <div className="flex gap-3 mt-3">
                     <div className="akun-thumb w-16 h-16 shrink-0 overflow-hidden">
-                      {item?.product_image ? (
-                        <img src={item.product_image} alt={item.product_name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                      ) : (
-                        <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="#000000" strokeWidth="1.2"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>
-                      )}
+                      <OrderItemThumb
+                        item={item || {}}
+                        lookup={photoLookup}
+                        className="w-full h-full"
+                        fallback={<svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="#000000" strokeWidth="1.2"><path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" /><path d="M3 8.5v7L12 20l9-4.5v-7" /></svg>}
+                      />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-bold text-sm truncate" style={{ color: "#000000" }}>{item?.product_name || "Produk"}</p>

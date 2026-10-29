@@ -100,6 +100,35 @@ export function orderItemPhoto(item: OrderItemPhotoKey, lookup?: OrderPhotoLooku
   return catalogPhotoForLegacyItem(item, lookup?.catalog ?? []);
 }
 
+/**
+ * Daftar foto yang bisa dicoba, URUT sesuai prioritas `orderItemPhoto`:
+ * snapshot → katalog per warna → katalog utama → pencocokan katalog lama.
+ *
+ * Dipakai `OrderItemThumb` supaya saat sebuah URL gagal dimuat (404) browser bisa pindah ke
+ * kandidat berikutnya. `orderItemPhoto` tetap mengembalikan SATU hasil seperti sebelumnya.
+ */
+export function photoCandidates(item: OrderItemPhotoKey, lookup?: OrderPhotoLookup | null): string[] {
+  const hasil: string[] = [];
+  const push = (url?: string | null) => {
+    const clean = (url || "").trim();
+    if (clean && !isVideoUrl(clean) && !hasil.includes(clean)) hasil.push(clean);
+  };
+
+  // 1. Snapshot baris pesanan (dilewati kalau berupa video).
+  push(item.product_image);
+
+  // 2/3. Foto katalog per warna, lalu foto utama produk.
+  const id = (item.product_id || "").trim();
+  const color = norm(item.color);
+  if (id && color) push(lookup?.byColor?.[`${id}|${color}`]);
+  if (id) push(lookup?.main?.[id]);
+
+  // 4. Pencocokan katalog lama (kain + series + warna / nama).
+  push(catalogPhotoForLegacyItem(item, lookup?.catalog ?? []));
+
+  return hasil;
+}
+
 /** Salin tiap item pesanan dengan `product_image` hasil `orderItemPhoto` (tanpa mengubah data lain). */
 export function resolveItemPhotos<T extends OrderItemPhotoKey>(
   items: T[],
