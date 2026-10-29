@@ -10,13 +10,18 @@ import {
   trackingRow,
   trackingSummary,
 } from "@/lib/jnt/track-status";
-import { orderStatusKey, shippingStatusOf, SHIPPING_STATUS_LABEL } from "@/lib/order-flow";
+import { orderStatusKey, shippingStatusOf, SHIPPING_STATUS_LABEL, orderStage } from "@/lib/order-flow";
+import PanelDetailPesanan, { jamWIB, type AksiFooter } from "@/components/ops/transaksi/PanelDetailPesanan";
+import { orderSourceLabel } from "@/lib/transaksi";
 import { jntServiceCodeFromShippingMethod } from "@/lib/jnt/layanan";
 import { useSafeTranslations } from "@/lib/safe-i18n";
 import { PaymentMethodValue } from "@/components/admin/PaymentMethodsManager";
 import OrderDetailPanel from "@/components/ops/transaksi/OrderDetailPanel";
 import { RINCIAN_CSS } from "@/components/akun/RincianPesanan";
 import { NEUTRAL_ITEM_PHOTO, resolveItemPhotos, type OrderPhotoLookup } from "@/lib/order-photo";
+import { variantName } from "@/lib/item-label";
+import { usePaymentMethodName } from "@/lib/use-payment-methods";
+import { paymentChannelLabel } from "@/lib/payment-channel";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { waNumber, waLink, pesanPembayaran } from "@/lib/whatsapp";
 import { supabase } from "@/lib/supabase";
@@ -192,6 +197,9 @@ export default function OrderDetailContent({
   onDelete,
   onArrangeOrder,
   onSynced,
+  tampilan = "lama",
+  onClose,
+  tema = "mono",
 }: {
   order: AdminDetailOrder;
   onStatusChange: (status: string) => void;
@@ -206,6 +214,15 @@ export default function OrderDetailContent({
     awb_no?: string;
     shipping_method?: string;
   }) => void;
+  /**
+   * `baru` = tampilan drawer yang sama dengan panel admin (layout mockup), `mono` secara
+   * bawaan untuk /admin. `lama` = tampilan struk bawaan. Semua state & aksi tetap di sini;
+   * yang berbeda hanya pembungkus tampilannya.
+   */
+  tampilan?: "lama" | "baru";
+  /** Wajib untuk `tampilan="baru"` (tombol tutup di header). */
+  onClose?: () => void;
+  tema?: "warna" | "mono";
 }) {
   const effectiveStatus = orderStatusKey(order);
   const sc = strukStatus(effectiveStatus);
@@ -224,6 +241,24 @@ export default function OrderDetailContent({
   const alamat = [order.shipping_address, order.shipping_city, order.shipping_postal_code].filter(Boolean).join(", ");
 
   const [showAlamat, setShowAlamat] = useState(false);
+
+  // Metode pembayaran untuk tampilan baru (sama dengan yang dipakai drawer ops).
+  const { name: paymentName } = usePaymentMethodName(order.payment_method);
+  const channelLabel = paymentChannelLabel(order.payment_channel);
+  const paymentDetail = paymentName ? `${paymentName}${channelLabel ? ` · ${channelLabel}` : ""}` : channelLabel || "—";
+
+  // Salin nomor (resi/pesanan) untuk tampilan baru — hanya umpan balik "Tersalin" sesaat.
+  const [tersalin, setTersalin] = useState<"" | "resi" | "nomor">("");
+  async function salin(jenis: "resi" | "nomor", nilai: string) {
+    if (!nilai) return;
+    try {
+      await navigator.clipboard.writeText(nilai);
+      setTersalin(jenis);
+      window.setTimeout(() => setTersalin(""), 1600);
+    } catch {
+      /* clipboard bisa diblokir browser */
+    }
+  }
 
   // "Atur Pesanan" — pembuatan resi J&T manual, dan hanya untuk pesanan yang sudah diproses
   // admin (chip status → Diproses, ala Shopee): pesanan yang masih menunggu pembayaran belum
@@ -586,6 +621,56 @@ export default function OrderDetailContent({
     </button>
   );
 
+  /**
+   * Aksi untuk tampilan baru (sama aturannya dengan blok tombol di bawah):
+   * bahaya → sekunder → utama, urutannya seperti drawer panel admin.
+   */
+  const aksiBaru: AksiFooter[] = (() => {
+    const list: AksiFooter[] = [];
+    if (!shipped && order.status !== "dibatalkan") {
+      list.push({ key: "batal", label: "Batalkan", jenis: "bahaya", onClick: () => onStatusChange("dibatalkan") });
+    }
+    if (!shipped) {
+      list.push({ key: "proses", label: "Proses Pesanan", jenis: "sekunder", onClick: () => onStatusChange("diproses") });
+    }
+    list.push({ key: "hapus", label: "Hapus Pesanan", jenis: "sekunder", onClick: onDelete });
+    if (order.status === "selesai") {
+      list.push({
+        key: "hubungi",
+        label: "Hubungi Customer",
+        jenis: "utama",
+        disabled: !canHubungiCustomer,
+        onClick: () => {
+          if (canHubungiCustomer) window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
+        },
+      });
+    } else if (resi && !resiVoided) {
+      list.push({
+        key: "cetak",
+        label: "Cetak Label",
+        jenis: "utama",
+        onClick: () => window.open(`/admin/label/${order.order_number}`, "_blank", "noopener,noreferrer"),
+      });
+    } else if (canArrange) {
+      list.push({ key: "atur", label: arranging ? "Memproses…" : "Atur Pesanan", jenis: "utama", disabled: arranging, onClick: handleArrange });
+    }
+    return list;
+  })();
+
+  /** Ringkasan riwayat J&T untuk tampilan baru (dibuka dari tombol "Lacak"). */
+  const trackPanel = tracking ? (
+    <span>Memuat riwayat dari J&amp;T…</span>
+  ) : trackError ? (
+    <span>{trackError}</span>
+  ) : trackUpdates.length > 0 ? (
+    <span>
+      {trackingRow(trackUpdates[0]).status}
+      {trackingRow(trackUpdates[0]).location ? ` · ${trackingRow(trackUpdates[0]).location}` : ""}
+    </span>
+  ) : (
+    <span>Belum ada riwayat dari J&amp;T.</span>
+  );
+
   // Layout detail disamakan dengan panel admin. Dashboard admin memakai tema mono
   // (hitam/slate), bukan pink.
   const panelOrder = {
@@ -614,6 +699,65 @@ export default function OrderDetailContent({
       <style>{RINCIAN_CSS}</style>
       <style>{OD_CSS}</style>
 
+      {tampilan === "baru" ? (
+        <PanelDetailPesanan
+          tema={tema}
+          onClose={onClose || (() => {})}
+          sumber={orderSourceLabel(order)}
+          tahap={orderStage(order)}
+          createdAt={order.created_at}
+          nama={order.customer_name || "Tanpa nama"}
+          telepon={order.customer_whatsapp || ""}
+          alamat={alamat}
+          kurir="J&T Express"
+          layanan={(serviceCode || "").toUpperCase() || "—"}
+          resi={resi}
+          resiKosong={resi ? "" : "Resi belum dibuat"}
+          resiCatatan={resi ? "Resi sudah terbit" : "Resi otomatis setelah bayar"}
+          onLacak={() => openTrack(!showTrack)}
+          onSalinResi={() => salin("resi", resi)}
+          resiTersalin={tersalin === "resi"}
+          berat={`Berat ${totalWeight.grams ? formatWeightExact(totalWeight.grams) : "-"}`}
+          items={itemsWithPhotos.map((item) => ({
+            key: `${item.product_id}-${item.color}-${item.size}`,
+            nama: item.product_name,
+            chips: [
+              item.kain ? { teks: `Kain ${item.kain}`, jenis: "kain" as const } : null,
+              variantName(item.series) ? { teks: variantName(item.series), jenis: "kain" as const } : null,
+              { teks: `${item.size || ""}${item.size ? " · " : ""}x${item.quantity}`, jenis: "netral" as const },
+            ].filter((c): c is { teks: string; jenis: "kain" | "netral" } => !!c),
+            harga: `Rp ${Number(item.price * item.quantity).toLocaleString("id-ID")}`,
+            foto: item.product_image || NEUTRAL_ITEM_PHOTO,
+          }))}
+          subtotal={order.subtotal}
+          ongkir={order.shipping_cost}
+          diskon={order.discount}
+          total={order.total}
+          metodeBayar={paymentDetail}
+          waktuPesan={jamWIB(order.created_at)}
+          waktuBayar={order.paid_at ? jamWIB(order.paid_at) : null}
+          nomorPesanan={order.order_number}
+          onSalinNomor={() => salin("nomor", order.order_number)}
+          nomorTersalin={tersalin === "nomor"}
+          onChat={() => {
+            if (order.customer_whatsapp) window.open(waLink(order.customer_whatsapp, waPesan), "_blank", "noopener,noreferrer");
+          }}
+          aksi={aksiBaru}
+          ekstra={
+            <>
+              {order.items_edited_after_resi && resi ? (
+                <p className="dp-warning" role="status">
+                  Item diubah setelah resi terbit. Cetak ulang label dan beri tahu tim packing. Label lama jangan dipakai.
+                  Nomor resi tetap <b>{resi}</b>.
+                </p>
+              ) : null}
+              {order.shipping_notes ? <p className="dp-catatan">Catatan pembeli: {order.shipping_notes}</p> : null}
+              {showTrack ? <div className="dp-catatan">{trackPanel}</div> : null}
+            </>
+          }
+        />
+      ) : (
+        <>
       {/* Sama seperti drawer ops: panel langsung di body, tanpa wrapper struk customer. */}
       <OrderDetailPanel
         order={panelOrder}
@@ -906,10 +1050,12 @@ export default function OrderDetailContent({
                     >
 {JSON.stringify(censorReceiverPII(trackRaw), null, 2)}
                     </pre>
-                  ) : null}
+                   ) : null}
                 </div>
               ) : null}
       </div>
+        </>
+      )}
     </div>
   );
 }

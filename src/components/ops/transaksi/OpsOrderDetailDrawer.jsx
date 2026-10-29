@@ -7,12 +7,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Ban, Pencil, Truck, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { waNumber } from "@/lib/whatsapp";
 import { formatTrackingTime, sortHistoryDesc, trackingRow, trackingSummary } from "@/lib/jnt/track-status";
+import { orderStage } from "@/lib/order-flow";
+import { NEUTRAL_ITEM_PHOTO } from "@/lib/order-photo";
+import { formatWeightExact } from "@/lib/shipping-weight";
+import { usePaymentMethodName } from "@/lib/use-payment-methods";
+import { paymentChannelLabel } from "@/lib/payment-channel";
+import PanelDetailPesanan, { jamWIB } from "@/components/ops/transaksi/PanelDetailPesanan";
 import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
-import OrderDetailPanel from "@/components/ops/transaksi/OrderDetailPanel";
+import { formatRupiah } from "@/components/ops/transaksi/transaksi-format";
 
 export default function OpsOrderDetailDrawer({ open, order, onClose, onEdit, onCancel, onResiCreated }) {
   const [track, setTrack] = useState({ status: "idle", history: [], error: "" });
@@ -30,6 +35,29 @@ export default function OpsOrderDetailDrawer({ open, order, onClose, onEdit, onC
   const isSelesai = order?.status === "selesai" || order?.shipping_status === "selesai";
   const customerWa = waNumber(order?.customer_whatsapp || "");
   const canHubungiCustomer = /^628[1-9][0-9]{6,10}$/.test(customerWa);
+
+  // Metode pembayaran (sama dengan yang dipakai drawer panel admin).
+  const { name: paymentName } = usePaymentMethodName(order?.payment_method);
+  const channelLabel = paymentChannelLabel(order?.payment_channel);
+  const paymentDetail = paymentName ? `${paymentName}${channelLabel ? ` · ${channelLabel}` : ""}` : channelLabel || "—";
+
+  // Aksi footer: aturan sama dengan tombol lama (Ubah / Cetak Resi / Hubungi Customer / Batalkan).
+  const aksiOps = [];
+  if (order?.can_edit) aksiOps.push({ key: "ubah", label: "Ubah", jenis: "sekunder", onClick: () => onEdit(order) });
+  if (isSelesai) {
+    aksiOps.push({
+      key: "hubungi",
+      label: "Hubungi Customer",
+      jenis: "utama",
+      disabled: !canHubungiCustomer,
+      onClick: () => {
+        if (canHubungiCustomer) window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
+      },
+    });
+  } else if (canPrint) {
+    aksiOps.push({ key: "cetak", label: "Cetak Resi", jenis: "utama", onClick: () => resiPanelRef.current?.print() });
+  }
+  if (order?.can_cancel) aksiOps.push({ key: "batal", label: "Batalkan", jenis: "bahaya", onClick: () => onCancel(order) });
 
   useEffect(() => {
     if (!open) {
@@ -171,72 +199,56 @@ export default function OpsOrderDetailDrawer({ open, order, onClose, onEdit, onC
             role="dialog"
             aria-label="Detail pesanan"
           >
-            <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-3.5 dark:border-slate-800">
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{order.source_label}</p>
-                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">Detail Pesanan</h3>
-              </div>
-              <button
-                onClick={onClose}
-                className="rounded-full p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-                aria-label="Tutup"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 py-4" style={{ scrollbarWidth: "none" }}>
-              <OrderDetailPanel
-                order={order}
-                theme="mono"
-                latestTracking={lastScan}
-                trackingState={track.status}
-                shippingContent={shippingContent}
-                onOpenTrack={toggleTrack}
-              />
-            </div>
-
-            {(order.can_edit || order.can_cancel || canPrint || isSelesai) && (
-              <div className="flex shrink-0 gap-2 border-t border-slate-200 px-5 py-3.5 dark:border-slate-800">
-                {order.can_edit ? (
-                  <button
-                    onClick={() => onEdit(order)}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-slate-200 px-4 py-2.5 font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    <Pencil size={16} /> Ubah
-                  </button>
-                ) : null}
-                {isSelesai ? (
-                  <button
-                    type="button"
-                    disabled={!canHubungiCustomer}
-                    onClick={() => {
-                      if (canHubungiCustomer) {
-                        window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
-                      }
-                    }}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-slate-200 px-4 py-2.5 font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    Hubungi Customer
-                  </button>
-                ) : canPrint ? (
-                  <button
-                    onClick={() => resiPanelRef.current?.print()}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-slate-200 px-4 py-2.5 font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    Cetak Resi
-                  </button>
-                ) : null}
-                {order.can_cancel ? (
-                  <button
-                    onClick={() => onCancel(order)}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-red-200 px-4 py-2.5 font-bold text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20"
-                  >
-                    <Ban size={16} /> Batalkan
-                  </button>
-                ) : null}
-              </div>
-            )}
+            {/* Tampilan sama dengan panel admin, tema mono (hitam-putih). Logic & aksi tetap
+                dikirim dari sini; isi resi J&T/lacak tetap memakai blok lama (`shippingContent`). */}
+            <PanelDetailPesanan
+              tema="mono"
+              onClose={onClose}
+              sumber={order.source_label}
+              tahap={orderStage(order)}
+              createdAt={order.created_at}
+              nama={order.customer_name || "Tanpa nama"}
+              telepon={order.customer_whatsapp || ""}
+              alamat={[order.shipping_address, order.shipping_kecamatan, order.kota, order.shipping_province, order.shipping_postal_code].filter(Boolean).join(", ")}
+              kurir={order.shipping_method || "J&T Express"}
+              layanan={order.shipping_method || "—"}
+              resi={awb}
+              resiKosong="Resi belum dibuat"
+              resiCatatan={awb ? "Resi sudah terbit" : "Resi otomatis setelah bayar"}
+              onLacak={toggleTrack}
+              onSalinResi={() => {
+                if (awb) navigator.clipboard?.writeText(awb).catch(() => {});
+              }}
+              resiTersalin={false}
+              berat={order.weight > 0 ? `Berat ${formatWeightExact(order.weight)}` : "Berat belum diisi"}
+              items={(order.items || []).map((item, index) => ({
+                key: `${item.product_id}-${item.color}-${item.size}-${index}`,
+                nama: item.product_name,
+                chips: [
+                  item.kain ? { teks: `Kain ${item.kain}`, jenis: "kain" } : null,
+                  item.series ? { teks: item.series, jenis: "kain" } : null,
+                  { teks: `${item.size || ""}${item.size ? " · " : ""}x${item.quantity}`, jenis: "netral" },
+                ].filter(Boolean),
+                harga: `Rp ${formatRupiah(item.price * item.quantity)}`,
+                foto: item.product_image || NEUTRAL_ITEM_PHOTO,
+              }))}
+              subtotal={order.subtotal}
+              ongkir={order.shipping_cost}
+              diskon={order.discount}
+              total={order.total}
+              metodeBayar={paymentDetail}
+              waktuPesan={jamWIB(order.created_at)}
+              waktuBayar={order.paid_at ? jamWIB(order.paid_at) : null}
+              nomorPesanan={order.order_number}
+              onSalinNomor={() => navigator.clipboard?.writeText(order.order_number).catch(() => {})}
+              nomorTersalin={false}
+              onChat={() => {
+                if (canHubungiCustomer) window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
+              }}
+              aksi={aksiOps}
+            >
+              {shippingContent}
+            </PanelDetailPesanan>
           </motion.aside>
         </>
       ) : null}

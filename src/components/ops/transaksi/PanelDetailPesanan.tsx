@@ -212,9 +212,15 @@ export default function PanelDetailPesanan({
   onChat,
   onClose,
   aksi = [],
+  tema = "warna",
   ekstra,
   children,
 }: {
+  /**
+   * `warna` = panel admin (pastel biru). `mono` = dashboard /admin & ops: seluruh aksen
+   * jadi hitam-putih/abu, termasuk kartu status dan stepper.
+   */
+  tema?: "warna" | "mono";
   sumber: string;
   tahap: string;
   /** Jam pesanan dibuat — dasar hitung mundur auto-cancel 24 jam. */
@@ -270,7 +276,7 @@ export default function PanelDetailPesanan({
     belumBayar && Number.isFinite(mulai) ? Math.max(0, (mulai + BATAS_AUTOCANCEL_MS - sekarang) / 1000) : null;
 
   return (
-    <div className="dp-wrap">
+    <div className={`dp-wrap${tema === "mono" ? " tema-mono" : ""}`}>
       {/* Header ikut ke-scroll (tidak sticky); kartu status menimpa bagian bawahnya. */}
       <div className="dp-header">
         <div className="dp-header-txt">
@@ -529,10 +535,13 @@ export function PanelDetailFooter({ aksi }: { aksi: AksiFooter[] }) {
 export function PanelDetailShell({
   open,
   onClose,
+  tema = "warna",
   children,
 }: {
   open: boolean;
   onClose: () => void;
+  /** `mono` untuk dashboard /admin & ops (hitam-putih). */
+  tema?: "warna" | "mono";
   children: ReactNode;
 }) {
   return (
@@ -551,7 +560,7 @@ export function PanelDetailShell({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "tween", duration: 0.24, ease: "easeOut" }}
-            className="dp-panel"
+            className={`dp-panel${tema === "mono" ? " tema-mono" : ""}`}
             role="dialog"
             aria-label="Detail Pesanan"
           >
@@ -569,6 +578,7 @@ export function PanelDetailShell({
 const DP_CSS = `
 .dp-overlay{position:fixed;inset:0;z-index:9998;background:rgba(18,32,48,.45);backdrop-filter:blur(3px)}
 .dp-panel{position:fixed;inset-block:0;right:0;z-index:9999;display:flex;flex-direction:column;width:100%;max-width:100vw;background:#f4f7fb;color:#24324a;border-left:1px solid #e8eef5;overflow:hidden;box-shadow:-24px 0 60px -24px rgba(18,32,48,.4)}
+.dp-panel.tema-mono{background:#fff;border-left-color:#e5e7eb}
 @media (min-width:640px){.dp-panel{width:560px;max-width:560px}}
 
 /* Satu kolom scroll: header ikut ke-scroll, bukan sticky. */
@@ -746,6 +756,75 @@ const DP_CSS = `
 .dp-trk b{display:block;font-size:13px;font-weight:900;color:#3d4a5c}
 .dp-trk li.is-latest b{color:#2774a8}
 .dp-trk small{display:block;margin-top:2px;font-size:12px;font-weight:600;color:#5a6b80}
+
+/* ── Tema MONO (dashboard /admin & ops) ──
+   Seluruh aksen jadi hitam-putih/abu: header, kartu status, stepper, resi, tombol.
+   Semua hijau/kuning/merah diganti skala abu yang berbeda terang-gelap, jadi tahap
+   pesanan tetap bisa dibedakan tanpa warna. */
+.dp-wrap.tema-mono{background:#fff;color:#111827}
+.tema-mono .dp-header{background:linear-gradient(135deg,#111827 0%,#1f2937 60%,#374151 100%)}
+.tema-mono .dp-tutup{border-color:rgba(255,255,255,.35);background:rgba(255,255,255,.14)}
+.tema-mono .dp-kartu,
+.tema-mono .dp-kartu-gabung{box-shadow:0 6px 20px rgba(17,24,39,.06)}
+.tema-mono .dp-status-kartu{box-shadow:0 16px 40px rgba(17,24,39,.1)}
+
+/* Ikon status: hanya beda tingkat gelapnya. */
+.tema-mono .dp-status-ikon{background:#f3f4f6 !important;color:#111827 !important}
+.tema-mono .dp-hitung{background:#f3f4f6;color:#111827}
+.tema-mono .dp-status-catatan{color:#6b7280}
+.tema-mono .dp-status-judul{color:#111827}
+
+/* Stepper mono: lewat = hitam, aktif = hitam berbingkai, belum = abu. */
+.tema-mono .dp-langkah-garis{background:#e5e7eb}
+.tema-mono .dp-langkah-dot{background:#f3f4f6;color:#9ca3af}
+.tema-mono .dp-langkah-item.lewat .dp-langkah-dot{background:#111827;color:#fff}
+.tema-mono .dp-langkah-item.lewat .dp-langkah-label{color:#111827}
+.tema-mono .dp-langkah-item.aktif .dp-langkah-dot{background:#fff;border:2px solid #111827;color:#111827}
+.tema-mono .dp-langkah-item.aktif .dp-langkah-label{color:#111827;font-weight:900}
+.tema-mono .dp-langkah-label{color:#9ca3af}
+
+.tema-mono .dp-kepala-ikon{background:#f3f4f6;color:#111827}
+.tema-mono .dp-kepala-ikon.pink{background:#f3f4f6;color:#111827}
+.tema-mono .dp-kepala-judul{color:#111827}
+
+.tema-mono .dp-lencana.kurir{background:#111827;color:#fff}
+.tema-mono .dp-lencana.layanan{background:#f3f4f6;color:#374151}
+.tema-mono .dp-resi{background:linear-gradient(135deg,#f9fafb,#f3f4f6)}
+.tema-mono .dp-resi-label{color:#6b7280}
+.tema-mono .dp-resi-nomor{color:#111827}
+.tema-mono .dp-resi-nomor.kosong{color:#9ca3af}
+.tema-mono .dp-pil{background:#fff;color:#374151;box-shadow:inset 0 0 0 1px #e5e7eb}
+.tema-mono .dp-pil:hover:not(:disabled){background:#f9fafb;color:#111827}
+.tema-mono .dp-pil.biru{background:#f3f4f6;color:#111827;box-shadow:none}
+.tema-mono .dp-chip{background:#f3f4f6;color:#374151}
+.tema-mono .dp-chip.kain{background:#e5e7eb;color:#111827}
+
+.tema-mono .dp-alamat-hp{color:#6b7280}
+.tema-mono .dp-alamat-jalan{color:#374151}
+.tema-mono .dp-wa{background:#f3f4f6;color:#111827}
+.tema-mono .dp-wa:hover{background:#e5e7eb}
+
+.tema-mono .dp-item-foto{background:linear-gradient(160deg,#f9fafb,#f3f4f6)}
+.tema-mono .dp-kosong-teks{color:#6b7280}
+
+.tema-mono .dp-ringkas{background:#f9fafb}
+.tema-mono .dp-ringkas-baris{color:#374151}
+.tema-mono .dp-ringkas-baris .hijau{color:#374151}
+.tema-mono .dp-ringkas-total span:last-child{color:#111827}
+.tema-mono .dp-kv-baris span{color:#6b7280}
+.tema-mono .dp-kv-baris b{color:#111827}
+.tema-mono .dp-kv-baris b.kosong{color:#9ca3af}
+
+/* Tombol: utama jadi hitam pekat, sekunder abu, bahaya abu bergaris. */
+.tema-mono .dp-tombol.bahaya{background:#fff;color:#374151;box-shadow:inset 0 0 0 1px #e5e7eb}
+.tema-mono .dp-tombol.bahaya:hover:not(:disabled){background:#f9fafb}
+.tema-mono .dp-tombol.sekunder{background:#f3f4f6;color:#111827}
+.tema-mono .dp-tombol.sekunder:hover:not(:disabled){background:#e5e7eb}
+.tema-mono .dp-tombol.utama{background:linear-gradient(135deg,#111827,#374151);color:#fff;box-shadow:0 8px 20px -6px rgba(17,24,39,.5)}
+
+.tema-mono .dp-warning{background:#f9fafb;border-color:#e5e7eb;color:#374151}
+.tema-mono .dp-catatan{color:#6b7280}
+.tema-mono .dp-error{color:#111827}
 
 /* Layar sempit: jarak & huruf sedikit dikecilkan, struktur tetap sama. */
 @media (max-width:639.98px){
