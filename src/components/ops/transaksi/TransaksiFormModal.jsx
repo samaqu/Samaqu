@@ -419,6 +419,10 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       ...rows,
       {
         product_id: stockedAddon ? OPEN_ORDER_ADDON_TARGET_ID : OPEN_ORDER_ADDON.id,
+        // Nama HARUS sama dengan yang dipakai baris prefill (`row.product` = nama add-on),
+        // karena `resolveProduct` mencocokkan nama ini. Kalau memakai nama katalog
+        // ("Cover Hanger"), barisnya tidak pernah ketemu → paket tidak terpilih → harga
+        // add-on hilang dari total dan form mengira total berubah.
         product_name: OPEN_ORDER_ADDON.name,
         category: "Cover & Hanger",
         kain: "",

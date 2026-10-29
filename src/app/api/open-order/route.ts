@@ -364,8 +364,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Add-on sudah ikut di `validatedItems` (baris `cover-hanger`), jadi `subtotal` SUDAH
+    // memuat harganya. Jangan menambahkan harga add-on lagi ke total — dulu dobel Rp35.000
+    // sejak add-on berubah jadi baris item biasa.
     const subtotal = validatedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const addonTotal = extraCover ? OPEN_ORDER_ADDON.price : 0;
 
     // ── Berat kirim (gram): FUNGSI PUSAT yang sama dengan wizard (berat varian → produk). ──
     // Baris add-on ikut sebagai item biasa (produk `cover-hanger` + variannya), jadi beratnya
@@ -428,7 +430,7 @@ export async function POST(request: NextRequest) {
 
     const shippingNotes = [instagram ? `IG @${instagram}` : "", note].filter(Boolean).join(" · ");
 
-    const total = subtotal + addonTotal + shippingCost;
+    const total = subtotal + shippingCost;
     const orderNumber = generateOrderNumber();
 
     // ── Potong stok (atomik, rollback kalau ada yang gagal) ──
@@ -721,7 +723,7 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    return NextResponse.json({ success: true, orderNumber, total, productTotal: subtotal + addonTotal, awbNo: null, paymentUrl });
+    return NextResponse.json({ success: true, orderNumber, total, productTotal: subtotal, awbNo: null, paymentUrl });
   } catch (error) {
     console.error("[OPEN-ORDER] Failed:", error);
     return NextResponse.json({ error: "Terjadi kesalahan server" }, { status: 500 });
