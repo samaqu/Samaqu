@@ -249,10 +249,48 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
         ? "Resi otomatis setelah bayar"
         : "Resi dibuat manual";
 
+    // Alasan tombol Ubah mati. Server hanya mengirim `can_edit` (tanpa alasannya), jadi
+    // diturunkan dari status yang terlihat. Hanya dipakai untuk pesan; keputusan tetap
+    // milik `can_edit` dari server.
+    const editLockedReason = !order.can_edit
+      ? order.status === "dikirim" || order.status === "selesai"
+        ? "Pesanan sudah dikirim, item tidak bisa diubah lagi."
+        : order.shipping_status === "dikirim" || order.shipping_status === "selesai"
+          ? "Paket sudah berjalan, item tidak bisa diubah lagi."
+          : order.status === "dibatalkan"
+            ? "Pesanan sudah dibatalkan."
+            : "Item pesanan ini terkunci (stok tidak tercatat sistem atau pengiriman sudah dimulai)."
+      : "";
+
     // Footer: bahaya (Batalkan) → sekunder (Ubah) → utama paling lebar, sesuai mockup.
     const aksi = [];
     if (order.can_cancel) aksi.push({ key: "batal", label: "Batalkan", jenis: "bahaya", onClick: () => onCancel?.(order) });
     if (order.can_edit) aksi.push({ key: "ubah", label: "Ubah", jenis: "sekunder", onClick: () => onEdit?.(order) });
+    // Pesanan yang lolos cek status dasar tapi kunci karena stok/pengiriman: tampilkan
+    // tombolnya dalam keadaan mati + alasan, supaya tidak terlihat seperti tombol hilang.
+    else if (order.edit_warning || editLockedReason) {
+      aksi.push({
+        key: "ubah-terkunci",
+        label: "Ubah",
+        jenis: "sekunder",
+        disabled: true,
+        hint: editLockedReason,
+        onClick: () => {},
+      });
+    }
+    // Proses: pending → diproses, sama dengan chip status di /admin. Ditaruh sebagai aksi
+    // utama kalau belum ada aksi utama lain (mis. pesanan belum bayar tanpa tombol bayar).
+    const bisaProses =
+      order.status === "pending" || (order.status === "diproses" && order.shipping_status !== "dikirim");
+    if (bisaProses && order.status !== stage) {
+      aksi.push({
+        key: "proses",
+        label: statusBusy ? "Memproses…" : "Proses Pesanan",
+        jenis: "sekunder",
+        disabled: statusBusy,
+        onClick: () => changeStatus("diproses"),
+      });
+    }
     if (isSelesai) {
       aksi.push({
         key: "hubungi",
@@ -316,7 +354,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
           ekstra={
             /* Hanya dikirim kalau memang ada isinya — fragment kosong membuat kartu putih
                kosong menggantung di atas footer. */
-            order.items_edited_after_resi || order.notes || statusError ? (
+            order.items_edited_after_resi || order.notes || statusError || (editLockedReason && order.status !== "dibatalkan") ? (
               <>
                 {order.items_edited_after_resi && awb ? (
                   <div className="dp-warning" role="status">
@@ -325,6 +363,9 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
                   </div>
                 ) : null}
                 {order.notes ? <p className="dp-catatan">Catatan pembeli: {order.notes}</p> : null}
+                {editLockedReason && order.status !== "dibatalkan" ? (
+                  <p className="dp-catatan">Ubah terkunci: {editLockedReason}</p>
+                ) : null}
                 {statusError ? <p className="dp-error">{statusError}</p> : null}
               </>
             ) : null

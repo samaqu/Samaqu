@@ -178,6 +178,8 @@ export interface AksiFooter {
   jenis: "utama" | "sekunder" | "bahaya";
   onClick: () => void;
   disabled?: boolean;
+  /** Keterangan saat tombol mati (mis. alasan Ubah terkunci). */
+  hint?: string;
 }
 
 export default function PanelDetailPesanan({
@@ -501,7 +503,14 @@ export function PanelDetailFooter({ aksi }: { aksi: AksiFooter[] }) {
       {pendamping.length > 0 ? (
         <div className="dp-footer-baris">
           {pendamping.map((a) => (
-            <button key={a.key} type="button" className={`dp-tombol ${a.jenis}`} onClick={a.onClick} disabled={a.disabled}>
+            <button
+              key={a.key}
+              type="button"
+              className={`dp-tombol ${a.jenis}`}
+              onClick={a.onClick}
+              disabled={a.disabled}
+              title={a.disabled && a.hint ? a.hint : undefined}
+            >
               {a.label}
             </button>
           ))}
