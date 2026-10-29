@@ -39,7 +39,12 @@ import { AlertCircle, Check, Clock, Info, Loader2, Pencil, Plus, RotateCcw, Save
 import { base44 } from "@/lib/ops-api";
 import { MANUAL_PRICE_MAX, MANUAL_PRICE_MIN, MANUAL_SOURCE_KEYS, SOURCE_LABEL, manualPrice } from "@/lib/transaksi";
 import { PAKET_SIZE, isPaketKategori, variantName } from "@/lib/item-label";
-import { OPEN_ORDER_ADDON } from "@/lib/open-order-config";
+import {
+  isOpenOrderAddonLine,
+  OPEN_ORDER_ADDON,
+  OPEN_ORDER_ADDON_TARGET_ID,
+  OPEN_ORDER_ADDON_VARIANT,
+} from "@/lib/open-order-config";
 import { openOrderEffectivePrice } from "@/lib/open-order-offering";
 import { OPS_STOCK_SIZES } from "@/lib/ops-stock";
 import { categoryRank, seriesRank, variantSortKey } from "@/lib/ops-order";
@@ -400,24 +405,29 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       linkedTo: variant.base_series_name || variant.base_product_name || null,
     }));
 
-    // Add-on Open Order bukan baris `products` biasa. Saat mengedit pesanan yang
-    // memuatnya, tambahkan entri sintetis supaya baris lama tidak kosong lalu ikut
-    // terhapus (selisih Rp 35.000). Baris ini tetap tidak boleh diubah.
-    const hasAddon = (initialData?.items || []).some((item) => item?.product_id === OPEN_ORDER_ADDON.id);
-    if (!isEdit || !hasAddon) return rows;
+    // Add-on Open Order bukan baris `products` biasa. Saat mengedit pesanan yang memuatnya,
+    // tambahkan entri sintetis supaya baris lama tidak kosong lalu ikut terhapus (selisih
+    // Rp 35.000). Baris ini tetap tidak boleh diubah.
+    //
+    // Dua format: LAMA = id bayangan `addon-cover-hanger`; BARU = id katalog `cover-hanger`
+    // dengan varian katalognya. Id asli dipertahankan supaya saat menyimpan server memakai aturan
+    // yang tepat (format baru memegang stok varian).
+    const addonItem = (initialData?.items || []).find((item) => isOpenOrderAddonLine(item));
+    if (!isEdit || !addonItem) return rows;
+    const stockedAddon = addonItem.product_id === OPEN_ORDER_ADDON_TARGET_ID;
     return [
       ...rows,
       {
-        product_id: OPEN_ORDER_ADDON.id,
+        product_id: stockedAddon ? OPEN_ORDER_ADDON_TARGET_ID : OPEN_ORDER_ADDON.id,
         product_name: OPEN_ORDER_ADDON.name,
         category: "Cover & Hanger",
         kain: "",
-        warna: OPEN_ORDER_ADDON.name,
+        warna: stockedAddon ? OPEN_ORDER_ADDON_VARIANT.color : OPEN_ORDER_ADDON.name,
         series: "",
-        color: OPEN_ORDER_ADDON.name,
+        color: stockedAddon ? OPEN_ORDER_ADDON_VARIANT.color : OPEN_ORDER_ADDON.name,
         price: OPEN_ORDER_ADDON.price,
         hpp: 0,
-        sizes: { "ALL SIZE": 1 },
+        sizes: stockedAddon ? { [OPEN_ORDER_ADDON_VARIANT.size]: 1 } : { "ALL SIZE": 1 },
         weights: {},
         product_weight: 0,
         linkedTo: null,
@@ -579,9 +589,12 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
 
     const rows = (initialData.items || []).map((item) => {
       // Add-on Open Order: jangan cari lewat katalog biasa — entri sintetisnya ada di
-      // `dataset`, dan ukurannya penanda "ALL SIZE", bukan ukuran produk.
-      if (item.product_id === OPEN_ORDER_ADDON.id) {
-        const addon = dataset.find((entry) => entry.product_id === OPEN_ORDER_ADDON.id);
+      // `dataset`, dan variannya penanda ("ALL SIZE" untuk format lama, varian katalog untuk
+      // format baru), bukan ukuran produk biasa.
+      if (isOpenOrderAddonLine(item)) {
+        const addonId =
+          item.product_id === OPEN_ORDER_ADDON_TARGET_ID ? OPEN_ORDER_ADDON_TARGET_ID : OPEN_ORDER_ADDON.id;
+        const addon = dataset.find((entry) => entry.product_id === addonId);
         return {
           ...emptyRow(),
           product: OPEN_ORDER_ADDON.name,
@@ -832,6 +845,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     const product = resolveProduct(row);
     const paket = isPaketEntry(product);
     const groupIsPaket = paketOptions(groupOf(row)).length > 0;
+    // Baris add-on dikenali lewat id produknya (format lama & baru) — sama dengan server.
+    const isAddonRow = isOpenOrderAddonLine({ product_id: product?.product_id });
     const options = sizeOptions(product);
     const chosen = paket ? options[0] || null : options.find((entry) => entry.value === row.variant) || null;
     const quantity = Number(row.quantity) || 0;
@@ -844,8 +859,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       issue = `Harga manual harus bilangan bulat Rp ${formatRupiah(MANUAL_PRICE_MIN)} - Rp ${formatRupiah(MANUAL_PRICE_MAX)}`;
     } else {
       const entry = requested[`${product.product_id}||${chosen?.value}`];
-      // Add-on Open Order bukan stok varian; barisnya juga tidak boleh diubah.
-      if (product.product_id !== OPEN_ORDER_ADDON.id && entry && entry.total > entry.option.stock) {
+      // Add-on Open Order dipatok: barisnya tidak boleh diubah. Format baru memegang stok
+      // varian katalog, tapi stoknya dikelola di luar form ini (dipatok seperti format lama).
+      if (!isAddonRow && entry && entry.total > entry.option.stock) {
         issue = paket
           ? `Stok paket "${entry.option.color}" tersedia ${entry.option.stock}, diminta ${entry.total}`
           : `Stok ${entry.option.size} tersedia ${entry.option.stock}, diminta ${entry.total}`;
@@ -857,7 +873,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     return {
       product,
       paket,
-      isAddon: product?.product_id === OPEN_ORDER_ADDON.id,
+      isAddon: isAddonRow,
       options,
       chosen,
       quantity,
@@ -902,8 +918,15 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     const product = resolveProduct(row);
     const paket = isPaketEntry(product);
     const [variantColor, variantSize] = String(row.variant).split("||");
+    // `product_name` ikut dikirim: server memakainya untuk membedakan baris ADD-ON Open Order
+    // (`Extra Cover & Hanger Samaqu`) dari produk "Cover Hanger" yang dibeli biasa — keduanya
+    // ber-id sama. Tidak dipakai menyimpan nama; nama final tetap dari database.
+    const name = isOpenOrderAddonLine({ product_id: product?.product_id })
+      ? OPEN_ORDER_ADDON.name
+      : product?.product_name || "";
     return {
       product_id: product?.product_id || "",
+      product_name: name,
       color: paket ? product.color : variantColor || "default",
       size: paket ? paketSize(product) : variantSize,
       quantity: Number(row.quantity) || 0,

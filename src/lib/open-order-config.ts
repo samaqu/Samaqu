@@ -92,5 +92,60 @@ export function isAddonAvailable(rows: AddonCatalogRows): boolean {
   return stock !== null && stock > 0;
 }
 
+/** Baris `order_items` minimal untuk mengenali baris add-on. */
+export interface AddonLineLike {
+  product_id?: string | null;
+  product_name?: string | null;
+  color?: string | null;
+  size?: string | null;
+}
+
+/**
+ * True kalau baris `order_items` ini baris ADD-ON Open Order. Dua format yang dikenali:
+ *
+ *  - **format lama**: `product_id = "addon-cover-hanger"` (id bayangan).
+ *  - **format baru**: `product_id = "cover-hanger"` dengan salah satu penanda add-on —
+ *    nama baris = nama add-on, ATAU baris tanpa nama/warna sama sekali (input form yang hanya
+ *    membawa id produk).
+ *
+ * Produk "Cover Hanger" yang dibeli sebagai produk BIASA punya nama katalog ("Cover Hanger"),
+ * sehingga tetap dianggap baris produk biasa — termasuk pada input form yang membawa
+ * `product_name: "Cover Hanger"`.
+ */
+export function isOpenOrderAddonLine(line?: AddonLineLike | null): boolean {
+  const id = String(line?.product_id ?? "").trim();
+  const name = String(line?.product_name ?? "").trim();
+  const color = String(line?.color ?? "").trim();
+  const size = String(line?.size ?? "").trim().toUpperCase();
+
+  if (id === OPEN_ORDER_ADDON.id) return true;
+  if (id !== OPEN_ORDER_ADDON_TARGET_ID) return false;
+
+  // Produk "Cover Hanger" yang dibeli sebagai produk biasa → baris produk biasa. Nama katalog
+  // selalu terisi untuk baris semacam itu, jadi diperiksa lebih dulu.
+  if (name && name !== OPEN_ORDER_ADDON.name) return false;
+
+  if (name === OPEN_ORDER_ADDON.name) return true;
+  // Varian add-on yang persis (baris DB hasil checkout Open Order).
+  if (
+    color === OPEN_ORDER_ADDON_VARIANT.color &&
+    size === OPEN_ORDER_ADDON_VARIANT.size.toUpperCase()
+  ) {
+    return true;
+  }
+  // Tanpa nama maupun warna = pemanggil hanya membawa id (mis. input form baris add-on).
+  return !name && !color;
+}
+
+/**
+ * True kalau baris add-on ini memegang stok varian katalog (format baru). Hanya baris inilah
+ * yang ikut aturan stok (potong saat dibuat, kembali saat batal/edit). Format lama memakai id
+ * bayangan yang tidak punya baris varian, jadi stoknya tidak boleh disentuh.
+ */
+export function isStockedAddonLine(line?: AddonLineLike | null): boolean {
+  const id = String(line?.product_id ?? "").trim();
+  return id === OPEN_ORDER_ADDON_TARGET_ID && isOpenOrderAddonLine(line);
+}
+
 /** Ukuran yang bisa dipilih customer — tersimpan di kolom `size` (order_items). */
 export const OPEN_ORDER_SIZES = ["S", "M", "L", "XL", "XXL"];

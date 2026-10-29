@@ -18,7 +18,14 @@ import {
 } from "@/lib/shipping-weight";
 import { computeOrderHppForItems, snapshotOrderHpp } from "@/lib/produksi-order-hpp";
 import { orderEditGuard, weightEditError } from "@/lib/order-edit";
-import { OPEN_ORDER_ADDON, resolveAddonWeight } from "@/lib/open-order-config";
+import {
+  isOpenOrderAddonLine,
+  isStockedAddonLine,
+  OPEN_ORDER_ADDON,
+  OPEN_ORDER_ADDON_TARGET_ID,
+  OPEN_ORDER_ADDON_VARIANT,
+  resolveAddonWeight,
+} from "@/lib/open-order-config";
 import { openOrderEffectivePrice } from "@/lib/open-order-offering";
 
 /**
@@ -70,6 +77,8 @@ function newOrderNumber(createdAt: Date) {
 
 type ItemInput = {
   product_id?: unknown;
+  /** Nama dari form — hanya dipakai membedakan add-on Open Order dari produk katalog biasa. */
+  product_name?: unknown;
   color?: unknown;
   size?: unknown;
   quantity?: unknown;
@@ -281,6 +290,9 @@ async function buildEditSnapshot(
   const cleaned = input
     .map((row) => ({
       product_id: String(row?.product_id || "").trim(),
+      // Nama dari form dipakai HANYA untuk membedakan add-on Open Order dari produk
+      // "Cover Hanger" biasa (id-nya sama). Nama yang disimpan tetap dari database.
+      product_name: String(row?.product_name || "").trim(),
       color: String(row?.color || "default").trim() || "default",
       size: String(row?.size || "").trim().toUpperCase(),
       quantity: Math.round(Number(row?.quantity) || 0),
@@ -291,7 +303,9 @@ async function buildEditSnapshot(
 
   if (cleaned.length === 0) return { error: "Minimal satu produk harus diisi" };
   for (const row of cleaned) {
-    const openOrderAddon = group === "open_order" && row.product_id === OPEN_ORDER_ADDON.id;
+    // Baris add-on Open Order dikenali lewat helper bersama (format lama & baru) — hanya di
+    // pesanan Open Order, supaya Cover Hanger yang dibeli biasa tetap baris produk normal.
+    const openOrderAddon = group === "open_order" && isOpenOrderAddonLine(row);
     if (!openOrderAddon && !row.size) return { error: "Ukuran produk harus dipilih" };
     if (row.quantity < 1 || row.quantity > 99) return { error: "Jumlah produk harus antara 1 dan 99" };
   }
@@ -299,8 +313,8 @@ async function buildEditSnapshot(
   const productIds = [
     ...new Set(
       cleaned
-        .map((row) => row.product_id)
-        .filter((id) => !(group === "open_order" && id === OPEN_ORDER_ADDON.id)),
+        .filter((row) => !(group === "open_order" && isOpenOrderAddonLine(row)))
+        .map((row) => row.product_id),
     ),
   ];
   let products: any[] = [];
@@ -332,15 +346,29 @@ async function buildEditSnapshot(
 
   const items: Snapshot[] = [];
   for (const row of cleaned) {
-    if (group === "open_order" && row.product_id === OPEN_ORDER_ADDON.id) {
-      const old = oldById.get(row.source_item_id) || oldByKey.get(`${row.product_id}||default||`);
+    if (group === "open_order" && isOpenOrderAddonLine(row)) {
+      // Cari baris lama yang bersangkutan: format lama (tanpa warna/ukuran) atau format baru
+      // (varian katalog add-on). Bentuk barisnya DIPERTAHANKAN apa adanya — format baru tetap
+      // membawa color/size-nya supaya stoknya cocok saat edit, format lama tetap tanpa varian.
+      const old =
+        oldById.get(row.source_item_id) ||
+        oldByKey.get(`${row.product_id}||${row.color}||${row.size}`) ||
+        oldByKey.get(`${row.product_id}||default||`) ||
+        oldItems.find(
+          (entry) =>
+            isOpenOrderAddonLine(entry) &&
+            String(entry.product_id) === String(row.product_id),
+        ) ||
+        oldItems.find((entry) => isOpenOrderAddonLine(entry));
+
+      const stocked = isStockedAddonLine(row) || isStockedAddonLine(old);
       items.push({
-        product_id: OPEN_ORDER_ADDON.id,
+        product_id: stocked ? OPEN_ORDER_ADDON_TARGET_ID : OPEN_ORDER_ADDON.id,
         product_name: OPEN_ORDER_ADDON.name,
         series: null,
         kain: null,
-        color: null,
-        size: null,
+        color: stocked ? OPEN_ORDER_ADDON_VARIANT.color : null,
+        size: stocked ? OPEN_ORDER_ADDON_VARIANT.size : null,
         quantity: 1,
         price: OPEN_ORDER_ADDON.price,
         manual_price: false,
@@ -353,6 +381,8 @@ async function buildEditSnapshot(
 
     const product = productById.get(row.product_id);
     if (!product) return { error: `Produk tidak ditemukan (${row.product_id})` };
+    // Produk Cover Hanger yang dibeli sebagai produk BIASA di pesanan Open Order: barisnya
+    // divalidasi seperti produk lain (varian harus ada). Add-on sendiri sudah ditangani di atas.
     if (!variantSet.has(`${row.product_id}||${row.color}||${row.size}`)) {
       return { error: `Ukuran ${row.size} tidak tersedia untuk ${product.name}` };
     }
@@ -918,15 +948,35 @@ export async function PATCH(req: NextRequest) {
     if (oldItems.length === 0) return bad("Pesanan ini tidak punya item untuk diubah");
 
     // Add-on Open Order tidak boleh berubah: jumlah baris, qty, dan harga harus sama.
+    // Pengenalannya lewat satu helper — format lama (`addon-cover-hanger`) dan format baru
+    // (`cover-hanger` + varian add-on) sama-sama dipatok.
     if (group === "open_order") {
-      const oldAddon = oldItems.filter((row) => row.product_id === OPEN_ORDER_ADDON.id);
-      const newAddon = inputItems.filter((row) => String(row?.product_id || "").trim() === OPEN_ORDER_ADDON.id);
+      const oldAddon = oldItems.filter((row) => isOpenOrderAddonLine(row));
+      const newAddon = inputItems.filter((row) =>
+        isOpenOrderAddonLine({
+          product_id: String(row?.product_id ?? ""),
+          color: String(row?.color ?? ""),
+          size: String(row?.size ?? ""),
+        }),
+      );
       if (oldAddon.length !== newAddon.length) return bad("Baris Extra Cover & Hanger tidak boleh ditambah atau dihapus.");
       for (const row of newAddon) {
         const qty = Math.round(Number(row?.quantity) || 0);
         if (qty !== 1) return bad("Baris Extra Cover & Hanger tidak boleh diubah.");
         if (hasManualPrice(row?.price) && manualPrice(row?.price) !== OPEN_ORDER_ADDON.price) {
           return bad("Baris Extra Cover & Hanger tidak boleh diubah.");
+        }
+        // Format baru boleh membawa varian katalognya; format lama tidak punya varian.
+        const productId = String(row?.product_id || "").trim();
+        if (productId === OPEN_ORDER_ADDON_TARGET_ID) {
+          const color = String(row?.color || "").trim();
+          const size = String(row?.size || "").trim().toUpperCase();
+          if (color && color !== OPEN_ORDER_ADDON_VARIANT.color) {
+            return bad("Baris Extra Cover & Hanger tidak boleh diubah.");
+          }
+          if (size && size !== OPEN_ORDER_ADDON_VARIANT.size.toUpperCase()) {
+            return bad("Baris Extra Cover & Hanger tidak boleh diubah.");
+          }
         }
       }
     }
@@ -968,7 +1018,7 @@ export async function PATCH(req: NextRequest) {
     const addonTotal =
       group === "open_order"
         ? items
-            .filter((item) => item.product_id === OPEN_ORDER_ADDON.id)
+            .filter((item) => isOpenOrderAddonLine(item))
             .reduce((sum, item) => sum + item.price * item.quantity, 0)
         : 0;
     const subtotal = group === "open_order" ? allSubtotal - addonTotal : allSubtotal;
@@ -998,13 +1048,13 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Berat baru tidak boleh melebihi berat lama.
-    const weightIds = [
-      ...new Set(
-        items
-          .map((item) => item.product_id)
-          .filter((id) => !(group === "open_order" && id === OPEN_ORDER_ADDON.id)),
-      ),
-    ];
+    // Baris add-on tetap dihitung beratnya:
+    //  - format BARU → berat varian katalognya sendiri (id `cover-hanger`), jadi ikut dihitung
+    //    lewat jalur biasa dan TIDAK boleh ditambah setting lagi;
+    //  - format LAMA → id bayangan tanpa baris varian; beratnya dari setting admin.
+    const isAddonItem = (item: Snapshot) => group === "open_order" && isOpenOrderAddonLine(item);
+    const countedForWeight = (item: Snapshot) => !isAddonItem(item) || isStockedAddonLine(item);
+    const weightIds = [...new Set(items.filter(countedForWeight).map((item) => item.product_id))];
     let productWeights: WeightMap = {};
     let variantWeights: VariantWeightMap = {};
     if (weightIds.length > 0) {
@@ -1019,7 +1069,7 @@ export async function PATCH(req: NextRequest) {
     }
     const weightResult = sumWeightGramsBySize(
       items
-        .filter((item) => !(group === "open_order" && item.product_id === OPEN_ORDER_ADDON.id))
+        .filter(countedForWeight)
         .map((item) => ({ productId: item.product_id, color: item.color, size: item.size, quantity: item.quantity })),
       productWeights,
       variantWeights,
@@ -1028,7 +1078,7 @@ export async function PATCH(req: NextRequest) {
       return bad("Berat sebagian produk belum diisi. Lengkapi berat produk dulu sebelum mengubah item.");
     }
     let newWeight = weightResult.grams;
-    if (group === "open_order" && items.some((item) => item.product_id === OPEN_ORDER_ADDON.id)) {
+    if (group === "open_order" && items.some((item) => isAddonItem(item) && !isStockedAddonLine(item))) {
       const { data: addonSetting } = await admin
         .from("store_settings")
         .select("open_order_addon_weight")
@@ -1039,17 +1089,21 @@ export async function PATCH(req: NextRequest) {
     const weightError = weightEditError(order.weight, newWeight);
     if (weightError) return bad(weightError);
 
-    // Snapshot HPP dihitung SEBELUM RPC, lalu ditulis di transaksi yang sama.
+    // Snapshot HPP dihitung SEBELUM RPC, lalu ditulis di transaksi yang sama. Index tetap
+    // memakai posisi di `items` supaya pemasangan `line_index` di RPC tidak bergeser, tetapi
+    // baris add-on dilewati (HPP-nya sudah tercakup kemasan — lihat `orderItemRows`).
     const hpp = await computeOrderHppForItems(
       admin,
-      items.map((item, index) => ({
-        line_index: index,
-        product_id: item.product_id,
-        product_name: item.product_name,
-        color: item.color,
-        size: item.size,
-        quantity: item.quantity,
-      })),
+      items
+        .map((item, index) => ({
+          line_index: index,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          color: item.color,
+          size: item.size,
+          quantity: item.quantity,
+        }))
+        .filter((row) => !isAddonItem(items[row.line_index])),
     );
 
     const rpcItems = items.map((item) => ({
@@ -1065,6 +1119,11 @@ export async function PATCH(req: NextRequest) {
       minimum_price: item.minimum_price ?? null,
       product_image: item.product_image ?? null,
     }));
+
+    // Add-on format baru memegang stok varian katalog → dikirim terpisah supaya RPC menyimpan
+    // warna/ukurannya dan ikut memotong/mengembalikan stok. Format lama tetap lewat
+    // `p_addon_product_id` (varian dikosongkan, stok tidak disentuh).
+    const stockedAddonPresent = items.some((item) => isStockedAddonLine(item));
 
     const manualHeader = isManual
       ? {
@@ -1093,6 +1152,8 @@ export async function PATCH(req: NextRequest) {
       p_hpp_goods: hpp.hpp_goods,
       p_new_weight: Math.round(newWeight),
       p_addon_product_id: group === "open_order" ? OPEN_ORDER_ADDON.id : "",
+      p_addon_stocked_product_id:
+        group === "open_order" && stockedAddonPresent ? OPEN_ORDER_ADDON_TARGET_ID : "",
       p_header: manualHeader,
       p_note: order.awb_no ? "Item diubah setelah resi terbit; label internal perlu dicetak ulang." : null,
     });
