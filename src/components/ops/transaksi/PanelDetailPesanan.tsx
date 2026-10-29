@@ -458,18 +458,20 @@ export default function PanelDetailPesanan({
               {nomorTersalin ? "Tersalin" : "Salin"}
             </button>
           </div>
-          <div className="dp-fakta">
-            <div className="dp-fakta-item">
-              <span className="dp-fakta-label">Pembayaran</span>
-              <span className="dp-fakta-nilai">{metodeBayar}</span>
+          {/* Susunan sama dengan drawer /admin (OrderDetailPanel `.kv`): label di kiri,
+              nilai rata kanan, satu baris per data — bukan tiga kotak ke samping. */}
+          <div className="dp-kv">
+            <div className="dp-kv-baris">
+              <span>Metode Pembayaran</span>
+              <b>{metodeBayar}</b>
             </div>
-            <div className="dp-fakta-item">
-              <span className="dp-fakta-label">Dipesan</span>
-              <span className="dp-fakta-nilai">{waktuPesan}</span>
+            <div className="dp-kv-baris">
+              <span>Waktu Pemesanan</span>
+              <b>{waktuPesan}</b>
             </div>
-            <div className="dp-fakta-item">
-              <span className="dp-fakta-label">Dibayar</span>
-              <span className={`dp-fakta-nilai${waktuBayar ? "" : " kosong"}`}>{waktuBayar || "Belum"}</span>
+            <div className="dp-kv-baris">
+              <span>Waktu Pembayaran</span>
+              <b className={waktuBayar ? undefined : "kosong"}>{waktuBayar || "Belum"}</b>
             </div>
           </div>
         </section>
@@ -654,11 +656,14 @@ const DP_CSS = `
 .dp-nomor-teks{display:flex;flex-direction:column;gap:2px;min-width:0}
 .dp-nomor-label{font-size:12px;font-weight:800;color:#5a6b80;letter-spacing:.04em}
 .dp-nomor-isi{font-size:16px;font-weight:900;overflow-wrap:anywhere}
-.dp-fakta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.dp-fakta-item{background:#f7f9fb;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:3px;min-width:0}
-.dp-fakta-label{font-size:11px;font-weight:800;color:#5a6b80}
-.dp-fakta-nilai{font-size:13px;font-weight:900;line-height:1.3;overflow-wrap:anywhere}
-.dp-fakta-nilai.kosong{color:#9aa6b4}
+/* Info pesanan: satu baris per data, label kiri nilai kanan — sama dengan baris kv di
+   drawer /admin (OrderDetailPanel), bukan tiga kotak ke samping. */
+.dp-kv{display:flex;flex-direction:column;gap:0}
+.dp-kv-baris{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 0;font-size:14px;border-bottom:1px solid #eef2f6}
+.dp-kv-baris:last-child{border-bottom:0;padding-bottom:0}
+.dp-kv-baris span{flex:none;color:#5a6b80;font-weight:600}
+.dp-kv-baris b{min-width:0;font-weight:900;text-align:right;overflow-wrap:anywhere}
+.dp-kv-baris b.kosong{color:#9aa6b4;font-weight:800}
 
 /* Footer: bahaya (pink) → sekunder (biru muda) → utama (biru penuh, paling lebar). */
 .dp-footer{flex:none;display:flex;gap:10px;padding:16px 20px 22px;background:#fff;border-radius:28px 28px 0 0;box-shadow:0 -10px 30px rgba(36,50,74,.08)}
@@ -712,7 +717,7 @@ const DP_CSS = `
   .dp-garis{margin:0 16px}
   .dp-status-judul{font-size:16px}
   .dp-resi{flex-wrap:wrap}
-  .dp-fakta{grid-template-columns:1fr 1fr}
+  .dp-kv-baris{font-size:13.5px}
   .dp-langkah-label{font-size:11px}
   .dp-footer{padding:12px 14px 18px;border-radius:24px 24px 0 0}
   .dp-tombol{height:50px;padding:0 16px;font-size:14px}
