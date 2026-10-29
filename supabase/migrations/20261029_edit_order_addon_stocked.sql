@@ -63,33 +63,35 @@ declare
   v_new_addon_variants text;
   v_old_hpp production_order_hpp;
   v_packaging_cost numeric := 0;
-  v_packaging_status text;
-  v_use_cover_hanger boolean;
-  v_packaging_warning boolean;
+  v_packaging_status text := 'belum';
+  v_use_cover_hanger boolean := false;
+  v_packaging_warning boolean := false;
   v_request_id text;
   v_packaged_at timestamptz;
   v_packaged_by text;
   v_returned_at timestamptz;
   v_return_reason text;
+  v_stock record;
 begin
   select * into v_order from orders where id = p_order_id for update;
   if not found then
     raise exception 'Pesanan tidak ditemukan';
   end if;
 
+  -- Sumber: CYO- dulu, baru SMQ-/website, sisanya manual.
   v_group := case
-    when lower(coalesce(v_order.source, '')) = 'open_order' then 'open_order'
-    when v_order.order_number like 'CYO-%' then 'open_order'
-    when v_order.order_number like 'SMQ-%' then 'website'
-    when lower(coalesce(v_order.source, '')) = 'website' then 'website'
-    when lower(coalesce(v_order.source, '')) in ('shopee', 'tiktok', 'instagram', 'whatsapp', 'manual', 'other') then 'manual'
-    else 'unknown'
+    when upper(coalesce(v_order.order_number, '')) like 'CYO-%' then 'open_order'
+    when upper(coalesce(v_order.order_number, '')) like 'SMQ-%'
+      or lower(coalesce(v_order.source, '')) = 'website' then 'website'
+    else 'manual'
   end;
 
-  if lower(coalesce(v_order.status, '')) = 'dibatalkan' then
-    raise exception 'Pesanan sudah dibatalkan dan tidak bisa diubah.';
+  if v_order.stock_reserved is not true then
+    raise exception 'Item terkunci karena stok pesanan ini tidak dipotong sistem. Untuk koreksi gunakan batal atau retur.';
   end if;
-
+  if v_order.status not in ('pending', 'diproses') then
+    raise exception 'Item hanya bisa diubah saat status Belum Bayar atau Lunas. Untuk koreksi gunakan batal atau retur.';
+  end if;
   if coalesce(nullif(trim(v_order.shipping_status), ''), '') not in ('', 'menunggu_pickup') then
     raise exception 'Item terkunci karena pengiriman sudah berjalan. Untuk koreksi gunakan batal atau retur.';
   end if;
@@ -99,6 +101,7 @@ begin
   end if;
 
   v_old_weight := coalesce(v_order.weight, 0);
+  -- Berat baru tidak boleh melebihi berat lama. Pesanan lama tanpa berat tidak dibatasi.
   if v_old_weight > 0 and coalesce(p_new_weight, 0) > v_old_weight then
     raise exception 'Berat item baru melebihi berat pesanan lama. Kurangi qty/berat atau gunakan batal lalu buat order baru.';
   end if;
@@ -352,11 +355,16 @@ begin
     return_reason = excluded.return_reason,
     updated_at = now();
 
-  -- Update header order. Untuk website/CYO hanya field item/berat yang berubah.
+  -- Update header order. Untuk website/CYO hanya field item/berat yang berubah;
+  -- payment/invoice/source/alamat tidak disentuh.
   if v_group = 'manual' and p_header is not null then
     update orders set
       customer_name = coalesce(nullif(trim(p_header->>'customer_name'), ''), customer_name),
       customer_whatsapp = coalesce(nullif(trim(p_header->>'customer_whatsapp'), ''), customer_whatsapp),
+      -- `orders.customer_id` bertipe uuid, sedangkan `trim(p_header->>'customer_id')` bertipe
+      -- text. Tanpa cast eksplisit, Postgres menolak seluruh UPDATE dengan
+      -- "COALESCE types text and uuid cannot be matched" — itulah yang membuat tombol simpan
+      -- di form Ubah Transaksi gagal total.
       customer_id = coalesce(nullif(trim(p_header->>'customer_id'), '')::uuid, customer_id),
       source = coalesce(nullif(trim(p_header->>'source'), ''), source),
       shipping_address = coalesce(nullif(trim(p_header->>'shipping_address'), ''), shipping_address),
