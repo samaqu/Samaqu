@@ -45,7 +45,19 @@ function readLabelSize() {
 }
 
 const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
-  { order, onResiCreated, hidePrintButton = false, latestTracking = null, trackingState = "idle" },
+  {
+    order,
+    onResiCreated,
+    hidePrintButton = false,
+    latestTracking = null,
+    trackingState = "idle",
+    /**
+     * `compact` hanya untuk drawer panel admin: nomor resi & status terbaru sudah ditampilkan
+     * di blok resi bergradasi, jadi panel ini cukup mengeluarkan aksinya (buat resi, ubah resi
+     * HBO, tandai dikirim, cetak). Tidak mengubah logic apa pun.
+     */
+    compact = false,
+  },
   ref,
 ) {
   const [resiCheck, setResiCheck] = useState(null);
@@ -433,49 +445,53 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
 
       {awb ? (
         <>
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nomor Resi</p>
-              <p className="text-sm font-black font-mono text-slate-900 dark:text-white truncate">{awb}</p>
-            </div>
-            <button
-              type="button"
-              onClick={copyAwb}
-              className={`shrink-0 inline-flex items-center justify-center p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
-                copied ? "text-emerald-600 dark:text-emerald-400" : "text-slate-600 dark:text-slate-300"
-              }`}
-              aria-label={copied ? "Nomor resi tersalin" : "Salin nomor resi"}
-              title={copied ? "Tersalin" : "Salin nomor resi"}
-            >
-              {copied ? <ClipboardCheck size={15} /> : <Clipboard size={15} />}
-            </button>
-          </div>
+          {compact ? null : (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nomor Resi</p>
+                  <p className="text-sm font-black font-mono text-slate-900 dark:text-white truncate">{awb}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={copyAwb}
+                  className={`shrink-0 inline-flex items-center justify-center p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
+                    copied ? "text-emerald-600 dark:text-emerald-400" : "text-slate-600 dark:text-slate-300"
+                  }`}
+                  aria-label={copied ? "Nomor resi tersalin" : "Salin nomor resi"}
+                  title={copied ? "Tersalin" : "Salin nomor resi"}
+                >
+                  {copied ? <ClipboardCheck size={15} /> : <Clipboard size={15} />}
+                </button>
+              </div>
 
-          {/* Pesanan yang sudah dibatalkan: `shipping_status` lama masih "menunggu_pickup"
-              (jalur pembatalan tidak mengubah kolom itu), jadi ditampilkan "Dibatalkan". */}
-          {cancelled ? (
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Status: <b className="text-red-600 dark:text-red-400">Dibatalkan</b>
-            </p>
-          ) : latestTracking ? (
-            /* Status J&T ditampilkan APA ADANYA (tanpa label karangan) + scan terakhirnya. */
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Status terbaru:{" "}
-                <b className="text-slate-700 dark:text-slate-200">{latestTracking.status}</b>
-              </p>
-              {trackingMeta ? (
-                <p className="mt-0.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{trackingMeta}</p>
+              {/* Pesanan yang sudah dibatalkan: `shipping_status` lama masih "menunggu_pickup"
+                  (jalur pembatalan tidak mengubah kolom itu), jadi ditampilkan "Dibatalkan". */}
+              {cancelled ? (
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Status: <b className="text-red-600 dark:text-red-400">Dibatalkan</b>
+                </p>
+              ) : latestTracking ? (
+                /* Status J&T ditampilkan APA ADANYA (tanpa label karangan) + scan terakhirnya. */
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    Status terbaru:{" "}
+                    <b className="text-slate-700 dark:text-slate-200">{latestTracking.status}</b>
+                  </p>
+                  {trackingMeta ? (
+                    <p className="mt-0.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{trackingMeta}</p>
+                  ) : null}
+                </div>
+              ) : shippingStatus || trackingState === "loading" ? (
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Status kirim:{" "}
+                  <b className="text-slate-700 dark:text-slate-200">
+                    {trackingState === "loading" ? "memuat…" : SHIPPING_STATUS_LABEL[shippingStatus] || shippingStatus}
+                  </b>
+                </p>
               ) : null}
-            </div>
-          ) : shippingStatus || trackingState === "loading" ? (
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Status kirim:{" "}
-              <b className="text-slate-700 dark:text-slate-200">
-                {trackingState === "loading" ? "memuat…" : SHIPPING_STATUS_LABEL[shippingStatus] || shippingStatus}
-              </b>
-            </p>
-          ) : null}
+            </>
+          )}
 
           {!voided && !hidePrintButton ? (
             /* Satu tombol saja (alurnya sama dengan "Buat Resi" / "Atur Pesanan"): klik → popup
@@ -559,9 +575,13 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
           </button>
         </>
       ) : (
-        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-          Resi untuk pesanan ini dibuat lewat alur pesanan, bukan dari menu Transaksi.
-        </p>
+        /* Di drawer panel admin pesanan website tidak punya aksi resi sama sekali; keterangannya
+           sudah diwakili chip "Resi otomatis setelah bayar", jadi kalimat ini tidak diulang. */
+        compact ? null : (
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            Resi untuk pesanan ini dibuat lewat alur pesanan, bukan dari menu Transaksi.
+          </p>
+        )
       )}
 
       {resiError && !resiCheck ? (

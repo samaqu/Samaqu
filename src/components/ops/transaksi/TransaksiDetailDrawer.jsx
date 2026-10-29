@@ -25,7 +25,11 @@ import { jntServiceTag } from "@/lib/jnt/layanan";
 import JntBadge from "@/components/JntBadge";
 import { SOURCE_STYLES, STATUS_STYLES, formatRupiah, formatTanggalJamID } from "@/components/ops/transaksi/transaksi-format";
 import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
-import PanelDetailPesanan, { PanelDetailFooter, PanelDetailShell } from "@/components/ops/transaksi/PanelDetailPesanan";
+import PanelDetailPesanan, {
+  PanelDetailFooter,
+  PanelDetailShell,
+  jamWIB,
+} from "@/components/ops/transaksi/PanelDetailPesanan";
 
 export default function TransaksiDetailDrawer({ open, order, variant = "ops", onClose, onEdit, onCancel, onDelete, onResiCreated }) {
   const isPanel = variant === "panel";
@@ -219,38 +223,54 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
           ? "Resi tidak tersedia"
           : "Resi belum dibuat";
 
-    const itemsTampilan = (order.items || []).map((item, index) => ({
-      key: `${item.product_id}-${item.color}-${item.size}-${index}`,
-      nama: item.product_name,
-      chips: (
-        isPaketItem(item)
-          ? [item.kain ? `Kain ${item.kain}` : null, variantName(item.color) || variantName(item.series) || null]
-          : [item.kain ? `Kain ${item.kain}` : null, item.series, item.color && item.color !== "default" ? item.color : null, item.size]
-      )
-        .filter(Boolean)
-        .concat([`× ${item.quantity}`]),
-      harga: `Rp ${formatRupiah(item.price * item.quantity)}`,
-      foto: item.product_image || NEUTRAL_ITEM_PHOTO,
-    }));
+    const itemsTampilan = (order.items || []).map((item, index) => {
+      // Chip varian: kain & series berwarna biru, ukuran/qty netral (seperti mockup).
+      const kain = item.kain ? { teks: `Kain ${item.kain}`, jenis: "kain" } : null;
+      const series = variantName(item.series) ? { teks: variantName(item.series), jenis: "kain" } : null;
+      const ukuranQty = { teks: `${item.size || ""}${item.size ? " · " : ""}x${item.quantity}`, jenis: "netral" };
+      const chips = isPaketItem(item)
+        ? [kain, variantName(item.color) ? { teks: variantName(item.color), jenis: "kain" } : null, ukuranQty]
+        : [
+            kain,
+            series,
+            variantName(item.color) ? { teks: variantName(item.color), jenis: "kain" } : null,
+            ukuranQty,
+          ];
+      return {
+        key: `${item.product_id}-${item.color}-${item.size}-${index}`,
+        nama: item.product_name,
+        chips: chips.filter(Boolean),
+        harga: `Rp ${formatRupiah(item.price * item.quantity)}`,
+        foto: item.product_image || NEUTRAL_ITEM_PHOTO,
+      };
+    });
 
-    // Footer: aturan tombol sama dengan tampilan lama (termasuk khusus Selesai).
+    // Keterangan chip di samping berat. "Resi otomatis setelah bayar" hanya untuk pesanan
+    // website/Open Order yang resinya memang dibuat otomatis; transaksi manual tidak.
+    const resiCatatan = awb
+      ? "Resi sudah terbit"
+      : order.source === "website" || String(order.order_number || "").startsWith("CYO-")
+        ? "Resi otomatis setelah bayar"
+        : "Resi dibuat manual";
+
+    // Footer: bahaya (Batalkan) → sekunder (Ubah) → utama paling lebar, sesuai mockup.
     const aksi = [];
-    if (canDelete) aksi.push({ key: "hapus", label: "Hapus", jenis: "bahaya", onClick: () => onDelete?.(order) });
+    if (order.can_cancel) aksi.push({ key: "batal", label: "Batalkan", jenis: "bahaya", onClick: () => onCancel?.(order) });
     if (order.can_edit) aksi.push({ key: "ubah", label: "Ubah", jenis: "sekunder", onClick: () => onEdit?.(order) });
     if (isSelesai) {
       aksi.push({
         key: "hubungi",
         label: "Hubungi Customer",
-        jenis: "sekunder",
+        jenis: "utama",
         disabled: !canHubungiCustomer,
         onClick: () => {
           if (canHubungiCustomer) window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
         },
       });
     } else if (canPrint) {
-      aksi.push({ key: "cetak", label: "Cetak Resi", jenis: "sekunder", onClick: () => resiPanelRef.current?.print() });
+      aksi.push({ key: "cetak", label: "Cetak Resi", jenis: "utama", onClick: () => resiPanelRef.current?.print() });
     }
-    if (order.can_cancel) aksi.push({ key: "batal", label: "Batalkan", jenis: "bahaya", onClick: () => onCancel?.(order) });
+    if (canDelete) aksi.push({ key: "hapus", label: "Hapus", jenis: "sekunder", onClick: () => onDelete?.(order) });
 
     // Khusus belum bayar: aksi utama "Ingatkan Bayar" (WhatsApp berisi nomor pesanan & total).
     if (stage === "belum_bayar" && canHubungiPanel) {
@@ -277,6 +297,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
           layanan={jntServiceTag(track.serviceCode || order.shipping_method).replace(/^Service\s+/i, "")}
           resi={awb}
           resiKosong={resiKosong}
+          resiCatatan={resiCatatan}
           onLacak={openTrackModal}
           onSalinResi={copyResi}
           resiTersalin={copied === "resi"}
@@ -287,8 +308,8 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
           diskon={order.discount}
           total={order.total}
           metodeBayar={paymentDetail}
-          waktuPesan={formatTanggalJamID(order.created_at)}
-          waktuBayar={order.paid_at ? formatTanggalJamID(order.paid_at) : null}
+          waktuPesan={jamWIB(order.created_at)}
+          waktuBayar={order.paid_at ? jamWIB(order.paid_at) : null}
           nomorPesanan={order.order_number}
           onSalinNomor={copyNomor}
           nomorTersalin={copied === "nomor"}
@@ -308,12 +329,14 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", on
             </>
           }
         >
-          {/* Panel resi asli: buat resi, resi HBO, cetak (logic lama, tidak diubah). */}
+          {/* Panel resi asli: buat resi, resi HBO, tandai dikirim, cetak (logic lama, tidak diubah).
+              `compact` karena nomor resi sudah tampil di blok resi bergradasi. */}
           <TransaksiResiPanel
             ref={resiPanelRef}
             order={order}
             onResiCreated={onResiCreated}
             hidePrintButton
+            compact
             latestTracking={lastScan}
             trackingState={track.status}
           />
