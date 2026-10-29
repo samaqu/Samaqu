@@ -1714,7 +1714,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "tween", duration: 0.24, ease: "easeOut" }}
-            className="fixed inset-y-0 right-0 z-[9999] w-full sm:w-[680px] bg-white dark:bg-[#1a1d28] shadow-2xl flex flex-col overflow-hidden"
+            className={`fixed inset-y-0 right-0 z-[9999] w-full bg-white dark:bg-[#1a1d28] shadow-2xl flex flex-col overflow-hidden ${
+              isPanelForm ? "sm:w-[560px] sm:max-w-[560px]" : "sm:w-[680px]"
+            }`}
             style={isPanelForm ? { background: "#fffafc" } : undefined}
             role="dialog"
             aria-label={isEdit ? "Ubah transaksi" : "Tambah transaksi"}
@@ -1882,7 +1884,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                     <Lightbulb size={16} className="mt-0.5 shrink-0" style={{ color: PANEL_BLUE_DEEP }} />
                     <p className="text-[12.5px] font-semibold leading-relaxed" style={{ color: PANEL_BLUE_DEEP }}>
                       {managedSource
-                        ? `Boleh ganti ukuran atau series ya. Totalnya tetap Rp${formatRupiah(originalTotal)} karena sudah dibayar customer.`
+                        ? (form.payment_status || "paid") === "unpaid"
+                          ? `Boleh ganti ukuran atau series ya. Totalnya tetap Rp${formatRupiah(originalTotal)} selama pesanan belum dibatalkan.`
+                          : `Boleh ganti ukuran atau series ya. Totalnya tetap Rp${formatRupiah(originalTotal)} karena sudah dibayar customer.`
                         : "Boleh ganti ukuran, series, atau harga. Total pesanan ikut menyesuaikan."}
                     </p>
                   </div>
@@ -2537,9 +2541,13 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
               <section className="space-y-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <h4 className={sectionClass}>{isPanelForm ? "Produk di pesanan" : "Produk"}</h4>
-                  <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
-                    {openRowIsPaket ? "Cari produk → Paket → Qty" : "Cari produk → Series → Ukuran → Qty"}
-                  </span>
+                  {/* Petunjuk alur pemilih hanya untuk tampilan ops — di panel admin
+                      produk sudah tampil sebagai kartu, jadi tidak relevan. */}
+                  {isPanelForm ? null : (
+                    <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+                      {openRowIsPaket ? "Cari produk → Paket → Qty" : "Cari produk → Series → Ukuran → Qty"}
+                    </span>
+                  )}
                 </div>
 
                 {/* Daftar item tidak lagi punya kotak scroll sendiri: pemilih produk ikut
