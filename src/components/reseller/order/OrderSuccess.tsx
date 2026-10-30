@@ -25,40 +25,36 @@ export default function OrderSuccess({
   const status = orderStatus(result.status);
 
   return (
-    <div className="card" style={{ maxWidth: 620 }}>
-      <div className="card-b stack">
-        <div className="row">
-          <CheckCircle size={26} style={{ color: "var(--rs-ok)" }} />
-          <div>
-            <h2 className="bold" style={{ fontSize: 18 }}>
-              Pesanan berhasil dibuat
-            </h2>
-            <p className="small muted">Simpan nomor pesanan ini untuk pelacakan.</p>
-          </div>
+    <div className="submitted-wrap">
+      <div className="card submitted-card">
+        <div className="submitted-check" aria-hidden="true">
+          <CheckCircle size={34} />
         </div>
+        <h1>Pesanan berhasil dibuat</h1>
+        <p className="submitted-sub">
+          Pembayaran dari saldo berhasil. Simpan nomor pesanan ini untuk pelacakan.
+        </p>
 
-        <div className="kv-list">
-          <div className="it">
-            <span className="muted">Nomor pesanan</span>
-            <b className="bold">{result.orderNumber}</b>
+        <div className="submitted-summary">
+          <div className="kv">
+            <span>Nomor pesanan</span>
+            <b>{result.orderNumber}</b>
           </div>
-          <div className="it">
-            <span className="muted">Status</span>
+          <div className="kv">
+            <span>Status</span>
             <StatusBadge status={status} />
           </div>
-          <div className="it">
-            <span className="muted">Total</span>
-            <b className="bold">{rupiah(result.total)}</b>
+          <div className="kv">
+            <span>Total</span>
+            <b>{rupiah(result.total)}</b>
           </div>
-          <div className="it">
-            <span className="muted">Dipotong dari saldo</span>
-            <b className="bold" style={{ color: "var(--rs-ok)" }}>
-              {rupiah(result.balanceDeduction)}
-            </b>
+          <div className="kv">
+            <span>Dipotong dari saldo</span>
+            <b style={{ color: "var(--rs-ok)" }}>{rupiah(result.balanceDeduction)}</b>
           </div>
         </div>
 
-        <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+        <div className="submitted-actions">
           <Link className="btn" href={`/reseller/pesanan/${encodeURIComponent(result.orderNumber)}`}>
             Lihat pesanan
           </Link>

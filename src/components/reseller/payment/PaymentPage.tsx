@@ -7,17 +7,12 @@ import type { ResellerSettingsView } from "@/lib/reseller/client";
 import { rupiah, topupStatus } from "@/lib/reseller/format";
 import { ConfirmActionModal } from "../admin/Modal";
 import UploadBukti from "../UploadBukti";
-import type { PaymentMethodChoice } from "./types";
+import SubmittedCard from "./SubmittedCard";
+import type { PaymentMethodChoice, PaymentPageStatus } from "./types";
 import { StatusBadge } from "../ui";
 import { useCountdown } from "./useCountdown";
 
-export type PaymentPageStatus =
-  | "unpaid"
-  | "submitted"
-  | "approved"
-  | "rejected"
-  | "expired"
-  | "cancelled";
+export type { PaymentPageStatus } from "./types";
 
 /**
  * SATU halaman bayar untuk top up DAN kekurangan pesanan:
@@ -44,6 +39,9 @@ export default function PaymentPage({
   historyHref,
   historyLabel,
   submittedSub,
+  submittedFinalStep,
+  rejectedCtaLabel,
+  rejectedCtaHref,
   expiredTitle,
   expiredMessage,
   expiredCtaLabel,
@@ -68,6 +66,9 @@ export default function PaymentPage({
   historyHref: string;
   historyLabel: string;
   submittedSub: string;
+  submittedFinalStep: string;
+  rejectedCtaLabel: string;
+  rejectedCtaHref: string;
   expiredTitle: string;
   expiredMessage: string;
   expiredCtaLabel: string;
@@ -79,6 +80,7 @@ export default function PaymentPage({
   );
   const [proof, setProof] = useState<string | null>(proofUrl);
   const [submitting, setSubmitting] = useState(false);
+  const [justSubmitted, setJustSubmitted] = useState(false);
   const [localError, setLocalError] = useState("");
   const [copied, setCopied] = useState<"" | "total" | "rekening">("");
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -113,6 +115,7 @@ export default function PaymentPage({
     setSubmitting(true);
     try {
       await onSubmit(proof, method);
+      setJustSubmitted(true);
     } catch (e) {
       setLocalError(e instanceof Error ? e.message : "Gagal mengirim bukti. Coba lagi.");
     } finally {
@@ -153,47 +156,68 @@ export default function PaymentPage({
     </div>
   );
 
-  // ── State: terkirim / dikonfirmasi / ditolak ──
-  if (status !== "unpaid" && status !== "expired" && status !== "cancelled") {
-    const badge =
-      status === "submitted"
-        ? topupStatus("pending")
-        : status === "approved"
-          ? topupStatus("approved")
-          : topupStatus("rejected");
+  const viewStatus: PaymentPageStatus =
+    status === "unpaid" && justSubmitted ? "submitted" : status;
+
+  // ── State: bukti terkirim (modern) ──
+  if (viewStatus === "submitted") {
+    return (
+      <SubmittedCard
+        amount={amount}
+        method={method}
+        referenceLabel={referenceLabel}
+        reference={reference}
+        proofUrl={proof || proofUrl}
+        subtitle={submittedSub}
+        finalStepLabel={submittedFinalStep}
+        historyHref={historyHref}
+        historyLabel={historyLabel}
+        homeHref={homeHref}
+      />
+    );
+  }
+
+  // ── State: dikonfirmasi / ditolak ──
+  if (viewStatus === "approved" || viewStatus === "rejected") {
+    const badge = viewStatus === "approved" ? topupStatus("approved") : topupStatus("rejected");
     return (
       <div className="stack" style={{ maxWidth: 560 }}>
         <div className="card">
           <div className="card-b stack" style={{ alignItems: "center", textAlign: "center" }}>
-            {status === "rejected" ? (
+            {viewStatus === "rejected" ? (
               <span style={{ fontSize: 34 }} aria-hidden="true">✕</span>
             ) : (
               <CheckCircle size={44} style={{ color: "var(--rs-ok)" }} />
             )}
             <div>
               <h1 className="bold" style={{ fontSize: 19 }}>
-                {status === "submitted"
-                  ? "Bukti pembayaran terkirim"
-                  : status === "approved"
-                    ? "Pembayaran dikonfirmasi"
-                    : "Bukti pembayaran ditolak"}
+                {viewStatus === "approved" ? "Pembayaran dikonfirmasi" : "Bukti pembayaran ditolak"}
               </h1>
               <p className="small muted" style={{ marginTop: 6 }}>
-                {status === "submitted"
-                  ? submittedSub
-                  : status === "approved"
-                    ? "Terima kasih. Pembayaran sudah diverifikasi admin SAMAQU."
-                    : rejectReason || "Silakan hubungi admin SAMAQU kalau ada pertanyaan."}
+                {viewStatus === "approved"
+                  ? "Terima kasih. Pembayaran sudah diverifikasi admin SAMAQU."
+                  : `${rejectReason || "Silakan hubungi admin SAMAQU kalau ada pertanyaan."} Buat pembayaran baru untuk mengunggah bukti lagi.`}
               </p>
             </div>
             <div style={{ width: "100%", textAlign: "left", marginTop: 6 }}>{summaryCard(badge)}</div>
             <div className="row" style={{ gap: 10, flexWrap: "wrap", justifyContent: "center", marginTop: 6 }}>
-              <Link className="btn" href={homeHref}>
+              {viewStatus === "rejected" ? (
+                <Link className="btn" href={rejectedCtaHref}>
+                  {rejectedCtaLabel}
+                </Link>
+              ) : (
+                <Link className="btn" href={historyHref}>
+                  {historyLabel}
+                </Link>
+              )}
+              <Link className="btn ghost" href={homeHref}>
                 Kembali ke Beranda
               </Link>
-              <Link className="btn ghost" href={historyHref}>
-                {historyLabel}
-              </Link>
+              {viewStatus === "rejected" ? (
+                <Link className="btn ghost" href={historyHref}>
+                  {historyLabel}
+                </Link>
+              ) : null}
             </div>
           </div>
         </div>
@@ -202,16 +226,16 @@ export default function PaymentPage({
   }
 
   // ── State: kedaluwarsa / dibatalkan ──
-  if (status === "expired" || status === "cancelled" || (countdown.expired && status === "unpaid")) {
+  if (viewStatus === "expired" || viewStatus === "cancelled" || (countdown.expired && viewStatus === "unpaid")) {
     return (
       <div className="stack" style={{ maxWidth: 560 }}>
         <div className="card">
           <div className="card-b stack" style={{ alignItems: "center", textAlign: "center" }}>
             <span style={{ fontSize: 34 }} aria-hidden="true">⏱</span>
             <h1 className="bold" style={{ fontSize: 19 }}>
-              {status === "cancelled" ? "Pembayaran dibatalkan" : expiredTitle}
+              {viewStatus === "cancelled" ? "Pembayaran dibatalkan" : expiredTitle}
             </h1>
-            <p className="small muted">{status === "cancelled" ? "Tidak ada saldo yang terpotong." : expiredMessage}</p>
+            <p className="small muted">{viewStatus === "cancelled" ? "Tidak ada saldo yang terpotong." : expiredMessage}</p>
             <div className="row" style={{ gap: 10, flexWrap: "wrap", justifyContent: "center", marginTop: 6 }}>
               <Link className="btn" href={expiredCtaHref}>
                 {expiredCtaLabel}

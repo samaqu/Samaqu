@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, resellerApi, type TopupRow } from "@/lib/reseller/client";
-import { isPastDeadline } from "@/lib/reseller/topups";
 import { useReseller } from "../ResellerShell";
 import { Note } from "../ui";
 import PaymentPage, { type PaymentPageStatus } from "./PaymentPage";
+import { resolvePaymentPageStatus } from "./status";
 import type { PaymentMethodChoice } from "./types";
 
 /** Halaman bayar TOP UP (`/reseller/top-up/[kode]`) — memakai PaymentPage bersama. */
@@ -71,20 +71,12 @@ export default function TopupPaymentView({ code }: { code: string }) {
     );
   }
 
-  const status: PaymentPageStatus =
-    row.status === "approved"
-      ? "approved"
-      : row.status === "rejected"
-        ? "rejected"
-        : row.status === "pending"
-          ? "submitted"
-          : row.status === "kedaluwarsa"
-            ? "expired"
-            : row.status === "dibatalkan"
-              ? "cancelled"
-              : isPastDeadline(row.pay_deadline)
-                ? "expired"
-                : "unpaid";
+  const status: PaymentPageStatus = resolvePaymentPageStatus({
+    kind: "topup",
+    status: row.status,
+    proofUrl: row.proof_url,
+    deadlineIso: row.pay_deadline,
+  });
 
   return (
     <PaymentPage
@@ -107,6 +99,9 @@ export default function TopupPaymentView({ code }: { code: string }) {
       historyHref="/reseller/saldo"
       historyLabel="Lihat riwayat top up"
       submittedSub="Admin SAMAQU sedang mengecek. Kamu dapat WhatsApp begitu saldo masuk."
+      submittedFinalStep="Saldo masuk"
+      rejectedCtaLabel="Top up lagi"
+      rejectedCtaHref="/reseller/top-up"
       expiredTitle="Waktu pembayaran habis"
       expiredMessage="Waktu pembayaran habis. Buat top up baru ya."
       expiredCtaLabel="Top up lagi"

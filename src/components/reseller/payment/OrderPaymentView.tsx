@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, resellerApi, type OrderDetail } from "@/lib/reseller/client";
-import { isPastDeadline } from "@/lib/reseller/topups";
 import { useReseller } from "../ResellerShell";
 import { Note } from "../ui";
 import PaymentPage, { type PaymentPageStatus } from "./PaymentPage";
+import { resolvePaymentPageStatus } from "./status";
 import type { PaymentMethodChoice } from "./types";
 
 /**
@@ -71,21 +71,13 @@ export default function OrderPaymentView({ orderNumber }: { orderNumber: string 
     );
   }
 
-  const deadlinePassed = isPastDeadline(shortfall.deadline);
-  const status: PaymentPageStatus =
-    shortfall.status === "approved"
-      ? "approved"
-      : shortfall.status === "rejected"
-        ? "rejected"
-        : order.status === "dibatalkan"
-          ? deadlinePassed
-            ? "expired"
-            : "cancelled"
-          : order.status !== "pending"
-            ? "approved"
-            : deadlinePassed
-              ? "expired"
-              : "unpaid";
+  const status: PaymentPageStatus = resolvePaymentPageStatus({
+    kind: "order",
+    status: shortfall.status,
+    proofUrl: shortfall.proof_url,
+    orderStatus: order.status,
+    deadlineIso: shortfall.deadline,
+  });
 
   return (
     <PaymentPage
@@ -107,6 +99,9 @@ export default function OrderPaymentView({ orderNumber }: { orderNumber: string 
       historyHref={`/reseller/pesanan/${encodeURIComponent(orderNumber)}`}
       historyLabel="Lihat pesanan"
       submittedSub="Admin SAMAQU sedang mengecek. Pesanan diproses setelah pembayaran dikonfirmasi."
+      submittedFinalStep="Pesanan diproses"
+      rejectedCtaLabel="Buat pesanan lagi"
+      rejectedCtaHref="/reseller/pesanan/baru"
       expiredTitle="Waktu pembayaran habis"
       expiredMessage="Pesanan dibatalkan otomatis dan saldo yang terpotong sudah dikembalikan."
       expiredCtaLabel="Lihat pesanan"

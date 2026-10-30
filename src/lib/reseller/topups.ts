@@ -12,17 +12,13 @@
 
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
+export { isPastDeadline } from "./deadline";
+
 export const TOPUP_PAY_WINDOW_MINUTES = 60;
 
 /** Batas waktu bayar (ISO) untuk top up baru. */
 export function topupDeadlineIso(from: Date = new Date()): string {
   return new Date(from.getTime() + TOPUP_PAY_WINDOW_MINUTES * 60_000).toISOString();
-}
-
-/** true kalau batas waktu sudah lewat (null = tidak pernah kedaluwarsa). */
-export function isPastDeadline(deadline: string | null | undefined, now = Date.now()): boolean {
-  if (!deadline) return false;
-  return new Date(deadline).getTime() <= now;
 }
 
 /**
