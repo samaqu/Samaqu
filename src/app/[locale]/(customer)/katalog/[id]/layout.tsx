@@ -3,6 +3,15 @@ import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, localeAlternates } from "@/lib/site-config";
 
+// Shell + metadata produk di-cache; admin memanggil revalidatePath saat produk disimpan.
+export const revalidate = 300;
+
+/** Semua produk terbit diprerender saat build; produk baru dibuat on-demand lalu di-cache. */
+export async function generateStaticParams() {
+  const { data } = await supabase.from("products").select("id").eq("is_published", true);
+  return (data ?? []).map((product) => ({ id: String(product.id) }));
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ locale: string; id: string }> }): Promise<Metadata> {
   const { locale, id } = await params;
   const { data: product } = await supabase.from("products").select("id, name, description, category, image, price, colors").eq("id", id).eq("is_published", true).maybeSingle();

@@ -22,15 +22,10 @@ export default function middleware(request: NextRequest, event: NextFetchEvent) 
 }
 
 function handleRequest(request: NextRequest) {
-  // x-pathname dipakai layout/metadata untuk menghitung canonical + hreflang
-  // tanpa perlu tahu URL-nya dari sisi klien.
-  const headers = new Headers(request.headers);
-  headers.set("x-pathname", request.nextUrl.pathname);
-
   // Route API tidak boleh diproses next-intl. `/api/*` sudah dikecualikan lewat matcher;
   // guard ini menutup varian lama `/id/api/*` dan `/en/api/*` supaya tidak di-rewrite.
   if (/^\/(id|en)\/api(\/|$)/.test(request.nextUrl.pathname)) {
-    return NextResponse.next({ request: { headers } });
+    return NextResponse.next();
   }
 
   const host = (request.headers.get("host") || "").split(":")[0].toLowerCase();
@@ -47,7 +42,7 @@ function handleRequest(request: NextRequest) {
     if (!url.pathname.startsWith("/affiliate")) {
       url.pathname = url.pathname === "/" ? "/affiliate" : `/affiliate${url.pathname}`;
     }
-    return NextResponse.rewrite(url, { request: { headers } });
+    return NextResponse.rewrite(url);
   }
 
   if (host === OPS_HOST) {
@@ -63,7 +58,7 @@ function handleRequest(request: NextRequest) {
     if (!url.pathname.startsWith("/ops")) {
       url.pathname = url.pathname === "/" ? "/ops" : `/ops${url.pathname}`;
     }
-    return NextResponse.rewrite(url, { request: { headers } });
+    return NextResponse.rewrite(url);
   }
 
   if (host === ADMIN_HOST) {
@@ -79,14 +74,14 @@ function handleRequest(request: NextRequest) {
     if (!url.pathname.startsWith("/panel-admin")) {
       url.pathname = url.pathname === "/" ? "/panel-admin" : `/panel-admin${url.pathname}`;
     }
-    return NextResponse.rewrite(url, { request: { headers } });
+    return NextResponse.rewrite(url);
   }
 
   // Portal reseller hidup TANPA prefix locale dan HANYA di domain website. Di subdomain
   // internal (office.samaqu.id / admin.samaqu.id) path /reseller sudah di-rewrite ke halaman
   // ADMIN reseller pada cabang host di atas — jadi yang sampai ke sini adalah portalnya.
   if (/^\/reseller(\/|$)/.test(request.nextUrl.pathname)) {
-    return NextResponse.next({ request: { headers } });
+    return NextResponse.next();
   }
 
   // Halaman Bio Link hidup TANPA prefix locale (samaqu.id/bio). Jalur lama /id/bio & /en/bio
@@ -97,7 +92,7 @@ function handleRequest(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  return intlMiddleware(new NextRequest(request, { headers }));
+  return intlMiddleware(request);
 }
 
 export const config = {

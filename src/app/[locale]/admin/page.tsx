@@ -6,4 +6,4 @@
 // (beberapa kartu di panel Pengaturan tidak ikut tersalin ke sini). Sekarang kedua
 // route merender komponen yang SAMA, supaya perubahan tidak pernah cuma masuk ke
 // satu sisi.
-export { default } from "@/app/admin/page";
+export { default } from "@/app/(internal)/admin/page";

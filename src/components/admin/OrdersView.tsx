@@ -23,7 +23,7 @@ import StageIcon from "@/components/ops/transaksi/StageIcon";
 // Animasi angka kartu KPI memakai komponen yang SAMA dengan kartu metrik dashboard admin
 // (`CountUp`) supaya geraknya konsisten: angka naik dari 0 saat data masuk.
 import CountUp from "@/components/admin/CountUp";
-import "@/app/ops/ops-transaksi.css";
+import "@/app/(internal)/ops/ops-transaksi.css";
 
 /** Field yang dipakai daftar; `Order` di halaman admin memenuhinya. */
 export interface AdminOrderRow {

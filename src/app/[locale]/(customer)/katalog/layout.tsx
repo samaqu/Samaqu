@@ -2,6 +2,9 @@ import { Metadata } from "next";
 import { supabase } from "@/lib/supabase";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, localeAlternates, OG_IMAGE } from "@/lib/site-config";
 
+// Shell halaman katalog boleh statis; produk baru langsung tampil dari client + revalidate admin.
+export const revalidate = 300;
+
 export async function generateMetadata({
   params,
 }: {

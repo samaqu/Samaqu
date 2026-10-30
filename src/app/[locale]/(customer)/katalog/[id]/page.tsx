@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, use, useRef, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Minus, Plus, ChevronLeft, ChevronRight, ChevronDown, Play, ShoppingCart } from "lucide-react";
 import { Bag } from "@phosphor-icons/react";
@@ -218,7 +218,6 @@ function MobileCartButton() {
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const searchParams = useSearchParams();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [colorHex, setColorHex] = useState<Record<string, string>>({});
@@ -288,16 +287,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           (data || []).forEach((v) => { if (v.hex) map[v.color] = v.hex; });
           setColorHex(map);
         });
-        // Read color/size from URL params (preserved from series navigation)
-        const urlColor = searchParams.get("color");
-        const urlSize = searchParams.get("size");
+        // Baca color/size dari URL tanpa useSearchParams supaya halaman bisa diprerender.
+        const params = new URLSearchParams(window.location.search);
+        const urlColor = params.get("color");
+        const urlSize = params.get("size");
         const initialColor = urlColor && p.colors.includes(urlColor) ? urlColor : (p.colors[0] || "");
         setSelectedColor(initialColor);
         if (urlSize) setSelectedSize(urlSize);
       }
       setLoading(false);
     });
-  }, [id, searchParams]);
+  }, [id]);
 
   // Ukuran asli produk tanpa series → ID item katalog (satu baris per ukuran di feed).
   useEffect(() => {

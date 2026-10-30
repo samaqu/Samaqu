@@ -8,6 +8,9 @@ import {
   resolveOpenOrderState,
 } from "@/lib/open-order-window";
 
+// Jendela Open Order global; cache sebentar supaya status buka/tutup tetap akurat.
+export const revalidate = 60;
+
 /**
  * Open Order Samaqu — alur 6 langkah (daftar produk → detail → keranjang → data pemesan →
  * review → pesanan berhasil). Tampil tanpa navbar (lihat (customer)/layout.tsx).

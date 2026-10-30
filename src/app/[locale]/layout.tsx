@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { NextIntlClientProvider } from "next-intl";
-import { getMessages } from "next-intl/server";
+import { getMessages, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { locales } from "@/i18n/config";
-import { SITE_NAME, SITE_URL, localeAlternates, OG_IMAGE } from "@/lib/site-config";
+import { RootDocument, ROOT_METADATA } from "@/components/RootDocument";
+import { SITE_NAME, OG_IMAGE } from "@/lib/site-config";
+import "@/app/globals.css";
+
+/** Semua halaman ber-locale bisa diprerender untuk id + en. */
+export function generateStaticParams() {
+  return locales.map((locale) => ({ locale }));
+}
 
 export async function generateMetadata({
   params,
@@ -12,16 +18,16 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  // x-pathname di-set middleware: /id/katalog → path "/katalog"
-  const pathname = (await headers()).get("x-pathname") || `/${locale}`;
-  const path = pathname.replace(new RegExp(`^/(${locales.join("|")})(?=/|$)`), "") || "/";
   const isEn = locale === "en";
 
+  // Canonical/hreflang + og:url per halaman dihitung oleh layout masing-masing
+  // (params locale + slug route), bukan dengan membaca x-pathname dari header.
   return {
-    alternates: localeAlternates(locale, path),
+    ...ROOT_METADATA,
+    // Sama persis dengan metadata locale lama: OG halaman (url/title) diisi layout rute,
+    // sedangkan field umum di bawah ini menjadi fallback.
     openGraph: {
       type: "website",
-      url: `${SITE_URL}/${locale}${path === "/" ? "" : path}`,
       locale: isEn ? "en_US" : "id_ID",
       alternateLocale: [isEn ? "id_ID" : "en_US"],
       siteName: SITE_NAME,
@@ -38,15 +44,17 @@ export default async function LocaleLayout({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  if (!locales.includes(locale as any)) {
+  if (!locales.includes(locale as (typeof locales)[number])) {
     notFound();
   }
 
+  // next-intl butuh ini agar getMessages() tidak jatuh ke dynamic rendering.
+  setRequestLocale(locale);
   const messages = await getMessages();
 
-  // Root layout (src/app/layout.tsx) sudah merender <html>/<body> + <Providers> untuk
-  // seluruh route; me-render RootLayout lagi di sini membuat <html> bersarang di dalam
-  // <body> (hydration error) sekaligus menggandakan tiap provider. Layout locale cukup
-  // menambahkan provider pesan next-intl.
-  return <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>;
+  return (
+    <RootDocument lang={locale}>
+      <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
+    </RootDocument>
+  );
 }

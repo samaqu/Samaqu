@@ -1,1 +1,1 @@
-export { default } from "../../../admin/instagram/page";
+export { default } from "@/app/(internal)/admin/instagram/page";

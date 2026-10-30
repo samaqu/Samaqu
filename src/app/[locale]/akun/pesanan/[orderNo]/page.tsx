@@ -12,8 +12,8 @@ import { useSafeLocale } from "@/lib/safe-i18n";
 import { orderSourceLabel } from "@/lib/transaksi";
 import OrderDetailPanel from "@/components/ops/transaksi/OrderDetailPanel";
 import UlasanPesananSection from "@/components/akun/UlasanPesananSection";
-import "@/app/panel-admin/panel-transaksi.css";
-import "@/app/panel-admin/panel-mono.css";
+import "@/app/(internal)/panel-admin/panel-transaksi.css";
+import "@/app/(internal)/panel-admin/panel-mono.css";
 
 /**
  * Detail pesanan customer — layout sama dengan detail di dashboard admin:

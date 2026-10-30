@@ -1,1 +1,1 @@
-export { default } from "../../../admin/biolink/page";
+export { default } from "@/app/(internal)/admin/biolink/page";

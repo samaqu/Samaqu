@@ -1,1 +1,1 @@
-export { default } from "../../../admin/bio-carousel/page";
+export { default } from "@/app/(internal)/admin/bio-carousel/page";
