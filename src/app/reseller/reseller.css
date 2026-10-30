@@ -414,3 +414,5 @@
   .rs-root .paste-box .btn.sm { min-height: 44px; }
   .rs-root .selected-block { border-top-style: solid; }
 }
+
+.rs-root .min-hint { font-size: 10.5px; color: var(--rs-mut); margin-top: 3px; }

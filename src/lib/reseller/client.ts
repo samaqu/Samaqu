@@ -123,6 +123,8 @@ export interface KatalogProduct {
   discount_percent: number;
   buy_price: number;
   min_sell_price: number;
+  min_sell_source: "catalog" | "configured" | "buy";
+  min_sell_reason: string;
   variants: KatalogVariant[];
 }
 

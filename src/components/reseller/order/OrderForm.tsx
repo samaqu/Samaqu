@@ -172,7 +172,7 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
     : lines.some((line) => !line.size)
       ? "Pilih ukuran dulu."
       : !priceValid
-        ? "Periksa harga jual — ada yang di bawah batas."
+        ? "Harga jual di bawah batas minimal."
         : !address.name.trim()
           ? "Lengkapi nama penerima."
           : address.whatsapp.replace(/\D/g, "").length < 9
@@ -192,7 +192,7 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
         : lines.some((line) => !line.size)
           ? "Pilih ukuran dulu."
           : !priceValid
-            ? "Periksa harga jual — ada yang di bawah batas."
+            ? "Harga jual di bawah batas minimal."
             : ""
       : step === 1
         ? !address.name.trim()

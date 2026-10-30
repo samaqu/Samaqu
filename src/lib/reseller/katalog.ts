@@ -14,7 +14,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { catalogGroupKey } from "@/lib/catalog-group";
 import { isWebsiteCatalog } from "./visibility";
-import { effectiveDiscountPercent, resellerBuyPrice, resellerMinSellPrice } from "./pricing";
+import { effectiveDiscountPercent, resellerBuyPrice, resellerMinSellInfo } from "./pricing";
 import { getResellerSettings } from "./settings";
 
 export interface ResellerVariant {
@@ -35,8 +35,10 @@ export interface ResellerCatalogProduct {
   /** Diskon efektif (khusus series atau default) untuk tampilan. */
   discount_percent: number;
   buy_price: number;
-  /** Batas bawah harga jual = max(minimum jual tersimpan, harga beli). */
+  /** Batas bawah harga jual + sumber teksnya (satu helper pricing.ts). */
   min_sell_price: number;
+  min_sell_source: "catalog" | "configured" | "buy";
+  min_sell_reason: string;
   variants: ResellerVariant[];
 }
 
@@ -154,6 +156,7 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
 
   return products.map((product) => {
     const own = variants.filter((v) => v.product_id === product.id);
+    const minSell = resellerMinSellInfo(product, defaultDiscount);
     return {
       id: product.id,
       name: product.name,
@@ -166,7 +169,9 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
       price: Math.round(Number(product.price) || 0),
       discount_percent: effectiveDiscountPercent(product, defaultDiscount),
       buy_price: resellerBuyPrice(product, defaultDiscount),
-      min_sell_price: resellerMinSellPrice(product, defaultDiscount),
+      min_sell_price: minSell.value,
+      min_sell_source: minSell.source,
+      min_sell_reason: minSell.reason,
       // Varian series turunan boleh dibeli, stoknya mengikuti basis —
       // baris varian dikelompokkan per (color, size) tanpa duplikat.
       variants: own

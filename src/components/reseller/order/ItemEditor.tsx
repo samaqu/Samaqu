@@ -117,7 +117,10 @@ export default function ItemEditor({
             invalid={!sellValid}
             onChange={(value) => onChange({ sellPrice: value })}
           />
-          {!sellValid ? <span className="err">Minimal {rupiah(minSell)}</span> : null}
+          <div className="min-hint">
+            Minimal {rupiah(minSell)} · {line.product.min_sell_reason}
+          </div>
+          {!sellValid ? <span className="err">Harga jual di bawah batas minimal.</span> : null}
         </div>
         <div className={`profit-chip ${profit > 0 ? "" : "flat"}`}>
           <span>Untung / pcs</span>

@@ -75,7 +75,7 @@ export function createOrderLine(product: KatalogProduct): OrderLine | null {
     color: variant.color,
     size: variant.size,
     quantity: 1,
-    sellPrice: product.min_sell_price,
+    sellPrice: product.price,
     stock: variant.stock,
   };
 }

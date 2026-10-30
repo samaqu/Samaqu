@@ -13,7 +13,7 @@ import { sumWeightGramsBySize, productWeightMapFromRows, variantWeightMapFromRow
 import { orderItemPhoto } from "@/lib/order-photo";
 import { loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { notifyAdminNewOrder } from "@/lib/fonnte";
-import { resellerBuyPrice, resellerMinSellPrice } from "./pricing";
+import { resellerBuyPrice, resellerMinSellInfo } from "./pricing";
 import { getResellerSettings } from "./settings";
 import { notifyResellerOrderCreated } from "./notify";
 import type { ResellerRow } from "./types";
@@ -161,12 +161,12 @@ export async function createResellerOrder(
     }
 
     const buyPrice = resellerBuyPrice(product, defaultDiscount);
-    const minSell = resellerMinSellPrice(product, defaultDiscount);
+    const minSell = resellerMinSellInfo(product, defaultDiscount);
     const sellPrice = Math.round(Number(raw?.sellPrice));
-    if (!Number.isFinite(sellPrice) || sellPrice < minSell) {
+    if (!Number.isFinite(sellPrice) || sellPrice < minSell.value) {
       return {
         ok: false,
-        error: `Harga jual minimal Rp ${minSell.toLocaleString("id-ID")} (harga beli kamu)`,
+        error: minSell.message,
         status: 400,
       };
     }

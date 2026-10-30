@@ -90,12 +90,16 @@ function MinSellField({
         onBlur={commit}
         compact
         disabled={saving}
-        placeholder="Belum diatur"
+        placeholder={
+          row.reseller_min_sell_price == null
+            ? `${row.price.toLocaleString("id-ID")} (harga katalog)`
+            : "Belum diatur"
+        }
         ariaLabel={`Harga minimum jual reseller ${row.series || row.name}`}
       />
       {belowBuy ? (
         <p className={`text-[10.5px] font-bold text-amber-600 ${compactLabel ? "" : "mt-0.5"}`}>
-          Di bawah harga beli
+          Di bawah harga beli (batas tetap harga beli)
         </p>
       ) : null}
     </div>
@@ -160,7 +164,7 @@ export default function SeriesRow({
         {rupiah(row.buy_price)}
       </td>
       <td className="px-2 py-1.5 align-middle">
-        <div className="w-[128px]">
+        <div className="w-[184px]">
           <MinSellField row={row} saving={saving} onCommit={onMinSellCommit} />
         </div>
       </td>

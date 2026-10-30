@@ -28,6 +28,10 @@ export default function PriceTable({
 }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <p className="px-4 py-2.5 text-[11.5px] text-slate-500 border-b border-slate-100 bg-slate-50/60">
+        Harga minimum jual: batas terendah harga jual reseller. Kosong = sama dengan harga katalog.
+        Tidak bisa di bawah harga beli reseller.
+      </p>
       <div className="hidden md:block">
         <table className="w-full text-left table-fixed">
           <colgroup>
@@ -36,7 +40,7 @@ export default function PriceTable({
             <col style={{ width: 100 }} />
             <col style={{ width: 112 }} />
             <col style={{ width: 150 }} />
-            <col style={{ width: 150 }} />
+            <col style={{ width: 200 }} />
             <col style={{ width: 62 }} />
           </colgroup>
           <thead>
@@ -46,7 +50,12 @@ export default function PriceTable({
               <th className="px-2 py-2.5 sticky top-0 z-10 bg-slate-50 text-right whitespace-nowrap">Harga katalog</th>
               <th className="px-2 py-2.5 sticky top-0 z-10 bg-slate-50 whitespace-nowrap">Diskon</th>
               <th className="px-2 py-2.5 sticky top-0 z-10 bg-slate-50 text-right whitespace-nowrap">Harga beli reseller</th>
-              <th className="px-2 py-2.5 sticky top-0 z-10 bg-slate-50 whitespace-nowrap">Harga minimum jual</th>
+              <th
+                className="px-2 py-2.5 sticky top-0 z-10 bg-slate-50 whitespace-nowrap"
+                title="Batas terendah harga jual reseller. Kosong = harga katalog; tidak bisa di bawah harga beli."
+              >
+                Harga minimum jual
+              </th>
               <th className="px-2 py-2.5 sticky top-0 z-10 bg-slate-50 text-center whitespace-nowrap">Dijual</th>
             </tr>
           </thead>
@@ -98,7 +107,7 @@ export default function PriceTable({
 
       <p className="px-4 py-3 text-[11.5px] text-slate-500 border-t border-slate-100 bg-slate-50/60">
         Hanya produk Katalog website yang bisa dijual reseller. Harga minimum jual membatasi harga
-        jual portal (tidak boleh di bawah nilai ini); isi kosong = batas harga beli.
+        jual portal; kosong = harga katalog, dan angka di bawah harga beli tetap dibatasi harga beli.
       </p>
     </div>
   );
