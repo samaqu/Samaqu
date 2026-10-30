@@ -16,7 +16,8 @@ export default function BarisProduk({
   onRemove: () => void;
 }) {
   const buy = line.product.buy_price;
-  const minSell = line.product.min_sell_price;
+  // Batas harga jual reseller = harga beli (tidak boleh di bawah modal).
+  const minSell = line.product.buy_price;
   const sellValid = Number.isFinite(line.sellPrice) && line.sellPrice >= minSell;
   const profit = Math.round(line.sellPrice || 0) - buy;
 
@@ -68,7 +69,7 @@ export default function BarisProduk({
         </button>
       </div>
 
-      <div className="price-grid">
+      <div className="price-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
         <div className="price-cell">
           <small>Harga katalog</small>
           <b className="price-strike">{rupiah(line.product.price)}</b>
@@ -76,10 +77,6 @@ export default function BarisProduk({
         <div className="price-cell">
           <small>Harga beli kamu (−{line.product.discount_percent}%)</small>
           <b>{rupiah(buy)}</b>
-        </div>
-        <div className="price-cell">
-          <small>Minimum jual</small>
-          <b>{rupiah(minSell)}</b>
         </div>
       </div>
 
@@ -92,7 +89,7 @@ export default function BarisProduk({
             invalid={!sellValid}
             onChange={(value) => onChange({ sellPrice: value })}
           />
-          {!sellValid ? <span className="err">Harga jual minimal {rupiah(minSell)}</span> : null}
+          {!sellValid ? <span className="err">Harga jual minimal {rupiah(minSell)} (harga beli kamu)</span> : null}
         </div>
         <div className="price-cell" style={{ alignSelf: "end" }}>
           <small>Untung / pcs</small>

@@ -481,3 +481,30 @@ terdeteksi → penarikan ke BSI lama tetap kena biaya Rp2.500.
   ke RPC (biaya dari pengaturan); browser tidak pernah mengirim is_bsi/nominal biaya.
 - Tarik Saldo menampilkan rincian eksplisit: "Gratis (sesama BSI)" atau "Rp{biaya} (bank selain BSI)";
   nama bank di riwayat/antrean/drawer tampil sebagai label (kode → label).
+
+### 8.14 Penyederhanaan tab "Produk & Harga" + batas jual = harga beli (30 Oktober 2026)
+
+**Aturan baru:** batas harga jual reseller = **harga beli reseller** (modal), tidak ada lagi kolom
+"Min jual reseller". `src/lib/reseller/pricing.ts` → `resellerMinSellPrice()` kini mengembalikan
+`resellerBuyPrice()`. Kolom DB `products.reseller_min_sell_price` **tetap ada tapi tidak dipakai**
+(tanpa migration); `products.minimum_price` milik CYP juga tetap tidak dipakai reseller.
+
+- **API/katalog:** `min_sell_price` dihapus dari `GET /api/reseller/katalog`, `listAdminCatalog()`,
+  `CatalogRow`/`CatalogUpdate` admin, dan `KatalogProduct` klien. `PATCH /api/ops/reseller/catalog`
+  hanya menerima `reseller_enabled` + `reseller_discount_percent`.
+- **Pesanan:** validasi harga jual di `src/lib/reseller/orders.ts` memakai
+  `minSell = resellerMinSellPrice(...)` = harga beli, pesan
+  "Harga jual minimal Rp {harga beli} (harga beli kamu)". `OrderForm` & `BarisProduk` portal
+  memakai `product.buy_price` yang sama; `PilihProduk` mengisi `sellPrice = buy_price`.
+- **Tabel admin 6 kolom:** [checkbox · Series · Harga katalog · Diskon · Harga beli · Dijual].
+  Foto produk dihapus (komponen `ProductThumb.tsx` dihapus, `admin-catalog.ts` tidak lagi mengambil
+  thumbnail) dan kolom status simpan dihapus — toggle "Dijual" satu-satunya yang menyimpan
+  otomatis (`savingId`, `RowSaveState`/timer ikon dihapus dari `PriceTab`). Diskon tetap lewat aksi
+  massal; label Baru, filter "Tampil di", dan kartu diskon default tidak berubah.
+- **Series kosong:** produk satu-series tanpa nama series menampilkan "Standar" (nama produk sudah
+  tampil di baris grup); grup multi-series tanpa nama tetap "—". Baris ±47–53px, sel vertical-align
+  middle, header sticky; tabel `min-w-[560px]` di dalam wrapper `max-lg:overflow-x-auto` supaya di
+  375px kolom Series tidak runtuh/teks tidak menumpuk; di 1280 tidak ada scroll horizontal.
+- **Verifikasi:** `npx tsc --noEmit` EXIT=0; render mock Playwright 1280 & 375 (tanpa akun uji,
+  halaman temp dihapus sebelum commit) — 0 console error, tanpa foto/min jual/kolom status, tanpa
+  scroll horizontal di 1280. Catatan §8.11 bagian "input min jual" dan "kolom status" tidak berlaku.

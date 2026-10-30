@@ -8,10 +8,11 @@ import { listAdminCatalog } from "@/lib/reseller/admin-catalog";
  * (tiap series = satu baris `products`).
  *
  *   GET  → semua produk/series + harga katalog, diskon khusus, kolom reseller,
- *          harga beli & batas jual hasil hitungan server, dan diskon default.
- *   PATCH { updates: [{ id, reseller_enabled?, reseller_discount_percent?,
- *          reseller_min_sell_price? }] } → simpan per baris maupun massal.
+ *          dan harga beli hasil hitungan server, plus diskon default.
+ *   PATCH { updates: [{ id, reseller_enabled?,
+ *          reseller_discount_percent? }] } → simpan per baris maupun massal.
  *
+ * Batas harga jual portal = harga beli reseller (tanpa kolom minimum jual).
  * Hanya menyentuh kolom reseller — harga katalog/stok/minimum_price CYP tidak
  * pernah ditulis di sini.
  */
@@ -61,19 +62,6 @@ export async function PATCH(req: NextRequest) {
           return NextResponse.json({ error: "Diskon harus 0–100" }, { status: 400 });
         }
         patch.reseller_discount_percent = Math.round(num * 100) / 100;
-      }
-    }
-
-    if (item.reseller_min_sell_price !== undefined) {
-      const value = item.reseller_min_sell_price;
-      if (value === null || value === "") {
-        patch.reseller_min_sell_price = null;
-      } else {
-        const num = Math.round(Number(value));
-        if (!Number.isFinite(num) || num < 0) {
-          return NextResponse.json({ error: "Harga minimum jual tidak valid" }, { status: 400 });
-        }
-        patch.reseller_min_sell_price = num;
       }
     }
 

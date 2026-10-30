@@ -67,7 +67,7 @@ export default function PilihProduk({
       color,
       size,
       quantity: Math.min(qty, stock),
-      sellPrice: active.min_sell_price,
+      sellPrice: active.buy_price,
       stock,
     });
     setOpenId("");
@@ -112,7 +112,7 @@ export default function PilihProduk({
                     <b className="bold">{rupiah(product.buy_price)}</b> (−{product.discount_percent}%)
                   </span>
                   <span className="small muted" style={{ display: "block" }}>
-                    Stok {totalStock} · min jual {rupiah(product.min_sell_price)}
+                    Stok {totalStock}
                   </span>
                 </span>
                 <span className="btn ghost sm">{isOpen ? "Tutup" : "Pilih"}</span>

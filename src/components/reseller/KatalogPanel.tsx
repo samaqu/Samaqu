@@ -76,7 +76,6 @@ export default function KatalogPanel() {
                   <div className="small">
                     Beli kamu <b className="bold">{rupiah(product.buy_price)}</b> (−{product.discount_percent}%)
                   </div>
-                  <div className="small muted">Min jual {rupiah(product.min_sell_price)}</div>
                   <div className="small muted">Stok {stock}</div>
                   <Link
                     className="btn sm blk"

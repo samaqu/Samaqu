@@ -1,14 +1,12 @@
 "use client";
 
 import type { CatalogRow } from "./api";
-import ProductThumb from "./ProductThumb";
-import SeriesRow, { type RowSaveState } from "./SeriesRow";
+import SeriesRow from "./SeriesRow";
 
 export interface CatalogGroup {
   key: string;
   name: string;
   category: string;
-  thumbnail: string | null;
   kain: string | null;
   rows: CatalogRow[];
 }
@@ -18,29 +16,28 @@ export default function ProductGroupRow({
   group,
   defaultDiscount,
   selected,
-  rowStatus,
+  savingId,
   onSelectGroup,
   onSelectRow,
   onToggle,
-  onMinSellCommit,
   isNewRow,
 }: {
   group: CatalogGroup;
   defaultDiscount: number;
   selected: Set<string>;
-  rowStatus: Record<string, RowSaveState>;
+  savingId: string | null;
   onSelectGroup: (checked: boolean) => void;
   onSelectRow: (id: string, checked: boolean) => void;
   onToggle: (row: CatalogRow) => void;
-  onMinSellCommit: (row: CatalogRow, value: number | null) => void;
   isNewRow: (row: CatalogRow) => boolean;
 }) {
   const allSelected = group.rows.every((row) => selected.has(row.id));
+  const singleSeries = group.rows.length === 1;
 
   return (
     <>
       <tr className="bg-slate-50 border-y border-slate-200">
-        <td className="px-3 py-2 align-middle" colSpan={8}>
+        <td className="px-3 py-2 align-middle" colSpan={6}>
           <div className="flex items-center gap-2.5">
             <input
               type="checkbox"
@@ -49,7 +46,6 @@ export default function ProductGroupRow({
               aria-label={`Pilih semua series ${group.name}`}
               style={{ accentColor: "#2563eb", width: 15, height: 15 }}
             />
-            <ProductThumb src={group.thumbnail} className="w-9 h-[42px] rounded-lg flex-none" />
             <div className="min-w-0">
               <p className="font-extrabold text-slate-900 text-[13px] leading-tight">
                 {group.name}
@@ -77,12 +73,12 @@ export default function ProductGroupRow({
           key={row.id}
           row={row}
           defaultDiscount={defaultDiscount}
+          seriesLabel={row.series || (singleSeries ? "Standar" : "—")}
           selected={selected.has(row.id)}
           isNew={isNewRow(row)}
-          status={rowStatus[row.id] || "idle"}
+          saving={savingId === row.id}
           onSelect={(checked) => onSelectRow(row.id, checked)}
           onToggle={() => onToggle(row)}
-          onMinSellCommit={(value) => onMinSellCommit(row, value)}
         />
       ))}
     </>

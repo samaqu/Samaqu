@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import {
   AdminApiError,
@@ -9,7 +9,6 @@ import {
   type CatalogUpdate,
 } from "./api";
 import type { CatalogGroup } from "./ProductGroupRow";
-import type { RowSaveState } from "./SeriesRow";
 import DefaultDiscountCard from "./DefaultDiscountCard";
 import BulkBar from "./BulkBar";
 import PriceTable from "./PriceTable";
@@ -29,10 +28,9 @@ export default function PriceTab() {
   const [status, setStatus] = useState<"all" | "on" | "off">("all");
   const [visibility, setVisibility] = useState<VisibilityFilter>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [rowStatus, setRowStatus] = useState<Record<string, RowSaveState>>({});
   const [bulkBusy, setBulkBusy] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: "ok" | "err" } | null>(null);
-  const statusTimers = useRef<Record<string, number>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const load = useCallback(async (preserveSelection = false) => {
     try {
@@ -56,13 +54,6 @@ export default function PriceTab() {
   useEffect(() => {
     load();
   }, [load]);
-
-  useEffect(() => {
-    const timers = statusTimers.current;
-    return () => {
-      Object.values(timers).forEach((timer) => window.clearTimeout(timer));
-    };
-  }, []);
 
   const categories = useMemo(
     () => [...new Set(rows.map((row) => row.category).filter(Boolean))].sort(),
@@ -91,11 +82,9 @@ export default function PriceTab() {
         key,
         name: row.name,
         category: row.category,
-        thumbnail: null,
         kain: row.kain,
         rows: [],
       };
-      if (!group.thumbnail && row.thumbnail) group.thumbnail = row.thumbnail;
       group.rows.push(row);
       map.set(key, group);
     }
@@ -106,16 +95,6 @@ export default function PriceTab() {
     if (row.reseller_enabled || !row.created_at) return false;
     const age = Date.now() - new Date(row.created_at).getTime();
     return age >= 0 && age <= NEW_SERIES_DAYS * 86_400_000;
-  };
-
-  const setRowState = (id: string, state: RowSaveState, fade = false) => {
-    setRowStatus((prev) => ({ ...prev, [id]: state }));
-    if (statusTimers.current[id]) window.clearTimeout(statusTimers.current[id]);
-    if (fade) {
-      statusTimers.current[id] = window.setTimeout(() => {
-        setRowStatus((prev) => ({ ...prev, [id]: "idle" }));
-      }, 2000);
-    }
   };
 
   const toggleSelectRow = (id: string, checked: boolean) => {
@@ -138,17 +117,20 @@ export default function PriceTab() {
     });
   };
 
-  /** Simpan satu baris (toggle / harga minimum). Reload menjaga harga beli tetap akurat. */
-  const saveRow = async (updates: CatalogUpdate[], successMessage: string, rowId: string) => {
-    setRowState(rowId, "saving");
+  /** Simpan toggle satu baris. Reload menjaga harga beli tetap akurat. */
+  const saveToggle = async (row: CatalogRow) => {
+    setSavingId(row.id);
     try {
-      await opsResellerApi.saveCatalog(updates);
+      await opsResellerApi.saveCatalog([{ id: row.id, reseller_enabled: !row.reseller_enabled }]);
       await load(true);
-      setRowState(rowId, "saved", true);
-      setToast({ message: successMessage, tone: "ok" });
+      setToast({
+        message: `${row.series || row.name} ${!row.reseller_enabled ? "dinyalakan" : "dimatikan"} untuk reseller.`,
+        tone: "ok",
+      });
     } catch (e) {
-      setRowState(rowId, "error");
       setToast({ message: e instanceof AdminApiError ? e.message : "Gagal menyimpan.", tone: "err" });
+    } finally {
+      setSavingId(null);
     }
   };
 
@@ -246,23 +228,10 @@ export default function PriceTab() {
           groups={groups}
           defaultDiscount={defaultDiscount}
           selected={selected}
-          rowStatus={rowStatus}
+          savingId={savingId}
           onSelectGroup={selectGroup}
           onSelectRow={toggleSelectRow}
-          onToggle={(row) =>
-            saveRow(
-              [{ id: row.id, reseller_enabled: !row.reseller_enabled }],
-              `${row.series || row.name} ${!row.reseller_enabled ? "dinyalakan" : "dimatikan"} untuk reseller.`,
-              row.id
-            )
-          }
-          onMinSellCommit={(row, value) =>
-            saveRow(
-              [{ id: row.id, reseller_min_sell_price: value }],
-              `Harga minimum jual ${row.series || row.name} disimpan.`,
-              row.id
-            )
-          }
+          onToggle={saveToggle}
           isNewRow={isNewRow}
         />
       )}

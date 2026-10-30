@@ -82,7 +82,7 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
   );
 
   const priceValid = lines.every(
-    (line) => Number.isFinite(line.sellPrice) && line.sellPrice >= line.product.min_sell_price
+    (line) => Number.isFinite(line.sellPrice) && line.sellPrice >= line.product.buy_price
   );
   const addressValid =
     address.name.trim() &&
