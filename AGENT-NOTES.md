@@ -586,13 +586,16 @@ dua baris produk berbeda (SKU `THB-A02-BLK-*` vs keluarga B-01). Nama TIDAK diub
 2. Kalau kosong: foto **grup** memakai aturan kartu katalog website (`groupCatalogProducts`):
    grup = `category::name` (helper baru `catalogGroupKey` di `src/lib/catalog-group.ts`), foto
    diambil dari anggota grup pertama yang punya gambar (urutan `created_at`).
-3. Kalau grup juga kosong: foto dari **katalog publik** — produk `is_published = true` dengan
-   kategori + series yang sama dan **warna terdekat** dari nama (contoh `Thobe Black` → foto
-   `Thobe Superblack` series yang sama). Hanya tampilan; produk, nama, harga, dan stok yang dijual
-   tetap baris reseller.
-4. Kalau tidak ada kecocokan: placeholder `ProductPhoto`.
-Karena grup Thobe Black (A-02) tidak punya foto, keenam series memakai foto Superblack dari
-katalog publik (bukan placeholder lagi). Harga/nama reseller tetap Thobe Black 324/339rb.
+3. Kalau grup juga kosong: placeholder `ProductPhoto`.
+Percobaan meminjam foto produk publik lain (mis. Black → Superblack, commit `5fe3afb5`)
+**DIBATALKAN** di `a990c5e` karena foto produk berbeda berisiko komplain.
+
+**Sumber produk reseller disamakan dengan menu Katalog publik (30 Okt 2026, di luar git):**
+flag `reseller_enabled` di DB dipindahkan dari baris duplikat **Thobe Black** (A-02, unpublished,
+0 foto, 0 pesanan) ke baris **Thobe Superblack** (B-01, published, foto lengkap, 57 pesanan):
+6 series Superblack `true`, 6 series Black `false`; Thobe Broken White Bayati tetap `true`.
+Hasilnya katalog reseller = produk yang benar-benar tampil di website, nama + foto asli, harga
+Superblack 359/374rb (diskon default 25% → beli 269.250/280.500).
 
 **Placeholder baru (`ProductPhoto`):** latar netral lembut `#f0f0ec`, wordmark "SAMAQU" halus,
 inisial + nama series (mis. "JI / JIHARKAH"); `aria-hidden` sehingga TIDAK ada teks alt. Di
@@ -603,12 +606,13 @@ pemilih produk yang kecil hanya inisial. `NEUTRAL_ITEM_PHOTO` tidak lagi dipakai
 bisa scroll tanpa panah. Terukur 768/900/1080: `scrollHeight = clientHeight` (tidak ada overflow);
 500px: overflow ada tetapi scrollbar none. Mobile (≤767) tidak berubah karena `.sb` disembunyikan.
 
-**Status foto reseller (30 Okt 2026):** 7/7 produk enabled sekarang punya foto — Thobe Broken
-White Bayati memakai foto sendiri; 6 Thobe Black memakai foto publik Superblack per series
-(`.../thobe-superblack-<series>/02_semua_foto.png`, semua URL 200 image/png). Produk lain tanpa
-foto di DB (Thobe Sand Beige, Warm Taupe, Graphite Grey, Ash Grey, Coffe Bean) tidak aktif reseller.
+**Status foto reseller (30 Okt 2026):** 7/7 produk enabled punya foto sendiri — 6 series Thobe
+Superblack + Thobe Broken White Bayati (semua dari `product_images` baris masing-masing, video
+dilewati). Baris Thobe Black (A-02) tidak lagi dijual reseller. Produk tanpa foto lain di DB
+(Thobe Sand Beige, Warm Taupe, Graphite Grey, Ash Grey, Coffe Bean) tidak aktif reseller.
 
 **Verifikasi:** `tsc` EXIT=0; cek read-only `getResellerCatalog()` via route temp (dihapus):
-7/7 `image` terisi dan URL PNG valid; render mock 1280 & 375 (foto asli, placeholder wordmark,
-stok habis nonaktif); shell asli + mock `/me` diukur pada 768/900/1080/500. Tidak ada perubahan pada
-query Open Order, resolveStock, katalog website, atau sisi customer.
+7 produk, 7/7 `image` terisi (nama/harga Superblack), URL PNG valid; render mock 1280 & 375
+(foto asli, placeholder wordmark, stok habis nonaktif); shell asli + mock `/me` diukur pada
+768/900/1080/500. Tidak ada perubahan pada query Open Order, resolveStock, katalog website, atau
+sisi customer.
