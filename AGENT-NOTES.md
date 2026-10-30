@@ -655,3 +655,42 @@ placeholder tetap `ProductPhoto` hanya bila benar-benar tidak ada foto.
 **Verifikasi:** `tsc` EXIT=0; cek read-only via route temp (dihapus): admin 67 baris katalog
 website (0 Open Order/tersembunyi), portal 7 baris, 7/7 berfoto, `min_sell_price` terisi; render
 mock 1280 & 375 (header tidak terpotong, kartu mobile rapi, warning min jual muncul).
+
+### 8.19 Redesain UX "Buat Pesanan" portal reseller (30 Oktober 2026)
+
+**Tujuan:** alur produk → penerima → kirim lebih jelas, desktop 2 kolom + ringkasan sticky,
+mobile 3 langkah (Produk/Penerima/Kirim) dengan bar bawah sticky. Logic harga/untung/min jual,
+stok, parsing alamat, ongkir J&T, pembuatan pesanan, saldo, dan pembayaran kekurangan TIDAK diubah.
+
+**Komponen baru/pecahan** (semua di `src/components/reseller/order/`):
+- `ProdukPicker` — grup per produk induk (kategori+nama) + foto `ProductPhoto`; series jadi chip
+  (nama, harga beli, stok). Chip aktif hitam; stok 0 = abu putus-putus "Stok habis", disabled.
+- `ItemEditor` — blok item langsung di bawah daftar: nama + harga katalog coret, UKURAN 5 kotak
+  besar (stok 0 dicoret/disabled), qty +/−, harga jual (RupiahInput), chip untung nominal+persen,
+  tombol hapus. Mendukung banyak item.
+- `PenerimaForm` — tempel alamat + Isi otomatis/Reset (endpoint `resellerApi.alamatTebak` yang
+  sama). Setelah auto: ringkasan 3 baris (Nama, WhatsApp, Alamat) dengan "Ubah"; isian manual hanya
+  muncul untuk data kosong/tidak terbaca atau saat Ubah. Tanpa auto: form manual lengkap.
+- `OngkirCards` — kartu EZ & ECO (label/estimasi dari `src/lib/jnt/layanan.ts`, tarif dari
+  `/api/reseller/ongkir`), EZ auto-pilih kalau tersedia; layanan tidak tersedia = kartu disabled
+  "Tidak tersedia untuk kecamatan ini"; sebelum kecamatan: "Isi alamat dulu untuk melihat ongkir".
+- `RingkasanPesanan` — indikator 3 segmen + "x dari 3 lengkap", rincian item/ukuran×qty, ongkir
+  EZ/ECO, total, saldo, estimasi untung, warning saldo singkat, CTA "Buat pesanan" atau
+  "Bayar Rp{kurang} & buat pesanan", alasan disabled + catatan 24 jam.
+- `OrderBottomBar` — bar mobile: total + "Lanjut" (langkah 1–2) atau CTA (langkah 3), alasan
+  disabled di atas tombol.
+- `OrderStepper` — indikator 1-2-3 mobile.
+
+**OrderForm:** state lines kini memakai `uid` stabil (perubahan ukuran/warna memperbarui key,
+duplikat varian digabung), `createOrderLine` memilih warna + ukuran pertama yang ada stok, dan
+`preselectProductId` otomatis menambah item. Desktop memakai `.form-grid` (kiri 3 kartu, kanan
+ringkasan sticky). Mobile memakai `.order-step` (satu kartu per langkah) + bar bawah; kartu ringkas
+item terpilih + "Ubah" muncul di langkah Penerima/Kirim. Tampilan shell portal tidak diubah.
+
+**Dihapus:** `BarisProduk.tsx`, `FormAlamat.tsx`, `PilihOngkir.tsx`, `PilihProduk.tsx`
+(digantikan komponen di atas). CSS lama tidak dipakai lagi.
+
+**Verifikasi:** `tsc` EXIT=0; mock browser desktop 1280 & mobile 390/360: alur tambah series →
+ukuran/qty/harga/untung → auto-isi alamat → ringkasan 3 baris → EZ/ECO auto EZ → ringkasan lengkap
+→ CTA; ukuran chip 58px, size box 52px, qty 44px, tombol bar 46px; `scrollWidth < innerWidth` di
+360/430 (tidak ada scroll horizontal). Tidak ada perubahan pada payload createOrder.
