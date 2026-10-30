@@ -13,13 +13,23 @@ const STATIC_PAGES: { path: string; priority: number; changeFrequency: Freq }[] 
   { path: "/katalog", priority: 0.9, changeFrequency: "weekly" },
   { path: "/testimoni", priority: 0.7, changeFrequency: "weekly" },
   { path: "/tentang-kami", priority: 0.6, changeFrequency: "monthly" },
-  { path: "/cek-resi", priority: 0.5, changeFrequency: "monthly" },
   { path: "/faq", priority: 0.6, changeFrequency: "monthly" },
   { path: "/panduan-ukuran", priority: 0.6, changeFrequency: "monthly" },
   { path: "/create-your-price", priority: 0.6, changeFrequency: "weekly" },
-  { path: "/garansi-retur", priority: 0.5, changeFrequency: "monthly" },
   { path: "/cara-pesan", priority: 0.5, changeFrequency: "monthly" },
+  { path: "/garansi-retur", priority: 0.5, changeFrequency: "monthly" },
   { path: "/sama-quran", priority: 0.5, changeFrequency: "monthly" },
+  { path: "/cek-resi", priority: 0.4, changeFrequency: "monthly" },
+];
+
+/**
+ * Halaman dengan SATU URL saja (tanpa prefix locale).
+ * `/bio` hidup di luar next-intl dan `/id/bio` di-redirect 308 ke sini, jadi
+ * cukup satu entri. Dulu halaman ini tidak terdaftar, sehingga mesin pencari
+ * (dan crawler AI) tidak tahu halamannya ada.
+ */
+const SINGLE_URL_PAGES: { path: string; priority: number; changeFrequency: Freq }[] = [
+  { path: "/bio", priority: 0.5, changeFrequency: "monthly" },
 ];
 
 /** Satu path → entri per locale, masing-masing membawa hreflang lengkap. */
@@ -52,6 +62,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     localizedEntries(page.path, now, page.changeFrequency, page.priority),
   );
 
+  // Halaman URL tunggal: tanpa alternates karena memang tidak punya versi locale.
+  const singleEntries: MetadataRoute.Sitemap = SINGLE_URL_PAGES.map((page) => ({
+    url: `${SITE_URL}${page.path}`,
+    lastModified: now,
+    changeFrequency: page.changeFrequency,
+    priority: page.priority,
+  }));
+
   const { data: products } = await supabase
     .from("products")
     .select("id, created_at")
@@ -67,5 +85,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ),
   );
 
-  return [...staticEntries, ...productEntries];
+  return [...staticEntries, ...singleEntries, ...productEntries];
 }
