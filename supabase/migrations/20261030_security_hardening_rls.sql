@@ -1,61 +1,92 @@
 -- =============================================================================
--- Audit keamanan 2026-10-30 — perbaikan RLS KRITIS
+-- Audit keamanan 2026-10-30 — perbaikan RLS KRITIS (v2, idempoten)
 -- =============================================================================
 --
--- JANGAN dijalankan otomatis oleh deploy. Jalankan manual di Supabase SQL Editor,
--- setelah review, karena mengubah kebijakan akses tabel yang sedang dipakai.
+-- Jalankan manual di Supabase SQL Editor. Aman diulang.
 --
--- Isi:
---   1. store_settings   — policy `FOR ALL USING (true)` untuk PUBLIC membuat anon bisa
---                         MENULIS nomor rekening BSI reseller & gambar QRIS.
---   2. page_sections    — policy serupa; anon bisa mengubah toggle section CMS.
---   3. order_tracking_events — RLS tidak pernah diaktifkan; anon bisa INSERT event
---                         pengiriman palsu dan membaca semua AWB.
---   4. postal_district_cache — RLS tidak diaktifkan.
+-- v2: setiap objek dicek dulu keberadaannya. Database produksi ternyata TIDAK
+-- punya `page_sections`, `order_tracking_events`, maupun `postal_district_cache`
+-- (beberapa file migrasi lama tidak pernah dijalankan). Versi sebelumnya gagal
+-- dengan 42P01 karena itu.
+--
+-- Yang dikerjakan:
+--   1. store_settings        — policy `FOR ALL USING (true)` untuk PUBLIC membuat
+--                              anon bisa MENULIS nomor rekening BSI & gambar QRIS.
+--   2. page_sections         — hanya kalau tabelnya ada.
+--   3. order_tracking_events — aktifkan RLS kalau tabelnya ada.
+--   4. postal_district_cache — aktifkan RLS kalau tabelnya ada.
 --   5. Revoke EXECUTE fungsi production_* & cleanup_destination_cache dari anon.
 --
--- Semua pemakaian aplikasi membaca/menulis tabel ini lewat /api/* dengan service
--- role, jadi mencabut akses anon TIDAK mengubah perilaku aplikasi.
+-- Semua pemakaian aplikasi lewat /api/* memakai service role, jadi mencabut akses
+-- anon tidak mengubah perilaku aplikasi.
 -- =============================================================================
 
-begin;
-
--- ── 1 & 2. store_settings / page_sections ────────────────────────────────────
-drop policy if exists "Service role all store_settings" on public.store_settings;
-drop policy if exists "Service role all page_sections" on public.page_sections;
-
+-- ── 1. store_settings ────────────────────────────────────────────────────────
 do $$
 begin
+  if to_regclass('public.store_settings') is null then
+    raise notice 'store_settings tidak ada, dilewati';
+    return;
+  end if;
+
+  -- Policy lama yang salah nama: FOR ALL USING(true) tanpa TO => berlaku untuk PUBLIC.
+  execute 'drop policy if exists "Service role all store_settings" on public.store_settings';
+
   if not exists (
     select 1 from pg_policies
     where schemaname = 'public' and tablename = 'store_settings' and policyname = 'Admin write'
   ) then
-    create policy "Admin write" on public.store_settings for all to authenticated
-      using (exists (select 1 from public.admins a where a.user_id = auth.uid()))
-      with check (exists (select 1 from public.admins a where a.user_id = auth.uid()));
+    execute $p$
+      create policy "Admin write" on public.store_settings for all to authenticated
+        using (exists (select 1 from public.admins a where a.user_id = auth.uid()))
+        with check (exists (select 1 from public.admins a where a.user_id = auth.uid()))
+    $p$;
   end if;
+
+  execute 'revoke insert, update, delete on public.store_settings from anon';
+end $$;
+
+-- ── 2. page_sections (hanya kalau ada) ───────────────────────────────────────
+do $$
+begin
+  if to_regclass('public.page_sections') is null then
+    raise notice 'page_sections tidak ada, dilewati';
+    return;
+  end if;
+
+  execute 'drop policy if exists "Service role all page_sections" on public.page_sections';
 
   if not exists (
     select 1 from pg_policies
     where schemaname = 'public' and tablename = 'page_sections' and policyname = 'Admin write'
   ) then
-    create policy "Admin write" on public.page_sections for all to authenticated
-      using (exists (select 1 from public.admins a where a.user_id = auth.uid()))
-      with check (exists (select 1 from public.admins a where a.user_id = auth.uid()));
+    execute $p$
+      create policy "Admin write" on public.page_sections for all to authenticated
+        using (exists (select 1 from public.admins a where a.user_id = auth.uid()))
+        with check (exists (select 1 from public.admins a where a.user_id = auth.uid()))
+    $p$;
   end if;
+
+  execute 'revoke insert, update, delete on public.page_sections from anon';
 end $$;
 
--- SELECT publik tetap: toko butuh membaca setting tampilan & section aktif.
-revoke insert, update, delete on public.store_settings from anon;
-revoke insert, update, delete on public.page_sections from anon;
+-- ── 3 & 4. Tabel cache/tracking: aktifkan RLS kalau ada ──────────────────────
+do $$
+begin
+  if to_regclass('public.order_tracking_events') is not null then
+    execute 'alter table public.order_tracking_events enable row level security';
+    execute 'revoke all on public.order_tracking_events from anon, authenticated';
+  else
+    raise notice 'order_tracking_events tidak ada, dilewati';
+  end if;
 
--- ── 3 & 4. Aktifkan RLS pada tabel cache/tracking yang belum punya ───────────
-alter table if exists public.order_tracking_events enable row level security;
-alter table if exists public.postal_district_cache enable row level security;
-
--- Tanpa policy = hanya service role yang bisa membaca/menulis.
-revoke all on public.order_tracking_events from anon, authenticated;
-revoke all on public.postal_district_cache from anon, authenticated;
+  if to_regclass('public.postal_district_cache') is not null then
+    execute 'alter table public.postal_district_cache enable row level security';
+    execute 'revoke all on public.postal_district_cache from anon, authenticated';
+  else
+    raise notice 'postal_district_cache tidak ada, dilewati';
+  end if;
+end $$;
 
 -- ── 5. Cabut EXECUTE RPC dari anon/authenticated ─────────────────────────────
 do $$
@@ -73,8 +104,6 @@ begin
   end loop;
 end $$;
 
-commit;
-
 -- =============================================================================
 -- VERIFIKASI setelah dijalankan
 -- =============================================================================
@@ -83,7 +112,6 @@ commit;
 -- where schemaname = 'public' and tablename in ('store_settings','page_sections')
 -- order by 1, 2;
 --
--- select relname, relrowsecurity
--- from pg_class
+-- select relname, relrowsecurity from pg_class
 -- where relname in ('order_tracking_events','postal_district_cache');
 -- =============================================================================
