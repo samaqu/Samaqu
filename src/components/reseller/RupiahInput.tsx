@@ -28,6 +28,7 @@ export default function RupiahInput({
   max,
   invalid,
   compact,
+  hero,
   className = "",
   ariaLabel,
   onBlur,
@@ -44,6 +45,8 @@ export default function RupiahInput({
   invalid?: boolean;
   /** Varian ringkas untuk tabel (tinggi ±34px, teks lebih kecil). */
   compact?: boolean;
+  /** Varian besar & rata tengah (nominal utama di halaman bayar). */
+  hero?: boolean;
   /** Dipanggil saat input kehilangan fokus (dipakai simpan otomatis di tabel). */
   onBlur?: () => void;
   className?: string;
@@ -74,17 +77,17 @@ export default function RupiahInput({
   return (
     <div
       className={`flex w-full items-center gap-2 border-2 bg-white focus-within:ring-2 focus-within:ring-slate-900/5 ${
-        compact ? "rounded-lg px-2" : "rounded-xl px-3"
+        hero ? "rounded-2xl px-4" : compact ? "rounded-lg px-2" : "rounded-xl px-3"
       } ${
         invalid ? "border-red-400 focus-within:border-red-500" : "border-slate-200 focus-within:border-slate-400"
       } ${disabled ? "opacity-60" : ""} ${className}`}
     >
-      <span className={`font-bold text-slate-500 select-none ${compact ? "text-[11.5px]" : "text-[13px]"}`}>Rp</span>
+      <span className={`font-bold text-slate-500 select-none ${compact ? "text-[11.5px]" : hero ? "text-lg" : "text-[13px]"}`}>Rp</span>
       <input
         ref={inputRef}
         id={id}
         className={`w-full min-w-0 bg-transparent font-semibold text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400 ${
-          compact ? "py-1.5 text-[12.5px]" : "py-2.5 text-sm"
+          hero ? "py-2 text-center text-3xl font-extrabold tracking-tight" : compact ? "py-1.5 text-[12.5px]" : "py-2.5 text-sm"
         }`}
         inputMode="numeric"
         autoComplete="off"

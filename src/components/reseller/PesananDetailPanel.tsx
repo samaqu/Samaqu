@@ -5,21 +5,13 @@ import Link from "next/link";
 import { ArrowLeft, Truck } from "lucide-react";
 import { resellerApi, type OrderDetail } from "@/lib/reseller/client";
 import { orderStatus, rupiah, tglJamID } from "@/lib/reseller/format";
-import { useReseller } from "./ResellerShell";
-import PaymentMethodTabs, { type PaymentMethodChoice } from "./PaymentMethodTabs";
-import UploadBukti from "./UploadBukti";
 import { Note, SkeletonRows, StatusBadge } from "./ui";
 
 /** Detail pesanan reseller: item + untung, alamat, status, resi & tracking. */
 export default function PesananDetailPanel({ orderNumber }: { orderNumber: string }) {
-  const { me } = useReseller();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [method, setMethod] = useState<PaymentMethodChoice>("bsi");
-  const [proofUrl, setProofUrl] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -34,22 +26,6 @@ export default function PesananDetailPanel({ orderNumber }: { orderNumber: strin
       alive = false;
     };
   }, [orderNumber]);
-
-  const sendProof = async (url: string | null) => {
-    setProofUrl(url);
-    if (!url || !order) return;
-    setSending(true);
-    try {
-      const activeMethod: PaymentMethodChoice =
-        method === "qris" && me.pengaturan.qris_image_url ? "qris" : "bsi";
-      await resellerApi.uploadProof(order.order_number, url, activeMethod);
-      setSent(true);
-    } catch {
-      setError("Bukti gagal dikirim. Coba lagi.");
-    } finally {
-      setSending(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -109,17 +85,12 @@ export default function PesananDetailPanel({ orderNumber }: { orderNumber: strin
               Pesanan diproses setelah admin mengecek transfer kamu. Kalau tidak dibayar dalam 24 jam,
               pesanan otomatis dibatalkan dan saldo dikembalikan.
               <div style={{ marginTop: 10 }}>
-                {sent ? (
-                  <span style={{ fontWeight: 700 }}>Bukti terkirim. Menunggu konfirmasi admin.</span>
-                ) : (
-                  <>
-                    <div style={{ marginBottom: 10 }}>
-                      <PaymentMethodTabs settings={me.pengaturan} method={method} onChange={setMethod} />
-                    </div>
-                    <UploadBukti value={proofUrl} onChange={sendProof} label="Upload bukti transfer" />
-                  </>
-                )}
-                {sending ? <p className="hint" style={{ marginTop: 6 }}>Mengirim bukti…</p> : null}
+                <Link
+                  className="btn sm"
+                  href={`/reseller/pesanan/${encodeURIComponent(order.order_number)}/bayar`}
+                >
+                  Bayar sekarang
+                </Link>
               </div>
             </Note>
           ) : null}

@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import type { ResellerSettingsView, ShippingOption } from "@/lib/reseller/client";
-import PaymentMethodTabs, { type PaymentMethodChoice } from "../PaymentMethodTabs";
+import type { ShippingOption } from "@/lib/reseller/client";
 import { rupiah } from "@/lib/reseller/format";
 import { Note } from "../ui";
 import { lineProfit, lineSubtotal, type OrderLine } from "./types";
@@ -13,7 +11,6 @@ export default function RingkasanPesanan({
   lines,
   shipping,
   saldoTersedia,
-  settings,
   disabled,
   disabledReason,
   submitting,
@@ -23,15 +20,12 @@ export default function RingkasanPesanan({
   lines: OrderLine[];
   shipping: ShippingOption | null;
   saldoTersedia: number;
-  settings: ResellerSettingsView;
   disabled: boolean;
   disabledReason: string;
   submitting: boolean;
   submitError: string;
   onSubmit: () => void;
 }) {
-  const [method, setMethod] = useState<PaymentMethodChoice>("bsi");
-
   const subtotal = lines.reduce((sum, line) => sum + lineSubtotal(line), 0);
   const shippingCost = shipping?.cost || 0;
   const total = subtotal + shippingCost;
@@ -74,15 +68,9 @@ export default function RingkasanPesanan({
           {shortfall > 0 ? (
             <div style={{ marginTop: 12 }}>
               <Note tone="warn">
-                <b>Saldo kamu kurang {rupiah(shortfall)}.</b> Selesaikan pembayaran lewat metode di bawah,
-                lalu upload bukti transfer.
-                <div style={{ marginTop: 10 }}>
-                  <PaymentMethodTabs settings={settings} method={method} onChange={setMethod} />
-                </div>
-                <div style={{ marginTop: 8, fontSize: 12 }}>
-                  Pesanan diproses setelah admin mengecek transfer kamu. Kalau tidak dibayar dalam 24 jam,
-                  pesanan otomatis dibatalkan dan saldo dikembalikan.
-                </div>
+                <b>Saldo kamu kurang {rupiah(shortfall)}.</b> Setelah pesanan dibuat, kamu langsung diarahkan ke
+                halaman pembayaran kekurangan (QRIS atau transfer BSI). Pesanan diproses setelah admin mengecek
+                pembayaran. Kalau tidak dibayar dalam 24 jam, pesanan otomatis dibatalkan dan saldo dikembalikan.
               </Note>
             </div>
           ) : null}

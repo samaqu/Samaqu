@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { ApiError, resellerApi, type KatalogProduct, type ShippingOption } from "@/lib/reseller/client";
 import { rupiah } from "@/lib/reseller/format";
@@ -25,6 +26,7 @@ type CreateResult = {
 /** Halaman Buat Pesanan: pilih produk → penerima & alamat → pengiriman → ringkasan. */
 export default function OrderForm({ preselectProductId }: { preselectProductId?: string }) {
   const { me, refreshMe } = useReseller();
+  const router = useRouter();
   const [products, setProducts] = useState<KatalogProduct[] | null>(null);
   const [catalogError, setCatalogError] = useState("");
   const [lines, setLines] = useState<OrderLine[]>([]);
@@ -127,8 +129,13 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
         },
         show_reseller_name_on_label: showLabel,
       });
-      setResult(res);
       await refreshMe();
+      // Saldo kurang → langsung ke halaman bayar kekurangan (alur 3 langkah).
+      if (res.shortfall > 0) {
+        router.push(`/reseller/pesanan/${encodeURIComponent(res.orderNumber)}/bayar`);
+        return;
+      }
+      setResult(res);
     } catch (e) {
       setSubmitError(e instanceof ApiError ? e.message : "Gagal membuat pesanan. Coba lagi.");
     } finally {
@@ -231,7 +238,6 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
           lines={lines}
           shipping={shipping}
           saldoTersedia={me.saldo.saldo_tersedia}
-          settings={me.pengaturan}
           disabled={!canSubmit}
           disabledReason={disabledReason}
           submitting={submitting}

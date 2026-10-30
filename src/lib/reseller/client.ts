@@ -159,6 +159,8 @@ export interface TopupRow {
   status: string;
   reject_reason: string | null;
   reviewed_at: string | null;
+  /** Batas waktu bayar (ISO) — hanya untuk status menunggu_bayar. */
+  pay_deadline: string | null;
   created_at: string;
 }
 
@@ -229,6 +231,14 @@ export interface OrderDetail extends OrderListRow {
   show_reseller_name_on_label: boolean;
   order_items: OrderItemDetail[];
   tracking: { status_code: number | null; status_text: string | null; city_name: string | null; event_time: string | null }[];
+  /** Data pembayaran kekurangan (null kalau pesanan lunas dari saldo). */
+  shortfall: {
+    amount: number;
+    status: string;
+    proof_url: string | null;
+    payment_method: string | null;
+    deadline: string | null;
+  } | null;
 }
 
 export interface StatsResponse {
@@ -301,10 +311,20 @@ export const resellerApi = {
 
   topups: () => api<{ data: TopupRow[] }>("/api/reseller/topups"),
 
-  createTopup: (amount: number, proofUrl: string, paymentMethod: "bsi" | "qris") =>
-    api<{ ok: true }>("/api/reseller/topups", {
+  /** Langkah 1: buat top up `menunggu_bayar` (60 menit) lalu lanjut ke halaman bayar. */
+  createTopup: (amount: number, paymentMethod: "bsi" | "qris") =>
+    api<{ ok: true; code: string; status: string }>("/api/reseller/topups", {
       method: "POST",
-      body: JSON.stringify({ amount, proof_url: proofUrl, payment_method: paymentMethod }),
+      body: JSON.stringify({ amount, payment_method: paymentMethod }),
+    }),
+
+  topupDetail: (code: string) =>
+    api<{ data: TopupRow }>(`/api/reseller/topups/${encodeURIComponent(code)}`),
+
+  patchTopup: (code: string, body: { action: "submit_proof" | "cancel"; proof_url?: string; payment_method?: "bsi" | "qris" }) =>
+    api<{ ok: true; status: string }>(`/api/reseller/topups/${encodeURIComponent(code)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
     }),
 
   withdrawals: () => api<{ data: WithdrawalRow[] }>("/api/reseller/withdrawals"),

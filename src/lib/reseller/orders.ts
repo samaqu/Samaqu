@@ -390,13 +390,40 @@ export async function getResellerOrderDetail(
 
   if (error || !order) return null;
 
-  const { data: tracking } = await supabase
-    .from("order_tracking_events")
-    .select("status_code, status_text, city_name, event_time")
-    .eq("order_id", order.id)
-    .order("event_time", { ascending: true });
+  const [{ data: tracking }, { data: payment }] = await Promise.all([
+    supabase
+      .from("order_tracking_events")
+      .select("status_code, status_text, city_name, event_time")
+      .eq("order_id", order.id)
+      .order("event_time", { ascending: true }),
+    supabase
+      .from("reseller_order_payments")
+      .select("amount, proof_url, payment_method, status, created_at")
+      .eq("order_id", order.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
-  return { ...order, tracking: tracking ?? [] };
+  // Batas bayar kekurangan = 24 jam sejak pesanan dibuat — SAMA dengan jendela
+  // auto-cancel yang sudah ada (cron tidak diubah; ini hanya tampilan batas).
+  const shortfallDeadline = order.created_at
+    ? new Date(new Date(order.created_at as string).getTime() + 24 * 3600 * 1000).toISOString()
+    : null;
+
+  return {
+    ...order,
+    tracking: tracking ?? [],
+    shortfall: payment
+      ? {
+          amount: Number(payment.amount) || 0,
+          status: String(payment.status),
+          proof_url: (payment.proof_url as string | null) ?? null,
+          payment_method: (payment.payment_method as string | null) ?? null,
+          deadline: shortfallDeadline,
+        }
+      : null,
+  };
 }
 
 /**
@@ -417,14 +444,19 @@ export async function uploadShortfallProof(
   const supabase = getSupabaseAdmin();
   const { data: order } = await supabase
     .from("orders")
-    .select("id, reseller_shortfall_status")
+    .select("id, status, created_at, reseller_shortfall_status")
     .eq("reseller_id", resellerId)
     .eq("order_number", orderNumber)
     .maybeSingle();
 
   if (!order) return { ok: false, error: "Pesanan tidak ditemukan", status: 404 };
-  if (order.reseller_shortfall_status !== "pending") {
+  if (order.status !== "pending" || order.reseller_shortfall_status !== "pending") {
     return { ok: false, error: "Pesanan ini tidak menunggu bukti pembayaran kekurangan", status: 400 };
+  }
+  // Lewat 24 jam = jendela auto-cancel; bukti tidak diterima lagi (cron tetap yang membatalkan).
+  const deadline = new Date(order.created_at as string).getTime() + 24 * 3600 * 1000;
+  if (Date.now() > deadline) {
+    return { ok: false, error: "Waktu pembayaran habis. Pesanan dibatalkan otomatis.", status: 410 };
   }
 
   const { error } = await supabase

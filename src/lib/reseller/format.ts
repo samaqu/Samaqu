@@ -34,7 +34,11 @@ export function orderStatus(status: string): RsStatus {
 export function topupStatus(status: string): RsStatus {
   if (status === "approved") return { label: "Dikonfirmasi", tone: "ok" };
   if (status === "rejected") return { label: "Ditolak", tone: "err" };
-  return { label: "Menunggu", tone: "warn" };
+  if (status === "menunggu_bayar") return { label: "Menunggu bayar", tone: "warn" };
+  if (status === "kedaluwarsa") return { label: "Kedaluwarsa", tone: "muted" };
+  if (status === "dibatalkan") return { label: "Dibatalkan", tone: "muted" };
+  // pending = bukti sudah diupload, menunggu konfirmasi admin.
+  return { label: "Menunggu konfirmasi", tone: "warn" };
 }
 
 export function withdrawalStatus(status: string): RsStatus {

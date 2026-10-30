@@ -430,3 +430,33 @@ Template WA "penarikan ditransfer" menyamarkan rekening jadi "{bank} •••�
   tanpa scroll horizontal di 1280/panel. Kolom "—" diganti ikon status simpan.
 - **Simpan otomatis:** toggle langsung menyimpan; harga minimum tersimpan saat blur/Enter; ikon
   spinner → centang hijau (fade 2 dtk) / tanda gagal + toast. Aksi massal tetap seperti sebelumnya.
+
+### 8.12 Alur top up 3 langkah + halaman bayar bersama (30 Oktober 2026)
+
+**Migration `20261030_reseller_topup_flow.sql` (aditif, sudah dijalankan):**
+`reseller_topups.status` kini boleh `menunggu_bayar` | `pending` | `approved` | `rejected` |
+`kedaluwarsa` | `dibatalkan` (+ `pay_deadline timestamptz` + index parsial). Bukti boleh kosong
+saat `menunggu_bayar`. **Hanya `pending` (bukti sudah diupload) yang masuk antrean admin dan
+dihitung "top up belum dikonfirmasi"** — status baru otomatis dikecualikan karena query lama
+memfilter `status = 'pending'`. Tidak ada mutasi saldo/ledger untuk top up yang tidak jadi.
+
+**Logic** `src/lib/reseller/topups.ts`: `TOPUP_PAY_WINDOW_MINUTES=60`, `topupDeadlineIso`,
+`isPastDeadline`, `expireOverdueTopups(resellerId)` (dipanggil saat list & detail dibaca —
+kedaluwarsa tanpa cron baru, tanpa mutasi saldo).
+
+**Alur top up:** `/reseller/top-up` (langkah 1: nominal hero RupiahInput + chip cepat + kartu
+metode QRIS/BSI + "Lanjut bayar") → `POST /api/reseller/topups` (tanpa bukti) membuat
+`menunggu_bayar` → `/reseller/top-up/[kode]` (bar kuning "Bayar sebelum" + hitung mundur dari
+`pay_deadline` server, total + salin, QRIS/BSI + ganti metode, langkah 1-2-3, upload bukti,
+"Saya sudah bayar" → `PATCH submit_proof` → `pending`, "Batalkan top up" → `dibatalkan`,
+kedaluwarsa → pesan + "Top up lagi", terkirim/dikonfirmasi/ditolak dalam satu halaman).
+
+**Bayar kekurangan pesanan:** `OrderForm` mengarahkan ke `/reseller/pesanan/[nomor]/bayar` saat
+saldo kurang. Detail pesanan mengirim `shortfall {amount,status,proof_url,payment_method,deadline}`
+(deadline = created_at + 24 jam — SAMA dengan jendela auto-cancel; cron tidak diubah). Upload bukti
+ditolak 410 setelah lewat batas. Detail pesanan yang menunggu punya tombol "Bayar sekarang".
+
+**UI:** satu komponen `components/reseller/payment/PaymentPage.tsx` dipakai top up & kekurangan
+(termasuk `useCountdown` yang dihitung dari deadline server + digate `mounted` supaya tidak
+hydration mismatch). Komponen `PaymentMethodTabs` lama DIHAPUS (QRIS/rekening tidak lagi tampil di
+langkah 1/ringkasan); tipe `PaymentMethodChoice` pindah ke `payment/types.ts`.
