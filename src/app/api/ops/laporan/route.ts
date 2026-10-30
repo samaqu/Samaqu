@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
 import { BIZ_OFFSET_MS } from "@/lib/ops-followup";
-import { SALE_STATUSES, orderRevenue } from "@/lib/transaksi";
+import { SALE_STATUSES, ORDER_SOURCE_LABEL, orderRevenue, orderSourceKey } from "@/lib/transaksi";
 import { paymentChannelLabel } from "@/lib/payment-channel";
 
 /**
@@ -119,9 +119,41 @@ const UNKNOWN_PAYMENT_LABEL = "Belum tercatat";
 function paymentLabelFor(raw: string, methodById: Map<string, string>): string {
   const key = String(raw || "").trim();
   if (!key) return UNKNOWN_PAYMENT_LABEL;
+  // Pesanan Reseller Center menyimpan nilai SUMBER (`'reseller'`) di kolom metode bayar.
+  // Kategori sendiri di laporan — bukan "Metode Pembayaran" generik.
+  if (key.toLowerCase() === "reseller") return RESELLER_PAYMENT_LABEL;
   const known = methodById.get(key);
   if (known) return known;
   return LEGACY_PAYMENT_LABELS[key.toLowerCase()] || "Metode Pembayaran";
+}
+
+/** Kategori metode bayar untuk pesanan reseller (saldo reseller dipotong di SAMAQU). */
+export const RESELLER_PAYMENT_LABEL = "Saldo Reseller";
+
+/**
+ * Sebaran omzet per SUMBER pesanan (Website, Reseller, Open Order, …).
+ *
+ * Pesanan reseller dihitung dari `orderRevenue(order)` = `total − ongkir`, yaitu uang yang
+ * dibayar reseller ke SAMAQU (harga beli + ongkir dikurangi ongkir), BUKAN harga jual
+ * reseller ke pelanggannya. Hanya pesanan sah (SALE_STATUSES) yang ikut, sama seperti
+ * omzet di atas — jadi pesanan batal/kedaluwarsa tidak pernah masuk.
+ *
+ * Top up & penarikan saldo reseller TIDAK ada di sini: keduanya mutasi `reseller_ledger`,
+ * bukan penjualan, jadi tidak boleh menambah omzet maupun pengeluaran.
+ */
+function buildSourceBreakdown(orders: OrderRow[]) {
+  const groups = new Map<string, { key: string; label: string; count: number; amount: number }>();
+  for (const order of orders) {
+    const key = orderSourceKey(order as never);
+    const entry = groups.get(key) || { key, label: ORDER_SOURCE_LABEL[key] || key, count: 0, amount: 0 };
+    entry.count += 1;
+    entry.amount += orderRevenue(order);
+    groups.set(key, entry);
+  }
+  const total = [...groups.values()].reduce((sum, row) => sum + row.amount, 0);
+  return [...groups.values()]
+    .map((row) => ({ ...row, share: total > 0 ? Math.round((row.amount / total) * 1000) / 10 : 0 }))
+    .sort((a, b) => b.amount - a.amount);
 }
 
 /**
@@ -564,6 +596,9 @@ export async function GET(req: NextRequest) {
       if (pm.id) methodById.set(String(pm.id), label);
     }
     const payments = buildPaymentBreakdown(current.validOrders, methodById, bankMethodIds, mayarMethodIds);
+    // Pemisahan sumber (Website / Reseller / Open Order / …) — pesanan reseller bisa
+    // dilihat & dipisahkan dari penjualan lain tanpa mengubah angka omzet total.
+    const sources = buildSourceBreakdown(current.validOrders);
 
     const trend = buildTrend(
       from,
@@ -637,6 +672,7 @@ export async function GET(req: NextRequest) {
       },
       trend,
       payments,
+      sources,
       tables: {
         sales: salesRows,
         returns: returnTable,

@@ -22,6 +22,7 @@ import { NEUTRAL_ITEM_PHOTO, resolveItemPhotos, type OrderPhotoLookup } from "@/
 import { variantName } from "@/lib/item-label";
 import { usePaymentMethodName } from "@/lib/use-payment-methods";
 import { paymentChannelLabel } from "@/lib/payment-channel";
+import { describePayment } from "@/lib/order-shared";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { waNumber, waLink, pesanPembayaran } from "@/lib/whatsapp";
 import { supabase } from "@/lib/supabase";
@@ -243,9 +244,24 @@ export default function OrderDetailContent({
   const [showAlamat, setShowAlamat] = useState(false);
 
   // Metode pembayaran untuk tampilan baru (sama dengan yang dipakai drawer ops).
+  // Pesanan reseller diturunkan dari data pembayarannya (helper bersama `describePayment`),
+  // bukan dari nilai sumber "reseller".
   const { name: paymentName } = usePaymentMethodName(order.payment_method);
   const channelLabel = paymentChannelLabel(order.payment_channel);
-  const paymentDetail = paymentName ? `${paymentName}${channelLabel ? ` · ${channelLabel}` : ""}` : channelLabel || "—";
+  const isResellerOrder = Boolean((order as { reseller_id?: string | null }).reseller_id);
+  const paymentDetail = isResellerOrder
+    ? describePayment({
+        is_reseller: true,
+        reseller_balance_deduction: (order as { reseller_balance_deduction?: number }).reseller_balance_deduction,
+        reseller_shortfall_amount: (order as { reseller_shortfall_amount?: number }).reseller_shortfall_amount,
+        reseller_shortfall_status: (order as { reseller_shortfall_status?: string }).reseller_shortfall_status,
+        reseller_payment:
+          ((order as { reseller_payment?: { amount: number; status: string; payment_method?: string | null } })
+            .reseller_payment as never) || null,
+      })
+    : paymentName
+      ? `${paymentName}${channelLabel ? ` · ${channelLabel}` : ""}`
+      : channelLabel || "—";
 
   // Salin nomor (resi/pesanan) untuk tampilan baru — hanya umpan balik "Tersalin" sesaat.
   const [tersalin, setTersalin] = useState<"" | "resi" | "nomor">("");

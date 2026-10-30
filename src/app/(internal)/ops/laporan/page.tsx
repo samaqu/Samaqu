@@ -12,6 +12,7 @@ import {
   CreditCard,
   RefreshCw,
   Search,
+  Store,
   X,
 } from "lucide-react";
 import {
@@ -98,6 +99,9 @@ type PaymentBreakdownRow = {
   share: number;
 };
 
+/** Sebaran omzet per SUMBER pesanan (Website, Reseller, Open Order, …). */
+type SourceBreakdownRow = PaymentBreakdownRow;
+
 type ReportData = {
   period: Period;
   summary: Summary;
@@ -112,6 +116,8 @@ type ReportData = {
   deltas: { gross: number | null; net: number | null; profit: number | null };
   trend: { type: "day" | "week" | "month"; points: TrendPoint[] };
   payments: PaymentBreakdownRow[];
+  /** Opsional: laporan lama/response tanpa field ini tetap tampil normal. */
+  sources?: SourceBreakdownRow[];
   tables: {
     sales: any[];
     returns: any[];
@@ -298,6 +304,7 @@ export default function LaporanKeuanganPage() {
 
   const s = data.summary;
   const payments = data.payments || [];
+  const sources = data.sources || [];
   const profitPositive = (s.profit ?? 0) >= 0;
   const pendingEmpty = s.refundsPendingCount === 0 && s.exchangePendingCount === 0;
   const profitBadge =
@@ -665,6 +672,47 @@ export default function LaporanKeuanganPage() {
 
       {/* PRODUK TERLARIS — periode sendiri + pembanding bulan lalu */}
       <BestSellerSection />
+
+      {/* SUMBER PESANAN — memisahkan Reseller dari penjualan lain */}
+      {sources.length > 0 ? (
+        <section className="rounded-3xl border border-[#E5E7EB] bg-white p-5 shadow-sm md:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#F3F4F6] text-slate-700">
+                <Store size={18} strokeWidth={1.9} />
+              </span>
+              <div>
+                <h2 className="text-lg font-black tracking-tight text-[#374151]">Sumber Pesanan</h2>
+                <p className="text-xs font-medium text-slate-500">
+                  Omzet per sumber. Pesanan reseller dihitung dari harga beli reseller + ongkir.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-4">
+            {sources.map((row, index) => (
+              <div key={row.key}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="min-w-0 truncate text-sm font-bold text-[#374151]" title={row.label}>
+                    {row.label}
+                  </p>
+                  <p className="shrink-0 whitespace-nowrap text-[11px] font-bold text-slate-500 tabular-nums">
+                    {row.count} trx · {row.share.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%
+                  </p>
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#F3F4F6]">
+                  <div
+                    className={`h-full rounded-full ${PAYMENT_BAR[index] || "bg-slate-300"}`}
+                    style={{ width: `${Math.max(2, row.share)}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 whitespace-nowrap text-xs font-black text-slate-700 tabular-nums">{rp(row.amount)}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {/* METODE PEMBAYARAN */}
       <section className="rounded-3xl border border-[#E5E7EB] bg-white p-5 shadow-sm md:p-6">

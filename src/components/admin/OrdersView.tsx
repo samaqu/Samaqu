@@ -11,14 +11,9 @@
  * membuka detail lewat `onSelect`.
  */
 import { useMemo, useState } from "react";
-import {
-  ORDER_STAGE_LABEL,
-  ORDER_STAGE_TABS,
-  matchesStage,
-  orderStage,
-  type OrderStageFilter,
-} from "@/lib/order-flow";
+import { ORDER_STAGE_LABEL, matchesStage, orderStage, type OrderStageFilter } from "@/lib/order-flow";
 import { ORDER_SOURCE_LABEL, SALE_BASIS_NOTE, SALE_STATUSES, orderRevenue, orderSourceKey, orderSourceLabel, saleCount } from "@/lib/transaksi";
+import { countByStage, stageCounts, stageTabsWithCounts } from "@/lib/order-shared";
 import StageIcon from "@/components/ops/transaksi/StageIcon";
 // Animasi angka kartu KPI memakai komponen yang SAMA dengan kartu metrik dashboard admin
 // (`CountUp`) supaya geraknya konsisten: angka naik dari 0 saat data masuk.
@@ -167,28 +162,20 @@ export default function OrdersView({
   // "Omset bulan ini" di menu Transaksi & Laporan — `orders.total` masih memuat ongkir.
   const kpis = useMemo(() => {
     const sold = orders.filter((o) => (SALE_STATUSES as readonly string[]).includes(o.status));
+    // Satu helper bersama (`stageCounts`) dipakai panel admin, panel ops, dan chip packing —
+    // tidak ada lagi hitungan kembar yang bisa berbeda (mis. pesanan reseller).
+    const counts = stageCounts(orders);
     return {
       total: saleCount(orders),
       revenue: sold.reduce((sum, o) => sum + orderRevenue(o), 0),
-      unpaid: orders.filter((o) => orderStage(o) === "belum_bayar").length,
-      toProcess: orders.filter((o) => {
-        const stage = orderStage(o);
-        return stage === "belum_dipacking" || stage === "sudah_dipacking";
-      }).length,
+      unpaid: counts.belum_bayar,
+      toProcess: counts.perlu_diproses,
     };
   }, [orders]);
 
-  const stageTabs = useMemo(
-    () =>
-      ORDER_STAGE_TABS.map((tab) => ({
-        ...tab,
-        count:
-          tab.key === "semua"
-            ? orders.length
-            : orders.filter((o) => orderStage(o) === tab.key).length,
-      })),
-    [orders],
-  );
+  const stageTabs = useMemo(() => stageTabsWithCounts(orders, { includeBelumDipacking: true }), [orders]);
+
+  const belumDipacking = useMemo(() => countByStage(orders, "belum_dipacking"), [orders]);
 
   /**
    * Keterangan kartu KPI mengikuti kartu dashboard admin & menu Transaksi (permintaan pemilik
@@ -274,7 +261,7 @@ export default function OrdersView({
             aria-pressed={orderFilter === "belum_dipacking"}
           >
             Belum di packing
-            <em>{stageTabs.find((tab) => tab.key === "belum_dipacking")?.count ?? 0}</em>
+            <em>{belumDipacking}</em>
           </button>
           {onPrevMonth || onNextMonth ? (
             <div className="ptx-month">

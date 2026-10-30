@@ -27,6 +27,7 @@ import { SOURCE_STYLES, STATUS_STYLES, formatRupiah, formatTanggalJamID } from "
 import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
 import PanelDetailPesanan, { PanelDetailShell, PanelLacakModal, jamWIB } from "@/components/ops/transaksi/PanelDetailPesanan";
 import ResellerOrderBlock from "@/components/reseller/admin/ResellerOrderBlock";
+import { describePayment } from "@/lib/order-shared";
 
 export default function TransaksiDetailDrawer({ open, order, variant = "ops", owner = "panel", onClose, onEdit, onCancel, onDelete, onResiCreated }) {
   const isPanel = variant === "panel";
@@ -61,9 +62,21 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
   const { name: paymentName } = usePaymentMethodName(order?.payment_method);
   // Rincian channel gateway (mis. Mayar → "QRIS" / "BNI Virtual Account"), kalau sudah tercatat.
   const channelLabel = paymentChannelLabel(order?.payment_channel);
-  const paymentDetail = paymentName
-    ? `${paymentName}${channelLabel ? ` · ${channelLabel}` : ""}`
-    : channelLabel || "-";
+  // Pesanan reseller: `orders.payment_method` hanya berisi "reseller" (nilai SUMBER, bukan cara
+  // bayar). Labelnya diturunkan dari data pembayaran yang tercatat lewat helper bersama —
+  // dipakai juga oleh drawer /admin supaya kedua panel menampilkan hal yang persis sama.
+  const isResellerOrder = Boolean(order?.reseller_id) || order?.source_key === "reseller";
+  const paymentDetail = isResellerOrder
+    ? describePayment({
+        is_reseller: true,
+        reseller_balance_deduction: order?.reseller_balance_deduction,
+        reseller_shortfall_amount: order?.reseller_shortfall_amount,
+        reseller_shortfall_status: order?.reseller_shortfall_status,
+        reseller_payment: order?.reseller_payment || null,
+      })
+    : paymentName
+      ? `${paymentName}${channelLabel ? ` · ${channelLabel}` : ""}`
+      : channelLabel || "-";
 
   const awb = order?.awb_no || "";
   const totalItemWeight = (order?.items || []).reduce((sum, item) => {

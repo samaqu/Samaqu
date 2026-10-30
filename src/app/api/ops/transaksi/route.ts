@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { cancelOrderCompletely, type CancelableOrder } from "@/lib/cancel-order";
-import { MANUAL_PRICE_MAX, MANUAL_PRICE_MIN, MANUAL_SOURCE_KEYS, hasManualPrice, itemSummary, manualPrice, orderSourceKey, orderSourceLabel, sourceKey, statusLabel } from "@/lib/transaksi";
+import { MANUAL_PRICE_MAX, MANUAL_PRICE_MIN, MANUAL_SOURCE_KEYS, RESELLER_SOURCE_KEY, hasManualPrice, itemSummary, manualPrice, orderSourceKey, orderSourceLabel, sourceKey, statusLabel } from "@/lib/transaksi";
 import { localPhone } from "@/lib/whatsapp";
 import { notifyCustomerInvoice } from "@/lib/fonnte";
 import { kotaFromShipping } from "@/lib/kota";
@@ -534,6 +534,34 @@ export async function GET(req: NextRequest) {
     .in("order_id", orderIds);
   const hppByOrder = new Map((hppHeaders || []).map((row: any) => [String(row.order_id), row]));
 
+  // Pembayaran kekurangan reseller — dipakai drawer untuk menurunkan label metode bayar
+  // ("Saldo Reseller", "Saldo Reseller + Transfer (BSI) · menunggu verifikasi", …).
+  // Hanya pesanan reseller yang punya baris di sini; pesanan biasa tidak terpengaruh.
+  const resellerPaymentByOrder = new Map<
+    string,
+    { amount: number; status: string; payment_method: string | null }
+  >();
+  const orderNumbersById = new Set<string>();
+  for (const order of list as any[]) {
+    if (order.reseller_id) orderNumbersById.add(String(order.id));
+  }
+  if (orderNumbersById.size > 0) {
+    const { data: paymentRows } = await admin
+      .from("reseller_order_payments")
+      .select("order_id, amount, status, payment_method, created_at")
+      .in("order_id", [...orderNumbersById])
+      .order("created_at", { ascending: false });
+    for (const row of paymentRows || []) {
+      const key = String((row as any).order_id);
+      if (resellerPaymentByOrder.has(key)) continue; // ambil yang terbaru saja
+      resellerPaymentByOrder.set(key, {
+        amount: Number((row as any).amount) || 0,
+        status: String((row as any).status || ""),
+        payment_method: ((row as any).payment_method as string | null) ?? null,
+      });
+    }
+  }
+
   const { data: lineItems } = await admin
     .from("order_items")
     .select(
@@ -621,6 +649,8 @@ export async function GET(req: NextRequest) {
       reseller_balance_deduction: Number(order.reseller_balance_deduction) || 0,
       reseller_shortfall_amount: Number(order.reseller_shortfall_amount) || 0,
       reseller_shortfall_status: order.reseller_shortfall_status || "none",
+      // Baris pembayaran kekurangan terbaru (null untuk pesanan non-reseller).
+      reseller_payment: resellerPaymentByOrder.get(String(order.id)) || null,
       show_reseller_name_on_label: order.show_reseller_name_on_label === true,
       status,
       status_label: statusLabel(status),
@@ -1288,6 +1318,12 @@ export async function DELETE(req: NextRequest) {
     }
     if (sourceKey(order.source) === "website") {
       return bad("Pesanan website tidak bisa dihapus dari menu Transaksi.");
+    }
+    // Pesanan reseller punya jurnal saldo (reseller_ledger) + pembayaran kekurangan. Menghapus
+    // barisnya di sini akan meninggalkan mutasi saldo yang menggantung, jadi tidak diizinkan —
+    // jalurnya "Batalkan" (stok & saldo dikembalikan lewat `cancelOrderCompletely`).
+    if (orderSourceKey(order) === RESELLER_SOURCE_KEY) {
+      return bad("Pesanan reseller tidak bisa dihapus dari menu Transaksi. Gunakan Batalkan supaya saldo reseller ikut dikembalikan.");
     }
 
     const { data: items } = await admin

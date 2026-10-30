@@ -27,9 +27,15 @@ export const SOURCE_LABEL: Record<string, string> = {
 /** Sumber yang boleh dipilih dari form — Website otomatis dari checkout website. */
 export const MANUAL_SOURCE_KEYS: string[] = SOURCE_KEYS.filter((key) => key !== "website");
 
-/** Normalisasi nilai sumber apa pun ke kunci yang dikenal (default: `website`). */
+/** Normalisasi nilai sumber apa pun ke kunci yang dikenal (default: `website`).
+ *
+ * Catatan: `'reseller'` (pesanan Reseller Center) TIDAK dipetakan ke `website` — kalau
+ * dipetakan, API mengirim `source: "website"` dan guard hapus menganggap pesanan reseller
+ * sebagai pesanan website. Kunci `reseller` dibiarkan apa adanya.
+ */
 export function sourceKey(value: unknown): string {
   const key = String(value ?? "").trim().toLowerCase();
+  if (key === "reseller") return "reseller";
   return SOURCE_KEYS.includes(key) ? key : "website";
 }
 

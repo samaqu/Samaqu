@@ -17,7 +17,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { base44 } from "@/lib/ops-api";
 import { SALE_BASIS_NOTE, SALE_STATUSES, orderRevenue, saleCount } from "@/lib/transaksi";
-import { ORDER_STAGE_TABS_VISIBLE, matchesStage, orderStage } from "@/lib/order-flow";
+import { matchesStage } from "@/lib/order-flow";
+import { countByStage, stageCounts, stageTabsWithCounts } from "@/lib/order-shared";
 import DateFilter from "@/components/ops/leads/DateFilter";
 import ConfirmDeleteModal from "@/components/ops/ConfirmDeleteModal";
 import TransaksiFormModal from "@/components/ops/transaksi/TransaksiFormModal";
@@ -257,25 +258,24 @@ export default function Transaksi({ variant = "ops" }) {
   // angkanya beda sendiri dari layar lain.
   const panelKpis = useMemo(() => {
     const sold = orders.filter((order) => SALE_STATUSES.includes(order.status));
+    // Hitungan per tahap memakai SATU helper bersama (`stageCounts`) — angka di sini, di
+    // chip "Belum di packing", dan di tab selalu berasal dari hitungan yang sama, supaya
+    // tidak mungkin lagi ada chip 0 padahal barisnya ada (kasus pesanan reseller).
+    const counts = stageCounts(orders);
     return {
       total: saleCount(orders),
       revenue: sold.reduce((sum, order) => sum + orderRevenue(order), 0),
-      unpaid: orders.filter((order) => orderStage(order) === "belum_bayar").length,
-      toProcess: orders.filter((order) => orderStage(order) === "belum_dipacking" || orderStage(order) === "sudah_dipacking").length,
+      unpaid: counts.belum_bayar,
+      toProcess: counts.perlu_diproses,
     };
   }, [orders]);
 
-  // Tab = TAHAP resmi aplikasi (`ORDER_STAGE_TABS` order-flow — SAMA dengan halaman Pesanan admin):
-  // Semua · Belum Bayar · Menunggu Pickup · Dikirim · Selesai · Dibatalkan.
-  // "Belum di Packing" tetap jadi filter cepat di bar bawah (sub-status pesanan `diproses`).
-  const stageTabs = useMemo(
-    () =>
-      ORDER_STAGE_TABS_VISIBLE.map((tab) => ({
-        ...tab,
-        count: tab.key === "semua" ? orders.length : orders.filter((order) => orderStage(order) === tab.key).length,
-      })),
-    [orders],
-  );
+  // Tab = TAHAP resmi aplikasi (`ORDER_STAGE_TABS_VISIBLE` order-flow — SAMA dengan halaman
+  // Pesanan admin). "Belum di Packing" tetap jadi filter cepat di bar bawah (sub-status
+  // pesanan `diproses`), angkanya dari helper yang sama.
+  const stageTabs = useMemo(() => stageTabsWithCounts(orders, { includeBelumDipacking: true }), [orders]);
+
+  const belumDipacking = useMemo(() => countByStage(orders, "belum_dipacking"), [orders]);
 
   // Warna badge STATUS pesanan (bukan tahap packing) untuk tabel panel.
   const PANEL_STATUS_COLOR = { pending: "bayar", diproses: "siap", dikirim: "kirim", selesai: "selesai", dibatalkan: "batal" };
@@ -425,7 +425,7 @@ export default function Transaksi({ variant = "ops" }) {
               title="Tampilkan hanya pesanan yang belum dipacking"
             >
               Belum di packing
-              <em>{stageTabs.find((tab) => tab.key === "belum_dipacking")?.count ?? 0}</em>
+              <em>{belumDipacking}</em>
             </button>
             <div className="ptx-month">
               <button type="button" onClick={prevMonth} aria-label="Bulan sebelumnya">
