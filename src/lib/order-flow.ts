@@ -134,6 +134,9 @@ export const ORDER_STAGE_TABS: { key: OrderStageFilter; label: string }[] = [
   { key: "dibatalkan", label: ORDER_STAGE_LABEL.dibatalkan },
 ];
 
+/** Tab yang tampil di daftar pesanan (tanpa sub-tahap "Belum di Packing"). */
+export const ORDER_STAGE_TABS_VISIBLE = ORDER_STAGE_TABS.filter((tab) => tab.key !== "belum_dipacking");
+
 export function matchesStage(order: StageSource, filter: OrderStageFilter): boolean {
   return filter === "semua" || orderStage(order) === filter;
 }

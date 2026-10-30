@@ -514,3 +514,80 @@
 @media (prefers-reduced-motion: reduce) {
   .rs-root .submitted-check { animation: none; }
 }
+/* ── Daftar pesanan reseller (seragam Transaksi admin) ── */
+.rs-root .orders-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rs-root .orders-filters .in { min-height: 44px; }
+.rs-root .order-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.rs-root .order-tab {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; min-height: 38px;
+  border: 1px solid var(--rs-bd); border-radius: 999px; background: #fff;
+  font-size: 12px; font-weight: 800; color: var(--rs-mut); cursor: pointer;
+}
+.rs-root .order-tab span { font-size: 10.5px; font-weight: 800; color: var(--rs-mut); }
+.rs-root .order-tab.on { background: var(--rs-black); border-color: var(--rs-black); color: #fff; }
+.rs-root .order-tab.on span { color: rgba(255, 255, 255, .72); }
+
+.rs-root .orders-table-wrap { overflow-x: auto; }
+.rs-root .orders-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.rs-root .orders-table th {
+  text-align: left; padding: 10px 12px; font-size: 10px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--rs-mut); background: var(--rs-soft); border-bottom: 1px solid var(--rs-bd);
+  white-space: nowrap;
+}
+.rs-root .orders-table td {
+  padding: 11px 12px; border-bottom: 1px solid var(--rs-bd); vertical-align: top;
+  font-size: 12px; color: var(--rs-tx);
+}
+.rs-root .orders-table tbody tr { cursor: pointer; }
+.rs-root .orders-table tbody tr:hover { background: #fafaf8; }
+.rs-root .orders-table td small { display: block; margin-top: 2px; font-size: 10.5px; color: var(--rs-mut); }
+.rs-root .orders-table .oid { display: block; font-weight: 800; color: var(--rs-ink); font-family: ui-monospace, monospace; font-size: 12px; }
+.rs-root .orders-table .oprod { display: block; font-weight: 700; color: var(--rs-ink); }
+.rs-root .orders-table .oresi { font-weight: 700; color: var(--rs-ink); font-size: 11.5px; word-break: break-all; }
+.rs-root .orders-table td b { color: var(--rs-ink); }
+
+.rs-root .order-stage-pill {
+  display: inline-block; padding: 4px 8px; border-radius: 999px; border: 1px solid transparent;
+  font-size: 10.5px; font-weight: 800; white-space: nowrap;
+}
+
+.rs-root .orders-cards { display: none; }
+
+@media (max-width: 767px) {
+  .rs-root .orders-table-wrap { display: none; }
+  .rs-root .orders-cards { display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+  .rs-root .order-card {
+    display: flex; flex-direction: column; gap: 5px; padding: 11px 12px; min-height: 112px;
+    border: 1px solid var(--rs-bd); border-radius: 12px; background: #fff;
+  }
+  .rs-root .order-card:active { background: #fafaf8; }
+  .rs-root .order-card .oc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .rs-root .order-card .oc-id { font-family: ui-monospace, monospace; font-size: 12.5px; font-weight: 800; color: var(--rs-ink); }
+  .rs-root .order-card .oc-cust { font-size: 13px; font-weight: 800; color: var(--rs-ink); }
+  .rs-root .order-card .oc-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
+  .rs-root .order-card .oc-bottom b { font-size: 14px; font-weight: 800; color: var(--rs-ink); }
+  .rs-root .orders-filters { align-items: stretch; }
+  .rs-root .orders-filters > div { min-width: 100% !important; }
+  .rs-root .orders-filters input[type="month"], .rs-root .orders-filters input[type="date"] { max-width: none !important; flex: 1; }
+  .rs-root .order-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .rs-root .order-tabs::-webkit-scrollbar { display: none; }
+  .rs-root .order-tab { flex: none; min-height: 40px; }
+}
+/* ── Detail pesanan reseller ── */
+.rs-root .chip-tag {
+  display: inline-block; padding: 2px 7px; border-radius: 999px; background: var(--rs-soft);
+  color: var(--rs-tx); font-size: 9.5px; font-weight: 700; line-height: 1.5;
+}
+.rs-root .detail-pay-bar { display: none; }
+
+@media (max-width: 767px) {
+  .rs-root .detail-pay-bar {
+    display: flex; position: fixed; left: 0; right: 0; bottom: calc(56px + env(safe-area-inset-bottom));
+    z-index: 44; align-items: center; justify-content: space-between; gap: 10px;
+    background: #fff; border-top: 1px solid var(--rs-bd); padding: 9px 14px;
+    box-shadow: 0 -8px 24px rgba(17, 17, 17, .06);
+  }
+  .rs-root .detail-pay-bar .btn { min-height: 46px; }
+}
+
+.rs-root .orders-table td { overflow-wrap: anywhere; }

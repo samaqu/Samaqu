@@ -17,11 +17,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { base44 } from "@/lib/ops-api";
 import { SALE_BASIS_NOTE, SALE_STATUSES, orderRevenue, saleCount } from "@/lib/transaksi";
-import { ORDER_STAGE_TABS, matchesStage, orderStage } from "@/lib/order-flow";
+import { ORDER_STAGE_TABS_VISIBLE, matchesStage, orderStage } from "@/lib/order-flow";
 import DateFilter from "@/components/ops/leads/DateFilter";
 import ConfirmDeleteModal from "@/components/ops/ConfirmDeleteModal";
 import TransaksiFormModal from "@/components/ops/transaksi/TransaksiFormModal";
 import TransaksiDetailDrawer from "@/components/ops/transaksi/TransaksiDetailDrawer";
+import ResellerEditItemModal from "@/components/ops/transaksi/ResellerEditItemModal";
+import { isResellerOrderNumber } from "@/lib/reseller/order-number";
 import StageIcon from "@/components/ops/transaksi/StageIcon";
 import AnimatedNumber from "@/components/AnimatedNumber";
 import { MONTHS, SOURCE_STYLES, formatRupiah, formatTanggalSingkatID, itemVariantText, pad } from "@/components/ops/transaksi/transaksi-format";
@@ -132,6 +134,7 @@ export default function Transaksi({ variant = "ops" }) {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [resellerEdit, setResellerEdit] = useState(null);
   const [detail, setDetail] = useState(null);
 
   // Drawer yang sedang terbuka ikut memakai baris terbaru setelah polling.
@@ -267,7 +270,7 @@ export default function Transaksi({ variant = "ops" }) {
   // "Belum di Packing" tetap jadi filter cepat di bar bawah (sub-status pesanan `diproses`).
   const stageTabs = useMemo(
     () =>
-      ORDER_STAGE_TABS.map((tab) => ({
+      ORDER_STAGE_TABS_VISIBLE.map((tab) => ({
         ...tab,
         count: tab.key === "semua" ? orders.length : orders.filter((order) => orderStage(order) === tab.key).length,
       })),
@@ -300,12 +303,28 @@ export default function Transaksi({ variant = "ops" }) {
         onClose={() => setDetail(null)}
         onEdit={(order) => {
           setDetail(null);
+          if (order.source_key === "reseller" || isResellerOrderNumber(order.order_number)) {
+            setResellerEdit(order);
+            return;
+          }
           setEditing(order);
           setFormOpen(true);
         }}
         onCancel={(order) => setCancelTarget(order)}
         onDelete={(order) => setDeleteTarget(order)}
       />
+
+      {resellerEdit ? (
+        <ResellerEditItemModal
+          order={resellerEdit}
+          onClose={() => setResellerEdit(null)}
+          onSaved={() => {
+            setResellerEdit(null);
+            queryClient.invalidateQueries({ queryKey: ["transaksi"] });
+            toast({ title: "Ukuran/warna diperbarui", variant: "success" });
+          }}
+        />
+      ) : null}
 
       <ConfirmDeleteModal
         isOpen={!!cancelTarget}
@@ -373,7 +392,7 @@ export default function Transaksi({ variant = "ops" }) {
 
         <div className="bar">
           <div className="tabs">
-            {stageTabs.filter((tab) => tab.key !== "belum_dipacking").map((tab) => (
+            {stageTabs.map((tab) => (
               <button
                 key={tab.key}
                 type="button"
@@ -501,22 +520,6 @@ export default function Transaksi({ variant = "ops" }) {
                     <tr key={order.id} onClick={() => setDetail(order)}>
                       <td data-label="No. Pesanan">
                         <span className="id">{order.order_number}</span>
-                        {order.reseller_store_name ? (
-                          <small
-                            style={{
-                              display: "inline-block",
-                              marginTop: 2,
-                              padding: "1px 6px",
-                              borderRadius: 999,
-                              background: "#ecfdf3",
-                              color: "#15803d",
-                              fontSize: 10,
-                              fontWeight: 800,
-                            }}
-                          >
-                            {order.reseller_store_name}
-                          </small>
-                        ) : null}
                         <small>
                           {formatTanggalSingkatID(order.date_wib)} · {order.time_wib}
                         </small>

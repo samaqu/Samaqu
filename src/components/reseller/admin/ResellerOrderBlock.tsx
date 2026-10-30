@@ -8,7 +8,14 @@ import type { ReactNode } from "react";
  * orders.reseller_id terisi (pemanggil yang memutuskan). Menampilkan nama
  * toko + WA, status kekurangan, dan harga beli vs harga jual per item.
  */
-export default function ResellerOrderBlock({ order }: { order: Record<string, any> }): ReactNode {
+export default function ResellerOrderBlock({
+  order,
+  resellerHref,
+}: {
+  order: Record<string, any>;
+  /** Tautan ke drawer detail reseller di menu Reseller (ops/panel). */
+  resellerHref?: string;
+}): ReactNode {
   if (!order?.reseller_id) return null;
 
   const shortfall = Number(order.reseller_shortfall_amount) || 0;
@@ -23,6 +30,14 @@ export default function ResellerOrderBlock({ order }: { order: Record<string, an
         {order.reseller_whatsapp || "—"}
         {order.reseller_owner_name ? ` · ${order.reseller_owner_name}` : ""}
       </p>
+      {resellerHref ? (
+        <a
+          className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 underline underline-offset-2 mt-1"
+          href={resellerHref}
+        >
+          Buka detail reseller
+        </a>
+      ) : null}
 
       {shortfall > 0 || (order.reseller_shortfall_status && order.reseller_shortfall_status !== "none") ? (
         <p className="text-[11px] font-semibold text-amber-700 mt-1">

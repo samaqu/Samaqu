@@ -16,6 +16,7 @@ import { notifyAdminNewOrder } from "@/lib/fonnte";
 import { resellerBuyPrice, resellerMinSellInfo } from "./pricing";
 import { getResellerSettings } from "./settings";
 import { notifyResellerOrderCreated } from "./notify";
+import { RESELLER_ORDER_PREFIX } from "./order-number";
 import type { ResellerRow } from "./types";
 
 const MAX_ITEMS = 30;
@@ -65,10 +66,10 @@ export type CreateResellerOrderResult =
     }
   | { ok: false; error: string; status: number };
 
-/** Nomor pesanan reseller: RSL-YYYYMMDD-NNN (pola yang sama dengan SMQ-). */
+/** Nomor pesanan reseller: EP-YYYYMMDD-NNN (RSL- lama tetap dikenali). */
 function generateResellerOrderNumber(): string {
   const d = new Date();
-  return `RSL-${d.toISOString().slice(0, 10).replace(/-/g, "")}-${String(Math.floor(Math.random() * 900) + 100)}`;
+  return `${RESELLER_ORDER_PREFIX}${d.toISOString().slice(0, 10).replace(/-/g, "")}-${String(Math.floor(Math.random() * 900) + 100)}`;
 }
 
 interface ProductRow {
@@ -340,30 +341,42 @@ export async function createResellerOrder(
 /* ── Daftar & detail ── */
 
 const ORDER_LIST_COLUMNS =
-  "id, order_number, status, shipping_status, created_at, total, customer_name, shipping_city, awb_no, tracking_status_code, reseller_shortfall_amount, reseller_shortfall_status";
+  "id, order_number, status, shipping_status, created_at, total, customer_name, customer_whatsapp, shipping_city, awb_no, tracking_status_code, tracking_status_text, reseller_shortfall_amount, reseller_shortfall_status, order_items(product_name, series, kain, color, size, quantity)";
 
 export async function listResellerOrders(
   resellerId: string,
   page: number,
-  pageSize: number
+  pageSize: number,
+  month?: string
 ): Promise<{ rows: unknown[]; total: number } | { error: string }> {
   const safePage = Math.max(1, Math.round(Number(page) || 1));
-  const safeSize = Math.min(50, Math.max(1, Math.round(Number(pageSize) || 10)));
+  const safeSize = Math.min(200, Math.max(1, Math.round(Number(pageSize) || 10)));
   const from = (safePage - 1) * safeSize;
   const to = from + safeSize - 1;
 
   const supabase = getSupabaseAdmin();
+  let query = supabase
+    .from("orders")
+    .select(ORDER_LIST_COLUMNS, { count: "exact" })
+    .eq("reseller_id", resellerId)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+  let countQuery = supabase
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("reseller_id", resellerId);
+
+  if (month && /^\d{4}-\d{2}$/.test(month)) {
+    const start = new Date(`${month}-01T00:00:00+07:00`);
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + 1);
+    query = query.gte("created_at", start.toISOString()).lt("created_at", end.toISOString());
+    countQuery = countQuery.gte("created_at", start.toISOString()).lt("created_at", end.toISOString());
+  }
+
   const [{ data, error, count }, { count: totalCount, error: countError }] = await Promise.all([
-    supabase
-      .from("orders")
-      .select(ORDER_LIST_COLUMNS, { count: "exact" })
-      .eq("reseller_id", resellerId)
-      .order("created_at", { ascending: false })
-      .range(from, to),
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .eq("reseller_id", resellerId),
+    query,
+    countQuery,
   ]);
 
   if (error || countError) {
@@ -382,7 +395,7 @@ export async function getResellerOrderDetail(
   const { data: order, error } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, shipping_status, payment_status, created_at, paid_at, cancelled_at, cancel_reason, subtotal, discount, shipping_cost, shipping_method, total, customer_name, customer_whatsapp, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, shipping_notes, awb_no, tracking_status_code, tracking_status_text, tracking_city, tracking_updated_at, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label, order_items(id, product_id, product_name, product_image, color, size, series, kain, quantity, price, reseller_buy_price, reseller_sell_price)"
+      "id, order_number, status, shipping_status, payment_status, created_at, paid_at, cancelled_at, cancel_reason, subtotal, discount, shipping_cost, shipping_method, payment_method, total, customer_name, customer_whatsapp, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, shipping_notes, awb_no, tracking_status_code, tracking_status_text, tracking_city, tracking_updated_at, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label, order_items(id, product_id, product_name, product_image, color, size, series, kain, quantity, price, reseller_buy_price, reseller_sell_price)"
     )
     .eq("reseller_id", resellerId)
     .eq("order_number", orderNumber)

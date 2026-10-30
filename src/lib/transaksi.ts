@@ -9,6 +9,8 @@
  * `website`), jadi checkout dan Open Order tidak perlu diubah.
  */
 
+import { isResellerOrderNumber } from "@/lib/reseller/order-number";
+
 /** Kunci yang disimpan di `orders.source`. */
 export const SOURCE_KEYS: string[] = ["website", "whatsapp", "instagram", "shopee", "tiktok", "offline"];
 
@@ -46,7 +48,7 @@ export function sourceLabel(value: unknown): string {
  */
 export const OPEN_ORDER_SOURCE_KEY = "open_order";
 export const UNKNOWN_SOURCE_KEY = "unknown";
-/** Pesanan reseller (`RSL-…`) — bukan sumber pilihan form manual. */
+/** Pesanan reseller (`EP-…` baru, `RSL-…` lama) — bukan sumber pilihan form manual. */
 export const RESELLER_SOURCE_KEY = "reseller";
 
 export const ORDER_SOURCE_LABEL: Record<string, string> = {
@@ -59,7 +61,7 @@ export const ORDER_SOURCE_LABEL: Record<string, string> = {
 export function orderSourceKey(order?: { order_number?: string | null; source?: unknown } | null): string {
   const number = String(order?.order_number ?? "").trim().toUpperCase();
   if (number.startsWith("CYO-")) return OPEN_ORDER_SOURCE_KEY;
-  if (number.startsWith("RSL-")) return RESELLER_SOURCE_KEY;
+  if (isResellerOrderNumber(number)) return RESELLER_SOURCE_KEY;
 
   const raw = String(order?.source ?? "").trim().toLowerCase();
   if (raw === RESELLER_SOURCE_KEY) return RESELLER_SOURCE_KEY;

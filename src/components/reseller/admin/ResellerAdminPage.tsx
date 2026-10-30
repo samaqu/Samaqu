@@ -32,13 +32,28 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
   const [loadingQueue, setLoadingQueue] = useState(true);
   const [loadingList, setLoadingList] = useState(true);
   const [detail, setDetail] = useState<ResellerAdminRow | null>(null);
+  const [openResellerId, setOpenResellerId] = useState("");
   const [error, setError] = useState("");
 
   // Tab awal bisa dari URL (?tab=data) — dipakai kartu dashboard ops.
   useEffect(() => {
-    const param = new URLSearchParams(window.location.search).get("tab");
-    if (TABS.some((item) => item.key === param)) setTab(param as TabKey);
+    const param = new URLSearchParams(window.location.search);
+    const tabParam = param.get("tab");
+    if (TABS.some((item) => item.key === tabParam)) setTab(tabParam as TabKey);
+    // Tautan dari blok Reseller di Detail Pesanan membuka drawer reseller tertentu.
+    const resellerParam = param.get("reseller") || "";
+    if (resellerParam) setOpenResellerId(resellerParam);
   }, []);
+
+  useEffect(() => {
+    if (!openResellerId) return;
+    const found = resellers.find((row) => row.id === openResellerId);
+    if (found) {
+      setDetail(found);
+      setTab("data");
+      setOpenResellerId("");
+    }
+  }, [openResellerId, resellers]);
 
   const loadStats = useCallback(async () => {
     try {

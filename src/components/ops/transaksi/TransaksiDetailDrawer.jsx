@@ -37,6 +37,9 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
   const [statusError, setStatusError] = useState("");
   const status = order ? STATUS_STYLES[order.status] : null;
   const source = order ? SOURCE_STYLES[order.source_key || order.source] : null;
+  const resellerHref = order?.reseller_id
+    ? `${owner === "ops" ? "/ops/reseller" : "/panel-admin/reseller"}?reseller=${encodeURIComponent(order.reseller_id)}`
+    : undefined;
 
   // Salin nomor (resi / pesanan) di tampilan panel — hanya umpan balik "Tersalin" sesaat.
   const [copied, setCopied] = useState("");
@@ -245,17 +248,17 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
       };
     });
 
-    // Alasan tombol Ubah mati. Server hanya mengirim `can_edit` (tanpa alasannya), jadi
-    // diturunkan dari status yang terlihat. Hanya dipakai untuk pesan; keputusan tetap
-    // milik `can_edit` dari server.
+    // Alasan tombol Ubah mati — server mengirim `edit_reason` dari guard yang SAMA
+    // (termasuk untuk pesanan reseller), jadi UI tidak menebak sendiri.
     const editLockedReason = !order.can_edit
-      ? order.status === "dikirim" || order.status === "selesai"
-        ? "Pesanan sudah dikirim, item tidak bisa diubah lagi."
-        : order.shipping_status === "dikirim" || order.shipping_status === "selesai"
-          ? "Paket sudah berjalan, item tidak bisa diubah lagi."
-          : order.status === "dibatalkan"
-            ? "Pesanan sudah dibatalkan."
-            : "Item pesanan ini terkunci (stok tidak tercatat sistem atau pengiriman sudah dimulai)."
+      ? order.edit_reason ||
+        (order.status === "dikirim" || order.status === "selesai"
+          ? "Pesanan sudah dikirim, item tidak bisa diubah lagi."
+          : order.shipping_status === "dikirim" || order.shipping_status === "selesai"
+            ? "Paket sudah berjalan, item tidak bisa diubah lagi."
+            : order.status === "dibatalkan"
+              ? "Pesanan sudah dibatalkan."
+              : "Item pesanan ini terkunci.")
       : "";
 
     // Footer: bahaya (Batalkan) → sekunder (Ubah) → utama paling lebar, sesuai mockup.
@@ -401,8 +404,8 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
             ) : null
           }
         >
-          {/* Blok reseller — hanya untuk pesanan ber-reseller_id (RSL-). */}
-          {order.reseller_id ? <ResellerOrderBlock order={order} /> : null}
+          {/* Blok reseller — hanya untuk pesanan ber-reseller_id (EP-/RSL-). */}
+          {order.reseller_id ? <ResellerOrderBlock order={order} resellerHref={resellerHref} /> : null}
           {/* Panel resi asli: buat resi, resi HBO, tandai dikirim, cetak (logic lama, tidak diubah).
               `compact` karena nomor resi sudah tampil di blok resi bergradasi. */}
           <TransaksiResiPanel
@@ -474,8 +477,8 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
                 </span>
               </div>
 
-              {/* Blok reseller — hanya untuk pesanan ber-reseller_id (RSL-). */}
-              {order.reseller_id ? <ResellerOrderBlock order={order} /> : null}
+              {/* Blok reseller — hanya untuk pesanan ber-reseller_id (EP-/RSL-). */}
+              {order.reseller_id ? <ResellerOrderBlock order={order} resellerHref={resellerHref} /> : null}
 
               {order.status !== "dibatalkan" ? (
                 <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-3">

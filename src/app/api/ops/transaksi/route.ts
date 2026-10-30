@@ -17,7 +17,7 @@ import {
   type WeightMap,
 } from "@/lib/shipping-weight";
 import { computeOrderHppForItems, snapshotOrderHpp } from "@/lib/produksi-order-hpp";
-import { orderEditGuard, weightEditError } from "@/lib/order-edit";
+import { RESELLER_EDIT_NOTICE, orderEditGuard, weightEditError } from "@/lib/order-edit";
 import {
   isOpenOrderAddonLine,
   isStockedAddonLine,
@@ -565,7 +565,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Nama toko reseller untuk badge baris RSL- & blok "Reseller" di drawer.
+  // Nama toko reseller untuk blok "Reseller" di drawer (badge baris sudah dihapus).
   const resellerIds = [...new Set(list.map((order: any) => order.reseller_id).filter(Boolean))];
   const resellerById = new Map<string, { store_name: string; owner_name: string; whatsapp: string | null }>();
   if (resellerIds.length > 0) {
@@ -667,6 +667,7 @@ export async function GET(req: NextRequest) {
       // Guard edit item dipakai server & UI. Website/Open Order sekarang boleh diedit
       // selama stoknya tercatat, status belum dikirim, dan pengiriman belum berjalan.
       can_edit: editReady && editGuard.canEdit,
+      edit_reason: editGuard.reason,
       edit_warning: editGuard.warning,
       weight: order.weight == null ? null : Number(order.weight) || 0,
       items_edited_at: null,
@@ -866,7 +867,7 @@ export async function PATCH(req: NextRequest) {
     const admin = getSupabaseAdmin();
     const { data: order, error } = await admin
       .from("orders")
-      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, customer_name, customer_whatsapp, customer_id, shipping_status, weight, subtotal, total, discount, shipping_cost, paid_at")
+      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, customer_name, customer_whatsapp, customer_id, shipping_status, weight, subtotal, total, discount, shipping_cost, paid_at, reseller_id")
       .eq("order_number", orderNumber)
       .maybeSingle();
 
@@ -929,6 +930,84 @@ export async function PATCH(req: NextRequest) {
       product_image: row.product_image ?? null,
     }));
     if (oldItems.length === 0) return bad("Pesanan ini tidak punya item untuk diubah");
+
+    // Pesanan reseller: HANYA ukuran/warna. Qty, produk/series, harga, jumlah baris,
+    // total, saldo, dan kekurangan tidak boleh berubah. RPC khusus memperbarui baris
+    // yang ada (kolom reseller_buy_price/reseller_sell_price tetap utuh).
+    if (group === "reseller") {
+      if (!order.reseller_id) return bad("Pesanan ini bukan pesanan reseller.");
+      if (inputItems.length !== oldItems.length) return bad(RESELLER_EDIT_NOTICE);
+
+      const oldById = new Map(oldItems.map((item) => [item.id, item]));
+      const seen = new Set<string>();
+      const updates: { id: string; color: string; size: string }[] = [];
+
+      for (const row of inputItems) {
+        const id = String(row?.source_item_id || "").trim();
+        const old = oldById.get(id);
+        if (!id || !old || seen.has(id)) return bad(RESELLER_EDIT_NOTICE);
+        seen.add(id);
+
+        if (String(row?.product_id || "").trim() !== old.product_id) return bad(RESELLER_EDIT_NOTICE);
+        const quantity = Math.round(Number(row?.quantity) || 0);
+        if (quantity !== old.quantity) return bad(RESELLER_EDIT_NOTICE);
+        if (row?.price !== undefined && row?.price !== null && String(row.price).trim() !== "") {
+          const price = Math.round(Number(row.price));
+          if (!Number.isFinite(price) || price !== old.price) return bad(RESELLER_EDIT_NOTICE);
+        }
+
+        const color = String(row?.color || "default").trim() || "default";
+        const size = String(row?.size || "").trim().toUpperCase();
+        if (!size) return bad("Ukuran produk harus dipilih");
+        updates.push({ id, color, size });
+      }
+      if (seen.size !== oldItems.length) return bad(RESELLER_EDIT_NOTICE);
+
+      const productIds = [...new Set(oldItems.map((item) => item.product_id).filter(Boolean))];
+      const { data: variantRows, error: variantError } = await admin
+        .from("product_variants")
+        .select("product_id, color, size")
+        .in("product_id", productIds);
+      if (variantError) return NextResponse.json({ error: variantError.message }, { status: 500 });
+      const variantSet = new Set(
+        (variantRows || []).map(
+          (variant: any) =>
+            `${variant.product_id}||${variant.color || "default"}||${String(variant.size || "").toUpperCase()}`,
+        ),
+      );
+      for (const update of updates) {
+        const old = oldById.get(update.id)!;
+        const unchanged =
+          update.color === (old.color || "default") &&
+          update.size === String(old.size || "").toUpperCase();
+        if (unchanged) continue;
+        if (!variantSet.has(`${old.product_id}||${update.color}||${update.size}`)) {
+          return bad(`Ukuran ${update.size} / warna ${update.color} tidak tersedia untuk produk ini.`);
+        }
+      }
+
+      const { data: rpcResult, error: rpcError } = await admin.rpc("samaqu_edit_reseller_order_items", {
+        p_order_id: order.id,
+        p_actor: String((await opsIdentity(req))?.email || "ops"),
+        p_items: updates,
+        p_note: order.awb_no
+          ? "Ukuran/warna item diubah setelah resi terbit; label internal perlu dicetak ulang."
+          : null,
+      });
+      if (rpcError) {
+        console.error("[OPS] transaksi PATCH reseller rpc:", rpcError.message);
+        return bad(rpcError.message);
+      }
+
+      return NextResponse.json({
+        order_number: order.order_number,
+        total: Number(order.total) || 0,
+        subtotal: Number(order.subtotal) || 0,
+        weight: Number(order.weight) || 0,
+        items_edited_after_resi: Boolean((rpcResult as any)?.items_edited_after_resi ?? order.awb_no),
+        warning: "",
+      });
+    }
 
     // Add-on Open Order tidak boleh berubah: jumlah baris, qty, dan harga harus sama.
     // Pengenalannya lewat satu helper — format lama (`addon-cover-hanger`) dan format baru

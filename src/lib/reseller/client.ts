@@ -189,11 +189,21 @@ export interface OrderListRow {
   created_at: string;
   total: number;
   customer_name: string | null;
+  customer_whatsapp: string | null;
   shipping_city: string | null;
   awb_no: string | null;
   tracking_status_code: number | null;
+  tracking_status_text: string | null;
   reseller_shortfall_amount: number;
   reseller_shortfall_status: string;
+  order_items: {
+    product_name: string;
+    series: string | null;
+    kain: string | null;
+    color: string | null;
+    size: string | null;
+    quantity: number;
+  }[];
 }
 
 export interface OrderItemDetail {
@@ -213,6 +223,7 @@ export interface OrderItemDetail {
 
 export interface OrderDetail extends OrderListRow {
   payment_status: string | null;
+  payment_method: string | null;
   paid_at: string | null;
   cancelled_at: string | null;
   cancel_reason: string | null;
@@ -349,10 +360,11 @@ export const resellerApi = {
 
   stats: () => api<StatsResponse>("/api/reseller/stats"),
 
-  orders: (params: { page?: number; pageSize?: number } = {}) => {
+  orders: (params: { page?: number; pageSize?: number; month?: string } = {}) => {
     const q = new URLSearchParams();
     q.set("page", String(params.page || 1));
     q.set("pageSize", String(params.pageSize || 20));
+    if (params.month) q.set("month", params.month);
     return api<{ rows: OrderListRow[]; total: number }>(`/api/reseller/orders?${q.toString()}`);
   },
 

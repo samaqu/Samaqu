@@ -8,9 +8,13 @@
  * menyimpan `source = 'website'` di database. Awalan `CYO-` yang membedakannya.
  */
 
-import { MANUAL_SOURCE_KEYS, orderSourceKey } from "@/lib/transaksi";
+import { MANUAL_SOURCE_KEYS, RESELLER_SOURCE_KEY, orderSourceKey } from "@/lib/transaksi";
 
-export type EditSourceGroup = "manual" | "website" | "open_order" | "unknown";
+export type EditSourceGroup = "manual" | "website" | "open_order" | "reseller" | "unknown";
+
+/** Teks aturan edit pesanan reseller — dipakai server & UI (satu sumber). */
+export const RESELLER_EDIT_NOTICE =
+  "Pesanan reseller: hanya ukuran dan warna yang bisa diubah. Untuk perubahan lain, batalkan lalu buat pesanan baru (saldo dan stok otomatis kembali).";
 
 export type EditableOrder = {
   order_number?: string | null;
@@ -37,6 +41,7 @@ export function editSourceGroup(order?: EditableOrder | null): EditSourceGroup {
   const key = orderSourceKey(order);
   if (key === "open_order") return "open_order";
   if (key === "website") return "website";
+  if (key === RESELLER_SOURCE_KEY) return "reseller";
   if (MANUAL_SOURCE_KEYS.includes(key)) return "manual";
   return "unknown";
 }

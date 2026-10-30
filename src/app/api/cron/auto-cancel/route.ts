@@ -5,6 +5,7 @@ import { notifyCustomerPaymentReminder, paymentInstructionFrom } from "@/lib/fon
 import { claimOrderNotification } from "@/lib/order-notify";
 import { fetchOrderPaymentMethodRow } from "@/lib/payment-methods";
 import { validMayarPaymentUrl } from "@/lib/mayar";
+import { RESELLER_ORDER_PREFIX, LEGACY_RESELLER_ORDER_PREFIX } from "@/lib/reseller/order-number";
 
 /**
  * Cron pembayaran: **reminder** lalu **auto-cancel**.
@@ -124,9 +125,11 @@ export async function GET(request: NextRequest) {
     .eq("status", "pending")
     .is("paid_at", null)
     // Sama seperti reminder: transaksi manual `OPS-…` ("Belum Lunas") tidak ikut dibatalkan.
-    // Pesanan reseller (`RSL-…`) yang masih pending = kekurangan belum dibayar; ikut
-    // dibatalkan setelah 24 jam lewat jalur resmi (saldo & stok kembali).
-    .or("order_number.like.SMQ-%,order_number.like.CYO-%,order_number.like.RSL-%")
+    // Pesanan reseller (`EP-…` baru / `RSL-…` lama) yang masih pending = kekurangan belum
+    // dibayar; ikut dibatalkan setelah 24 jam lewat jalur resmi (saldo & stok kembali).
+    .or(
+      `order_number.like.SMQ-%,order_number.like.CYO-%,order_number.like.${RESELLER_ORDER_PREFIX}%,order_number.like.${LEGACY_RESELLER_ORDER_PREFIX}%`
+    )
     .lt("created_at", cutoff);
 
   if (fetchError) {

@@ -10,8 +10,9 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const page = Number(url.searchParams.get("page")) || 1;
   const pageSize = Number(url.searchParams.get("pageSize")) || 10;
+  const month = (url.searchParams.get("month") || "").trim();
 
-  const result = await listResellerOrders(session.reseller.id, page, pageSize);
+  const result = await listResellerOrders(session.reseller.id, page, pageSize, month);
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: 500 });
   }
