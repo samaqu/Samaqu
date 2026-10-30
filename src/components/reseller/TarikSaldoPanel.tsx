@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { ApiError, resellerApi, type WithdrawalRow } from "@/lib/reseller/client";
 import RupiahInput from "./RupiahInput";
-import { maskAccount, rupiah, tglJamID, withdrawalStatus } from "@/lib/reseller/format";
+import { maskAccount, rupiah, withdrawalDisplay } from "@/lib/reseller/format";
 import { useReseller } from "./ResellerShell";
 import { EmptyState, Note, SkeletonRows, StatusBadge } from "./ui";
 
@@ -73,24 +73,15 @@ export default function TarikSaldoPanel() {
               <EmptyState text="Belum ada penarikan." />
             ) : (
               rows.map((row) => {
-                const status = withdrawalStatus(row.status);
+                const view = withdrawalDisplay(row);
                 return (
                   <div className="list-row" key={row.id} style={{ alignItems: "flex-start" }}>
                     <div>
                       <div className="t">{rupiah(row.amount)}</div>
-                      <div className="s">
-                        {maskAccount(row.bank_name, row.bank_number)} · {tglJamID(row.created_at)}
-                      </div>
-                      <div className="s">
-                        Biaya admin {rupiah(row.admin_fee)} · diterima {rupiah(row.transfer_amount)}
-                      </div>
-                      {row.status === "rejected" && row.reject_reason ? (
-                        <div className="s" style={{ color: "var(--rs-err)" }}>
-                          Ditolak: {row.reject_reason}
-                        </div>
-                      ) : null}
+                      <div className="s">{view.description}</div>
+                      {view.extra ? <div className="s">{view.extra}</div> : null}
                     </div>
-                    <StatusBadge status={status} />
+                    {view.badge ? <StatusBadge status={view.badge} /> : null}
                   </div>
                 );
               })

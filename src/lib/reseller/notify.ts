@@ -15,6 +15,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getFonnteConfigs, normalizeWhatsappTarget, sendFonnteMessage } from "@/lib/fonnte";
 import { SITE_URL } from "@/lib/site-config";
 import { greetingName } from "@/lib/greeting";
+import { maskAccount } from "./format";
 
 export type ResellerNotifyType =
   | "account_created"
@@ -247,7 +248,7 @@ function buildWithdrawalPaid(
   return [
     `Halo ${ka},`,
     "",
-    `Penarikan ${rupiah(amount)} sudah ditransfer ke ${bank} ${bankNumber}.`,
+    `Penarikan ${rupiah(amount)} sudah ditransfer ke ${maskAccount(bank, bankNumber)}.`,
     `Jumlah diterima: ${rupiah(transferAmount)}.`,
     ...linkBlock("Buka halaman Tarik Saldo di portal reseller:", portalUrl("tarik-saldo")),
     "",

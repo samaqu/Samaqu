@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { ApiError, resellerApi, type TopupRow } from "@/lib/reseller/client";
-import { rupiah, tglJamID, topupStatus } from "@/lib/reseller/format";
+import { rupiah, topupDisplay } from "@/lib/reseller/format";
 import { useReseller } from "./ResellerShell";
 import PaymentMethodTabs, { type PaymentMethodChoice } from "./PaymentMethodTabs";
 import RupiahInput from "./RupiahInput";
@@ -86,17 +86,17 @@ export default function TopUpPanel() {
               <EmptyState text="Belum ada top up." />
             ) : (
               rows.map((row) => {
-                const status = topupStatus(row.status);
+                const view = topupDisplay(row);
                 return (
                   <div className="list-row" key={row.id} style={{ alignItems: "flex-start" }}>
                     <div>
                       <div className="t">{rupiah(row.amount)}</div>
                       <div className="s">
-                        {row.code} · {methodLabel(row.payment_method)} · {tglJamID(row.created_at)}
+                        {methodLabel(row.payment_method)} · {view.description}
                       </div>
-                      {row.status === "rejected" && row.reject_reason ? (
+                      {view.extra ? (
                         <div className="s" style={{ color: "var(--rs-err)" }}>
-                          Ditolak: {row.reject_reason}
+                          {view.extra}
                         </div>
                       ) : null}
                       {row.proof_url ? (
@@ -105,7 +105,7 @@ export default function TopUpPanel() {
                         </a>
                       ) : null}
                     </div>
-                    <StatusBadge status={status} />
+                    {view.badge ? <StatusBadge status={view.badge} /> : null}
                   </div>
                 );
               })

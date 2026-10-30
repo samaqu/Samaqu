@@ -394,3 +394,20 @@ walau diskon diisi. Semua pengaturan harga reseller sekarang di satu tab admin.
   Catatan §8.5 bagian "Form produk" sudah tidak berlaku.
 - **Cache:** `/api/reseller/katalog` `force-dynamic`, klien portal `cache: "no-store"` — perubahan
   harga langsung terlihat saat reseller membuka katalog/Buat Pesanan.
+
+### 8.10 Status penarikan/top up di riwayat saldo (30 Oktober 2026)
+
+**Bug:** baris penarikan di Riwayat Saldo selalu "Saldo ditahan — penarikan diajukan" walau admin
+sudah menekan "Sudah ditransfer". Penyebab: `/api/reseller/ledger` hanya membaca `reseller_ledger`
+(baris hold tidak pernah berubah), sedangkan status hidup di `reseller_withdrawals` dan (sesuai
+aturan uang) "Sudah ditransfer" TIDAK menulis mutasi baru.
+
+**Perbaikan (tampilan/data saja, tanpa mutasi baru):** API ledger reseller kini menggabungkan
+baris `withdrawal_*` dengan `reseller_withdrawals` (status, bank + 4 digit, biaya, diterima,
+paid_at, alasan) dan baris `topup` dengan `reseller_topups` (status, reviewed_at). Satu helper
+`describeLedgerRow` / `topupDisplay` / `withdrawalDisplay` di `src/lib/reseller/format.ts` dipakai
+ListPanels (Dashboard + Riwayat Saldo), TopUpPanel, dan TarikSaldoPanel; label status seragam
+Menunggu / Dikonfirmasi / Ditransfer / Ditolak (muted "Dikembalikan" untuk baris release).
+"Ditahan untuk penarikan" di dashboard tetap dari RPC `samaqu_reseller_saldo` yang menghitung
+HANYA penarikan `status = 'pending'` (diverifikasi di SQL — tidak ada perubahan).
+Template WA "penarikan ditransfer" menyamarkan rekening jadi "{bank} ••••{4 digit}".

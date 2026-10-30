@@ -135,6 +135,19 @@ export interface LedgerRow {
   note: string | null;
   created_by: string | null;
   created_at: string;
+  /** Status terkini penarikan (untuk baris withdrawal_hold / withdrawal_release). */
+  withdrawal?: {
+    status: "pending" | "paid" | "rejected";
+    bank_name: string | null;
+    bank_last4: string;
+    transfer_amount: number;
+    admin_fee: number;
+    created_at: string;
+    paid_at: string | null;
+    reject_reason: string | null;
+  } | null;
+  /** Status terkini top up (untuk baris topup). */
+  topup?: { status: string; reviewed_at: string | null } | null;
 }
 
 export interface TopupRow {

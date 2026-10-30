@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ledgerTypeLabel, rupiah, tglJamID } from "@/lib/reseller/format";
+import { describeLedgerRow, rupiah, tglJamID, orderStatus } from "@/lib/reseller/format";
 import type { LedgerRow, OrderListRow } from "@/lib/reseller/client";
-import { orderStatus } from "@/lib/reseller/format";
 import { EmptyState, SkeletonRows, StatusBadge } from "./ui";
 
 /** Baris mutasi saldo: label jenis, catatan/referensi, nominal +/−, saldo akhir. */
@@ -13,23 +12,26 @@ export function MutasiList({ rows, loading }: { rows: LedgerRow[]; loading?: boo
 
   return (
     <div>
-      {rows.map((row) => (
-        <div className="list-row" key={row.id}>
-          <div style={{ minWidth: 0 }}>
-            <div className="t">{ledgerTypeLabel(row.type)}</div>
-            <div className="s">
-              {row.note || row.reference || "—"} · {tglJamID(row.created_at)}
+      {rows.map((row) => {
+        const view = describeLedgerRow(row);
+        return (
+          <div className="list-row" key={row.id} style={{ alignItems: "flex-start" }}>
+            <div style={{ minWidth: 0 }}>
+              <div className="t">{view.title}</div>
+              <div className="s">{view.description}</div>
+              {view.extra ? <div className="s">{view.extra}</div> : null}
+            </div>
+            <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+              {view.badge ? <StatusBadge status={view.badge} /> : null}
+              <div className={`amount ${row.amount >= 0 ? "pos" : "neg"}`}>
+                {row.amount >= 0 ? "+" : "−"}
+                {rupiah(Math.abs(row.amount))}
+              </div>
+              <div className="s">Saldo {rupiah(row.balance_after)}</div>
             </div>
           </div>
-          <div style={{ textAlign: "right" }}>
-            <div className={`amount ${row.amount >= 0 ? "pos" : "neg"}`}>
-              {row.amount >= 0 ? "+" : "−"}
-              {rupiah(Math.abs(row.amount))}
-            </div>
-            <div className="s">Saldo {rupiah(row.balance_after)}</div>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
