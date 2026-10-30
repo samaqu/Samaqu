@@ -616,3 +616,42 @@ dilewati). Baris Thobe Black (A-02) tidak lagi dijual reseller. Produk tanpa fot
 (foto asli, placeholder wordmark, stok habis nonaktif); shell asli + mock `/me` diukur pada
 768/900/1080/500. Tidak ada perubahan pada query Open Order, resolveStock, katalog website, atau
 sisi customer.
+
+### 8.18 Koreksi aturan "Tampil di" + tab Produk & Harga rapi (30 Oktober 2026)
+
+**Aturan baru (menggantikan §8.16):** reseller HANYA menjual produk **Katalog website**
+(`products.is_published = true`). Open Order & tersembunyi TIDAK ikut tab admin maupun portal.
+Klasifikasi "Tampil di" kini satu sumber di `src/lib/reseller/visibility.ts`
+(`catalogVisibility` / `isWebsiteCatalog` / `visibilityLabel`), dipakai `admin-catalog.ts` dan
+`katalog.ts`. Syarat portal = `isWebsiteCatalog` + `reseller_enabled` + harga/diskon efektif.
+Dropdown & chip "Tampil di" dihapus dari tab admin.
+
+**Data:** tidak ada flag yang diubah di commit ini. Cek DB 30 Okt: 0 produk Open Order/tersembunyi
+yang masih `reseller_enabled` (7 produk enabled semuanya katalog website: 6 Thobe Superblack +
+Thobe Broken White Bayati). Sebelum koreksi, 6 series **Thobe Black** (tersembunyi, A-02) sempat
+enabled; padanan katalog website-nya **Thobe Superblack** (B-01). Pengalihan Black → Superblack
+sudah dilakukan pada tugas sebelumnya (di luar commit ini), bukan otomatis oleh kode baru.
+
+**Harga minimum jual kembali aktif** (menggantikan §8.14 bagian min jual): `pricing.ts`
+`resellerMinSellPrice = max(reseller_min_sell_price, harga beli)`; kolom dibaca/ditulis di admin,
+katalog portal, validasi order server & portal, PATCH `/api/ops/reseller/catalog`. Input admin
+auto-save saat blur/Enter + peringatan "Di bawah harga beli" (tetap boleh simpan, seperti dulu).
+
+**Tab Produk & Harga (satu series = satu baris):**
+- Single-series: langsung satu baris "Nama produk — Series" (tanpa header grup).
+- Multi-series: header tipis (checkbox grup, nama, kategori, jumlah series, "Atur semua series
+  produk ini") + baris series ber-indent halus.
+- Kolom: checkbox · Series (+badge "Baru") · Harga katalog · Diskon (default/khusus) · Harga beli
+  reseller · Harga minimum jual (input) · Dijual. Header sticky satu baris, tidak wrap.
+- Mobile (<md): kartu ringkas per series (grid 2 kolom), tanpa scroll horizontal.
+- Filter cari/kategori/status + DefaultDiscountCard + BulkBar tetap; filter "Tampil di" dihapus.
+- Komponen: `SeriesRow` (baris + `SeriesCard`), `ProductGroupRow` (header grup), `MobilePriceList`,
+  `PriceTable`; `PriceTab` orkestrator.
+
+**Foto:** `loadOrderPhotoLookup` dapat parameter client opsional (default client publik, perilaku
+lama tidak berubah); katalog reseller memanggilnya dengan client admin. Portal 7/7 berfoto asli;
+placeholder tetap `ProductPhoto` hanya bila benar-benar tidak ada foto.
+
+**Verifikasi:** `tsc` EXIT=0; cek read-only via route temp (dihapus): admin 67 baris katalog
+website (0 Open Order/tersembunyi), portal 7 baris, 7/7 berfoto, `min_sell_price` terisi; render
+mock 1280 & 375 (header tidak terpotong, kartu mobile rapi, warning min jual muncul).
