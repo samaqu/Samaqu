@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { ApiError, resellerApi, type WithdrawalRow } from "@/lib/reseller/client";
 import RupiahInput from "./RupiahInput";
 import { maskAccount, rupiah, withdrawalDisplay } from "@/lib/reseller/format";
+import { bankDisplayName } from "@/lib/reseller/banks";
 import { useReseller } from "./ResellerShell";
 import { EmptyState, Note, SkeletonRows, StatusBadge } from "./ui";
 
@@ -39,6 +40,10 @@ export default function TarikSaldoPanel() {
   const saldo = me.saldo.saldo_tersedia;
   const bankReady = Boolean(me.reseller.bank_name && me.reseller.bank_number && me.reseller.bank_holder);
   const fee = me.pengaturan.rekening_bsi ? 0 : me.pengaturan.admin_fee_non_bsi;
+  // BSI (dari kode bank di server) selalu gratis; bank lain mengikuti pengaturan.
+  const feeLabel = me.pengaturan.rekening_bsi
+    ? "Gratis (sesama BSI)"
+    : `${rupiah(fee)} (bank selain BSI)`;
   const transfer = Math.max(0, amount - fee);
   const amountValid = amount >= 1 && amount <= saldo;
 
@@ -133,11 +138,11 @@ export default function TarikSaldoPanel() {
               <div className="kv-list" style={{ marginBottom: 12 }}>
                 <div className="it">
                   <span className="muted">Rekening tujuan</span>
-                  <b>{maskAccount(me.reseller.bank_name, me.reseller.bank_number)}</b>
+                  <b>{maskAccount(bankDisplayName(me.reseller.bank_name), me.reseller.bank_number)}</b>
                 </div>
                 <div className="it">
-                  <span className="muted">Biaya admin {me.pengaturan.rekening_bsi ? "(BSI, gratis)" : ""}</span>
-                  <b>{rupiah(fee)}</b>
+                  <span className="muted">Biaya admin</span>
+                  <b>{feeLabel}</b>
                 </div>
                 <div className="it">
                   <span className="muted">Kamu terima</span>
@@ -147,9 +152,9 @@ export default function TarikSaldoPanel() {
 
               {confirming ? (
                 <div className="note warn" style={{ marginBottom: 12 }}>
-                  Tarik {rupiah(amount)} ke {maskAccount(me.reseller.bank_name, me.reseller.bank_number)}?
-                  Biaya admin {rupiah(fee)}, kamu terima {rupiah(transfer)}. Saldo ditahan sampai admin
-                  mentransfer.
+                  Tarik {rupiah(amount)} ke{" "}
+                  {maskAccount(bankDisplayName(me.reseller.bank_name), me.reseller.bank_number)}? Biaya admin{" "}
+                  {feeLabel}, kamu terima {rupiah(transfer)}. Saldo ditahan sampai admin mentransfer.
                   <div className="row" style={{ marginTop: 10 }}>
                     <button className="btn sm" type="button" disabled={busy} onClick={submit}>
                       {busy ? <Loader2 size={14} /> : null}

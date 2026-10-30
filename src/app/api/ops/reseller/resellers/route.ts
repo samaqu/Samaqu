@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { normalizeWhatsappTarget } from "@/lib/fonnte";
 import { notifyResellerAccountCreated } from "@/lib/reseller/notify";
+import { normalizeBankValue } from "@/lib/reseller/banks";
 import { getResellerBalance } from "@/lib/reseller/saldo";
 
 /**
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
   const city = String(body.city ?? "").trim();
   const storeInfo = String(body.store_info ?? "").trim();
   const socialMedia = String(body.social_media ?? "").trim();
-  const bankName = String(body.bank_name ?? "").trim();
+  const bankName = normalizeBankValue(String(body.bank_name ?? ""));
   const bankNumber = String(body.bank_number ?? "").trim();
   const bankHolder = String(body.bank_holder ?? "").trim();
 

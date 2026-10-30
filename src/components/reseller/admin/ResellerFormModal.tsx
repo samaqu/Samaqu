@@ -2,16 +2,17 @@
 
 import { useState } from "react";
 import { AdminApiError, opsResellerApi, type ResellerAdminRow } from "./api";
+import BankSelect from "@/components/reseller/BankSelect";
 import { Modal } from "./Modal";
 
-const FIELDS: { key: keyof ResellerFormState; label: string; required?: boolean; placeholder?: string; textarea?: boolean }[] = [
+const FIELDS: { key: keyof ResellerFormState; label: string; required?: boolean; placeholder?: string; textarea?: boolean; kind?: "bank" }[] = [
   { key: "store_name", label: "Nama toko", required: true },
   { key: "owner_name", label: "Nama pemilik", required: true },
   { key: "whatsapp", label: "Nomor WhatsApp", required: true, placeholder: "08xxxxxxxxxx" },
   { key: "city", label: "Kota", placeholder: "KOTA MAKASSAR" },
   { key: "store_info", label: "Info toko", textarea: true, placeholder: "Alamat toko / keterangan" },
   { key: "social_media", label: "Sosial media", placeholder: "Instagram / TikTok / Shopee" },
-  { key: "bank_name", label: "Bank" },
+  { key: "bank_name", label: "Bank", kind: "bank" },
   { key: "bank_number", label: "Nomor rekening" },
   { key: "bank_holder", label: "Nama pemilik rekening" },
 ];
@@ -91,7 +92,16 @@ export default function ResellerFormModal({
               <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">
                 {field.label} {field.required ? <span className="text-red-500">*</span> : null}
               </label>
-              {field.textarea ? (
+              {field.kind === "bank" ? (
+                <div style={{ marginTop: 2 }}>
+                  <BankSelect
+                    label={field.label}
+                    required={false}
+                    value={form.bank_name}
+                    onChange={(value) => set("bank_name", value)}
+                  />
+                </div>
+              ) : field.textarea ? (
                 <textarea
                   className="w-full px-3 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-sm font-semibold text-slate-900"
                   rows={2}

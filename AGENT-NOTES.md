@@ -460,3 +460,24 @@ ditolak 410 setelah lewat batas. Detail pesanan yang menunggu punya tombol "Baya
 (termasuk `useCountdown` yang dihitung dari deadline server + digate `mounted` supaya tidak
 hydration mismatch). Komponen `PaymentMethodTabs` lama DIHAPUS (QRIS/rekening tidak lagi tampil di
 langkah 1/ringkasan); tipe `PaymentMethodChoice` pindah ke `payment/types.ts`.
+
+### 8.13 BSI selalu gratis — bank pakai KODE + dropdown (30 Oktober 2026)
+
+**Deteksi lama:** `isBsiBank` mencocokkan TEKS nama bank (lowercase, buang non-huruf, lalu
+`includes("bsi") || includes("banksyariahindonesia")`). Masalahnya: input nama bank bebas, dan
+bank lama yang sudah merger ke BSI ("Mandiri Syariah" / "BNI Syariah" / "BRI Syariah") TIDAK
+terdeteksi → penarikan ke BSI lama tetap kena biaya Rp2.500.
+
+**Sekarang:** `src/lib/reseller/banks.ts` = satu sumber daftar bank + deteksi:
+- Nilai `resellers.bank_name` disimpan sebagai KODE ("BSI", "BCA", "Mandiri", …); opsi "Lainnya"
+  menyimpan teks bebas. `isBsiBank()` = kode "BSI" (plus pola teks lama untuk data lama).
+- Input nama bank di **Profil → Rekening** (portal) dan **form Tambah/Ubah Reseller admin** kini
+  dropdown `BankSelect` (BSI, BCA, BRI, Mandiri, BNI, BTN, CIMB, Permata, Danamon, Muamalat, Jago,
+  SeaBank, BJB, Mega, Sinarmas, Panin, OCBC, UOB, BTPN + Lainnya).
+- Migration `20261030_reseller_bank_codes.sql` (sudah dijalankan) menormalisasi bank_name lama yang
+  mengandung bsi / syariah indonesia / mandiri syariah / bni syariah / bri syariah → "BSI"
+  (produksi saat ini 0 baris berubah — belum ada reseller BSI).
+- Server tetap menghitung sendiri: `/api/reseller/withdrawals` mengirim `p_is_bsi: isBsiBank(bank_name)`
+  ke RPC (biaya dari pengaturan); browser tidak pernah mengirim is_bsi/nominal biaya.
+- Tarik Saldo menampilkan rincian eksplisit: "Gratis (sesama BSI)" atau "Rp{biaya} (bank selain BSI)";
+  nama bank di riwayat/antrean/drawer tampil sebagai label (kode → label).

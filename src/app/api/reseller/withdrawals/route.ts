@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resellerSession, resellerUnauthorized } from "@/lib/reseller/auth";
-import { isBsiBank } from "@/lib/reseller/settings";
+import { isBsiBank } from "@/lib/reseller/banks";
 
 /** Daftar penarikan milik reseller sendiri. */
 export async function GET(req: NextRequest) {

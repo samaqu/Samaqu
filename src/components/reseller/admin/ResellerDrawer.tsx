@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { opsResellerApi, type ResellerAdminRow, type ResellerDetail } from "./api";
 import { ledgerTypeLabel, rupiah, tglJamID } from "@/lib/reseller/format";
+import { bankDisplayName } from "@/lib/reseller/banks";
 import { Modal } from "./Modal";
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -119,7 +120,7 @@ export default function ResellerDrawer({
           </div>
 
           <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5 text-[12px] text-slate-600">
-            <b>Rekening:</b> {detail.reseller.bank_name || "—"} {detail.reseller.bank_number || ""}{" "}
+            <b>Rekening:</b> {bankDisplayName(detail.reseller.bank_name) || "—"} {detail.reseller.bank_number || ""}{" "}
             {detail.reseller.bank_holder ? `a.n. ${detail.reseller.bank_holder}` : ""}
           </div>
         </div>

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resellerSession, resellerUnauthorized } from "@/lib/reseller/auth";
 import { getResellerBalance } from "@/lib/reseller/saldo";
-import { getResellerSettings, isBsiBank } from "@/lib/reseller/settings";
+import { getResellerSettings } from "@/lib/reseller/settings";
+import { isBsiBank, normalizeBankValue } from "@/lib/reseller/banks";
 
 /** Profil reseller + saldo + pengaturan (rekening BSI top up, biaya admin). */
 export async function GET(req: NextRequest) {
@@ -64,7 +65,8 @@ export async function PATCH(req: NextRequest) {
   const { error } = await getSupabaseAdmin()
     .from("resellers")
     .update({
-      bank_name: bankName,
+      // Simpan KODE bank bila dikenal ("BSI", "BCA", …); "Lainnya" tetap teks bebas.
+      bank_name: normalizeBankValue(bankName),
       bank_number: bankNumber,
       bank_holder: bankHolder,
       updated_at: new Date().toISOString(),

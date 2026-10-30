@@ -5,6 +5,7 @@
  */
 
 import { rupiah, tglID, tglJamID } from "@/lib/akun-format";
+import { bankDisplayName } from "./banks";
 
 export { rupiah, tglID, tglJamID };
 
@@ -163,7 +164,7 @@ export function describeLedgerRow(row: LedgerRowView): MutationDisplay {
     if (wd?.status === "paid") {
       return {
         title: "Tarik saldo",
-        description: `Ditransfer ke ${wd.bank_name || "Rekening"} ••••${wd.bank_last4} · ${tglJamID(wd.paid_at || row.created_at)}`,
+        description: `Ditransfer ke ${bankDisplayName(wd.bank_name) || "Rekening"} ••••${wd.bank_last4} · ${tglJamID(wd.paid_at || row.created_at)}`,
         extra: `Diterima ${rupiah(wd.transfer_amount)} · biaya admin ${rupiah(wd.admin_fee)}`,
         badge: { label: "Ditransfer", tone: "ok" },
       };
@@ -236,7 +237,7 @@ export function withdrawalDisplay(row: {
   if (row.status === "paid") {
     return {
       title: "Tarik saldo",
-      description: `Ditransfer ke ${row.bank_name || "Rekening"} ••••${last4Account(row.bank_number)} · ${tglJamID(row.paid_at || row.created_at)}`,
+      description: `Ditransfer ke ${bankDisplayName(row.bank_name) || "Rekening"} ••••${last4Account(row.bank_number)} · ${tglJamID(row.paid_at || row.created_at)}`,
       extra: `Diterima ${rupiah(row.transfer_amount)} · biaya admin ${rupiah(row.admin_fee)}`,
       badge: { label: "Ditransfer", tone: "ok" },
     };

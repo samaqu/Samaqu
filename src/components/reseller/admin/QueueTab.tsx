@@ -11,6 +11,7 @@ import {
   type QueueWithdrawal,
 } from "./api";
 import { rupiah, tglJamID } from "@/lib/reseller/format";
+import { bankDisplayName } from "@/lib/reseller/banks";
 import { ConfirmActionModal, Modal } from "./Modal";
 
 type Chip = "semua" | "topup" | "kekurangan" | "penarikan";
@@ -239,7 +240,7 @@ export default function QueueTab({
                       </td>
                       <td className="px-4 py-3">{resellerCell(row)}</td>
                       <td className="px-4 py-3 text-[12px] text-slate-500">
-                        {row.bank_name} {maskAccountNumber(row.bank_number)} a.n. {row.bank_holder}
+                        {bankDisplayName(row.bank_name)} {maskAccountNumber(row.bank_number)} a.n. {row.bank_holder}
                         <br />
                         Biaya admin {rupiah(row.admin_fee)} · transfer <b>{rupiah(row.transfer_amount)}</b>
                       </td>

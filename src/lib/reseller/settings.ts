@@ -51,18 +51,3 @@ export async function getResellerSettings(): Promise<ResellerSettingsValue> {
     };
   }
 }
-
-/** Apakah nama bank dianggap BSI (penarikan bebas biaya admin)? */
-export function isBsiBank(bankName?: string | null): boolean {
-  const name = String(bankName || "")
-    .toLowerCase()
-    .replace(/[^a-z]/g, "");
-  return name.includes("bsi") || name.includes("banksyariahindonesia");
-}
-
-/** Biaya admin penarikan: 0 kalau BSI, selain itu nilai pengaturan. */
-export async function withdrawalAdminFee(isBsi: boolean): Promise<number> {
-  if (isBsi) return 0;
-  const settings = await getResellerSettings();
-  return settings.adminFeeNonBsi;
-}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, LogOut } from "lucide-react";
 import { ApiError, clearResellerToken, resellerApi } from "@/lib/reseller/client";
+import BankSelect from "./BankSelect";
 import { useReseller } from "./ResellerShell";
 import { Note } from "./ui";
 
@@ -97,13 +98,7 @@ export default function ProfilPanel() {
           <div className="card-b">
             <form onSubmit={saveBank}>
               <div className="field">
-                <label>Nama bank</label>
-                <input
-                  className="in"
-                  placeholder="BSI / BCA / BRI…"
-                  value={bankName}
-                  onChange={(e) => setBankName(e.target.value)}
-                />
+                <BankSelect value={bankName} onChange={setBankName} />
               </div>
               <div className="field">
                 <label>Nomor rekening</label>

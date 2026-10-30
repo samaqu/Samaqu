@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { normalizeWhatsappTarget } from "@/lib/fonnte";
 import { getResellerBalance } from "@/lib/reseller/saldo";
+import { normalizeBankValue } from "@/lib/reseller/banks";
 
 /**
  * Detail satu reseller untuk drawer admin: profil + saldo + mutasi terakhir
@@ -71,9 +72,12 @@ export async function PATCH(
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
-  const textFields = ["store_name", "owner_name", "city", "store_info", "social_media", "bank_name", "bank_number", "bank_holder"] as const;
+  const textFields = ["store_name", "owner_name", "city", "store_info", "social_media", "bank_number", "bank_holder"] as const;
   for (const field of textFields) {
     if (typeof body[field] === "string") patch[field] = String(body[field]).trim() || null;
+  }
+  if (typeof body.bank_name === "string") {
+    patch.bank_name = normalizeBankValue(body.bank_name) || null;
   }
   if (typeof body.whatsapp === "string") {
     const target = normalizeWhatsappTarget(body.whatsapp);
