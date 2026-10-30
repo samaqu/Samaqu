@@ -77,6 +77,7 @@ interface ProductRow {
   price: number;
   reseller_enabled: boolean;
   reseller_discount_percent: number | string | null;
+  reseller_min_sell_price: number | null;
   series: string | null;
   image: string | null;
   jenis_kain?: { name?: string | null } | null;
@@ -123,7 +124,7 @@ export async function createResellerOrder(
   const { data: productRows, error: productsError } = await supabase
     .from("products")
     .select(
-      "id, name, price, reseller_enabled, reseller_discount_percent, series, image, jenis_kain_id, jenis_kain(name)"
+      "id, name, price, reseller_enabled, reseller_discount_percent, reseller_min_sell_price, series, image, jenis_kain_id, jenis_kain(name)"
     )
     .in("id", productIds);
 

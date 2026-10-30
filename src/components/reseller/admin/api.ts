@@ -152,7 +152,9 @@ export interface CatalogRow {
   created_at: string | null;
   reseller_enabled: boolean;
   reseller_discount_percent: number | null;
+  reseller_min_sell_price: number | null;
   buy_price: number;
+  min_sell_price: number;
 }
 
 export interface CatalogPayload {
@@ -164,6 +166,7 @@ export interface CatalogUpdate {
   id: string;
   reseller_enabled?: boolean;
   reseller_discount_percent?: number | null;
+  reseller_min_sell_price?: number | null;
 }
 
 export interface ResellerDetail {

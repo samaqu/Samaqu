@@ -11,7 +11,13 @@ export interface CatalogGroup {
   rows: CatalogRow[];
 }
 
-/** Grup satu produk (beberapa series) di tabel Produk & Harga. */
+/** Label untuk produk satu-series: "Nama produk — Series". */
+export function singleSeriesLabel(group: CatalogGroup): string {
+  const row = group.rows[0];
+  return row.series ? `${row.name} — ${row.series}` : row.name;
+}
+
+/** Grup produk di tabel Produk & Harga: header tipis + satu baris per series. */
 export default function ProductGroupRow({
   group,
   defaultDiscount,
@@ -20,6 +26,7 @@ export default function ProductGroupRow({
   onSelectGroup,
   onSelectRow,
   onToggle,
+  onMinSellCommit,
   isNewRow,
 }: {
   group: CatalogGroup;
@@ -29,15 +36,35 @@ export default function ProductGroupRow({
   onSelectGroup: (checked: boolean) => void;
   onSelectRow: (id: string, checked: boolean) => void;
   onToggle: (row: CatalogRow) => void;
+  onMinSellCommit: (row: CatalogRow, value: number | null) => void;
   isNewRow: (row: CatalogRow) => boolean;
 }) {
   const allSelected = group.rows.every((row) => selected.has(row.id));
-  const singleSeries = group.rows.length === 1;
+  const single = group.rows.length === 1;
+
+  if (single) {
+    const row = group.rows[0];
+    return (
+      <SeriesRow
+        row={row}
+        defaultDiscount={defaultDiscount}
+        seriesLabel={singleSeriesLabel(group)}
+        isSingle
+        indent={false}
+        selected={selected.has(row.id)}
+        isNew={isNewRow(row)}
+        saving={savingId === row.id}
+        onSelect={(checked) => onSelectRow(row.id, checked)}
+        onToggle={() => onToggle(row)}
+        onMinSellCommit={(value) => onMinSellCommit(row, value)}
+      />
+    );
+  }
 
   return (
     <>
       <tr className="bg-slate-50 border-y border-slate-200">
-        <td className="px-3 py-2 align-middle" colSpan={6}>
+        <td className="px-2 py-1.5 align-middle" colSpan={7}>
           <div className="flex items-center gap-2.5">
             <input
               type="checkbox"
@@ -47,15 +74,14 @@ export default function ProductGroupRow({
               style={{ accentColor: "#2563eb", width: 15, height: 15 }}
             />
             <div className="min-w-0">
-              <p className="font-extrabold text-slate-900 text-[13px] leading-tight">
+              <p className="font-extrabold text-slate-900 text-[12.5px] leading-tight">
                 {group.name}
                 <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                   {group.category}
                 </span>
-              </p>
-              <p className="text-[11px] text-slate-500 leading-tight">
-                {group.kain ? `Kain ${group.kain} · ` : ""}
-                {group.rows.length} series
+                <span className="ml-2 text-[10px] font-semibold text-slate-400">
+                  {group.rows.length} series
+                </span>
               </p>
             </div>
             <button
@@ -73,12 +99,14 @@ export default function ProductGroupRow({
           key={row.id}
           row={row}
           defaultDiscount={defaultDiscount}
-          seriesLabel={row.series || (singleSeries ? "Standar" : "—")}
+          isSingle={false}
+          indent
           selected={selected.has(row.id)}
           isNew={isNewRow(row)}
           saving={savingId === row.id}
           onSelect={(checked) => onSelectRow(row.id, checked)}
           onToggle={() => onToggle(row)}
+          onMinSellCommit={(value) => onMinSellCommit(row, value)}
         />
       ))}
     </>

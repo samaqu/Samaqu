@@ -13,7 +13,8 @@
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { catalogGroupKey } from "@/lib/catalog-group";
-import { effectiveDiscountPercent, resellerBuyPrice } from "./pricing";
+import { isWebsiteCatalog } from "./visibility";
+import { effectiveDiscountPercent, resellerBuyPrice, resellerMinSellPrice } from "./pricing";
 import { getResellerSettings } from "./settings";
 
 export interface ResellerVariant {
@@ -34,6 +35,8 @@ export interface ResellerCatalogProduct {
   /** Diskon efektif (khusus series atau default) untuk tampilan. */
   discount_percent: number;
   buy_price: number;
+  /** Batas bawah harga jual = max(minimum jual tersimpan, harga beli). */
+  min_sell_price: number;
   variants: ResellerVariant[];
 }
 
@@ -43,8 +46,11 @@ type ProductBaseRow = {
   category: string;
   series: string | null;
   price: number;
+  is_published: boolean | null;
+  open_order_enabled: boolean | null;
   reseller_enabled: boolean;
   reseller_discount_percent: number | string | null;
+  reseller_min_sell_price: number | null;
 };
 
 type VariantRow = {
@@ -65,11 +71,10 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
   const { data: rawProducts, error: productError } = await supabase
     .from("products")
     .select(
-      "id, name, category, series, price, reseller_enabled, reseller_discount_percent"
+      "id, name, category, series, price, is_published, open_order_enabled, reseller_enabled, reseller_discount_percent, reseller_min_sell_price"
     )
-    // Hanya series yang DIAKTIFKAN admin di tab Produk & Harga yang dijual ke
-    // reseller — tanpa filter is_published: Open Order & produk tersembunyi
-    // tetap tampil selama diaktifkan.
+    // Reseller hanya menjual produk KATALOG WEBSITE (klasifikasi "Tampil di"
+    // yang sama dengan tab admin) dan yang sudah diaktifkan admin.
     .eq("reseller_enabled", true)
     .order("created_at", { ascending: true });
 
@@ -78,7 +83,7 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
     throw new Error("Gagal memuat katalog reseller");
   }
 
-  const products = (rawProducts ?? []) as unknown as ProductBaseRow[];
+  const products = ((rawProducts ?? []) as unknown as ProductBaseRow[]).filter(isWebsiteCatalog);
   if (products.length === 0) return [];
 
   const ids = products.map((p) => String(p.id));
@@ -89,7 +94,7 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
       .select("product_id, color, size, stock, base_product_id, hex")
       .in("product_id", ids)
       .order("display_order"),
-    loadOrderPhotoLookup(ids),
+    loadOrderPhotoLookup(ids, [], supabase),
   ]);
 
   if (variantError) {
@@ -137,7 +142,7 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
         wantedGroups.has(catalogGroupKey(row))
       );
       if (candidates.length > 0) {
-        const groupLookup = await loadOrderPhotoLookup(candidates.map((row) => String(row.id)));
+        const groupLookup = await loadOrderPhotoLookup(candidates.map((row) => String(row.id)), [], supabase);
         for (const row of candidates) {
           const key = catalogGroupKey(row);
           const photo = groupLookup.main?.[String(row.id)];
@@ -161,6 +166,7 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
       price: Math.round(Number(product.price) || 0),
       discount_percent: effectiveDiscountPercent(product, defaultDiscount),
       buy_price: resellerBuyPrice(product, defaultDiscount),
+      min_sell_price: resellerMinSellPrice(product, defaultDiscount),
       // Varian series turunan boleh dibeli, stoknya mengikuti basis —
       // baris varian dikelompokkan per (color, size) tanpa duplikat.
       variants: own

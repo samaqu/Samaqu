@@ -8,6 +8,7 @@
  */
 
 import { supabase } from "./supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { isVideoUrl } from "./product-thumbnail";
 import type { OrderPhotoLookup } from "./order-photo";
 import type { Product } from "./katalog-data";
@@ -23,7 +24,10 @@ const norm = (value?: string | null) => String(value ?? "").trim().toLowerCase()
 
 export async function loadOrderPhotoLookup(
   productIds: (string | null | undefined)[],
-  catalog: Product[] = []
+  catalog: Product[] = [],
+  /** Default: client publik (perilaku lama). Pemanggil server boleh mengirim
+   *  client admin/service-role untuk produk yang tidak terbaca anon. */
+  client: SupabaseClient = supabase
 ): Promise<OrderPhotoLookup> {
   const ids = Array.from(
     new Set((productIds || []).map((id) => String(id ?? "").trim()).filter(Boolean))
@@ -33,7 +37,7 @@ export async function loadOrderPhotoLookup(
   if (ids.length === 0) return { main, byColor, catalog };
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from("product_images")
       .select("product_id, url, color, is_video, display_order")
       .in("product_id", ids)
@@ -63,7 +67,7 @@ export async function loadOrderPhotoLookup(
   const missing = ids.filter((id) => !main[id]);
   if (missing.length > 0) {
     try {
-      const { data, error } = await supabase.from("products").select("id, image, images").in("id", missing);
+      const { data, error } = await client.from("products").select("id, image, images").in("id", missing);
       if (error) console.error("[ORDER-PHOTO] Gagal ambil products:", error.message);
 
       for (const row of (data ?? []) as { id?: string; image?: string | null; images?: unknown }[]) {

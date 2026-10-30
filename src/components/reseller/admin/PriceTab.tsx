@@ -15,7 +15,6 @@ import PriceTable from "./PriceTable";
 import { AdminToast } from "./Modal";
 
 const NEW_SERIES_DAYS = 7;
-type VisibilityFilter = "all" | "katalog" | "open_order" | "tersembunyi";
 
 /** Tab "Produk & Harga": diskon default + tabel per series + aksi massal. */
 export default function PriceTab() {
@@ -26,7 +25,6 @@ export default function PriceTab() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState<"all" | "on" | "off">("all");
-  const [visibility, setVisibility] = useState<VisibilityFilter>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: "ok" | "err" } | null>(null);
@@ -66,13 +64,10 @@ export default function PriceTab() {
       if (category !== "all" && row.category !== category) return false;
       if (status === "on" && !row.reseller_enabled) return false;
       if (status === "off" && row.reseller_enabled) return false;
-      if (visibility === "katalog" && !row.is_published) return false;
-      if (visibility === "open_order" && !row.open_order_enabled) return false;
-      if (visibility === "tersembunyi" && (row.is_published || row.open_order_enabled)) return false;
       if (!needle) return true;
       return `${row.name} ${row.series || ""} ${row.kain || ""}`.toLowerCase().includes(needle);
     });
-  }, [rows, query, category, status, visibility]);
+  }, [rows, query, category, status]);
 
   const groups = useMemo<CatalogGroup[]>(() => {
     const map = new Map<string, CatalogGroup>();
@@ -117,22 +112,35 @@ export default function PriceTab() {
     });
   };
 
-  /** Simpan toggle satu baris. Reload menjaga harga beli tetap akurat. */
-  const saveToggle = async (row: CatalogRow) => {
+  /** Simpan satu perubahan baris. Reload menjaga harga beli/min jual tetap akurat. */
+  const saveRow = async (row: CatalogRow, updates: CatalogUpdate, message: string) => {
     setSavingId(row.id);
     try {
-      await opsResellerApi.saveCatalog([{ id: row.id, reseller_enabled: !row.reseller_enabled }]);
+      await opsResellerApi.saveCatalog([updates]);
       await load(true);
-      setToast({
-        message: `${row.series || row.name} ${!row.reseller_enabled ? "dinyalakan" : "dimatikan"} untuk reseller.`,
-        tone: "ok",
-      });
+      setToast({ message, tone: "ok" });
     } catch (e) {
       setToast({ message: e instanceof AdminApiError ? e.message : "Gagal menyimpan.", tone: "err" });
     } finally {
       setSavingId(null);
     }
   };
+
+  const saveToggle = (row: CatalogRow) =>
+    saveRow(
+      row,
+      { id: row.id, reseller_enabled: !row.reseller_enabled },
+      `${row.series || row.name} ${!row.reseller_enabled ? "dinyalakan" : "dimatikan"} untuk reseller.`
+    );
+
+  const saveMinSell = (row: CatalogRow, value: number | null) =>
+    saveRow(
+      row,
+      { id: row.id, reseller_min_sell_price: value },
+      value === null
+        ? `Harga minimum jual ${row.series || row.name} dikosongkan (ikut harga beli).`
+        : `Harga minimum jual ${row.series || row.name} disimpan.`
+    );
 
   const applyBulk = async (updates: CatalogUpdate[], message: string): Promise<boolean> => {
     setBulkBusy(true);
@@ -187,17 +195,6 @@ export default function PriceTab() {
         </select>
         <select
           className="px-3 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700"
-          value={visibility}
-          onChange={(e) => setVisibility(e.target.value as VisibilityFilter)}
-          aria-label="Filter tampil di"
-        >
-          <option value="all">Tampil di: Semua</option>
-          <option value="katalog">Katalog website</option>
-          <option value="open_order">Open Order</option>
-          <option value="tersembunyi">Tersembunyi</option>
-        </select>
-        <select
-          className="px-3 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700"
           value={status}
           onChange={(e) => setStatus(e.target.value as "all" | "on" | "off")}
           aria-label="Filter status reseller"
@@ -232,6 +229,7 @@ export default function PriceTab() {
           onSelectGroup={selectGroup}
           onSelectRow={toggleSelectRow}
           onToggle={saveToggle}
+          onMinSellCommit={saveMinSell}
           isNewRow={isNewRow}
         />
       )}

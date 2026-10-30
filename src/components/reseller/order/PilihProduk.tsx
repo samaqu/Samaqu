@@ -68,7 +68,7 @@ export default function PilihProduk({
       color,
       size,
       quantity: Math.min(qty, stock),
-      sellPrice: active.buy_price,
+      sellPrice: active.min_sell_price,
       stock,
     });
     setOpenId("");

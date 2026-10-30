@@ -7,15 +7,17 @@
  * - Diskon efektif = diskon KHUSUS per series (`reseller_discount_percent`)
  *   kalau diisi, selain itu diskon DEFAULT pengaturan reseller.
  * - Harga beli = harga katalog × (1 − diskon efektif/100), dibulatkan ke rupiah.
- * - Batas harga jual = HANYA harga beli reseller (tidak boleh jual di bawah modal).
- *   `products.reseller_min_sell_price` serta `products.minimum_price` (milik CYP)
- *   TIDAK dipakai untuk batas reseller.
+ * - Batas harga jual = nilai tertinggi antara `reseller_min_sell_price`
+ *   (kolom KHUSUS reseller, terpisah dari `products.minimum_price` milik CYP)
+ *   dan harga beli reseller.
  */
 
 export interface ResellerPriceable {
   price: number;
   /** Diskon khusus series (persen). NULL/kosong = pakai diskon default. */
   reseller_discount_percent?: number | string | null;
+  /** Batas minimum harga jual khusus reseller. */
+  reseller_min_sell_price?: number | null;
 }
 
 /** Diskon dipotong ke rentang wajar 0–100. */
@@ -44,10 +46,10 @@ export function resellerBuyPrice(product: ResellerPriceable, defaultPercent: num
 }
 
 /**
- * Batas bawah harga jual reseller = harga beli reseller (modal reseller).
- * Satu-satunya aturan batas jual; TIDAK memakai `products.minimum_price`
- * (milik Create Your Price) maupun kolom minimum khusus reseller yang lama.
+ * Batas bawah harga jual reseller = max(`reseller_min_sell_price`, harga beli).
+ * TIDAK memakai `products.minimum_price` (itu milik Create Your Price).
  */
 export function resellerMinSellPrice(product: ResellerPriceable, defaultPercent: number): number {
-  return resellerBuyPrice(product, defaultPercent);
+  const minimum = Math.round(Number(product.reseller_min_sell_price) || 0);
+  return Math.max(minimum, resellerBuyPrice(product, defaultPercent));
 }
