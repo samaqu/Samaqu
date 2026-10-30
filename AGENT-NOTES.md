@@ -331,3 +331,14 @@ tidak pernah berjalan dan request jatuh ke route portal apa adanya.
 **Parity ops ↔ panel admin:** halaman reseller admin satu komponen (`ResellerAdminPage`) tanpa
 gating `variant`; guard API sama (`isOpsAdmin`, tabel `admins`). Sudah dicek: tab, tombol
 Tambah Reseller, dan modal terbuka normal (render tanpa sesi admin; API 401 seperti seharusnya).
+
+### 8.7 Link portal di template WA reseller (30 Oktober 2026)
+
+Semua template WA reseller (`src/lib/reseller/notify.ts`) sekarang menyertakan tautan polos di
+baris sendiri (bisa diklik di WhatsApp): akun dibuat → `/reseller/login` (tepat setelah kalimat
+"akun sudah aktif", pengantar "Masuk ke portal reseller di sini:"), top up approved/rejected →
+`/reseller/top-up`, penarikan paid/rejected → `/reseller/tarik-saldo`, pesanan dibuat/lunas
+(kekurangan dikonfirmasi)/dikirim/diterima/dibatalkan/kekurangan ditolak →
+`/reseller/pesanan/<nomor>`. URL dibuat oleh SATU helper `portalUrl()` di file itu memakai
+`SITE_URL` (`src/lib/site-config.ts` — domain website, bukan office). Template customer/admin
+(`src/lib/fonnte.ts`), pemicu, dan klaim sekali-kirim tidak berubah.

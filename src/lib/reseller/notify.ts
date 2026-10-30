@@ -13,6 +13,7 @@
 
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getFonnteConfigs, normalizeWhatsappTarget, sendFonnteMessage } from "@/lib/fonnte";
+import { SITE_URL } from "@/lib/site-config";
 import { greetingName } from "@/lib/greeting";
 
 export type ResellerNotifyType =
@@ -102,6 +103,26 @@ async function notifyOnce(
   return sent;
 }
 
+/* ── Link portal (satu helper, selalu domain website) ── */
+
+type PortalPage = "login" | "top-up" | "tarik-saldo" | "pesanan";
+
+/**
+ * URL halaman portal reseller di domain website (SITE_URL = www.samaqu.id),
+ * BUKAN domain office. `orderNumber` hanya dipakai untuk halaman "pesanan".
+ */
+function portalUrl(page: PortalPage, orderNumber?: string): string {
+  if (page === "pesanan") {
+    return `${SITE_URL}/reseller/pesanan/${encodeURIComponent(String(orderNumber || "").trim())}`;
+  }
+  return `${SITE_URL}/reseller/${page}`;
+}
+
+/** Blok tautan polos di baris sendiri (WhatsApp otomatis menjadikannya bisa diklik). */
+function linkBlock(intro: string, url: string): string[] {
+  return ["", intro, url];
+}
+
 /* ── Penyusun pesan ── */
 
 function buildAccountCreated(ownerName: string): string {
@@ -110,8 +131,9 @@ function buildAccountCreated(ownerName: string): string {
     `Halo ${ka},`,
     "",
     "Akun reseller SAMAQU kamu sudah aktif.",
+    ...linkBlock("Masuk ke portal reseller di sini:", portalUrl("login")),
     "",
-    "Masuk ke portal reseller dengan nomor WhatsApp ini. Kode OTP akan dikirim ke nomor ini setiap kali masuk.",
+    "Kode OTP akan dikirim ke nomor WhatsApp ini setiap kali masuk.",
     "",
     "Terima kasih sudah menjadi bagian dari SAMAQU.",
   ].join("\n");
@@ -136,6 +158,7 @@ function buildOrderCreated(ownerName: string, shortfall: number, total: number, 
   } else {
     lines.push("", "Pembayaran sudah dipotong dari saldo dan pesanan langsung diproses.");
   }
+  lines.push(...linkBlock("Buka pesanan ini di portal reseller:", portalUrl("pesanan", orderNumber)));
   return lines.join("\n");
 }
 
@@ -147,6 +170,7 @@ function buildOrderPaid(ownerName: string, orderNumber: string): string {
     `Pembayaran kekurangan pesanan ${orderNumber} sudah dikonfirmasi. Pesanan kami proses.`,
     "",
     "Kami akan kirim nomor resi setelah pesanan dikirim.",
+    ...linkBlock("Lihat pesanan di portal reseller:", portalUrl("pesanan", orderNumber)),
   ].join("\n");
 }
 
@@ -158,6 +182,7 @@ function buildOrderShipped(ownerName: string, orderNumber: string, awbNo: string
     `Pesanan ${orderNumber} sudah dikirim, resi ${awbNo}.`,
     "",
     "Terima kasih telah berbelanja di SAMAQU.",
+    ...linkBlock("Lacak pesanan di portal reseller:", portalUrl("pesanan", orderNumber)),
   ].join("\n");
 }
 
@@ -169,6 +194,7 @@ function buildOrderDelivered(ownerName: string, orderNumber: string): string {
     `Pesanan ${orderNumber} sudah diterima penerima.`,
     "",
     "Terima kasih telah berbelanja di SAMAQU.",
+    ...linkBlock("Lihat pesanan di portal reseller:", portalUrl("pesanan", orderNumber)),
   ].join("\n");
 }
 
@@ -180,6 +206,7 @@ function buildOrderCancelled(ownerName: string, orderNumber: string, reason: str
     `Pesanan ${orderNumber} dibatalkan: ${reason}.`,
     "",
     "Saldo yang terpotong sudah dikembalikan otomatis.",
+    ...linkBlock("Lihat pesanan di portal reseller:", portalUrl("pesanan", orderNumber)),
   ].join("\n");
 }
 
@@ -190,6 +217,7 @@ function buildTopupApproved(ownerName: string, amount: number, balanceAfter: num
     "",
     `Top up ${rupiah(amount)} sudah dikonfirmasi.`,
     `Saldo kamu sekarang ${rupiah(balanceAfter)}.`,
+    ...linkBlock("Buka halaman Top Up di portal reseller:", portalUrl("top-up")),
     "",
     "Terima kasih,",
     "SAMAQU",
@@ -204,6 +232,7 @@ function buildTopupRejected(ownerName: string, amount: number, reason: string): 
     `Top up ${rupiah(amount)} ditolak: ${reason}.`,
     "",
     "Silakan hubungi admin SAMAQU kalau ada pertanyaan.",
+    ...linkBlock("Buka halaman Top Up di portal reseller:", portalUrl("top-up")),
   ].join("\n");
 }
 
@@ -220,6 +249,7 @@ function buildWithdrawalPaid(
     "",
     `Penarikan ${rupiah(amount)} sudah ditransfer ke ${bank} ${bankNumber}.`,
     `Jumlah diterima: ${rupiah(transferAmount)}.`,
+    ...linkBlock("Buka halaman Tarik Saldo di portal reseller:", portalUrl("tarik-saldo")),
     "",
     "Terima kasih,",
     "SAMAQU",
@@ -234,6 +264,7 @@ function buildWithdrawalRejected(ownerName: string, amount: number, reason: stri
     `Penarikan ${rupiah(amount)} ditolak: ${reason}.`,
     "",
     "Saldo yang ditahan sudah dikembalikan ke saldo kamu.",
+    ...linkBlock("Buka halaman Tarik Saldo di portal reseller:", portalUrl("tarik-saldo")),
   ].join("\n");
 }
 
@@ -245,6 +276,7 @@ function buildShortfallRejected(ownerName: string, orderNumber: string, reason: 
     `Bukti pembayaran kekurangan pesanan ${orderNumber} ditolak: ${reason}.`,
     "",
     "Pesanan dibatalkan dan saldo yang terpotong sudah dikembalikan otomatis.",
+    ...linkBlock("Lihat pesanan di portal reseller:", portalUrl("pesanan", orderNumber)),
   ].join("\n");
 }
 
