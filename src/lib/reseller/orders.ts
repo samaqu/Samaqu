@@ -411,8 +411,32 @@ export async function getResellerOrderDetail(
     ? new Date(new Date(order.created_at as string).getTime() + 24 * 3600 * 1000).toISOString()
     : null;
 
+  // Foto item: snapshot bisa berupa URL video (products.image lama) → pakai
+  // resolver bersama (lewati video, ambil foto katalog per warna/utama).
+  const rawItems = Array.isArray(order.order_items) ? order.order_items : [];
+  const photoLookup = await loadOrderPhotoLookup(
+    rawItems.map((item: { product_id?: string | null }) => item.product_id),
+    [],
+    supabase
+  );
+  const orderItems = rawItems.map((item: Record<string, unknown>) => {
+    const photo = orderItemPhoto(
+      {
+        product_id: (item.product_id as string | null) ?? null,
+        product_name: (item.product_name as string | null) ?? null,
+        kain: (item.kain as string | null) ?? null,
+        series: (item.series as string | null) ?? null,
+        color: (item.color as string | null) ?? null,
+        product_image: (item.product_image as string | null) ?? null,
+      },
+      photoLookup
+    );
+    return { ...item, product_image: photo || null };
+  });
+
   return {
     ...order,
+    order_items: orderItems,
     tracking: tracking ?? [],
     shortfall: payment
       ? {

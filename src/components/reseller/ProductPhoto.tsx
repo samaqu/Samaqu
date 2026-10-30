@@ -20,10 +20,12 @@ export default function ProductPhoto({
   src,
   name,
   series,
+  className = "ph",
 }: {
   src: string | null;
   name: string;
   series?: string | null;
+  className?: string;
 }) {
   const [failed, setFailed] = useState(false);
 
@@ -35,7 +37,7 @@ export default function ProductPhoto({
   if (!show) {
     const label = String(series || name || "").trim();
     return (
-      <div className="ph ph-empty" aria-hidden="true">
+      <div className={`${className} ph-empty`} aria-hidden="true">
         <span className="wm">SAMAQU</span>
         <span className="init">{initialsOf(label)}</span>
         {series ? <span className="sub">{series}</span> : null}
@@ -45,7 +47,7 @@ export default function ProductPhoto({
 
   return (
     <img
-      className="ph"
+      className={className}
       src={src as string}
       alt={name}
       loading="lazy"

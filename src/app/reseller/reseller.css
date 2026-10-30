@@ -454,3 +454,9 @@
   .rs-root .item-card-actions .btn { min-height: 44px; }
   .rs-root .prod-group-head { min-height: 64px; }
 }
+
+.rs-root .oi-ph { width: 44px; height: 55px; border-radius: 8px; object-fit: cover; flex: none; background: var(--rs-soft); }
+.rs-root .oi-ph.ph-empty { gap: 2px; }
+.rs-root .oi-ph.ph-empty .wm { font-size: 5.5px; letter-spacing: .1em; }
+.rs-root .oi-ph.ph-empty .init { font-size: 14px; }
+.rs-root .oi-ph.ph-empty .sub { display: none; }

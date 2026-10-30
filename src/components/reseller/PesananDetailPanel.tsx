@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Truck } from "lucide-react";
 import { resellerApi, type OrderDetail } from "@/lib/reseller/client";
 import { orderStatus, rupiah, tglJamID } from "@/lib/reseller/format";
+import ProductPhoto from "./ProductPhoto";
 import { Note, SkeletonRows, StatusBadge } from "./ui";
 
 /** Detail pesanan reseller: item + untung, alamat, status, resi & tracking. */
@@ -152,13 +153,12 @@ export default function PesananDetailPanel({ orderNumber }: { orderNumber: strin
             return (
               <div className="list-row" key={item.id} style={{ alignItems: "flex-start" }}>
                 <div style={{ display: "flex", gap: 10, minWidth: 0 }}>
-                  {item.product_image ? (
-                    <img
-                      src={item.product_image}
-                      alt={item.product_name}
-                      style={{ width: 44, height: 55, objectFit: "cover", borderRadius: 8 }}
-                    />
-                  ) : null}
+                  <ProductPhoto
+                    src={item.product_image}
+                    name={item.product_name}
+                    series={item.series}
+                    className="oi-ph"
+                  />
                   <div>
                     <div className="t">{item.product_name}</div>
                     <div className="s">
