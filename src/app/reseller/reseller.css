@@ -1,0 +1,283 @@
+/* =====================================================================
+   SAMAQU Portal Reseller — CSS terpisah (scoped .rs-root)
+   Monokrom brand + aksen: hijau (uang masuk/untung), kuning (menunggu),
+   merah (error/tolak). Font mengikuti website (Inter).
+   ===================================================================== */
+
+.rs-root {
+  --rs-bg: #f6f6f4;
+  --rs-card: #ffffff;
+  --rs-ink: #111111;
+  --rs-tx: #374151;
+  --rs-mut: #6b7280;
+  --rs-bd: #e4e4e0;
+  --rs-soft: #f3f3f0;
+  --rs-black: #111111;
+  --rs-ok: #15803d;
+  --rs-okbg: #ecfdf3;
+  --rs-warn: #b45309;
+  --rs-warnbg: #fffbeb;
+  --rs-err: #b91c1c;
+  --rs-errbg: #fef2f2;
+  --rs-r: 16px;
+  --rs-sh: 0 1px 2px rgba(17, 17, 17, 0.05);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  background: var(--rs-bg);
+  color: var(--rs-tx);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+.rs-root * { box-sizing: border-box; }
+.rs-root button, .rs-root input, .rs-root select, .rs-root textarea { font: inherit; color: inherit; }
+.rs-root a { color: inherit; text-decoration: none; }
+.rs-root h1, .rs-root h2, .rs-root h3, .rs-root p { margin: 0; }
+
+/* ── Kerangka ── */
+.rs-root .app { display: flex; min-height: 100vh; }
+.rs-root .sb {
+  width: 248px; background: #fff; border-right: 1px solid var(--rs-bd);
+  position: fixed; inset: 0 auto 0 0; display: flex; flex-direction: column; z-index: 40;
+}
+.rs-root .sb-head { padding: 20px 20px 10px; display: flex; align-items: center; gap: 10px; }
+.rs-root .sb-head img { height: 22px; width: auto; }
+.rs-root .sb-kicker {
+  font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--rs-mut); padding: 0 20px 14px; border-bottom: 1px solid var(--rs-bd);
+}
+.rs-root .sb-nav { flex: 1; overflow-y: auto; padding: 12px 12px 20px; display: flex; flex-direction: column; gap: 2px; }
+.rs-root .sb-label {
+  font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--rs-mut); padding: 14px 10px 6px;
+}
+.rs-root .sbn-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px;
+  font-weight: 600; color: var(--rs-tx); cursor: pointer; border: 0; background: none; width: 100%;
+  text-align: left;
+}
+.rs-root .sbn-item:hover { background: var(--rs-soft); }
+.rs-root .sbn-item.on { background: var(--rs-black); color: #fff; }
+.rs-root .sbn-item svg { width: 17px; height: 17px; flex: none; }
+.rs-root .sb-foot { border-top: 1px solid var(--rs-bd); padding: 12px; }
+.rs-root .main { flex: 1; margin-left: 248px; min-width: 0; display: flex; flex-direction: column; }
+.rs-root .hd {
+  display: flex; align-items: center; gap: 12px; padding: 14px 28px;
+  border-bottom: 1px solid var(--rs-bd); background: rgba(255, 255, 255, .9);
+  position: sticky; top: 0; z-index: 30; backdrop-filter: blur(8px);
+}
+.rs-root .hd h1 { font-size: 18px; font-weight: 800; letter-spacing: -.01em; color: var(--rs-ink); }
+.rs-root .hd .crumb { font-size: 12px; color: var(--rs-mut); font-weight: 600; }
+.rs-root .content { padding: 26px 28px 90px; max-width: 1180px; width: 100%; margin: 0 auto; }
+.rs-root .iconbtn {
+  width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--rs-bd);
+  background: #fff; display: grid; place-items: center; cursor: pointer; color: var(--rs-ink);
+}
+.rs-root .hide-m { display: initial; }
+.rs-root .show-m { display: none !important; }
+
+/* ── Kartu & grid ── */
+.rs-root .card { background: var(--rs-card); border: 1px solid var(--rs-bd); border-radius: var(--rs-r); box-shadow: var(--rs-sh); }
+.rs-root .card-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--rs-bd); }
+.rs-root .card-h h2 { font-size: 15px; font-weight: 800; color: var(--rs-ink); }
+.rs-root .card-h a, .rs-root .card-h .link { font-size: 12.5px; font-weight: 700; color: var(--rs-ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; background: none; border: 0; }
+.rs-root .card-b { padding: 18px; }
+.rs-root .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.rs-root .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+/* Halaman dengan ringkasan/form di kolom kanan (Buat Pesanan, Top Up, Tarik Saldo). */
+.rs-root .form-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; align-items: start; }
+.rs-root .stack { display: flex; flex-direction: column; gap: 18px; }
+.rs-root .row { display: flex; align-items: center; gap: 10px; }
+.rs-root .spread { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.rs-root .muted { color: var(--rs-mut); }
+.rs-root .small { font-size: 12px; }
+.rs-root .bold { font-weight: 800; color: var(--rs-ink); }
+
+/* ── Statistik ── */
+.rs-root .grid-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.rs-root .stat { background: #fff; border: 1px solid var(--rs-bd); border-radius: var(--rs-r); padding: 16px; }
+.rs-root .stat small { display: block; font-size: 11.5px; font-weight: 700; color: var(--rs-mut); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+.rs-root .stat b { font-size: 22px; font-weight: 800; color: var(--rs-ink); letter-spacing: -.02em; }
+.rs-root .stat .sub { font-size: 11.5px; color: var(--rs-mut); margin-top: 4px; }
+
+/* ── Kartu saldo hitam ── */
+.rs-root .saldo-card { background: var(--rs-black); color: #fff; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+.rs-root .saldo-card .lbl { font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.6); }
+.rs-root .saldo-card .big { font-size: 32px; font-weight: 800; letter-spacing: -.02em; }
+.rs-root .saldo-meta { display: flex; gap: 22px; flex-wrap: wrap; }
+.rs-root .saldo-meta div { font-size: 12.5px; color: rgba(255,255,255,.72); }
+.rs-root .saldo-meta b { display: block; color: #fff; font-size: 15px; font-weight: 700; margin-top: 3px; }
+.rs-root .saldo-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ── Tombol ── */
+.rs-root .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 11px 18px; border-radius: 12px; font-weight: 700; font-size: 14px;
+  border: 1px solid var(--rs-black); background: var(--rs-black); color: #fff; cursor: pointer;
+  transition: opacity .15s;
+}
+.rs-root .btn:hover { opacity: .88; }
+.rs-root .btn:disabled { opacity: .45; cursor: not-allowed; }
+.rs-root .btn.ghost { background: #fff; color: var(--rs-ink); border-color: var(--rs-bd); }
+.rs-root .btn.on-dark { background: #fff; color: var(--rs-black); border-color: #fff; }
+.rs-root .btn.on-dark.ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.4); }
+.rs-root .btn.danger { background: #fff; color: var(--rs-err); border-color: #f3c1c1; }
+.rs-root .btn.sm { padding: 7px 12px; font-size: 12.5px; border-radius: 9px; }
+.rs-root .btn.blk { width: 100%; }
+
+/* ── Form ── */
+.rs-root .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.rs-root .field > label { font-size: 12.5px; font-weight: 700; color: var(--rs-ink); }
+.rs-root .in, .rs-root select.in, .rs-root textarea.in {
+  width: 100%; border: 1px solid var(--rs-bd); border-radius: 11px; padding: 10px 12px;
+  background: #fff; outline: none; font-size: 14px;
+}
+.rs-root .in:focus { border-color: var(--rs-ink); box-shadow: 0 0 0 3px rgba(17,17,17,.08); }
+.rs-root .in.bad { border-color: #dc2626; }
+.rs-root .hint { font-size: 11.5px; color: var(--rs-mut); }
+.rs-root .err { font-size: 11.5px; color: var(--rs-err); font-weight: 600; }
+.rs-root textarea.in { resize: vertical; min-height: 70px; }
+
+/* ── Badge status ── */
+.rs-root .badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.rs-root .badge.ok { background: var(--rs-okbg); color: var(--rs-ok); }
+.rs-root .badge.warn { background: var(--rs-warnbg); color: var(--rs-warn); }
+.rs-root .badge.err { background: var(--rs-errbg); color: var(--rs-err); }
+.rs-root .badge.muted { background: var(--rs-soft); color: var(--rs-mut); }
+
+/* ── Baris daftar (mutasi & pesanan) ── */
+.rs-root .list-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 13px 4px; border-bottom: 1px solid var(--rs-soft);
+}
+.rs-root .list-row:last-child { border-bottom: 0; }
+.rs-root .list-row .t { font-weight: 700; color: var(--rs-ink); }
+.rs-root .list-row .s { font-size: 12px; color: var(--rs-mut); margin-top: 2px; }
+.rs-root .amount { font-weight: 800; white-space: nowrap; }
+.rs-root .amount.pos { color: var(--rs-ok); }
+.rs-root .amount.neg { color: var(--rs-ink); }
+
+/* ── Kosong / skeleton ── */
+.rs-root .empty { padding: 34px 16px; text-align: center; color: var(--rs-mut); font-size: 13px; }
+.rs-root .sk { background: linear-gradient(90deg, #eee 25%, #f5f5f3 37%, #eee 63%); background-size: 400% 100%; animation: rsShimmer 1.3s ease infinite; border-radius: 8px; }
+@keyframes rsShimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+.rs-root .sk-row { height: 44px; margin-bottom: 10px; }
+
+/* ── Notifikasi inline ── */
+.rs-root .note { border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.55; border: 1px solid; }
+.rs-root .note.warn { background: var(--rs-warnbg); border-color: #f1d9a7; color: #7c4a03; }
+.rs-root .note.ok { background: var(--rs-okbg); border-color: #bfe8cf; color: #14532d; }
+.rs-root .note.err { background: var(--rs-errbg); border-color: #f3c1c1; color: #7f1d1d; }
+
+/* ── Tabs ── */
+.rs-root .tabs { display: flex; gap: 6px; overflow-x: auto; padding: 4px; scrollbar-width: none; }
+.rs-root .tabs::-webkit-scrollbar { display: none; }
+.rs-root .tab {
+  padding: 7px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 700; white-space: nowrap;
+  border: 1px solid var(--rs-bd); background: #fff; color: var(--rs-tx); cursor: pointer;
+}
+.rs-root .tab.on { background: var(--rs-black); color: #fff; border-color: var(--rs-black); }
+
+/* ── Katalog & pilih produk ── */
+.rs-root .prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
+.rs-root .prod-card { background: #fff; border: 1px solid var(--rs-bd); border-radius: var(--rs-r); overflow: hidden; display: flex; flex-direction: column; }
+.rs-root .prod-card .ph { aspect-ratio: 4/5; background: var(--rs-soft); object-fit: cover; width: 100%; }
+.rs-root .prod-card .bd { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; }
+.rs-root .prod-card .nm { font-weight: 800; color: var(--rs-ink); font-size: 13.5px; line-height: 1.35; }
+.rs-root .price-strike { text-decoration: line-through; color: var(--rs-mut); font-size: 12px; }
+
+.rs-root .pick-row { display: flex; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--rs-bd); border-radius: 12px; background: #fff; cursor: pointer; width: 100%; text-align: left; }
+.rs-root .pick-row:hover { border-color: var(--rs-ink); }
+.rs-root .pick-row .ph { width: 52px; height: 64px; border-radius: 8px; object-fit: cover; background: var(--rs-soft); flex: none; }
+
+/* ── Baris produk pesanan ── */
+.rs-root .line-item { border: 1px solid var(--rs-bd); border-radius: 14px; padding: 14px; background: #fff; display: flex; flex-direction: column; gap: 12px; }
+.rs-root .line-item .head { display: flex; gap: 12px; }
+.rs-root .line-item .head img { width: 56px; height: 70px; object-fit: cover; border-radius: 9px; background: var(--rs-soft); flex: none; }
+.rs-root .price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rs-root .price-cell { background: var(--rs-soft); border-radius: 10px; padding: 8px 10px; }
+.rs-root .price-cell small { display: block; font-size: 10.5px; font-weight: 700; color: var(--rs-mut); text-transform: uppercase; letter-spacing: .04em; }
+.rs-root .price-cell b { font-size: 13.5px; color: var(--rs-ink); }
+
+/* ── Stepper qty ── */
+.rs-root .qty { display: inline-flex; align-items: center; border: 1px solid var(--rs-bd); border-radius: 10px; overflow: hidden; }
+.rs-root .qty button { width: 34px; height: 34px; border: 0; background: #fff; cursor: pointer; display: grid; place-items: center; }
+.rs-root .qty button:disabled { opacity: .35; cursor: not-allowed; }
+.rs-root .qty span { min-width: 34px; text-align: center; font-weight: 800; }
+
+/* ── Chip pilihan ── */
+.rs-root .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rs-root .chip { padding: 6px 11px; border-radius: 999px; border: 1px solid var(--rs-bd); background: #fff; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.rs-root .chip.on { background: var(--rs-black); border-color: var(--rs-black); color: #fff; }
+.rs-root .chip:disabled { opacity: .35; cursor: not-allowed; }
+
+/* ── Ringkasan pesanan ── */
+.rs-root .review { position: sticky; top: 84px; align-self: start; }
+.rs-root .review-sticky { display: none; }
+.rs-root .kv { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; font-size: 13px; }
+.rs-root .kv b { font-weight: 700; color: var(--rs-ink); text-align: right; }
+.rs-root .kv.total { border-top: 1px solid var(--rs-bd); margin-top: 8px; padding-top: 12px; font-size: 15px; }
+.rs-root .kv.total b { font-size: 18px; font-weight: 800; }
+
+/* ── Upload bukti ── */
+.rs-root .upload {
+  border: 1.5px dashed var(--rs-bd); border-radius: 12px; padding: 14px; text-align: center;
+  font-size: 12.5px; color: var(--rs-mut); cursor: pointer; background: #fff;
+}
+.rs-root .upload:hover { border-color: var(--rs-ink); color: var(--rs-ink); }
+.rs-root .upload img { max-height: 120px; border-radius: 8px; margin: 8px auto 0; display: block; }
+
+/* ── Detail pesanan ── */
+.rs-root .kv-list { display: flex; flex-direction: column; gap: 10px; }
+.rs-root .kv-list .it { display: flex; justify-content: space-between; gap: 14px; font-size: 13px; }
+.rs-root .timeline { display: flex; flex-direction: column; gap: 12px; }
+.rs-root .tl-item { display: flex; gap: 10px; }
+.rs-root .tl-dot { width: 9px; height: 9px; border-radius: 999px; background: var(--rs-ink); margin-top: 5px; flex: none; }
+
+/* ── Bottom nav (mobile) ── */
+.rs-root .bnav {
+  display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 45;
+  background: #fff; border-top: 1px solid var(--rs-bd);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.rs-root .bnav a {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 2px 7px; font-size: 10.5px; font-weight: 700; color: var(--rs-mut);
+}
+.rs-root .bnav a.on { color: var(--rs-ink); }
+.rs-root .bnav a svg { width: 20px; height: 20px; }
+
+/* ── Login ── */
+.rs-root .login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: var(--rs-bg); }
+.rs-root .login-card { width: 100%; max-width: 400px; background: #fff; border: 1px solid var(--rs-bd); border-radius: 20px; padding: 28px 24px; box-shadow: 0 12px 40px rgba(17,17,17,.06); }
+.rs-root .login-card img.logo { height: 24px; margin-bottom: 20px; }
+.rs-root .login-card h1 { font-size: 22px; font-weight: 800; color: var(--rs-ink); letter-spacing: -.01em; }
+.rs-root .login-card .sub { font-size: 13px; color: var(--rs-mut); margin-top: 6px; line-height: 1.5; }
+.rs-root .otp-in { letter-spacing: .5em; font-size: 20px; font-weight: 800; text-align: center; }
+
+/* ── Mobile ── */
+@media (max-width: 900px) {
+  .rs-root .grid-stats { grid-template-columns: repeat(2, 1fr); }
+  .rs-root .grid2, .rs-root .grid3, .rs-root .form-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 767px) {
+  .rs-root .sb { display: none; }
+  .rs-root .main { margin-left: 0; }
+  .rs-root .hd { padding: 12px 16px; }
+  .rs-root .hd h1 { font-size: 16px; }
+  .rs-root .content { padding: 16px 16px 96px; }
+  .rs-root .hide-m { display: none !important; }
+  .rs-root .show-m { display: inline-flex !important; }
+  .rs-root .bnav { display: flex; }
+  .rs-root .grid-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .rs-root .stat b { font-size: 18px; }
+  .rs-root .saldo-card .big { font-size: 28px; }
+  .rs-root .saldo-actions .btn { flex: 1; }
+  .rs-root .review { position: static; }
+  .rs-root .review-sticky {
+    position: fixed; left: 0; right: 0; bottom: calc(56px + env(safe-area-inset-bottom)); z-index: 44;
+    background: #fff; border-top: 1px solid var(--rs-bd); padding: 10px 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .rs-root .prod-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .rs-root .price-grid { grid-template-columns: 1fr 1fr; }
+}

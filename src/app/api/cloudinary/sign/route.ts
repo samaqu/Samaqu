@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { resellerSession } from "@/lib/reseller/auth";
 
 export const runtime = "nodejs";
 
@@ -72,7 +73,8 @@ const REVIEW_IMAGE_TRANSFORMATION = "c_limit,w_1280,q_auto:good";
 
 // Upload chat dan ulasan boleh memakai akun Cloudinary TERPISAH (isolasi storage/kredit).
 // Kalau env-nya belum diisi, jatuh ke akun utama supaya tetap jalan.
-function resolveScope(scope: "product" | "chat" | "review") {
+// Bukti transfer reseller (top up & kekurangan) memakai akun utama, folder "reseller".
+function resolveScope(scope: "product" | "chat" | "review" | "reseller") {
   if (scope === "chat") {
     return {
       cloudName: process.env.CHAT_CLOUDINARY_CLOUD || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD,
@@ -89,6 +91,15 @@ function resolveScope(scope: "product" | "chat" | "review") {
       apiSecret: process.env.REVIEW_CLOUDINARY_API_SECRET || process.env.CLOUDINARY_API_SECRET,
       folder: "reviews" as string | undefined,
       kind: "review" as const,
+    };
+  }
+  if (scope === "reseller") {
+    return {
+      cloudName: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD,
+      apiKey: process.env.CLOUDINARY_API_KEY,
+      apiSecret: process.env.CLOUDINARY_API_SECRET,
+      folder: "reseller" as string | undefined,
+      kind: "reseller" as const,
     };
   }
   return {
@@ -119,6 +130,15 @@ async function isCustomerRequest(request: Request) {
   }
 }
 
+/** Bukti transfer reseller hanya untuk sesi reseller (token hash di reseller_sessions). */
+async function isResellerRequest(request: Request) {
+  try {
+    return Boolean(await resellerSession(request as NextRequest));
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
   let body: { resourceType?: string; scope?: string } = {};
   try {
@@ -128,11 +148,22 @@ export async function POST(request: Request) {
   }
 
   const requested = String(body?.scope || "product");
-  const scope: "product" | "chat" | "review" =
-    requested === "chat" ? "chat" : requested === "review" ? "review" : "product";
+  const scope: "product" | "chat" | "review" | "reseller" =
+    requested === "chat"
+      ? "chat"
+      : requested === "review"
+        ? "review"
+        : requested === "reseller"
+          ? "reseller"
+          : "product";
 
   // Upload foto ulasan hanya untuk customer yang login.
   if (scope === "review" && !(await isCustomerRequest(request))) {
+    return NextResponse.json({ error: "Silakan masuk dulu." }, { status: 401 });
+  }
+
+  // Bukti transfer reseller hanya untuk sesi reseller yang sah.
+  if (scope === "reseller" && !(await isResellerRequest(request))) {
     return NextResponse.json({ error: "Silakan masuk dulu." }, { status: 401 });
   }
 
@@ -167,7 +198,7 @@ export async function POST(request: Request) {
   // Produk: gambar → c_limit,w_2400,q_auto:good; video → c_limit,w_720,q_auto (lihat catatan
   // VIDEO_* di atas: tarif SD, bukan HD). Chat dan ulasan: gambar 1280px.
   const transformation =
-    kind === "chat"
+    kind === "chat" || kind === "reseller"
       ? CHAT_IMAGE_TRANSFORMATION
       : kind === "review"
         ? REVIEW_IMAGE_TRANSFORMATION

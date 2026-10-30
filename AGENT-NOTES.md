@@ -247,3 +247,31 @@ Admin ops (`isOpsAdmin`): `GET/POST /api/ops/reseller/resellers`,
 - Reseller login tidak memakai Supabase Auth. Jangan menambahkan komponen yang mengharapkan
   `supabase.auth.getUser()` untuk reseller — pakai guard `resellerSession()`.
 - `resellers.whatsapp` disimpan ternormalisasi (62…); lookup login menormalkan input dulu.
+
+### 8.4 Portal reseller (tahap 3 — UI, 2026-10-30)
+
+Route `/reseller/**` (tanpa locale; middleware mengecualikan `reseller`). Tema monokrom
+sendiri di `src/app/reseller/reseller.css` (scoped `.rs-root`, font Inter, aksen hijau/kuning/merah).
+Token sesi disimpan di `localStorage: samaqu:reseller-token`; SATU pemanggil API:
+`src/lib/reseller/client.ts` (`resellerApi.*`). Format & label status: `src/lib/reseller/format.ts`
+(rupiah/tanggal memakai `src/lib/akun-format.ts`).
+
+Halaman (`src/app/reseller/`): `login` (OTP + hitung mundur), dashboard (`page.tsx`),
+`pesanan` + `pesanan/baru` + `pesanan/[orderNumber]`, `saldo` (tab jenis + bulan + muat lebih),
+`top-up`, `tarik-saldo` (biaya admin dari pengaturan; konfirmasi teks tetap), `katalog`, `profil`.
+Komponen di `src/components/reseller/` (shell, panel per halaman, `order/*` untuk Buat Pesanan,
+`UploadBukti` scope Cloudinary "reseller").
+
+Endpoint kecil yang ditambahkan untuk UI: `POST /api/reseller/alamat-tebak` (deteksi alamat yang
+sama dengan admin, ber-guard reseller + rate limit) dan `GET /api/reseller/stats` (statistik bulan
+ini + top up pending). `POST /api/reseller/ongkir` sekarang menerima `items` dan menghitung berat
+SERVER (fungsi `sumWeightGramsBySize` yang sama dengan pembuatan pesanan) supaya opsi J&T yang
+dipilih cocok saat diverifikasi ulang.
+
+Di luar folder reseller (sengaja, minimal): `middleware.ts` (kecualikan `reseller` dari redirect
+locale), `api/cloudinary/sign/route.ts` + `lib/cloudinary.ts` (scope `reseller`, folder `reseller`,
+wajib sesi reseller), `types/lucide-react.d.ts` (daftar ikon baru portal).
+
+Jebakan UI: jangan pakai inline `gridTemplateColumns` untuk halaman 2 kolom — pakai class
+`.form-grid` supaya mobile jatuh ke satu kolom; bar ringkasan mobile `.review-sticky` disembunyikan
+di desktop lewat CSS.

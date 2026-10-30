@@ -109,5 +109,14 @@ declare module "lucide-react" {
   export const Link2: FC<IconProps>;
   export const Receipt: FC<IconProps>;
   export const MousePointerClick: FC<IconProps>;
+  // Portal reseller
+  export const PackagePlus: FC<IconProps>;
+  export const ReceiptText: FC<IconProps>;
+  export const ArrowDownToLine: FC<IconProps>;
+  export const ArrowUpFromLine: FC<IconProps>;
+  export const History: FC<IconProps>;
+  export const UserRound: FC<IconProps>;
+  export const FileImage: FC<IconProps>;
+  export const Wand2: FC<IconProps>;
   export type LucideIcon = FC<IconProps>;
 }

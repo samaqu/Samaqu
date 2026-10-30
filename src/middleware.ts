@@ -103,6 +103,6 @@ export const config = {
   matcher: [
     "/",
     "/(id|en)/:path*",
-    "/((?!_next|admin|panel-admin|ops|affiliate|bio|r/|api|opengraph-image|twitter-image|icon|apple-icon|manifest|\\.well-known|.*\\..*).*)",
+    "/((?!_next|admin|panel-admin|ops|affiliate|reseller|bio|r/|api|opengraph-image|twitter-image|icon|apple-icon|manifest|\\.well-known|.*\\..*).*)",
   ],
 };

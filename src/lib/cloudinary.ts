@@ -91,7 +91,7 @@ interface CloudinarySignature {
   signature: string;
 }
 
-export type UploadScope = "product" | "chat" | "review";
+export type UploadScope = "product" | "chat" | "review" | "reseller";
 
 /* ────────────────────────────────────────────────────────────────────────────
    Validasi berkas media sebelum upload.
