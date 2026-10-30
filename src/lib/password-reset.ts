@@ -14,18 +14,24 @@
  * - Rate limit per akun (5/jam, jeda 60 detik) dan per IP (10/jam).
  */
 
-import { createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { getSupabaseAdmin } from "./supabase-admin";
 import { normalizeWhatsappTarget, notifyCustomerPasswordResetOtp } from "./fonnte";
+import {
+  OTP_MAX_ATTEMPTS,
+  otpExpiryIso,
+  otpGenerateCode,
+  otpHmac,
+  otpHmacMatches,
+  otpNormalizeCode,
+} from "./otp-core";
 
 export const PASSWORD_MIN_LENGTH = 6;
 
-const OTP_TTL_MS = 5 * 60 * 1000;
 const RESET_TTL_MS = 10 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
 const MAX_REQUESTS_PER_HOUR = 5;
 const MAX_REQUESTS_PER_IP_HOUR = 10;
-const MAX_ATTEMPTS = 5;
 
 /** Tabel/fungsi migrasi belum dijalankan di Supabase. */
 export class PasswordResetNotReadyError extends Error {
@@ -45,28 +51,12 @@ export type VerifyOtpResult =
 
 export type ResetPasswordResult = { ok: true } | { ok: false; error: string };
 
-function secret(): string {
-  const value = String(process.env.OTP_SECRET || "").trim();
-  if (!value) throw new PasswordResetNotReadyError("OTP_SECRET belum diatur.");
-  return value;
-}
-
 function hashValue(value: string): string {
-  return createHmac("sha256", secret()).update(value).digest("hex");
-}
-
-function sameHash(a: string, b: string): boolean {
-  const left = Buffer.from(a, "utf8");
-  const right = Buffer.from(b, "utf8");
-  return left.length === right.length && timingSafeEqual(left, right);
+  return otpHmac(value);
 }
 
 function normalizeEmail(email: string): string {
   return String(email || "").trim().toLowerCase();
-}
-
-function normalizeCode(code: string): string {
-  return String(code || "").replace(/\D/g, "").slice(0, 6);
 }
 
 /** IP disimpan sebagai hash supaya tidak menyimpan alamat mentah pelanggan. */
@@ -183,12 +173,12 @@ export async function requestPasswordResetOtp(
     .is("consumed_at", null)
     .is("used_at", null);
 
-  const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
+  const code = otpGenerateCode();
 
   const { error: insertError } = await admin.from("password_reset_otp").insert({
     user_id: userId,
     code_hash: hashValue(code),
-    expires_at: new Date(now + OTP_TTL_MS).toISOString(),
+    expires_at: otpExpiryIso(now),
     requested_ip: ipHash || null,
   });
 
@@ -209,7 +199,7 @@ export async function verifyPasswordResetOtp(
   rawCode: string
 ): Promise<VerifyOtpResult> {
   const email = normalizeEmail(rawEmail);
-  const code = normalizeCode(rawCode);
+  const code = otpNormalizeCode(rawCode);
   if (code.length !== 6) {
     return { ok: false, error: "Kode harus 6 digit." };
   }
@@ -241,17 +231,17 @@ export async function verifyPasswordResetOtp(
   }
 
   const attempts = Number(row.attempts) || 0;
-  if (attempts >= MAX_ATTEMPTS) {
+  if (attempts >= OTP_MAX_ATTEMPTS) {
     return { ok: false, error: "Terlalu banyak percobaan. Minta kode baru.", expired: true };
   }
 
-  if (!sameHash(String(row.code_hash), hashValue(code))) {
+  if (!otpHmacMatches(String(row.code_hash), hashValue(code))) {
     // Naikkan attempts ATOMIK lewat RPC supaya percobaan paralel tidak bisa melewati batas.
     // Fallback update lama hanya dipakai kalau migrasi RPC belum dijalankan.
     let nextAttempts = attempts + 1;
     const { data: bumped, error: bumpError } = await admin.rpc("samaqu_otp_bump_attempts", {
       p_id: row.id,
-      p_max: MAX_ATTEMPTS,
+      p_max: OTP_MAX_ATTEMPTS,
     });
     if (!bumpError && bumped !== null && bumped !== undefined) {
       nextAttempts = Number(bumped);
@@ -261,9 +251,9 @@ export async function verifyPasswordResetOtp(
         .update({ attempts: nextAttempts })
         .eq("id", row.id);
     }
-    nextAttempts = Math.min(MAX_ATTEMPTS, Math.max(nextAttempts, attempts + 1));
+    nextAttempts = Math.min(OTP_MAX_ATTEMPTS, Math.max(nextAttempts, attempts + 1));
 
-    const attemptsLeft = Math.max(0, MAX_ATTEMPTS - nextAttempts);
+    const attemptsLeft = Math.max(0, OTP_MAX_ATTEMPTS - nextAttempts);
     return {
       ok: false,
       error:

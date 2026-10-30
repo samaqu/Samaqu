@@ -124,7 +124,9 @@ export async function GET(request: NextRequest) {
     .eq("status", "pending")
     .is("paid_at", null)
     // Sama seperti reminder: transaksi manual `OPS-…` ("Belum Lunas") tidak ikut dibatalkan.
-    .or("order_number.like.SMQ-%,order_number.like.CYO-%")
+    // Pesanan reseller (`RSL-…`) yang masih pending = kekurangan belum dibayar; ikut
+    // dibatalkan setelah 24 jam lewat jalur resmi (saldo & stok kembali).
+    .or("order_number.like.SMQ-%,order_number.like.CYO-%,order_number.like.RSL-%")
     .lt("created_at", cutoff);
 
   if (fetchError) {

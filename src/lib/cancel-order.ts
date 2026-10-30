@@ -3,6 +3,7 @@ import { cancelOrder } from "@/lib/jnt";
 import { notifyAdminOrderCancelled, notifyCustomerOrderCancelled } from "@/lib/fonnte";
 import { claimOrderNotification } from "@/lib/order-notify";
 import { syncCommissionStatus } from "@/lib/affiliate/commission";
+import { claimResellerNotification, notifyResellerOrderCancelled } from "@/lib/reseller/notify";
 
 /**
  * Satu jalur pembatalan pesanan untuk semua pemanggil: customer (`/api/orders/cancel`),
@@ -25,6 +26,13 @@ export interface CancelableOrder {
   /** Dipakai notifikasi pembatalan (WhatsApp customer + admin). */
   customer_name?: string | null;
   customer_whatsapp?: string | null;
+  /**
+   * Pesanan reseller (dropship). Kalau tidak diisi pemanggil, nilainya
+   * dibaca dari database — perilaku pesanan non-reseller tidak berubah.
+   */
+  reseller_id?: string | null;
+  /** Potongan saldo yang harus dikembalikan saat pesanan reseller dibatalkan. */
+  reseller_balance_deduction?: number | null;
 }
 
 export type CancelOrderResult =
@@ -191,11 +199,59 @@ export async function cancelOrderCompletely(
     console.error("[CANCEL] Gagal menyelaraskan komisi affiliate:", e);
   }
 
-  // Notifikasi pembatalan: customer (token Fonnte Customer) dan admin (token Fonnte Admin)
-  // dikirim bersamaan dan saling terpisah. Klaim `cancelled_notified_at` memastikan hanya sekali
-  // per pesanan, dan kegagalan WhatsApp tidak pernah menggagalkan pembatalan yang sudah tersimpan.
-  // Refund tidak dijanjikan di pesan karena status dana tidak tersedia di data pesanan.
-  if (await claimOrderNotification(order.id, "cancelled")) {
+  // ── Pesanan reseller: saldo kembali + notif ke RESELLER (bukan customer akhir) ──
+  // Pemanggil tidak selalu men-select kolom reseller; baca sekali dari database
+  // supaya perilaku pemanggil lama tidak perlu diubah.
+  let resellerId = order.reseller_id ?? null;
+  let resellerDeduction = Math.round(Number(order.reseller_balance_deduction) || 0);
+  if (order.reseller_id === undefined) {
+    const { data: resellerOrder } = await supabase
+      .from("orders")
+      .select("reseller_id, reseller_balance_deduction")
+      .eq("id", order.id)
+      .maybeSingle();
+    resellerId = (resellerOrder?.reseller_id as string | null) ?? null;
+    resellerDeduction = Math.round(Number(resellerOrder?.reseller_balance_deduction) || 0);
+  }
+
+  if (resellerId) {
+    // Saldo yang terpotong dikembalikan lewat RPC tahap 1 — sekali saja per
+    // pesanan (UNIQUE type+reference). Refund dilakukan SETELAH status
+    // tersimpan: kalau pembatalan gagal, saldo tidak boleh sudah dikembalikan.
+    if (resellerDeduction > 0) {
+      const { error: refundError } = await supabase.rpc("samaqu_reseller_refund_order", {
+        p_reseller_id: resellerId,
+        p_order_id: order.id,
+        p_jumlah: resellerDeduction,
+        p_dibuat_oleh: "cancel-order",
+      });
+      if (refundError) {
+        console.error("[CANCEL] Gagal mengembalikan saldo reseller:", order.order_number, refundError.message);
+      }
+    }
+
+    // Klaim admin memakai kolom lama (`cancelled_notified_at`); klaim reseller
+    // memakai tabel reseller_notifications — dua pesan berbeda, dua klaim.
+    const [adminClaimed, resellerClaimed] = await Promise.all([
+      claimOrderNotification(order.id, "cancelled"),
+      claimResellerNotification("order_cancelled", order.id),
+    ]);
+    await Promise.allSettled([
+      ...(resellerClaimed
+        ? [notifyResellerOrderCancelled(resellerId, order.order_number, remark)]
+        : []),
+      ...(adminClaimed
+        ? [
+            notifyAdminOrderCancelled({
+              orderNumber: order.order_number,
+              customerName: order.customer_name ?? null,
+              reason: remark,
+            }),
+          ]
+        : []),
+    ]);
+  } else if (await claimOrderNotification(order.id, "cancelled")) {
+    // Jalur lama (customer + admin) — perilaku tidak berubah untuk non-reseller.
     await Promise.allSettled([
       notifyCustomerOrderCancelled({
         orderNumber: order.order_number,

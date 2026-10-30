@@ -171,3 +171,79 @@ dan setiap fitur **harus benar-benar berfungsi** (jangan tombol pajangan, jangan
 - **Kebijakan belum bayar**: sekarang stok dipotong saat order dibuat. Kalau user mau stok baru
   dipotong saat dibayar, pindahkan `samaqu_decrement_stock` dari `/api/orders` + `/api/open-order`
   ke saat status jadi `diproses`, lalu sesuaikan `PAID_ORDER_STATUS`.
+
+---
+
+## 8. Sistem Reseller — Tahap 1 & 2 (2026-10-30)
+
+Fitur baru di folder sendiri: logic `src/lib/reseller/`, API `src/app/api/reseller/**`,
+admin `src/app/api/ops/reseller/**`. Tahap 1 = database (migration
+`20261030_reseller.sql`), tahap 2 = API server (migration `20261030_reseller_tahap2.sql`).
+Keduanya **sudah dijalankan ke produksi** dan lolos smoke test SQL (rollback, 0 data uji).
+UI belum ada (tahap 3).
+
+### 8.1 Aturan bisnis (final)
+
+- Reseller dibuat admin (tidak ada pendaftaran publik). Login pakai **OTP WhatsApp**; OTP hanya
+  dikirim kalau nomor terdaftar sebagai reseller `active`. Sesi = token acak 30 hari, yang
+  disimpan hanya hash-nya (`reseller_sessions`).
+- Harga beli = katalog × (1 − `products.reseller_discount_percent`/100), dibulatkan.
+  Batas harga jual = max(`minimum_price`, harga beli). Diskon NULL = produk tidak dijual reseller.
+- `order_items.price` untuk pesanan reseller DIISI harga beli; `reseller_buy_price` &
+  `reseller_sell_price` ikut disimpan. Omset/laba/terlaris lama otomatis benar.
+- Saldo tidak pernah disimpan sebagai kolom — selalu SUM `reseller_ledger` (append-only).
+  Debit/refund/top up/penarikan hanya lewat RPC tahap 1 (`samaqu_reseller_*`) + `samaqu_reseller_adjust`
+  (koreksi admin, wajib catatan).
+- Pesanan reseller = **dropship**: notif otomatis (dibuat/lunas/dikirim/diterima/dibatalkan)
+  dikirim ke RESELLER, bukan customer akhir. Pengingat ulasan & pembayaran tidak untuk pesanan
+  reseller. Klaim kirim sekali: tabel `reseller_notifications` UNIQUE (type, reference).
+- Saldo cukup → pesanan `diproses` + lunas (`payment_status=paid`, `paid_at`). Saldo kurang →
+  potong semua saldo, sisa dicatat di `reseller_order_payments` + `orders.reseller_shortfall_status
+  = pending`, status `pending` sampai admin konfirmasi. Tolak bukti → pesanan dibatalkan lewat
+  `cancelOrderCompletely` (stok & saldo kembali).
+- Pembatalan reseller (manual/auto-cancel 24 jam/kekurangan ditolak) mengembalikan saldo lewat
+  `samaqu_reseller_refund_order` (sekali per pesanan) — dipanggil di `cancelOrderCompletely`
+  hanya untuk pesanan ber-`reseller_id`.
+- Auto-cancel cron kini also menyasar `RSL-%` (pesanan reseller pending = kekurangan belum dibayar).
+
+### 8.2 Endpoint
+
+Reseller (Bearer token sesi reseller; `status=active`):
+
+| Endpoint | Guna |
+|---|---|
+| `POST /api/reseller/auth/request-otp` | minta OTP (rate limit 10/jam per IP, respons generik) |
+| `POST /api/reseller/auth/verify-otp` | verifikasi OTP → token sesi |
+| `POST /api/reseller/auth/logout` | hapus sesi |
+| `GET /api/reseller/me` | profil + saldo + pengaturan (BSI, biaya admin) |
+| `PATCH /api/reseller/me` | ubah rekening bank |
+| `GET /api/reseller/katalog` | produk reseller + varian + stok efektif + harga beli/batas jual |
+| `GET /api/reseller/ledger` | mutasi saldo sendiri (`jenis`, `bulan`, paginasi) |
+| `GET/POST /api/reseller/topups` | daftar/ajukan top up (`amount`, `proof_url`) |
+| `GET/POST /api/reseller/withdrawals` | daftar/ajukan penarikan (rekening dari profil) |
+| `POST /api/reseller/ongkir` | cek tarif J&T (`city`, `district`, `weight` gram) |
+| `GET/POST /api/reseller/orders` | daftar (paginasi) / buat pesanan |
+| `GET /api/reseller/orders/[orderNumber]` | detail pesanan + tracking |
+| `POST /api/reseller/orders/[orderNumber]/payment-proof` | upload bukti kekurangan |
+
+Admin ops (`isOpsAdmin`): `GET/POST /api/ops/reseller/resellers`,
+`PATCH /api/ops/reseller/resellers/[id]`, `GET /api/ops/reseller/queue` (antrean pending),
+`PATCH /api/ops/reseller/topups/[id]`, `PATCH /api/ops/reseller/order-payments/[id]`,
+`PATCH /api/ops/reseller/withdrawals/[id]`, `GET/POST /api/ops/reseller/ledger`,
+`GET/PATCH /api/ops/reseller/settings`.
+
+### 8.3 Jebakan
+
+- **Atomisitas pesanan reseller** = RPC `samaqu_reseller_create_order` (satu transaksi:
+  stok → validasi subtotal → debit saldo → order + item + kekurangan). Jangan pernah memecah
+  langkahnya ke beberapa request; kalau RPC gagal, semua sudah otomatis rollback.
+- RPC menolak kalau subtotal kiriman server ≠ hitungannya sendiri, dan menolak pesanan kalau stok
+  toko di tengah jalan tidak cukup — saldo ikut batal (bukan hanya stok).
+- Refund saldo HANYA sekali per pesanan (UNIQUE type+reference di ledger). Refund dipanggil
+  SETELAH status pesanan tersimpan — kalau pembatalan gagal, saldo tidak boleh sudah kembali.
+- `reseller_ledger` append-only (trigger); koreksi harus lewat `adjustment` baru, bukan edit baris.
+- Klaim notif reseller beda dari klaim notif order lama: `cancelled_notified_at` tetap dipakai
+  untuk notif admin; reseller memakai `reseller_notifications`.
+- Reseller login tidak memakai Supabase Auth. Jangan menambahkan komponen yang mengharapkan
+  `supabase.auth.getUser()` untuk reseller — pakai guard `resellerSession()`.
+- `resellers.whatsapp` disimpan ternormalisasi (62…); lookup login menormalkan input dulu.

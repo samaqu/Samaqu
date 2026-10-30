@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
   const { data: orders, error } = await supabase
     .from("orders")
-    .select("id, order_number, awb_no, status, shipping_status, customer_name, customer_whatsapp, shipped_notified_at")
+    .select("id, order_number, awb_no, status, shipping_status, customer_name, customer_whatsapp, shipped_notified_at, reseller_id")
     .in("status", ["pending", "diproses", "dikirim"])
     .not("awb_no", "is", null)
     .order("created_at", { ascending: false })

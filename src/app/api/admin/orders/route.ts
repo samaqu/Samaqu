@@ -6,6 +6,7 @@ import { applyTrackingToOrder } from "@/lib/jnt/tracking-sync";
 import { cancelOrderCompletely } from "@/lib/cancel-order";
 import { notifyCustomerOrderPaid, notifyCustomerOrderShipped } from "@/lib/fonnte";
 import { claimOrderNotification, recordShippedNotifyStatus, sendOnce } from "@/lib/order-notify";
+import { notifyResellerOrderPaid, notifyResellerOrderShipped } from "@/lib/reseller/notify";
 import { isCodOrderPayment } from "@/lib/payment-methods";
 import { isOpsAdmin, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { syncCommissionStatus } from "@/lib/affiliate/commission";
@@ -26,6 +27,18 @@ async function notifyShippedOnce(
     awb_no: string;
   }
 ) {
+  // Pesanan reseller (dropship): customer akhir TIDAK dihubungi — reseller yang
+  // dikabari. Kolom reseller_id dibaca langsung supaya pemanggil lama tidak berubah.
+  const { data: resellerOrder } = await supabaseAdmin
+    .from("orders")
+    .select("reseller_id")
+    .eq("id", order.id)
+    .maybeSingle();
+  if (resellerOrder?.reseller_id) {
+    await notifyResellerOrderShipped(String(resellerOrder.reseller_id), order.order_number || "", order.awb_no);
+    return;
+  }
+
   if (!(await claimOrderNotification(order.id, "shipped"))) return;
   let sent = false;
   try {
@@ -421,7 +434,7 @@ export async function PATCH(request: NextRequest) {
       const { data: order, error: fetchError } = await supabaseAdmin
         .from("orders")
         .select(
-          "id, order_number, status, shipping_status, awb_no, customer_name, customer_whatsapp, shipped_notified_at"
+          "id, order_number, status, shipping_status, awb_no, customer_name, customer_whatsapp, shipped_notified_at, reseller_id"
         )
         .eq("order_number", identifier)
         .single();
@@ -484,7 +497,7 @@ export async function PATCH(request: NextRequest) {
       ? (
           await supabaseAdmin
             .from("orders")
-            .select("id, status, order_number, customer_name, customer_whatsapp, total, payment_method")
+            .select("id, status, order_number, customer_name, customer_whatsapp, total, payment_method, reseller_id")
             .eq("order_number", identifier)
             .maybeSingle()
         ).data
@@ -511,7 +524,10 @@ export async function PATCH(request: NextRequest) {
         .is("paid_at", null)
         .select("id");
 
-      if (paidRows && paidRows.length > 0 && previous.customer_whatsapp) {
+      if (paidRows && paidRows.length > 0 && previous.reseller_id) {
+        // Dropship reseller: customer akhir TIDAK dihubungi; reseller yang dikabari.
+        await notifyResellerOrderPaid(String(previous.reseller_id), previous.order_number || identifier);
+      } else if (paidRows && paidRows.length > 0 && previous.customer_whatsapp) {
         await sendOnce(previous.id, "paid", "WA pembayaran diterima (verifikasi admin)", () =>
           notifyCustomerOrderPaid({
             orderNumber: previous.order_number || identifier,
