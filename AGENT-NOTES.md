@@ -767,3 +767,31 @@ Superblack kolom itu berisi URL **video `.mp4`**, sehingga `<img>` gagal.
 
 **Verifikasi read-only** `RSL-20261030-818` (reseller 80abf627…): `product_image` berubah dari
 `.../00_semua_video.mp4` menjadi `.../02_semua_foto.png`; URL PNG 200. `tsc` bersih.
+
+### 8.23 Halaman bayar kekurangan: status terkirim + kartu modern (30 Oktober 2026)
+
+**Bug:** setelah upload bukti + "Saya sudah bayar", halaman tetap form upload. `uploadShortfallProof`
+hanya mengisi `proof_url`/`payment_method` (status baris tetap `pending`); `OrderPaymentView`
+memetakan shortfall pending + pesanan pending selalu ke `unpaid`, sehingga `PaymentPage` tidak
+pernah masuk `submitted`.
+
+**Perbaikan:**
+- `src/components/reseller/payment/status.ts`: SATU resolver `resolvePaymentPageStatus` untuk
+  pesanan & top up. Pesanan: shortfall pending + `proof_url` + pesanan pending + belum lewat 24 jam
+  = `submitted`; approved/rejected/expired/cancelled tetap. Top up: pending = submitted.
+- `PaymentPage`: `justSubmitted` lokal diset setelah `onSubmit` sukses → langsung render
+  `SubmittedCard` (tanpa menunggu reload); error upload tetap tampil dekat tombol, bukti tidak
+  dihapus, tombol aktif kembali. Jika `proof_url` sudah ada saat halaman dibuka, resolver langsung
+  memberi `submitted`.
+- `SubmittedCard` (baru): ikon centang animasi (hormati `prefers-reduced-motion`), ringkasan
+  jumlah/metode/nomor/status/bukti, 3 tahap (Bukti terkirim / Dicek admin / Pesanan diproses atau
+  Saldo masuk), tombol "Lihat pesanan"/riwayat + "Kembali ke Beranda" (full width di mobile).
+- Ditolak: tombol jalur baru "Buat pesanan lagi" / "Top up lagi" + hint upload bukti lewat
+  pembayaran baru (record rejected tidak bisa di-upload ulang tanpa mengubah logic admin).
+- `OrderSuccess` memakai gaya sukses yang sama; logic pembuatan pesanan tidak diubah.
+- `deadline.ts`: `isPastDeadline` dipindah ke modul murni (client-safe); `topups.ts` re-export.
+
+**Verifikasi:** resolver 8 skenario pesanan + 6 top up (no proof → unpaid; proof → submitted;
+proof + lewat deadline → expired; dibatalkan; diproses; approved/rejected) benar; `tsc` bersih;
+mock UI submit langsung menampilkan SubmittedCard desktop & mobile. Tidak ada perubahan saldo,
+stok, auto-cancel, admin approve/reject, atau notifikasi.
