@@ -29,6 +29,8 @@ import { RESELLER_ORDER_PREFIX, LEGACY_RESELLER_ORDER_PREFIX } from "@/lib/resel
 
 /** Batas jumlah reminder per eksekusi cron — supaya satu kali jalan tidak menembak terlalu banyak. */
 const REMINDER_LIMIT = 30;
+/** Batas pembatalan per eksekusi — mencegah backlog besar memicu loop stok + WA tanpa akhir. */
+const AUTO_CANCEL_LIMIT = 100;
 
 export async function GET(request: NextRequest) {
   // Verify cron secret (penjadwal mengirim header Authorization: Bearer $CRON_SECRET)
@@ -130,7 +132,8 @@ export async function GET(request: NextRequest) {
     .or(
       `order_number.like.SMQ-%,order_number.like.CYO-%,order_number.like.${RESELLER_ORDER_PREFIX}%,order_number.like.${LEGACY_RESELLER_ORDER_PREFIX}%`
     )
-    .lt("created_at", cutoff);
+    .lt("created_at", cutoff)
+    .limit(AUTO_CANCEL_LIMIT);
 
   if (fetchError) {
     console.error("[AUTO-CANCEL] Fetch error:", fetchError);

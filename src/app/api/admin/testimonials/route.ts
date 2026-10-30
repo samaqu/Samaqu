@@ -18,6 +18,8 @@ export async function GET(req: NextRequest) {
   const admin = getSupabaseAdmin();
   const { searchParams } = new URL(req.url);
   const status = parseReviewStatus(searchParams.get("status"));
+  /** Badge hanya butuh angka; lewati daftar ulasan + lookup produk supaya jauh lebih ringan. */
+  const countsOnly = searchParams.get("counts_only") === "1";
   const rawLimit = Number(searchParams.get("limit"));
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 200) : 100;
 
@@ -30,12 +32,24 @@ export async function GET(req: NextRequest) {
 
   if (status) query = query.eq("status", status);
 
-  const [itemsRes, pendingRes, publishedRes, rejectedRes] = await Promise.all([
-    query,
+  const countQueries = [
     admin.from("testimonials").select("id", { count: "exact", head: true }).eq("source", "customer").eq("status", "pending"),
     admin.from("testimonials").select("id", { count: "exact", head: true }).eq("source", "customer").eq("status", "published"),
     admin.from("testimonials").select("id", { count: "exact", head: true }).eq("source", "customer").eq("status", "rejected"),
-  ]);
+  ] as const;
+
+  if (countsOnly) {
+    const [pendingRes, publishedRes, rejectedRes] = await Promise.all(countQueries);
+    return NextResponse.json({
+      counts: {
+        pending: pendingRes.count || 0,
+        published: publishedRes.count || 0,
+        rejected: rejectedRes.count || 0,
+      },
+    });
+  }
+
+  const [itemsRes, pendingRes, publishedRes, rejectedRes] = await Promise.all([query, ...countQueries]);
 
   if (itemsRes.error) return NextResponse.json({ error: itemsRes.error.message }, { status: 500 });
 

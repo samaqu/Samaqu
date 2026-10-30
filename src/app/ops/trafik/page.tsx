@@ -214,8 +214,10 @@ export default function OpsTrafficPage() {
   const { data, isLoading, isError, error, isFetching, refetch } = useQuery({
     queryKey: ["ops-web-traffic-page", days],
     queryFn: () => base44.entities.Analytics.traffic(days),
-    staleTime: 60_000,
-    refetchInterval: 60_000,
+    staleTime: 5 * 60_000,
+    // Satu request analitik menjalankan belasan RPC agregasi; 5 menit sudah cukup.
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: false,
     placeholderData: keepPreviousData,
   });
 

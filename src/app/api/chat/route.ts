@@ -56,11 +56,20 @@ export async function GET() {
     // biarkan kosong; widget punya fallback
   }
 
-  return NextResponse.json({
-    enabled: profile.enabled,
-    greeting: profile.greeting,
-    whatsapp,
-  });
+  // Konfigurasi widget jarang berubah dan dipanggil di setiap halaman. Cache di CDN
+  // sebentar supaya tidak ada satu eksekusi fungsi + query DB per page view.
+  return NextResponse.json(
+    {
+      enabled: profile.enabled,
+      greeting: profile.greeting,
+      whatsapp,
+    },
+    {
+      headers: {
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+      },
+    }
+  );
 }
 
 export async function POST(req: NextRequest) {

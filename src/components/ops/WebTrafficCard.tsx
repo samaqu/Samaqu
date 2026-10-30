@@ -45,8 +45,11 @@ export default function WebTrafficCard() {
   const { data, isLoading, isError, error, isFetching } = useQuery({
     queryKey: ["ops-web-traffic", days],
     queryFn: () => base44.entities.Analytics.traffic(days),
-    staleTime: 60_000,
-    refetchInterval: 60_000,
+    staleTime: 5 * 60_000,
+    // Analitik tidak perlu realtime: satu request = belasan RPC agregasi di server.
+    // React Query juga otomatis berhenti saat tab tidak fokus (refetchIntervalInBackground=false).
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: false,
     // Ganti rentang: angka lama tetap tampil sampai data baru datang (tidak berkedip).
     placeholderData: keepPreviousData,
   });

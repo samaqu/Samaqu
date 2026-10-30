@@ -34,6 +34,7 @@ const IconTraffic: any =
   (LucideIcons as any).ChartNoAxesCombined ?? (LucideIcons as any).TrendingUp ?? (LucideIcons as any).LineChart ?? BarChart3;
 const IconReseller: any = (LucideIcons as any).Store ?? ShoppingBag;
 import { supabase } from "@/lib/supabase";
+import { useResellerQueueCount } from "@/lib/use-reseller-queue";
 import { Toaster } from "@/components/ops/ui/toaster";
 import OpsFooter from "@/components/ops/OpsFooter";
 
@@ -183,7 +184,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
     role: "other",
   });
   /** Jumlah antrean reseller "perlu dicek" untuk badge menu. */
-  const [resellerQueue, setResellerQueue] = useState(0);
+  const resellerQueue = useResellerQueueCount(authorized);
 
   useEffect(() => {
     setOnOpsHost(window.location.hostname === "office.samaqu.id");
@@ -242,30 +243,6 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
   }, [prodAccess]);
 
   useEffect(() => {
-    if (!authorized) return;
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        const token = data.session?.access_token;
-        if (!token) return;
-        const res = await fetch("/api/ops/reseller/stats", { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) return;
-        const json = await res.json().catch(() => null);
-        if (!cancelled && typeof json?.perlu_dicek === "number") setResellerQueue(json.perlu_dicek);
-      } catch {
-        /* badge hanya penanda */
-      }
-    };
-    load();
-    const timer = window.setInterval(load, 120000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [authorized]);
-
-  useEffect(() => {
     let cancelled = false;
     (async () => {
       const { data } = await supabase.auth.getSession();
@@ -275,7 +252,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        const res = await fetch("/api/ops/leads?limit=1", { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch("/api/ops/leads?limit=1&options=0", { headers: { Authorization: `Bearer ${token}` } });
         if (!cancelled) setAuthorized(res.ok);
       } catch {
         if (!cancelled) setAuthorized(false);
@@ -296,7 +273,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
       setBusy(false);
       return;
     }
-    const res = await fetch("/api/ops/leads?limit=1", { headers: { Authorization: `Bearer ${data.session.access_token}` } });
+    const res = await fetch("/api/ops/leads?limit=1&options=0", { headers: { Authorization: `Bearer ${data.session.access_token}` } });
     if (!res.ok) {
       setError("Akun ini bukan admin SAMAQU");
       await supabase.auth.signOut();

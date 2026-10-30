@@ -40,9 +40,24 @@ export async function GET(req: NextRequest) {
   const list = resellers.data ?? [];
   const aktif = list.filter((r) => r.status === "active").length;
 
-  // Total saldo = jumlah saldo tersedia semua reseller (satu-satunya sumber: RPC saldo).
-  const balances = await Promise.all(list.map((row) => getResellerBalance(String(row.id))));
-  const totalSaldo = balances.reduce((sum, balance) => sum + (balance?.saldo_tersedia ?? 0), 0);
+  // Total saldo = jumlah saldo tersedia semua reseller. Nilai `samaqu_reseller_saldo`
+  // adalah SUM(reseller_ledger.amount), jadi satu query agregat di sini menghasilkan angka
+  // yang sama tanpa memanggil RPC sekali per reseller (N+1).
+  let totalSaldo = 0;
+  const resellerIds = list.map((row) => String(row.id));
+  if (resellerIds.length > 0) {
+    const { data: ledgerRows, error: ledgerError } = await supabase
+      .from("reseller_ledger")
+      .select("amount")
+      .in("reseller_id", resellerIds);
+    if (!ledgerError) {
+      totalSaldo = (ledgerRows || []).reduce((sum, row) => sum + (Number((row as { amount?: number }).amount) || 0), 0);
+    } else {
+      // Fallback aman: perilaku lama (RPC resmi) kalau kolom/tabel tidak bisa dibaca.
+      const balances = await Promise.all(list.map((row) => getResellerBalance(String(row.id))));
+      totalSaldo = balances.reduce((sum, balance) => sum + (balance?.saldo_tersedia ?? 0), 0);
+    }
+  }
 
   const perluDicek = (topups.count ?? 0) + (payments.count ?? 0) + (withdrawals.count ?? 0);
 

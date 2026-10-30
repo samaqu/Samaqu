@@ -30,6 +30,7 @@ import ProductDetailDrawer from "@/components/admin/ProductDetailDrawer";
 import LiveChatView from "@/components/admin/LiveChatView";
 import { ADMIN_WF_VARS } from "@/components/admin/admin-theme";
 import { usePendingReviewCount } from "@/lib/use-pending-reviews";
+import { startVisiblePolling } from "@/lib/visible-poll";
 
 type Panel = "dashboard" | "orders" | "products" | "customers" | "chats" | "content" | "notif-template" | "settings";
 
@@ -457,7 +458,7 @@ function AdminPageInner() {
         const headers = await authHeaders();
         const [monthRes, trendRes] = await Promise.all([
           fetch(`/api/ops/orders?from=${encodeURIComponent(startISO)}&to=${encodeURIComponent(endISO)}&limit=1000`, { headers }),
-          fetch(`/api/ops/orders?from=${encodeURIComponent(trendFromISO)}&to=${encodeURIComponent(endISO)}&limit=1000`, { headers }),
+          fetch(`/api/ops/orders?from=${encodeURIComponent(trendFromISO)}&to=${encodeURIComponent(endISO)}&limit=1000&include_items=0`, { headers }),
         ]);
         const monthJson = await monthRes.json().catch(() => ({}));
         const trendJson = await trendRes.json().catch(() => ({}));
@@ -480,7 +481,8 @@ function AdminPageInner() {
   }, [user, role, bulanValue]);
 
   // Status pesanan juga berubah dari cron tracking J&T tanpa interaksi halaman ini.
-  // Polling menjaga daftar Order Management (dan drawer yang terbuka) tetap sinkron.
+  // Polling menjaga daftar Order Management (dan drawer yang terbuka) tetap sinkron,
+  // tetapi berhenti saat tab disembunyikan dan hanya jalan tiap 5 menit.
   useEffect(() => {
     if (!user || !hasAdminPanelAccess(role)) return;
     let alive = true;
@@ -498,17 +500,10 @@ function AdminPageInner() {
         // Diamkan; polling berikutnya mencoba lagi.
       }
     }
-    const timer = setInterval(refreshDashOrders, 60_000);
-    const onFocus = () => {
-      if (document.visibilityState !== "hidden") refreshDashOrders();
-    };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onFocus);
+    const stop = startVisiblePolling(refreshDashOrders, 5 * 60_000);
     return () => {
       alive = false;
-      clearInterval(timer);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onFocus);
+      stop();
     };
   }, [user, role, bulanValue]);
 

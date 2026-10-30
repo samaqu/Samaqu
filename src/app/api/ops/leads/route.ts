@@ -53,6 +53,8 @@ export async function GET(req: NextRequest) {
   const search = sp.get("search");
   const limit = Math.min(Math.max(parseInt(sp.get("limit") || "1000", 10) || 1000, 1), 2000);
   const offset = Math.max(parseInt(sp.get("offset") || "0", 10) || 0, 0);
+  // Probe login shell cukup butuh status 200; dua query opsi PIC di bawah tidak perlu ikut.
+  const includeOptions = sp.get("options") !== "0";
 
   const admin = getSupabaseAdmin();
   let query = admin
@@ -76,16 +78,19 @@ export async function GET(req: NextRequest) {
   const next_cursor = offset + limit < total ? String(offset + limit) : null;
 
   // Pilihan PIC untuk form: gabungan PIC yang sudah dipakai + akun admin SAMAQU.
-  const [{ data: picRows }, { data: adminRows }] = await Promise.all([
-    admin.from("leads").select("pic").not("pic", "is", null).limit(2000),
-    admin.from("admins").select("email").limit(50),
-  ]);
-  const pics = Array.from(
-    new Set([
-      ...((picRows as any[]) || []).map((r) => r.pic).filter(Boolean),
-      ...((adminRows as any[]) || []).map((r) => r.email).filter(Boolean),
-    ]),
-  ).sort();
+  let pics: string[] = [];
+  if (includeOptions) {
+    const [{ data: picRows }, { data: adminRows }] = await Promise.all([
+      admin.from("leads").select("pic").not("pic", "is", null).limit(2000),
+      admin.from("admins").select("email").limit(50),
+    ]);
+    pics = Array.from(
+      new Set([
+        ...((picRows as any[]) || []).map((r) => r.pic).filter(Boolean),
+        ...((adminRows as any[]) || []).map((r) => r.email).filter(Boolean),
+      ]),
+    ).sort();
+  }
 
   return NextResponse.json({ items: data || [], next_cursor, count: total, options: { pics } });
 }

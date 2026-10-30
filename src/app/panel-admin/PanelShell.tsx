@@ -4,7 +4,7 @@
  * Kerangka panel admin — tema dari mockup HTML (samaqu-admin-dashboard-2/pages/index.html).
  *
  * Ada gerbang login: semua API `/api/ops/*` butuh sesi admin Supabase, jadi isi panel baru
- * dirender setelah sesi terbukti admin (probe `GET /api/ops/leads?limit=1`), sama seperti ops.
+ * dirender setelah sesi terbukti admin (probe `GET /api/ops/leads?limit=1&options=0`), sama seperti ops.
  *
  * Catatan: menu Transaksi/Produk/Leads belum dibangun (badge `SOON`), jadi sengaja non-link.
  */
@@ -290,7 +290,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
         return;
       }
       try {
-        const res = await fetch("/api/ops/leads?limit=1", { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch("/api/ops/leads?limit=1&options=0", { headers: { Authorization: `Bearer ${token}` } });
         if (!cancelled) setAuthorized(res.ok);
       } catch {
         if (!cancelled) setAuthorized(false);
@@ -313,7 +313,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
       setBusy(false);
       return;
     }
-    const res = await fetch("/api/ops/leads?limit=1", {
+    const res = await fetch("/api/ops/leads?limit=1&options=0", {
       headers: { Authorization: `Bearer ${data.session.access_token}` },
     });
     if (!res.ok) {

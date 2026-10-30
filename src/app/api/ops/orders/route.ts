@@ -22,6 +22,8 @@ export async function GET(req: NextRequest) {
   const to = String(sp.get("to") || "").trim();
   const limitRaw = Number(sp.get("limit") || 50);
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 1000) : 50;
+  // Grafik/ringkasan hanya butuh kolom order; jangan ikut menarik semua order_items.
+  const includeItems = sp.get("include_items") !== "0";
 
   const client = getSupabaseAdmin();
 
@@ -50,7 +52,7 @@ export async function GET(req: NextRequest) {
 
   let query = client
     .from("orders")
-    .select("*, order_items(*)")
+    .select(includeItems ? "*, order_items(*)" : "*")
     .order("created_at", { ascending: false })
     .limit(limit);
 
