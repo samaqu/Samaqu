@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { resellerApi, type OrderListRow } from "@/lib/reseller/client";
 import { rupiah, tglJamID } from "@/lib/reseller/format";
@@ -15,6 +15,7 @@ import {
   type OrderStageFilter,
 } from "@/lib/order-flow";
 import OrderStagePill from "./OrderStagePill";
+import ResellerOrderDrawer from "./ResellerOrderDrawer";
 import { EmptyState, Note, SkeletonRows } from "./ui";
 
 function wibDate(iso: string): string {
@@ -46,9 +47,40 @@ function StagePill({ stageKey }: { stageKey: ReturnType<typeof orderStage> }) {
   return <OrderStagePill stage={stageKey} />;
 }
 
-/** Daftar pesanan reseller — tabel desktop, kartu mobile; tahap sama dengan Transaksi admin. */
+/** Daftar pesanan reseller — tabel desktop, kartu mobile; tahap sama dengan Transaksi admin.
+ *  Klik baris membuka DRAWER detail (bukan pindah halaman); status drawer disimpan di
+ *  query `?pesanan=` supaya tombol kembali browser menutup drawer. */
 export default function PesananPanel() {
+  return (
+    <Suspense fallback={null}>
+      <PesananPanelInner />
+    </Suspense>
+  );
+}
+
+const DRAWER_PARAM = "pesanan";
+
+function PesananPanelInner() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const openNumber = searchParams.get(DRAWER_PARAM);
+  // Scroll daftar dipulihkan setelah drawer ditutup (drawer mengunci scroll body).
+  const scrollRef = useRef(0);
+
+  const bukaPesanan = (orderNumber: string) => {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set(DRAWER_PARAM, orderNumber);
+    router.push(`${pathname}?${next.toString()}`, { scroll: false });
+  };
+
+  const tutupPesanan = () => {
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete(DRAWER_PARAM);
+    const q = next.toString();
+    router.push(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  };
+
   const [rows, setRows] = useState<OrderListRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -212,9 +244,18 @@ export default function PesananPanel() {
                   {filtered.map((order) => {
                     const product = productLine(order);
                     const shipStatus = shippingStatusOf(order);
-                    const href = `/reseller/pesanan/${encodeURIComponent(order.order_number)}`;
                     return (
-                      <tr key={order.id} onClick={() => router.push(href)}>
+                      <tr
+                        key={order.id}
+                        onClick={() => bukaPesanan(order.order_number)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            bukaPesanan(order.order_number);
+                          }
+                        }}
+                        tabIndex={0}
+                      >
                         <td data-label="No. Pesanan">
                           <span className="oid">{order.order_number}</span>
                           <small>{tglJamID(order.created_at)}</small>
@@ -251,10 +292,11 @@ export default function PesananPanel() {
               {filtered.map((order) => {
                 const product = productLine(order);
                 return (
-                  <Link
+                  <button
+                    type="button"
                     className="order-card"
                     key={order.id}
-                    href={`/reseller/pesanan/${encodeURIComponent(order.order_number)}`}
+                    onClick={() => bukaPesanan(order.order_number)}
                   >
                     <div className="oc-top">
                       <div>
@@ -273,7 +315,7 @@ export default function PesananPanel() {
                       <b>{rupiah(order.total)}</b>
                       <span className="small muted">{order.awb_no ? `Resi ${order.awb_no}` : "Belum ada resi"}</span>
                     </div>
-                  </Link>
+                  </button>
                 );
               })}
             </div>
@@ -286,6 +328,9 @@ export default function PesananPanel() {
           </>
         )}
       </div>
+
+      {/* Drawer detail: daftar tetap ter-mount di belakangnya, jadi filter/tab/scroll utuh. */}
+      <ResellerOrderDrawer orderNumber={openNumber} onClose={tutupPesanan} />
     </div>
   );
 }

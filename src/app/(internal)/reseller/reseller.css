@@ -559,6 +559,8 @@
   .rs-root .order-card {
     display: flex; flex-direction: column; gap: 5px; padding: 11px 12px; min-height: 112px;
     border: 1px solid var(--rs-bd); border-radius: 12px; background: #fff;
+    /* Kartu kini <button>: teks & warna harus ikut token, bukan default tombol peramban. */
+    width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer;
   }
   .rs-root .order-card:active { background: #fafaf8; }
   .rs-root .order-card .oc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
