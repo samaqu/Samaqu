@@ -73,7 +73,8 @@ const REVIEW_IMAGE_TRANSFORMATION = "c_limit,w_1280,q_auto:good";
 
 // Upload chat dan ulasan boleh memakai akun Cloudinary TERPISAH (isolasi storage/kredit).
 // Kalau env-nya belum diisi, jatuh ke akun utama supaya tetap jalan.
-// Bukti transfer reseller (top up & kekurangan) memakai akun utama, folder "reseller".
+// Bukti transfer reseller (top up & kekurangan) memakai akun yang SAMA dengan ulasan,
+// folder "reseller".
 function resolveScope(scope: "product" | "chat" | "review" | "reseller") {
   if (scope === "chat") {
     return {
@@ -94,10 +95,12 @@ function resolveScope(scope: "product" | "chat" | "review" | "reseller") {
     };
   }
   if (scope === "reseller") {
+    // Bukti transfer reseller ikut akun Cloudinary ULASAN (REVIEW_CLOUDINARY_*),
+    // fallback ke akun utama kalau env-nya belum diisi — pola yang sama dengan scope review.
     return {
-      cloudName: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD,
-      apiKey: process.env.CLOUDINARY_API_KEY,
-      apiSecret: process.env.CLOUDINARY_API_SECRET,
+      cloudName: process.env.REVIEW_CLOUDINARY_CLOUD || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD,
+      apiKey: process.env.REVIEW_CLOUDINARY_API_KEY || process.env.CLOUDINARY_API_KEY,
+      apiSecret: process.env.REVIEW_CLOUDINARY_API_SECRET || process.env.CLOUDINARY_API_SECRET,
       folder: "reseller" as string | undefined,
       kind: "reseller" as const,
     };
