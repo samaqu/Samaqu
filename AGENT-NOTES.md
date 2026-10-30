@@ -795,3 +795,48 @@ pernah masuk `submitted`.
 proof + lewat deadline → expired; dibatalkan; diproses; approved/rejected) benar; `tsc` bersih;
 mock UI submit langsung menampilkan SubmittedCard desktop & mobile. Tidak ada perubahan saldo,
 stok, auto-cancel, admin approve/reject, atau notifikasi.
+
+### 8.24 Edit varian reseller, prefix EP-, dan daftar pesanan portal (30 Oktober 2026)
+
+**1) Edit item pesanan reseller — hanya ukuran/warna.**
+- `orderEditGuard` (`src/lib/order-edit.ts`) mengenal source group `reseller`; syarat sama
+  (stock_reserved, status pending/diproses, pengiriman belum jalan). `RESELLER_EDIT_NOTICE`
+  dipakai UI + server.
+- Server PATCH `/api/ops/transaksi` menolak qty/produk/harga/baris berubah untuk reseller
+  dengan pesan jelas. RPC baru `samaqu_edit_reseller_order_items` (migration
+  `20261030_edit_reseller_order_items.sql`, SUDAH dijalankan) hanya UPDATE color/size pada
+  baris yang sama — `reseller_buy_price`, `reseller_sell_price`, qty, harga, total, saldo,
+  kekurangan tetap. Stok dipindah atomik via `samaqu_decrement_stock`/`samaqu_restore_stock`,
+  audit ke `order_item_edits`.
+- UI baru `src/components/ops/transaksi/ResellerEditItemModal.tsx` (ukuran/warna saja; qty,
+  harga, produk terkunci) dibuka dari tombol Ubah Transaksi untuk source reseller. Drawer
+  memakai `edit_reason` dari server, bukan teks cadangan lama.
+
+**2) Nama reseller di detail Transaksi.** Badge toko di kolom No. Pesanan dihapus;
+`ResellerOrderBlock` diberi tautan "Buka detail reseller" ke
+`/ops/reseller?reseller=<id>` atau `/panel-admin/reseller?reseller=<id>`. Menu Reseller
+membuka drawer reseller dari parameter itu. Data reseller tetap diambil dari query daftar
+yang sudah ada (tidak menambah query baru).
+
+**3) Prefix EP- (Exclusive Partner).** Helper `src/lib/reseller/order-number.ts`:
+`EP-` untuk pesanan baru, `RSL-` lama tetap dikenali (`isResellerOrderNumber`). Generator
+memakai EP-; `orderSourceKey` di `src/lib/transaksi.ts` memakai helper yang sama; cron
+auto-cancel memfilter `EP-%` + `RSL-%` (SMQ/CYO tetap). Pesanan lama RSL tidak diubah.
+Tempat berawalan RSL: generator (diganti EP), `orderSourceKey` (kedua), cron auto-cancel
+(kedua), komentar route/drawer (diperbarui). Cancel-order, notifikasi, ledger, laporan,
+pencarian memakai `reseller_id`/nomor sebagai data — tidak ada aturan prefix kedua.
+
+**4) Pesanan portal reseller seragam Transaksi admin.** `PesananPanel`: tab memakai
+`ORDER_STAGE_TABS_VISIBLE`/`orderStage` (Semua, Belum Bayar, Menunggu Pickup, Dikirim,
+Selesai, Dibatalkan + jumlah), filter cari/bulan/tanggal, tabel desktop (No. Pesanan,
+Pelanggan, Produk, Total, Resi, Status) dan kartu mobile; hanya data reseller login.
+API daftar reseller menerima `month` dan mengirim `order_items`, `customer_whatsapp`,
+`tracking_status_text`; total 200 baris/bulan. Detail `PesananDetailPanel` memakai kartu
+Informasi Produk, Detail Pesanan, Penerima, Pengiriman/resi+tracking, Ringkasan Reseller
+(harga beli/jual/untung, saldo, kekurangan + tombol bayar + batas waktu); tanpa aksi admin.
+`OrderStagePill` dipakai bersama daftar & detail.
+
+**Verifikasi:** `tsc` EXIT=0; RPC diuji dalam transaksi rollback pada `RSL-20261030-818`
+(XS→S: stok XS 11→12, S 20→19, kolom reseller & total/saldo/kekurangan tetap, audit 1,
+rollback); qty 2 ditolak dengan pesan reseller. Mock UI 1280/390 untuk daftar, detail, dan
+modal edit (tanpa scroll horizontal).
