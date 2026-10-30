@@ -95,7 +95,10 @@ export default async function ProductLayout({
         itemListElement: [
           { "@type": "ListItem", position: 1, name: locale === "en" ? "Home" : "Beranda", item: `${SITE_URL}/${locale}` },
           { "@type": "ListItem", position: 2, name: locale === "en" ? "Catalog" : "Katalog", item: `${SITE_URL}/${locale}/katalog` },
-          { "@type": "ListItem", position: 3, name: product.name },
+          // Item terakhir (halaman ini) tetap membawa URL supaya Google bisa memvalidasi
+          // breadcrumb lengkap. Tanpa `item`, sebagian laporan Search Console menganggapnya
+          // tidak lengkap.
+          { "@type": "ListItem", position: 3, name: product.name, item: `${SITE_URL}/${locale}/katalog/${product.id}` },
         ],
       },
     ],
