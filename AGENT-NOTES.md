@@ -751,3 +751,19 @@ daftar menutup dan Penerima/Pengiriman langsung dekat kartu item.
 daftar tutup + kartu item + Penerima dekat; Ganti produk menimpa; +Tambah menambah (item lama
 ringkas, item baru terbuka); cari "Broken" auto-buka. Mobile 390/360: item ringkas + editor,
 langkah 2 menampilkan baris ringkas + Ubah, tanpa scroll horizontal (`scrollWidth < innerWidth`).
+
+### 8.22 Foto item di detail pesanan reseller (30 Oktober 2026)
+
+**Bug:** item "Thobe Superblack" di detail pesanan menampilkan ikon rusak + teks alt.
+Penyebab: `order_items.product_image` menyimpan snapshot `products.image`; untuk Thobe
+Superblack kolom itu berisi URL **video `.mp4`**, sehingga `<img>` gagal.
+
+**Perbaikan (read-only, tanpa ubah DB):**
+- `getResellerOrderDetail` me-resolve `product_image` lewat helper bersama
+  `loadOrderPhotoLookup` (client admin) + `orderItemPhoto` — snapshot video dilewati, foto
+  katalog per warna/utama dipakai. Pesanan lama otomatis benar saat dibuka.
+- `PesananDetailPanel` memakai `ProductPhoto` (onError → placeholder netral, tanpa teks alt)
+  dengan class `oi-ph` 44×55; `ProductPhoto` mendapat prop `className` (default `"ph"`).
+
+**Verifikasi read-only** `RSL-20261030-818` (reseller 80abf627…): `product_image` berubah dari
+`.../00_semua_video.mp4` menjadi `.../02_semua_foto.png`; URL PNG 200. `tsc` bersih.
