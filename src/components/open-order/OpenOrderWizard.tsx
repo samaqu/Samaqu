@@ -48,6 +48,7 @@ import { localPhone } from "@/lib/whatsapp";
 import { fetchActivePaymentMethods, isOnlinePaymentMethod, type PaymentMethodRow } from "@/lib/payment-methods";
 import { startOnlinePayment } from "@/lib/mayar-client";
 import { getMetaBrowserIds, trackAddToCart, trackPurchaseOnce } from "@/lib/meta-pixel";
+import { metaCatalogContentIds, metaCatalogContents, metaCatalogItemId } from "@/lib/meta-catalog";
 import { supabase } from "@/lib/supabase";
 import StepAuth, { type AuthAccount } from "./StepAuth";
 import StepCart from "./StepCart";
@@ -260,6 +261,18 @@ export default function OpenOrderWizard({
   // semuanya yang diikutkan admin (`open_order_enabled`), lintas kategori.
   const products = useMemo(() => buildOpenOrderProducts(catalog, stockRows), [catalog, stockRows]);
 
+  /** Baris katalog asli + penanda series untuk mapping ID item katalog Meta. */
+  function metaCatalogRefForLine(line: ProductDraft) {
+    const product = findOpenOrderProduct(products, line.productId);
+    const variant = product ? openOrderVariantFor(product, line.color, line.series) : undefined;
+    return {
+      // Series memakai id baris produk series-nya; non-series memakai id per ukuran.
+      id: variant?.productId ?? line.productId,
+      series: variant?.series ?? (line.series || null),
+      size: line.size,
+    };
+  }
+
   const subtotal = lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
   const total = subtotal + (extraCover ? OPEN_ORDER_ADDON.price : 0) + (shipping?.cost ?? 0);
 
@@ -442,12 +455,15 @@ export default function OpenOrderWizard({
     setStep(3);
 
     // Meta Pixel: AddToCart — setelah baris benar-benar masuk keranjang wizard.
+    // ID item mengikuti katalog Meta (varian yang dipilih, bukan id grup produk).
+    const metaItem = metaCatalogRefForLine(line);
+    const metaContentId = metaCatalogItemId(metaItem, metaItem.size);
     trackAddToCart({
-      id: line.productId,
+      id: metaContentId,
       name: findOpenOrderProduct(products, line.productId)?.name || "Open Order",
       price: line.price,
       quantity: line.quantity,
-      contents: [{ id: line.productId, quantity: line.quantity, item_price: line.price }],
+      contents: [{ id: metaContentId, quantity: line.quantity, item_price: line.price }],
     });
   }
 
@@ -604,12 +620,19 @@ export default function OpenOrderWizard({
       // Meta Pixel: Purchase browser — hanya setelah server benar-benar menyimpan pesanan.
       // Value = subtotal produk saja (tanpa ongkir). CAPI Purchase dikirim server-side
       // (/api/open-order) dengan event_id yang sama, jadi tidak ada CAPI dobel dari browser.
-      const contents = lines.map((line) => ({
-        id: line.productId,
-        quantity: line.quantity,
-        item_price: line.price,
-      }));
-      const contentIds = Array.from(new Set(contents.map((item) => item.id)));
+      const contents = metaCatalogContents(
+        lines.map((line) => {
+          const metaItem = metaCatalogRefForLine(line);
+          return {
+            id: metaItem.id,
+            series: metaItem.series,
+            size: metaItem.size,
+            quantity: line.quantity,
+            itemPrice: line.price,
+          };
+        })
+      );
+      const contentIds = metaCatalogContentIds(contents);
       const numItems = contents.reduce((sum, item) => sum + item.quantity, 0);
       trackPurchaseOnce({
         orderId: String(data.orderNumber),

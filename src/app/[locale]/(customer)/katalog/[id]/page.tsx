@@ -19,7 +19,8 @@ import { getWhatsAppLink, useStoreSettings } from "@/lib/store-settings";
 import { supabase } from "@/lib/supabase";
 import { useWishlist } from "@/lib/use-wishlist";
 import { useSafeLocale } from "@/lib/safe-i18n";
-import { isPaketKategori, variantName as paketName } from "@/lib/item-label";
+import { PAKET_SIZE, isPaketKategori, variantName as paketName } from "@/lib/item-label";
+import { metaCatalogItemId, metaCatalogItemIds } from "@/lib/meta-catalog";
 import { trackViewContent, trackAddToCart, trackWhatsAppClick, sendCAPIEvent } from "@/lib/meta-pixel";
 
 const FALLBACK_SIZES = ["S", "M", "L", "XL", "XXL"];
@@ -261,6 +262,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   // Supabase images per color
   const [supabaseMedia, setSupabaseMedia] = useState<MediaItem[]>([]);
+  /** Ukuran asli produk tanpa series — dipakai menyusun content_ids ViewContent sesuai feed. */
+  const [catalogSizes, setCatalogSizes] = useState<{ productId: string; sizes: string[] } | null>(null);
 
   // Related products (same kain), for "Produk lain dari kain ini"
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
@@ -296,19 +299,43 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     });
   }, [id, searchParams]);
 
-  // Meta Pixel: ViewContent — sekali per produk yang benar-benar dibuka
+  // Ukuran asli produk tanpa series → ID item katalog (satu baris per ukuran di feed).
+  useEffect(() => {
+    if (!product || String(product.series ?? "").trim()) return;
+    let active = true;
+    supabase
+      .from("product_variants")
+      .select("size")
+      .eq("product_id", product.id)
+      .then(({ data }) => {
+        if (!active) return;
+        setCatalogSizes({
+          productId: product.id,
+          sizes: Array.from(new Set((data ?? []).map((v) => String(v.size ?? "").trim()).filter(Boolean))),
+        });
+      });
+    return () => { active = false; };
+  }, [product?.id, product?.series]);
+
+  // Meta Pixel: ViewContent — sekali per produk, ID mengikuti struktur katalog Meta.
+  // Produk ber-series → id produk; produk tanpa series → semua id ukuran (walau ukuran belum dipilih).
   const viewContentTracked = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (product && !viewContentTracked.current.has(product.id)) {
-      viewContentTracked.current.add(product.id);
-      trackViewContent({
-        id: product.id,
-        name: product.name,
-        price: product.create_your_price_enabled ? (product.minimum_price ?? product.price) : product.price,
-        category: product.category,
-      });
-    }
-  }, [product?.id]);
+    if (!product || viewContentTracked.current.has(product.id)) return;
+    const isSeries = Boolean(String(product.series ?? "").trim());
+    if (!isSeries && catalogSizes?.productId !== product.id) return;
+    const contentIds = isSeries
+      ? [product.id]
+      : metaCatalogItemIds(product, catalogSizes?.productId === product.id ? catalogSizes.sizes : []);
+    viewContentTracked.current.add(product.id);
+    trackViewContent({
+      id: product.id,
+      contentIds: contentIds.length > 0 ? contentIds : [product.id],
+      name: product.name,
+      price: product.create_your_price_enabled ? (product.minimum_price ?? product.price) : product.price,
+      category: product.category,
+    });
+  }, [product?.id, product?.series, catalogSizes]);
 
   // Fetch images from Supabase product_images table
   useEffect(() => {
@@ -528,13 +555,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     );
 
     // Meta Pixel: AddToCart — harga yang benar-benar masuk keranjang (termasuk Create Your Price)
+    // dan ID varian yang benar-benar dipilih (mengikuti ID item katalog Meta, bukan id induk).
     const trackedUnitPrice = isCYP ? finalCYPPrice : currentPrice;
+    const trackedSeries = product.series || availableSeries.find((s) => s.id === displayId)?.series || "";
+    const trackedCatalogId = metaCatalogItemId(
+      { id: displayId, series: trackedSeries },
+      isPaket ? PAKET_SIZE : selectedSize
+    );
     trackAddToCart({
-      id: displayId,
+      id: trackedCatalogId,
       name: product.name,
       price: trackedUnitPrice,
       quantity: qty,
-      contents: [{ id: displayId, quantity: qty, item_price: trackedUnitPrice }],
+      contents: [{ id: trackedCatalogId, quantity: qty, item_price: trackedUnitPrice }],
     });
   }
 
@@ -550,7 +583,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     // Cover & Hanger: tidak ada ukuran pakaian — paketnya sudah disebut di nama varian.
     const ukuranPart = isPaket ? "" : ` - Ukuran ${selectedSize}`;
     const msg = `Halo, saya mau pesan produk:\n${product.name}${variantParts ? " - " + variantParts : ""}${ukuranPart}\nHarga: Rp ${effectivePrice.toLocaleString("id-ID")}\nJumlah: ${qty}`;
-    trackWhatsAppClick("product_detail", displayId);
+    trackWhatsAppClick(
+      "product_detail",
+      metaCatalogItemId({ id: displayId, series: seriesName }, isPaket ? PAKET_SIZE : selectedSize)
+    );
     window.open(getWhatsAppLink(msg), "_blank");
   }
 

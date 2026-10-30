@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { ShieldCheck, Copy, Check, Clock, MessageCircle, ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { trackPurchaseOnce, trackLead } from "@/lib/meta-pixel";
+import { metaCatalogItemId } from "@/lib/meta-catalog";
 import { isPaketItem, itemNameSuffix } from "@/lib/item-label";
 import { normalizeMethodType, paymentMethodLabel, type PaymentMethodRow } from "@/lib/payment-methods";
 import { useResolvedPaymentMethod } from "@/lib/use-payment-methods";
@@ -25,7 +26,7 @@ interface OrderData {
   shipping_method: string;
   payment_method: string;
   created_at: string;
-  order_items: { product_id?: string | null; product_name: string; color: string; size: string; quantity: number; price: number }[];
+  order_items: { product_id?: string | null; product_name: string; color: string; size: string; series?: string | null; quantity: number; price: number }[];
 }
 
 function CheckoutSuccessContent() {
@@ -70,7 +71,7 @@ function CheckoutSuccessContent() {
             .catch(() => ({ data: null }))
         : supabase
             .from("orders")
-            .select("*, order_items(product_id, product_name, color, size, quantity, price)")
+            .select("*, order_items(product_id, product_name, color, size, series, quantity, price)")
             .eq("order_number", orderId)
             .single();
       const [orderRes, paymentRes, settingsRes] = await Promise.all([
@@ -86,11 +87,32 @@ function CheckoutSuccessContent() {
       if (orderRes.data) {
         const orderData = orderRes.data as any;
         const items: NonNullable<OrderData["order_items"]> = orderData.order_items || [];
-        const contents = items.map((item, i) => ({
-          id: String(item.product_id || item.product_name || `item-${i}`),
-          quantity: Number(item.quantity) || 1,
-          item_price: Number(item.price) || 0,
-        }));
+        // Sumber kebenaran "produk ini ber-series atau tidak" = `products.series`, bukan
+        // snapshot order lama yang bisa kosong. Fallback ke snapshot kalau produk sudah dihapus.
+        const productIds = Array.from(
+          new Set(items.map((item) => String(item.product_id || "").trim()).filter(Boolean))
+        );
+        const seriesById = new Map<string, string | null>();
+        if (productIds.length > 0) {
+          const { data: productRows } = await supabase.from("products").select("id, series").in("id", productIds);
+          for (const row of productRows ?? []) seriesById.set(String(row.id), row.series ?? null);
+        }
+        const contents = items.map((item, i) => {
+          const productId = String(item.product_id || "").trim();
+          // ID varian yang dibeli, sama dengan ID item katalog Meta (series → id produk,
+          // non-series → id per ukuran).
+          const id = productId
+            ? metaCatalogItemId(
+                { id: productId, series: seriesById.has(productId) ? seriesById.get(productId) : item.series },
+                item.size
+              )
+            : String(item.product_name || `item-${i}`);
+          return {
+            id,
+            quantity: Number(item.quantity) || 1,
+            item_price: Number(item.price) || 0,
+          };
+        });
         const contentIds = Array.from(new Set(contents.map((item) => item.id)));
         const numItems = contents.reduce((sum, item) => sum + item.quantity, 0);
 

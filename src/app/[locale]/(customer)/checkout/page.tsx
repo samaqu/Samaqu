@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { getWhatsAppLink } from "@/lib/store-settings";
 import { localPhone } from "@/lib/whatsapp";
 import { trackInitiateCheckout, sendCAPIEvent, getMetaBrowserIds } from "@/lib/meta-pixel";
+import { metaCatalogItemId } from "@/lib/meta-catalog";
 import { isPaketItem, isPaketSize, variantName } from "@/lib/item-label";
 import { PaymentIcon } from "@/lib/payment-icons";
 import { fetchActivePaymentMethods, isOnlinePaymentMethod, normalizeMethodType, paymentMethodLabel, type PaymentMethodRow } from "@/lib/payment-methods";
@@ -421,22 +422,31 @@ function CheckoutContent() {
     }
   }, [isCartMode, items, qty, productId, colorParam, sizeParam, productWeights, variantWeights]);
 
-  // Meta Pixel: InitiateCheckout (fire once on mount)
+  // Meta Pixel: InitiateCheckout — sekali per kunjungan checkout. Keranjang baru terisi
+  // setelah localStorage selesai dimuat, jadi event menunggu item/produk siap (bukan mount kosong).
+  const initiateCheckoutTracked = useRef(false);
   useEffect(() => {
+    if (initiateCheckoutTracked.current) return;
     if (isCartMode && items.length > 0) {
-      const contentIds = items.map(i => i.id);
+      // ID mengikuti item katalog Meta: series = id produk, non-series = id per ukuran.
+      const contentIds = Array.from(new Set(
+        items.map(i => metaCatalogItemId({ id: i.id, series: i.series }, i.size))
+      ));
       const numItems = items.reduce((sum, item) => sum + item.qty, 0);
       const total = items.reduce((sum, item) => {
         const unitPrice = (item.create_your_price_enabled && item.customer_price) ? item.customer_price : item.price;
         return sum + unitPrice * item.qty;
       }, 0);
+      initiateCheckoutTracked.current = true;
       const { eventId } = trackInitiateCheckout(total, numItems, contentIds);
       sendCAPIEvent("InitiateCheckout", eventId, { value: total, currency: "IDR", content_ids: contentIds, num_items: numItems });
     } else if (!isCartMode && product) {
-      const { eventId } = trackInitiateCheckout(product.price * qty, qty, [product.id]);
-      sendCAPIEvent("InitiateCheckout", eventId, { value: product.price * qty, currency: "IDR", content_ids: [product.id], num_items: qty });
+      const contentId = metaCatalogItemId({ id: product.id, series: product.series }, sizeParam);
+      initiateCheckoutTracked.current = true;
+      const { eventId } = trackInitiateCheckout(product.price * qty, qty, [contentId]);
+      sendCAPIEvent("InitiateCheckout", eventId, { value: product.price * qty, currency: "IDR", content_ids: [contentId], num_items: qty });
     }
-  }, []); // Empty deps = fire once on mount
+  }, [isCartMode, items, product, qty, sizeParam]);
 
   // ── Auto-trigger shipping calculation ──
   const calculateShipping = useCallback(async (addr: SavedAddress, signal?: AbortSignal) => {

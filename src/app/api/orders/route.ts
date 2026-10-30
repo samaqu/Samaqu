@@ -15,7 +15,8 @@ import { createOrderPaymentLink } from "@/lib/mayar";
 import { markLeadBoughtForOrder } from "@/lib/ops-lead-sync";
 import { sumWeightGramsBySize, productWeightMapFromRows, variantWeightMapFromRows } from "@/lib/shipping-weight";
 import { orderLookupToken } from "@/lib/order-token";
-import { formatProductLabel } from "@/lib/item-label";
+import { PAKET_SIZE, formatProductLabel, isPaketKategori } from "@/lib/item-label";
+import { metaCatalogContents } from "@/lib/meta-catalog";
 import { resolveAttribution } from "@/lib/affiliate/referral";
 import { recordCommissionForOrder } from "@/lib/affiliate/commission";
 import { snapshotOrderHpp } from "@/lib/produksi-order-hpp";
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest) {
     const { data: productRows, error: productsError } = requestedProductIds.length
       ? await supabase
           .from("products")
-          .select("id, price, create_your_price_enabled, minimum_price")
+          .select("id, price, create_your_price_enabled, minimum_price, series, category")
           .in("id", requestedProductIds)
       : { data: [], error: null };
     if (productsError) {
@@ -550,11 +551,20 @@ export async function POST(request: NextRequest) {
           orderNumber,
           // Sesuai ketentuan: subtotal produk saja, ongkir & diskon tidak ikut.
           value: subtotal,
-          contents: validatedItems.map((item) => ({
-            id: item.productId,
-            quantity: item.quantity || 1,
-            item_price: item.price,
-          })),
+          // ID item katalog Meta: series → id produk, non-series → id per ukuran.
+          // Sumber `products.series`/kategori dari database, bukan dari browser.
+          contents: metaCatalogContents(
+            validatedItems.map((item) => {
+              const product = productsById.get(item.productId);
+              return {
+                id: item.productId,
+                series: product?.series ?? null,
+                size: isPaketKategori(product?.category) ? PAKET_SIZE : item.size,
+                quantity: item.quantity || 1,
+                itemPrice: item.price,
+              };
+            })
+          ),
           eventSourceUrl: metaEventSourceUrl,
           user: {
             name: customer.name,

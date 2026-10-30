@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { buildFbc, getClientIp, getMetaCookies, sendMetaPurchaseEvent } from "@/lib/meta-capi";
+import { metaCatalogContents } from "@/lib/meta-catalog";
 import { OPEN_ORDER_ADDON, OPEN_ORDER_ADDON_TARGET_ID, OPEN_ORDER_ADDON_VARIANT, resolveAddonWeight, resolveAddonWeightFromCatalog } from "@/lib/open-order-config";
 import { readOpenOrderWindow } from "@/lib/open-order-settings";
 import { resolveOpenOrderState } from "@/lib/open-order-window";
@@ -700,11 +701,16 @@ export async function POST(request: NextRequest) {
           orderNumber,
           // Ketentuan: subtotal produk saja — ongkir tidak dihitung.
           value: subtotal,
-          contents: validatedItems.map((item) => ({
-            id: item.productId,
-            quantity: item.quantity || 1,
-            item_price: item.price,
-          })),
+          // ID item katalog Meta: series → id produk, non-series/add-on → id per ukuran.
+          contents: metaCatalogContents(
+            validatedItems.map((item) => ({
+              id: item.productId,
+              series: item.series,
+              size: item.size,
+              quantity: item.quantity || 1,
+              itemPrice: item.price,
+            }))
+          ),
           eventSourceUrl: metaEventSourceUrl,
           user: {
             name,

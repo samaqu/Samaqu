@@ -4,6 +4,7 @@ import { SITE_URL, DEFAULT_LOCALE } from "@/lib/site-config";
 import { resolveStock, type StockRow } from "@/lib/ops-stock";
 import { isVideoUrl } from "@/lib/product-thumbnail";
 import { OPEN_ORDER_ADDON_TARGET_ID } from "@/lib/open-order-config";
+import { metaCatalogItemId } from "@/lib/meta-catalog";
 
 /**
  * Product feed publik untuk Katalog Meta (Commerce Manager → "Gunakan URL").
@@ -302,7 +303,7 @@ export async function GET() {
         // Satu baris per series: semua ukuran digabung, tidak dipecah.
         rows.push(
           [
-            product.id,
+            metaCatalogItemId(product),
             buildTitle(product),
             base.description,
             availableSizes.length > 0 ? "in stock" : "out of stock",
@@ -326,7 +327,7 @@ export async function GET() {
         const sizeVariants = items.filter((v) => String(v.size ?? "").trim().toUpperCase() === size);
         rows.push(
           [
-            `${product.id}-${size.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+            metaCatalogItemId(product, size),
             buildTitle(product),
             base.description,
             (sizeStock.get(size) ?? 0) > 0 ? "in stock" : "out of stock",
