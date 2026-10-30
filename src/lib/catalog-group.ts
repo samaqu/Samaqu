@@ -15,13 +15,18 @@ export function catalogPrice(product: Product): number {
     : product.price;
 }
 
+/** Kunci grup katalog website: satu kartu = satu kategori + nama produk. */
+export function catalogGroupKey(product: { category: string; name: string }): string {
+  return `${product.category}::${product.name}`;
+}
+
 export function groupCatalogProducts(raw: Product[]): {
   items: CatalogProduct[];
   memberIdsByRep: Record<string, string[]>;
 } {
   const groups = new Map<string, Product[]>();
   for (const product of raw) {
-    const key = `${product.category}::${product.name}`;
+    const key = catalogGroupKey(product);
     const list = groups.get(key) || [];
     list.push(product);
     groups.set(key, list);

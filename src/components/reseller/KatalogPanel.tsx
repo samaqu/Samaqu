@@ -62,7 +62,7 @@ export default function KatalogPanel() {
             const habis = stock < 1;
             return (
               <div className="prod-card" key={product.id}>
-                <ProductPhoto src={product.image} name={product.name} />
+                <ProductPhoto src={product.image} name={product.name} series={product.series} />
                 <div className="bd">
                   <div className="nm">
                     {product.name}

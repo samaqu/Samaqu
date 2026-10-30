@@ -98,7 +98,7 @@ export default function PilihProduk({
           return (
             <div key={product.id}>
               <button type="button" className="pick-row" onClick={() => openProduct(product)}>
-                <ProductPhoto src={product.image} name={product.name} />
+                <ProductPhoto src={product.image} name={product.name} series={product.series} />
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="bold" style={{ display: "block", fontSize: 13.5 }}>
                     {product.name}

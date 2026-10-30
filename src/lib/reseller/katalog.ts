@@ -12,6 +12,7 @@
 
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { loadOrderPhotoLookup } from "@/lib/order-photo-data";
+import { catalogGroupKey } from "@/lib/catalog-group";
 import { effectiveDiscountPercent, resellerBuyPrice } from "./pricing";
 import { getResellerSettings } from "./settings";
 
@@ -113,6 +114,39 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
     return stockByKey.get(`${v.base_product_id}|${v.color}|${v.size}`) ?? 0;
   };
 
+  // Foto cadangan tingkat grup — aturan yang sama dengan kartu katalog website
+  // (`groupCatalogProducts`): satu grup = kategori + nama; foto grup diambil
+  // dari anggota pertama yang punya gambar (urutan created_at).
+  const groupPhotoByKey = new Map<string, string>();
+  const missingPhoto = products.filter((product) => !photoLookup.main?.[String(product.id)]);
+  if (missingPhoto.length > 0) {
+    const names = [...new Set(missingPhoto.map((product) => product.name))];
+    const categories = [...new Set(missingPhoto.map((product) => product.category))];
+    const { data: groupRows, error: groupError } = await supabase
+      .from("products")
+      .select("id, name, category")
+      .in("name", names)
+      .in("category", categories)
+      .order("created_at", { ascending: true });
+
+    if (groupError) {
+      console.error("[RESELLER-KATALOG] Gagal membaca foto grup:", groupError.message);
+    } else {
+      const wantedGroups = new Set(missingPhoto.map((product) => catalogGroupKey(product)));
+      const candidates = (groupRows ?? []).filter((row) =>
+        wantedGroups.has(catalogGroupKey(row))
+      );
+      if (candidates.length > 0) {
+        const groupLookup = await loadOrderPhotoLookup(candidates.map((row) => String(row.id)));
+        for (const row of candidates) {
+          const key = catalogGroupKey(row);
+          const photo = groupLookup.main?.[String(row.id)];
+          if (photo && !groupPhotoByKey.has(key)) groupPhotoByKey.set(key, photo);
+        }
+      }
+    }
+  }
+
   return products.map((product) => {
     const own = variants.filter((v) => v.product_id === product.id);
     return {
@@ -120,7 +154,10 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
       name: product.name,
       category: product.category,
       series: product.series ?? null,
-      image: photoLookup.main?.[String(product.id)] || null,
+      image:
+        photoLookup.main?.[String(product.id)] ||
+        groupPhotoByKey.get(catalogGroupKey(product)) ||
+        null,
       price: Math.round(Number(product.price) || 0),
       discount_percent: effectiveDiscountPercent(product, defaultDiscount),
       buy_price: resellerBuyPrice(product, defaultDiscount),

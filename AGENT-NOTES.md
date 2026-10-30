@@ -569,3 +569,42 @@ jadi toggle & foto dari admin langsung terlihat saat halaman dibuka ulang.
 **Verifikasi:** cek read-only produksi lewat route temp (dihapus sebelum commit): 7/7 enabled masuk
 katalog, foto Thobe Broken White kini PNG `02_semua_foto.png`; `tsc` EXIT=0; render mock 1280 & 375
 (foto asli, placeholder tanpa alt, stok habis + tombol nonaktif) tanpa error aplikasi.
+
+### 8.17 Foto katalog reseller: cadangan foto grup + sidebar tanpa scroll (30 Oktober 2026)
+
+**Temuan akar masalah (read-only produksi):** baris yang aktif reseller adalah **Thobe Black**
+(kain A-02, 6 series) — semuanya `is_published = false` dan **0 foto** di `product_images`,
+`products.images`, maupun `products.image`. Foto yang terlihat di website berasal dari keluarga
+produk BERBEDA: **Thobe Superblack** (kain B-01, 6 series, `is_published = true`,
+`reseller_enabled = false`) yang punya 7–9 foto per series. Kolom nama yang dibaca sama
+(`products.name`); jadi "Thobe Black" vs "Thobe Superblack" bukan salah ambil kolom — itu memang
+dua baris produk berbeda (SKU `THB-A02-BLK-*` vs keluarga B-01). Nama TIDAK diubah.
+
+**Resolver foto (satu rantai, tanpa versi kedua):**
+1. Foto series sendiri lewat `loadOrderPhotoLookup` (product_images display_order → products.images
+   → products.image, video dilewati) — helper yang sama dengan katalog/order website.
+2. Kalau kosong: foto **grup** memakai aturan kartu katalog website (`groupCatalogProducts`):
+   grup = `category::name` (helper baru `catalogGroupKey` di `src/lib/catalog-group.ts`), foto
+   diambil dari anggota grup pertama yang punya gambar (urutan `created_at`).
+3. Kalau grup juga kosong: placeholder `ProductPhoto`.
+Karena grup Thobe Black (A-02) tidak punya foto sama sekali, keenam series tetap placeholder.
+
+**Placeholder baru (`ProductPhoto`):** latar netral lembut `#f0f0ec`, wordmark "SAMAQU" halus,
+inisial + nama series (mis. "JI / JIHARKAH"); `aria-hidden` sehingga TIDAK ada teks alt. Di
+pemilih produk yang kecil hanya inisial. `NEUTRAL_ITEM_PHOTO` tidak lagi dipakai di komponen ini.
+
+**Sidebar:** `.sb-head`/kicker/nav/label/item/foot dirapatkan; `.sb-nav` memakai
+`scrollbar-width:none` + `::-webkit-scrollbar{display:none}` sehingga layar sangat pendek tetap
+bisa scroll tanpa panah. Terukur 768/900/1080: `scrollHeight = clientHeight` (tidak ada overflow);
+500px: overflow ada tetapi scrollbar none. Mobile (≤767) tidak berubah karena `.sb` disembunyikan.
+
+**Daftar produk reseller tanpa foto (30 Okt 2026):** Thobe Black — Jiharkah, Imron, Bayati,
+Nahawand, Karim, Imalah (6). Satu-satunya produk reseller enabled yang berfoto: Thobe Broken
+White — Bayati (7 foto). Produk tanpa foto lain di DB (Thobe Sand Beige, Warm Taupe, Graphite Grey,
+Ash Grey, Coffe Bean) tidak aktif reseller. Jika yang dimaksud produk website "Thobe Superblack"
+(B-01), baris itu belum diaktifkan reseller — aktifkan di tab Produk & Harga atau unggah foto untuk
+keluarga Thobe Black (A-02).
+
+**Verifikasi:** `tsc` EXIT=0; render mock 1280 & 375 (foto asli, placeholder wordmark, stok habis
+nonaktif); shell asli + mock `/me` diukur pada 768/900/1080/500. Tidak ada perubahan pada query
+Open Order, resolveStock, katalog website, atau sisi customer.

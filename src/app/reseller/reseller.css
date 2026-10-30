@@ -39,26 +39,31 @@
   width: 248px; background: #fff; border-right: 1px solid var(--rs-bd);
   position: fixed; inset: 0 auto 0 0; display: flex; flex-direction: column; z-index: 40;
 }
-.rs-root .sb-head { padding: 20px 20px 10px; display: flex; align-items: center; gap: 10px; }
-.rs-root .sb-head img { height: 22px; width: auto; }
+.rs-root .sb-head { padding: 14px 20px 8px; display: flex; align-items: center; gap: 10px; }
+.rs-root .sb-head img { height: 20px; width: auto; }
 .rs-root .sb-kicker {
   font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
-  color: var(--rs-mut); padding: 0 20px 14px; border-bottom: 1px solid var(--rs-bd);
+  color: var(--rs-mut); padding: 0 20px 10px; border-bottom: 1px solid var(--rs-bd);
 }
-.rs-root .sb-nav { flex: 1; overflow-y: auto; padding: 12px 12px 20px; display: flex; flex-direction: column; gap: 2px; }
+.rs-root .sb-nav {
+  flex: 1; overflow-y: auto; padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 1px;
+  /* layar sangat pendek masih bisa di-scroll, tetapi tanpa scrollbar/panah */
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+.rs-root .sb-nav::-webkit-scrollbar { display: none; }
 .rs-root .sb-label {
   font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
-  color: var(--rs-mut); padding: 14px 10px 6px;
+  color: var(--rs-mut); padding: 9px 10px 4px;
 }
 .rs-root .sbn-item {
-  display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px;
+  display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-radius: 10px;
   font-weight: 600; color: var(--rs-tx); cursor: pointer; border: 0; background: none; width: 100%;
   text-align: left;
 }
 .rs-root .sbn-item:hover { background: var(--rs-soft); }
 .rs-root .sbn-item.on { background: var(--rs-black); color: #fff; }
 .rs-root .sbn-item svg { width: 17px; height: 17px; flex: none; }
-.rs-root .sb-foot { border-top: 1px solid var(--rs-bd); padding: 12px; }
+.rs-root .sb-foot { border-top: 1px solid var(--rs-bd); padding: 8px 12px; }
 .rs-root .main { flex: 1; margin-left: 248px; min-width: 0; display: flex; flex-direction: column; }
 .rs-root .hd {
   display: flex; align-items: center; gap: 12px; padding: 14px 28px;
@@ -183,11 +188,22 @@
 .rs-root .prod-card .ph { aspect-ratio: 4/5; background: var(--rs-soft); object-fit: cover; width: 100%; }
 .rs-root .prod-card .bd { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; }
 .rs-root .prod-card .nm { font-weight: 800; color: var(--rs-ink); font-size: 13.5px; line-height: 1.35; }
+/* Placeholder foto: jelas bukan gambar rusak — wordmark halus + inisial/nama series. */
+.rs-root .ph-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  background: #f0f0ec; color: #b4b4ab; overflow: hidden; text-align: center;
+}
+.rs-root .ph-empty .wm { font-size: 8px; font-weight: 800; letter-spacing: .22em; text-transform: uppercase; opacity: .75; }
+.rs-root .ph-empty .init { font-size: 28px; font-weight: 800; line-height: 1; letter-spacing: .04em; color: #a8a89f; }
+.rs-root .ph-empty .sub { font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .8; max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rs-root .price-strike { text-decoration: line-through; color: var(--rs-mut); font-size: 12px; }
 
 .rs-root .pick-row { display: flex; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--rs-bd); border-radius: 12px; background: #fff; cursor: pointer; width: 100%; text-align: left; }
 .rs-root .pick-row:hover { border-color: var(--rs-ink); }
 .rs-root .pick-row .ph { width: 52px; height: 64px; border-radius: 8px; object-fit: cover; background: var(--rs-soft); flex: none; }
+.rs-root .pick-row .ph-empty { gap: 0; }
+.rs-root .pick-row .ph-empty .wm, .rs-root .pick-row .ph-empty .sub { display: none; }
+.rs-root .pick-row .ph-empty .init { font-size: 17px; }
 
 /* ── Baris produk pesanan ── */
 .rs-root .line-item { border: 1px solid var(--rs-bd); border-radius: 14px; padding: 14px; background: #fff; display: flex; flex-direction: column; gap: 12px; }
