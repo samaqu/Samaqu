@@ -257,6 +257,16 @@ export function describeLedgerRow(row: LedgerRowView, options: DescribeLedgerOpt
     };
   }
 
+  // Refund pesanan batal: nominalnya bisa gabungan potongan saldo + transfer yang lunas,
+  // jadi labelnya dibuat eksplisit supaya reseller paham uangnya kembali.
+  if (row.type === "order_refund") {
+    return {
+      title: "Pengembalian saldo",
+      description: `${row.note || "Pesanan dibatalkan"} · ${date}${actorSuffix(row.created_by, showActor)}`,
+      badge: { label: "Dikembalikan", tone: "ok" },
+    };
+  }
+
   return {
     title: ledgerTypeLabel(row.type),
     description: `${row.note || row.reference || "—"} · ${date}${actorSuffix(row.created_by, showActor)}`,

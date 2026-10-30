@@ -4,6 +4,7 @@ import { notifyAdminOrderCancelled, notifyCustomerOrderCancelled } from "@/lib/f
 import { claimOrderNotification } from "@/lib/order-notify";
 import { syncCommissionStatus } from "@/lib/affiliate/commission";
 import { claimResellerNotification, notifyResellerOrderCancelled } from "@/lib/reseller/notify";
+import { refundResellerOnCancel } from "@/lib/reseller/refund";
 
 /**
  * Satu jalur pembatalan pesanan untuk semua pemanggil: customer (`/api/orders/cancel`),
@@ -215,20 +216,18 @@ export async function cancelOrderCompletely(
   }
 
   if (resellerId) {
-    // Saldo yang terpotong dikembalikan lewat RPC tahap 1 — sekali saja per
-    // pesanan (UNIQUE type+reference). Refund dilakukan SETELAH status
-    // tersimpan: kalau pembatalan gagal, saldo tidak boleh sudah dikembalikan.
-    if (resellerDeduction > 0) {
-      const { error: refundError } = await supabase.rpc("samaqu_reseller_refund_order", {
-        p_reseller_id: resellerId,
-        p_order_id: order.id,
-        p_jumlah: resellerDeduction,
-        p_dibuat_oleh: "cancel-order",
-      });
-      if (refundError) {
-        console.error("[CANCEL] Gagal mengembalikan saldo reseller:", order.order_number, refundError.message);
-      }
-    }
+    // Yang dikembalikan bukan cuma potongan saldo: kalau sebagian atau seluruh pesanan
+    // dibayar lewat "bayar kekurangan" (transfer) dan sudah lunas, uang itu juga harus
+    // kembali. Satu baris ledger `order_refund` per pesanan; UNIQUE(type, reference)
+    // membuatnya idempoten walau pembatalan dipanggil berulang dari jalur berbeda.
+    // Refund dilakukan SETELAH status tersimpan.
+    await refundResellerOnCancel(supabase, {
+      resellerId,
+      orderId: order.id,
+      orderNumber: order.order_number,
+      balanceDeduction: resellerDeduction,
+      actor: "cancel-order",
+    });
 
     // Klaim admin memakai kolom lama (`cancelled_notified_at`); klaim reseller
     // memakai tabel reseller_notifications — dua pesan berbeda, dua klaim.
