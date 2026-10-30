@@ -19,6 +19,13 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json().catch(() => ({}) as Record<string, unknown>);
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
+  if (body.default_discount_percent !== undefined) {
+    const value = Number(body.default_discount_percent);
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
+      return NextResponse.json({ error: "Diskon default harus 0–100" }, { status: 400 });
+    }
+    patch.reseller_default_discount_percent = Math.round(value * 100) / 100;
+  }
   if (body.admin_fee_non_bsi !== undefined) {
     const fee = Math.round(Number(body.admin_fee_non_bsi));
     if (!Number.isFinite(fee) || fee < 0) {

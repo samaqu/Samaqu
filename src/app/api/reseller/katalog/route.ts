@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { resellerSession, resellerUnauthorized } from "@/lib/reseller/auth";
 import { getResellerCatalog } from "@/lib/reseller/katalog";
 
+// Harga reseller bisa diubah kapan saja dari tab admin Produk & Harga —
+// jangan pernah menyajikan respons katalog dari cache.
+export const dynamic = "force-dynamic";
+
 /**
  * Katalog reseller: hanya produk yang boleh dijual reseller
  * (`reseller_discount_percent` tidak NULL) + varian, stok efektif,

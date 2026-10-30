@@ -5,7 +5,8 @@
  */
 
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { resellerBuyPrice, resellerMinSellPrice } from "./pricing";
+import { effectiveDiscountPercent, resellerBuyPrice, resellerMinSellPrice } from "./pricing";
+import { getResellerSettings } from "./settings";
 
 export interface ResellerVariant {
   color: string;
@@ -22,7 +23,7 @@ export interface ResellerCatalogProduct {
   series: string | null;
   image: string | null;
   price: number;
-  minimum_price: number | null;
+  /** Diskon efektif (khusus series atau default) untuk tampilan. */
   discount_percent: number;
   buy_price: number;
   min_sell_price: number;
@@ -36,8 +37,9 @@ type ProductBaseRow = {
   series: string | null;
   image: string | null;
   price: number;
-  minimum_price: number | null;
+  reseller_enabled: boolean;
   reseller_discount_percent: number | string | null;
+  reseller_min_sell_price: number | null;
 };
 
 type VariantRow = {
@@ -52,11 +54,16 @@ type VariantRow = {
 export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
   const supabase = getSupabaseAdmin();
 
+  const settings = await getResellerSettings();
+  const defaultDiscount = settings.defaultDiscountPercent;
+
   const { data: rawProducts, error: productError } = await supabase
     .from("products")
-    .select("id, name, category, series, image, price, minimum_price, reseller_discount_percent")
-    // Produk dengan diskon NULL tidak dijual ke reseller (aturan bisnis).
-    .not("reseller_discount_percent", "is", null)
+    .select(
+      "id, name, category, series, image, price, reseller_enabled, reseller_discount_percent, reseller_min_sell_price"
+    )
+    // Hanya series yang DIAKTIFKAN admin di tab Produk & Harga yang dijual ke reseller.
+    .eq("reseller_enabled", true)
     .eq("is_published", true)
     .order("created_at", { ascending: true });
 
@@ -107,10 +114,9 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
       series: product.series ?? null,
       image: product.image ?? null,
       price: Math.round(Number(product.price) || 0),
-      minimum_price: product.minimum_price == null ? null : Math.round(Number(product.minimum_price) || 0),
-      discount_percent: Number(product.reseller_discount_percent) || 0,
-      buy_price: resellerBuyPrice(product),
-      min_sell_price: resellerMinSellPrice(product),
+      discount_percent: effectiveDiscountPercent(product, defaultDiscount),
+      buy_price: resellerBuyPrice(product, defaultDiscount),
+      min_sell_price: resellerMinSellPrice(product, defaultDiscount),
       // Varian series turunan boleh dibeli, stoknya mengikuti basis —
       // baris varian dikelompokkan per (color, size) tanpa duplikat.
       variants: own

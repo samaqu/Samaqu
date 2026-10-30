@@ -119,3 +119,29 @@ export function ConfirmActionModal({
     </Modal>
   );
 }
+
+/** Notifikasi kecil di pojok bawah (dipakai tab Produk & Harga). */
+export function AdminToast({
+  message,
+  tone,
+  onClose,
+}: {
+  message: string;
+  tone: "ok" | "err";
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const timer = window.setTimeout(onClose, 3500);
+    return () => window.clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div
+      className={`fixed bottom-5 right-5 z-[400] px-4 py-3 rounded-xl shadow-xl text-sm font-bold text-white ${
+        tone === "ok" ? "bg-emerald-600" : "bg-red-600"
+      }`}
+    >
+      {message}
+    </div>
+  );
+}

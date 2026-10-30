@@ -14,6 +14,7 @@ import { orderItemPhoto } from "@/lib/order-photo";
 import { loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { notifyAdminNewOrder } from "@/lib/fonnte";
 import { resellerBuyPrice, resellerMinSellPrice } from "./pricing";
+import { getResellerSettings } from "./settings";
 import { notifyResellerOrderCreated } from "./notify";
 import type { ResellerRow } from "./types";
 
@@ -74,8 +75,9 @@ interface ProductRow {
   id: string;
   name: string;
   price: number;
-  minimum_price: number | null;
+  reseller_enabled: boolean;
   reseller_discount_percent: number | string | null;
+  reseller_min_sell_price: number | null;
   series: string | null;
   image: string | null;
   jenis_kain?: { name?: string | null } | null;
@@ -116,10 +118,13 @@ export async function createResellerOrder(
 
   // ── Produk & harga: dihitung ulang dari database ──
   const productIds = [...new Set(items.map((i) => String(i?.productId || "").trim()).filter(Boolean))];
+  const settings = await getResellerSettings();
+  const defaultDiscount = settings.defaultDiscountPercent;
+
   const { data: productRows, error: productsError } = await supabase
     .from("products")
     .select(
-      "id, name, price, minimum_price, reseller_discount_percent, series, image, jenis_kain_id, jenis_kain(name)"
+      "id, name, price, reseller_enabled, reseller_discount_percent, reseller_min_sell_price, series, image, jenis_kain_id, jenis_kain(name)"
     )
     .in("id", productIds);
 
@@ -139,8 +144,8 @@ export async function createResellerOrder(
     if (!product) {
       return { ok: false, error: "Produk tidak ditemukan", status: 400 };
     }
-    // NULL = produk tidak dijual ke reseller (aturan bisnis).
-    if (product.reseller_discount_percent == null) {
+    // Hanya series yang diaktifkan admin di tab Produk & Harga yang bisa dipesan.
+    if (product.reseller_enabled !== true) {
       return { ok: false, error: `"${product.name}" tidak dijual ke reseller`, status: 400 };
     }
 
@@ -155,8 +160,8 @@ export async function createResellerOrder(
       return { ok: false, error: `Warna/ukuran untuk "${product.name}" tidak lengkap`, status: 400 };
     }
 
-    const buyPrice = resellerBuyPrice(product);
-    const minSell = resellerMinSellPrice(product);
+    const buyPrice = resellerBuyPrice(product, defaultDiscount);
+    const minSell = resellerMinSellPrice(product, defaultDiscount);
     const sellPrice = Math.round(Number(raw?.sellPrice));
     if (!Number.isFinite(sellPrice) || sellPrice < minSell) {
       return {

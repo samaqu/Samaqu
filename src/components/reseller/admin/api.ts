@@ -129,6 +129,35 @@ export interface LedgerRow {
   resellers: { store_name: string; owner_name: string } | null;
 }
 
+export interface CatalogRow {
+  id: string;
+  name: string;
+  category: string;
+  series: string | null;
+  image: string | null;
+  kain: string | null;
+  price: number;
+  is_published: boolean;
+  created_at: string | null;
+  reseller_enabled: boolean;
+  reseller_discount_percent: number | null;
+  reseller_min_sell_price: number | null;
+  buy_price: number;
+  min_sell_price: number;
+}
+
+export interface CatalogPayload {
+  data: CatalogRow[];
+  default_discount: number;
+}
+
+export interface CatalogUpdate {
+  id: string;
+  reseller_enabled?: boolean;
+  reseller_discount_percent?: number | null;
+  reseller_min_sell_price?: number | null;
+}
+
 export interface ResellerDetail {
   reseller: ResellerAdminRow;
   saldo: { saldo_tersedia: number; saldo_ditahan: number; saldo_total: number };
@@ -144,6 +173,7 @@ export interface ResellerDetail {
 }
 
 export interface ResellerSettings {
+  defaultDiscountPercent: number;
   adminFeeNonBsi: number;
   bsiBankName: string;
   bsiAccountNumber: string;
@@ -209,6 +239,14 @@ export const opsResellerApi = {
     }),
 
   settings: () => adminFetch<{ data: ResellerSettings }>("/api/ops/reseller/settings"),
+
+  catalog: () => adminFetch<CatalogPayload>("/api/ops/reseller/catalog"),
+
+  saveCatalog: (updates: CatalogUpdate[]) =>
+    adminFetch<{ ok: true; updated: number }>("/api/ops/reseller/catalog", {
+      method: "PATCH",
+      body: JSON.stringify({ updates }),
+    }),
 
   updateSettings: (payload: Record<string, unknown>) =>
     adminFetch<{ ok: true }>("/api/ops/reseller/settings", {

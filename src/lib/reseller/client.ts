@@ -44,6 +44,8 @@ export class ApiError extends Error {
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     ...init,
+    // Harga & saldo bisa berubah kapan saja dari admin — jangan pakai cache browser.
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${getResellerToken()}`,
@@ -118,7 +120,6 @@ export interface KatalogProduct {
   series: string | null;
   image: string | null;
   price: number;
-  minimum_price: number | null;
   discount_percent: number;
   buy_price: number;
   min_sell_price: number;

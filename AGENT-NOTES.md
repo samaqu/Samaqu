@@ -367,3 +367,30 @@ reseller ATAU admin ops; ganti/hapus tersedia; kalau kosong, tab QRIS disembunyi
 
 Jebakan: jangan menaruh `RupiahInput` di dalam komponen yang memformat ulang angkanya sendiri —
 format dilakukan DI DALAM komponen; state pemanggil harus angka (bukan string bertitik).
+
+### 8.9 Pengaturan harga reseller pindah ke tab "Produk & Harga" (30 Oktober 2026)
+
+**Alasan:** pengaturan diskon lewat form Edit Produk terlalu rumit dan katalog portal tetap kosong
+walau diskon diisi. Semua pengaturan harga reseller sekarang di satu tab admin.
+
+- **Migration `20261030_reseller_series_pricing.sql`** (aditif, sudah dijalankan): `products.reseller_enabled`
+  (bool default false), `products.reseller_min_sell_price` (integer nullable), `store_settings.reseller_default_discount_percent`
+  (default 25). Backfill SEKALI: produk dengan `reseller_discount_percent` terisi → `reseller_enabled = true`
+  (produksi: 6 dari 111). Backfill dibungkus cek kolom supaya re-run tidak menyalakan lagi series yang
+  sengaja dimatikan. `products.minimum_price` TIDAK disentuh.
+- **Aturan harga satu sumber** (`src/lib/reseller/pricing.ts`): diskon efektif = khusus series
+  (`reseller_discount_percent`) ?? default; harga beli = katalog × (1 − diskon efektif);
+  `resellerMinSellPrice` = max(`reseller_min_sell_price`, harga beli) — **`products.minimum_price`
+  milik CYP TIDAK dipakai lagi** untuk reseller. Katalog portal & pembuatan pesanan memfilter
+  `reseller_enabled = true` (bukan lagi `reseller_discount_percent` terisi).
+- **Tab admin "Produk & Harga"** (ops + panel, satu halaman): `DefaultDiscountCard`, `PriceTable`,
+  `ProductGroupRow`, `SeriesRow`, `BulkBar` di `src/components/reseller/admin/`; orkestrator `PriceTab`.
+  API: `GET/PATCH /api/ops/reseller/catalog` (per baris & massal; hanya kolom reseller yang ditulis).
+  Diskon khusus hanya bisa diatur lewat aksi massal ("Set diskon…"/"Pakai default"); toggle & harga
+  minimum jual disimpan per baris (tombol Simpan muncul saat berubah). Label "Baru" = series
+  dibuat ≤ 7 hari dan belum aktif.
+- **Form produk** kembali seperti SEBELUM tahap 4: `ProductResellerFields` dihapus dari
+  `ProductForm.tsx` (diff terhadap commit `31aab550` = kosong) dan file komponennya dihapus.
+  Catatan §8.5 bagian "Form produk" sudah tidak berlaku.
+- **Cache:** `/api/reseller/katalog` `force-dynamic`, klien portal `cache: "no-store"` — perubahan
+  harga langsung terlihat saat reseller membuka katalog/Buat Pesanan.

@@ -4,15 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import { opsResellerApi, type QueuePayload, type ResellerAdminRow, type ResellerStats } from "./api";
 import { rupiah } from "@/lib/reseller/format";
 import QueueTab from "./QueueTab";
+import PriceTab from "./PriceTab";
 import ResellersTab from "./ResellersTab";
 import ResellerDrawer from "./ResellerDrawer";
 import LedgerTab from "./LedgerTab";
 import SettingsTab from "./SettingsTab";
 
-type TabKey = "perlu-dicek" | "data" | "mutasi" | "pengaturan";
+type TabKey = "perlu-dicek" | "harga" | "data" | "mutasi" | "pengaturan";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "perlu-dicek", label: "Perlu Dicek" },
+  { key: "harga", label: "Produk & Harga" },
   { key: "data", label: "Data Reseller" },
   { key: "mutasi", label: "Mutasi Saldo" },
   { key: "pengaturan", label: "Pengaturan" },
@@ -135,6 +137,8 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
 
       {tab === "perlu-dicek" ? (
         <QueueTab queue={queue} loading={loadingQueue} onChanged={refreshAll} />
+      ) : tab === "harga" ? (
+        <PriceTab />
       ) : tab === "data" ? (
         <ResellersTab rows={resellers} loading={loadingList} onChanged={refreshAll} onOpenDetail={setDetail} />
       ) : tab === "mutasi" ? (
