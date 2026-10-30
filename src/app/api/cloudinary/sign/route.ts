@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resellerSession } from "@/lib/reseller/auth";
+import { isOpsAdmin } from "@/lib/ops-auth";
 
 export const runtime = "nodejs";
 
@@ -133,10 +134,14 @@ async function isCustomerRequest(request: Request) {
   }
 }
 
-/** Bukti transfer reseller hanya untuk sesi reseller (token hash di reseller_sessions). */
+/**
+ * Scope "reseller": bukti transfer portal (sesi reseller) ATAU upload QRIS dari
+ * tab Pengaturan admin reseller (sesi admin ops).
+ */
 async function isResellerRequest(request: Request) {
   try {
-    return Boolean(await resellerSession(request as NextRequest));
+    if (await resellerSession(request as NextRequest)) return true;
+    return await isOpsAdmin(request as NextRequest);
   } catch {
     return false;
   }

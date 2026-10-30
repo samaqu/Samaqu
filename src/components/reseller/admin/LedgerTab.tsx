@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AdminApiError, opsResellerApi, type LedgerRow, type ResellerAdminRow } from "./api";
 import { ledgerTypeLabel, rupiah, tglJamID } from "@/lib/reseller/format";
+import RupiahInput from "@/components/reseller/RupiahInput";
 import { Modal } from "./Modal";
 
 const LEDGER_TYPES: { key: string; label: string }[] = [
@@ -234,13 +235,7 @@ function KoreksiSaldoModal({
           </div>
           <div>
             <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Jumlah (Rp)</label>
-            <input
-              className="w-full px-3 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-lg text-sm font-semibold text-slate-900"
-              inputMode="numeric"
-              value={amount || ""}
-              onChange={(e) => setAmount(Number(e.target.value.replace(/\D/g, "")) || 0)}
-              placeholder="100000"
-            />
+            <RupiahInput value={amount} onChange={setAmount} placeholder="100.000" />
           </div>
         </div>
         <div>

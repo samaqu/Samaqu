@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
       bsi_bank_name: settings.bsiBankName,
       bsi_account_number: settings.bsiAccountNumber,
       bsi_account_holder: settings.bsiAccountHolder,
+      qris_image_url: settings.qrisImageUrl,
       rekening_bsi: isBsiBank(reseller.bank_name),
     },
   });

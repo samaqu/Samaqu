@@ -13,6 +13,8 @@ export interface ResellerSettingsValue {
   bsiBankName: string;
   bsiAccountNumber: string;
   bsiAccountHolder: string;
+  /** Gambar QRIS untuk top up & bayar kekurangan di portal reseller (null = belum diatur). */
+  qrisImageUrl: string | null;
 }
 
 /** Baris pengaturan reseller; nilai default dipakai kalau tabel/kolom belum ada. */
@@ -21,7 +23,7 @@ export async function getResellerSettings(): Promise<ResellerSettingsValue> {
     const { data } = await getSupabaseAdmin()
       .from("store_settings")
       .select(
-        "reseller_admin_fee_non_bsi, reseller_bsi_bank_name, reseller_bsi_account_number, reseller_bsi_account_holder"
+        "reseller_admin_fee_non_bsi, reseller_bsi_bank_name, reseller_bsi_account_number, reseller_bsi_account_holder, reseller_qris_image_url"
       )
       .eq("id", 1)
       .maybeSingle();
@@ -32,6 +34,7 @@ export async function getResellerSettings(): Promise<ResellerSettingsValue> {
       bsiBankName: String(row.reseller_bsi_bank_name ?? "Bank Syariah Indonesia (BSI)").trim(),
       bsiAccountNumber: String(row.reseller_bsi_account_number ?? "").trim(),
       bsiAccountHolder: String(row.reseller_bsi_account_holder ?? "").trim(),
+      qrisImageUrl: String(row.reseller_qris_image_url ?? "").trim() || null,
     };
   } catch (e) {
     console.error("[RESELLER] Gagal membaca pengaturan reseller:", e);
@@ -40,6 +43,7 @@ export async function getResellerSettings(): Promise<ResellerSettingsValue> {
       bsiBankName: "Bank Syariah Indonesia (BSI)",
       bsiAccountNumber: "",
       bsiAccountHolder: "",
+      qrisImageUrl: null,
     };
   }
 }

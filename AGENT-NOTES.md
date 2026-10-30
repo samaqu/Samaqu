@@ -342,3 +342,28 @@ baris sendiri (bisa diklik di WhatsApp): akun dibuat → `/reseller/login` (tepa
 `/reseller/pesanan/<nomor>`. URL dibuat oleh SATU helper `portalUrl()` di file itu memakai
 `SITE_URL` (`src/lib/site-config.ts` — domain website, bukan office). Template customer/admin
 (`src/lib/fonnte.ts`), pemicu, dan klaim sekali-kirim tidak berubah.
+
+### 8.8 Input rupiah + QRIS portal reseller (30 Oktober 2026)
+
+**RupiahInput** (`src/components/reseller/RupiahInput.tsx`) = SATU komponen input uang untuk portal
+& admin reseller. Tampilan "Rp 50.000", nilai ke pemanggil selalu angka bulat, hanya angka yang
+bisa diketik (`inputMode=numeric`), kursor dipulihkan berdasarkan jumlah digit di kiri kursor
+(tidak loncat saat mengetik/menghapus titik). Dipasang di: jumlah top up (+ chip cepat
+100rb/250rb/500rb/1jt), jumlah tarik saldo (max = saldo), harga jual Buat Pesanan, koreksi saldo,
+dan biaya admin di Pengaturan.
+
+**QRIS:** `payment_methods.qr_image_url` milik customer TIDAK dipakai — di produksi tidak ada baris
+QRIS aktif. Portal reseller memakai pengaturan sendiri `store_settings.reseller_qris_image_url`
+(migration `20261030_reseller_qris.sql`, aditif, sudah dijalankan) yang diunggah dari tab
+**Pengaturan** admin (upload Cloudinary scope "reseller" — scope itu sekarang menerima sesi
+reseller ATAU admin ops; ganti/hapus tersedia; kalau kosong, tab QRIS disembunyikan di portal).
+
+- Komponen pilihan bersama `src/components/reseller/PaymentMethodTabs.tsx` ("Transfer BSI" /
+  "QRIS", gambar bisa diperbesar & diunduh) dipakai di Top Up, kotak kekurangan (ringkasan Buat
+  Pesanan), panel sukses, dan detail pesanan.
+- Metode yang dipilih dicatat di `reseller_topups.payment_method` dan
+  `reseller_order_payments.payment_method` (default 'bsi'); tampil sebagai badge di antrean
+  "Perlu Dicek". Alur tetap: upload bukti → admin konfirmasi.
+
+Jebakan: jangan menaruh `RupiahInput` di dalam komponen yang memformat ulang angkanya sendiri —
+format dilakukan DI DALAM komponen; state pemanggil harus angka (bukan string bertitik).

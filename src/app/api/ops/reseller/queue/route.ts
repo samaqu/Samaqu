@@ -14,12 +14,12 @@ export async function GET(req: NextRequest) {
   const [topups, orderPayments, withdrawals] = await Promise.all([
     supabase
       .from("reseller_topups")
-      .select("id, code, amount, proof_url, status, created_at, reseller_id, resellers(store_name, owner_name, whatsapp)")
+      .select("id, code, amount, proof_url, payment_method, status, created_at, reseller_id, resellers(store_name, owner_name, whatsapp)")
       .eq("status", "pending")
       .order("created_at", { ascending: true }),
     supabase
       .from("reseller_order_payments")
-      .select("id, order_id, amount, proof_url, status, created_at, reseller_id, resellers(store_name, owner_name, whatsapp), orders(order_number, total, status, reseller_shortfall_status)")
+      .select("id, order_id, amount, proof_url, payment_method, status, created_at, reseller_id, resellers(store_name, owner_name, whatsapp), orders(order_number, total, status, reseller_shortfall_status)")
       .eq("status", "pending")
       .order("created_at", { ascending: true }),
     supabase

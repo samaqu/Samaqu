@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest) {
     }
     patch.reseller_admin_fee_non_bsi = fee;
   }
-  const textFields = ["bsi_bank_name", "bsi_account_number", "bsi_account_holder"] as const;
+  const textFields = ["bsi_bank_name", "bsi_account_number", "bsi_account_holder", "qris_image_url"] as const;
   for (const field of textFields) {
     if (typeof body[field] === "string") {
       const column = `reseller_${field}`;

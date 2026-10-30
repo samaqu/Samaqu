@@ -78,6 +78,7 @@ export interface QueueTopup {
   code: string;
   amount: number;
   proof_url: string | null;
+  payment_method: string | null;
   created_at: string;
   reseller_id: string;
   resellers: { store_name: string; owner_name: string; whatsapp: string | null } | null;
@@ -88,6 +89,7 @@ export interface QueueOrderPayment {
   order_id: string;
   amount: number;
   proof_url: string | null;
+  payment_method: string | null;
   created_at: string;
   reseller_id: string;
   resellers: { store_name: string; owner_name: string; whatsapp: string | null } | null;
@@ -146,6 +148,7 @@ export interface ResellerSettings {
   bsiBankName: string;
   bsiAccountNumber: string;
   bsiAccountHolder: string;
+  qrisImageUrl: string | null;
 }
 
 /* ── Pemanggil endpoint ── */

@@ -28,6 +28,20 @@ function maskWa(value: string | null | undefined): string {
   return `${digits.slice(0, 4)}••••${digits.slice(-3)}`;
 }
 
+/** Label metode pembayaran yang dipilih reseller (data lama default "bsi"). */
+function methodBadge(method: string | null | undefined) {
+  const isQris = method === "qris";
+  return (
+    <span
+      className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+        isQris ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-600"
+      }`}
+    >
+      {isQris ? "QRIS" : "Transfer BSI"}
+    </span>
+  );
+}
+
 function maskAccountNumber(value: string | null | undefined): string {
   const digits = String(value || "").replace(/\D/g, "");
   return digits.length > 4 ? `••••${digits.slice(-4)}` : digits || "—";
@@ -158,7 +172,10 @@ export default function QueueTab({
                         </span>
                       </td>
                       <td className="px-4 py-3">{resellerCell(row)}</td>
-                      <td className="px-4 py-3 text-[12px] text-slate-500">{row.code}</td>
+                      <td className="px-4 py-3 text-[12px] text-slate-500">
+                        {row.code}
+                        <div>{methodBadge(row.payment_method)}</div>
+                      </td>
                       <td className="px-4 py-3 text-right font-bold text-slate-900">{rupiah(row.amount)}</td>
                       <td className="px-4 py-3 text-[12px] text-slate-500">{tglJamID(row.created_at)}</td>
                       <td className="px-4 py-3">
@@ -188,7 +205,10 @@ export default function QueueTab({
                         </span>
                       </td>
                       <td className="px-4 py-3">{resellerCell(row)}</td>
-                      <td className="px-4 py-3 text-[12px] text-slate-500">Pesanan {row.orders?.order_number || "—"}</td>
+                      <td className="px-4 py-3 text-[12px] text-slate-500">
+                        Pesanan {row.orders?.order_number || "—"}
+                        <div>{methodBadge(row.payment_method)}</div>
+                      </td>
                       <td className="px-4 py-3 text-right font-bold text-slate-900">{rupiah(row.amount)}</td>
                       <td className="px-4 py-3 text-[12px] text-slate-500">{tglJamID(row.created_at)}</td>
                       <td className="px-4 py-3">

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { CheckCircle } from "lucide-react";
 import { resellerApi } from "@/lib/reseller/client";
 import { orderStatus, rupiah } from "@/lib/reseller/format";
+import { useReseller } from "../ResellerShell";
+import PaymentMethodTabs, { type PaymentMethodChoice } from "../PaymentMethodTabs";
 import UploadBukti from "../UploadBukti";
 import { Note, StatusBadge } from "../ui";
 
@@ -22,6 +24,8 @@ export default function OrderSuccess({
   };
   onNew: () => void;
 }) {
+  const { me } = useReseller();
+  const [method, setMethod] = useState<PaymentMethodChoice>("bsi");
   const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -35,7 +39,9 @@ export default function OrderSuccess({
     setError("");
     setSending(true);
     try {
-      await resellerApi.uploadProof(result.orderNumber, url);
+      const activeMethod: PaymentMethodChoice =
+        method === "qris" && me.pengaturan.qris_image_url ? "qris" : "bsi";
+      await resellerApi.uploadProof(result.orderNumber, url, activeMethod);
       setSent(true);
     } catch {
       setError("Bukti gagal dikirim. Coba upload ulang.");
@@ -92,6 +98,11 @@ export default function OrderSuccess({
             <p className="small bold" style={{ marginBottom: 8 }}>
               Upload bukti transfer kekurangan
             </p>
+            {!sent ? (
+              <div style={{ marginBottom: 10 }}>
+                <PaymentMethodTabs settings={me.pengaturan} method={method} onChange={setMethod} />
+              </div>
+            ) : null}
             {sent ? (
               <Note tone="ok">Bukti terkirim. Pesanan diproses setelah admin mengonfirmasi.</Note>
             ) : (

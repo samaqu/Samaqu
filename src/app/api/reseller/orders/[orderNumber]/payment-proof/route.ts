@@ -17,8 +17,9 @@ export async function POST(
   const { orderNumber } = await context.params;
   const body = await req.json().catch(() => ({}) as Record<string, unknown>);
   const proofUrl = typeof body.proof_url === "string" ? body.proof_url : "";
+  const paymentMethod = body.payment_method === "qris" ? "qris" : "bsi";
 
-  const result = await uploadShortfallProof(session.reseller.id, orderNumber, proofUrl);
+  const result = await uploadShortfallProof(session.reseller.id, orderNumber, proofUrl, paymentMethod);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }

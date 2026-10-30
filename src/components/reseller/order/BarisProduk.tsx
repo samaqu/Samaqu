@@ -2,6 +2,7 @@
 
 import { Trash2 } from "lucide-react";
 import { rupiah } from "@/lib/reseller/format";
+import RupiahInput from "../RupiahInput";
 import type { OrderLine } from "./types";
 
 /** Satu baris produk di pesanan: harga katalog/beli/min jual, harga jual, untung per pcs. */
@@ -85,12 +86,11 @@ export default function BarisProduk({
       <div className="grid2" style={{ gap: 10 }}>
         <div className="field" style={{ marginBottom: 0 }}>
           <label>Harga jual ke customer</label>
-          <input
-            className={`in ${sellValid ? "" : "bad"}`}
-            inputMode="numeric"
-            value={line.sellPrice || ""}
+          <RupiahInput
+            value={line.sellPrice}
             placeholder={String(minSell)}
-            onChange={(e) => onChange({ sellPrice: Number(e.target.value.replace(/\D/g, "")) || 0 })}
+            invalid={!sellValid}
+            onChange={(value) => onChange({ sellPrice: value })}
           />
           {!sellValid ? <span className="err">Harga jual minimal {rupiah(minSell)}</span> : null}
         </div>

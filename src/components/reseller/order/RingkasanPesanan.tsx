@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { ResellerSettingsView, ShippingOption } from "@/lib/reseller/client";
+import PaymentMethodTabs, { type PaymentMethodChoice } from "../PaymentMethodTabs";
 import { rupiah } from "@/lib/reseller/format";
 import { Note } from "../ui";
 import { lineProfit, lineSubtotal, type OrderLine } from "./types";
@@ -29,7 +30,7 @@ export default function RingkasanPesanan({
   submitError: string;
   onSubmit: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
+  const [method, setMethod] = useState<PaymentMethodChoice>("bsi");
 
   const subtotal = lines.reduce((sum, line) => sum + lineSubtotal(line), 0);
   const shippingCost = shipping?.cost || 0;
@@ -37,17 +38,6 @@ export default function RingkasanPesanan({
   const deducted = Math.min(Math.max(saldoTersedia, 0), total);
   const shortfall = Math.max(0, total - deducted);
   const profit = lines.reduce((sum, line) => sum + lineProfit(line), 0);
-
-  const copyAccount = async () => {
-    const text = `${settings.bsi_bank_name} ${settings.bsi_account_number} a.n. ${settings.bsi_account_holder}`.trim();
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      /* clipboard diblokir — nomor tetap terlihat di layar */
-    }
-  };
 
   return (
     <>
@@ -84,19 +74,11 @@ export default function RingkasanPesanan({
           {shortfall > 0 ? (
             <div style={{ marginTop: 12 }}>
               <Note tone="warn">
-                <b>Saldo kamu kurang {rupiah(shortfall)}.</b> Transfer kekurangannya ke rekening di bawah,
+                <b>Saldo kamu kurang {rupiah(shortfall)}.</b> Selesaikan pembayaran lewat metode di bawah,
                 lalu upload bukti transfer.
-                <div style={{ marginTop: 8, fontWeight: 700 }}>
-                  {settings.bsi_bank_name}
-                  <br />
-                  {settings.bsi_account_number || "(nomor rekening belum diatur admin)"}
-                  {settings.bsi_account_holder ? ` — a.n. ${settings.bsi_account_holder}` : ""}
+                <div style={{ marginTop: 10 }}>
+                  <PaymentMethodTabs settings={settings} method={method} onChange={setMethod} />
                 </div>
-                {settings.bsi_account_number ? (
-                  <button className="btn ghost sm" type="button" style={{ marginTop: 8 }} onClick={copyAccount}>
-                    <Copy size={13} /> {copied ? "Tersalin" : "Salin rekening"}
-                  </button>
-                ) : null}
                 <div style={{ marginTop: 8, fontSize: 12 }}>
                   Pesanan diproses setelah admin mengecek transfer kamu. Kalau tidak dibayar dalam 24 jam,
                   pesanan otomatis dibatalkan dan saldo dikembalikan.

@@ -401,7 +401,8 @@ export async function getResellerOrderDetail(
 export async function uploadShortfallProof(
   resellerId: string,
   orderNumber: string,
-  proofUrl: string
+  proofUrl: string,
+  paymentMethod: "bsi" | "qris" = "bsi"
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
   const url = String(proofUrl || "").trim();
   if (!/^https?:\/\/\S+$/i.test(url)) {
@@ -423,7 +424,7 @@ export async function uploadShortfallProof(
 
   const { error } = await supabase
     .from("reseller_order_payments")
-    .update({ proof_url: url })
+    .update({ proof_url: url, payment_method: paymentMethod })
     .eq("order_id", order.id)
     .eq("status", "pending");
 

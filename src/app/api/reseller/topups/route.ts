@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await getSupabaseAdmin()
     .from("reseller_topups")
-    .select("id, code, amount, proof_url, status, reject_reason, reviewed_at, created_at")
+    .select("id, code, amount, proof_url, payment_method, status, reject_reason, reviewed_at, created_at")
     .eq("reseller_id", session.reseller.id)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -39,6 +39,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}) as Record<string, unknown>);
   const amount = Math.round(Number(body.amount));
   const proofUrl = typeof body.proof_url === "string" ? body.proof_url.trim() : "";
+  // Metode pembayaran yang dipilih reseller: transfer BSI (default) atau QRIS.
+  const paymentMethod = body.payment_method === "qris" ? "qris" : "bsi";
 
   if (!Number.isFinite(amount) || amount < 1) {
     return NextResponse.json({ error: "Jumlah top up tidak valid" }, { status: 400 });
@@ -57,6 +59,7 @@ export async function POST(req: NextRequest) {
       reseller_id: session.reseller.id,
       amount,
       proof_url: proofUrl,
+      payment_method: paymentMethod,
       status: "pending",
     });
     if (!error) {

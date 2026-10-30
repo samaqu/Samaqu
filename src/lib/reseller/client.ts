@@ -93,6 +93,8 @@ export interface ResellerSettingsView {
   bsi_bank_name: string;
   bsi_account_number: string;
   bsi_account_holder: string;
+  /** Gambar QRIS untuk top up & bayar kekurangan (null = belum diatur admin). */
+  qris_image_url: string | null;
   rekening_bsi: boolean;
 }
 
@@ -139,6 +141,7 @@ export interface TopupRow {
   code: string;
   amount: number;
   proof_url: string | null;
+  payment_method: string | null;
   status: string;
   reject_reason: string | null;
   reviewed_at: string | null;
@@ -284,10 +287,10 @@ export const resellerApi = {
 
   topups: () => api<{ data: TopupRow[] }>("/api/reseller/topups"),
 
-  createTopup: (amount: number, proofUrl: string) =>
+  createTopup: (amount: number, proofUrl: string, paymentMethod: "bsi" | "qris") =>
     api<{ ok: true }>("/api/reseller/topups", {
       method: "POST",
-      body: JSON.stringify({ amount, proof_url: proofUrl }),
+      body: JSON.stringify({ amount, proof_url: proofUrl, payment_method: paymentMethod }),
     }),
 
   withdrawals: () => api<{ data: WithdrawalRow[] }>("/api/reseller/withdrawals"),
@@ -333,10 +336,10 @@ export const resellerApi = {
   orderDetail: (orderNumber: string) =>
     api<{ data: OrderDetail }>(`/api/reseller/orders/${encodeURIComponent(orderNumber)}`),
 
-  uploadProof: (orderNumber: string, proofUrl: string) =>
+  uploadProof: (orderNumber: string, proofUrl: string, paymentMethod: "bsi" | "qris") =>
     api<{ ok: true }>(`/api/reseller/orders/${encodeURIComponent(orderNumber)}/payment-proof`, {
       method: "POST",
-      body: JSON.stringify({ proof_url: proofUrl }),
+      body: JSON.stringify({ proof_url: proofUrl, payment_method: paymentMethod }),
     }),
 
   alamatTebak: (text: string) =>

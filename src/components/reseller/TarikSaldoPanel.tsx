@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { ApiError, resellerApi, type WithdrawalRow } from "@/lib/reseller/client";
+import RupiahInput from "./RupiahInput";
 import { maskAccount, rupiah, tglJamID, withdrawalStatus } from "@/lib/reseller/format";
 import { useReseller } from "./ResellerShell";
 import { EmptyState, Note, SkeletonRows, StatusBadge } from "./ui";
@@ -125,20 +126,17 @@ export default function TarikSaldoPanel() {
             <>
               <div className="field" style={{ marginTop: 12 }}>
                 <label htmlFor="rs-wd-amt">Jumlah penarikan</label>
-                <input
+                <RupiahInput
                   id="rs-wd-amt"
-                  className="in"
-                  inputMode="numeric"
+                  value={amount}
+                  max={saldo}
                   placeholder={String(saldo)}
-                  value={amount || ""}
-                  onChange={(e) => {
-                    const value = Number(e.target.value.replace(/\D/g, "")) || 0;
-                    setAmount(Math.min(value, saldo));
+                  onChange={(value) => {
+                    setAmount(value);
                     setConfirming(false);
                     setSent(false);
                   }}
                 />
-                {amount > saldo ? <span className="err">Melebihi saldo bisa dipakai.</span> : null}
               </div>
 
               <div className="kv-list" style={{ marginBottom: 12 }}>
