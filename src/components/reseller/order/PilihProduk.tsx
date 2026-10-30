@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import type { KatalogProduct } from "@/lib/reseller/client";
 import { rupiah } from "@/lib/reseller/format";
+import ProductPhoto from "../ProductPhoto";
 import { lineKey, type OrderLine } from "./types";
 
 /**
@@ -97,11 +98,7 @@ export default function PilihProduk({
           return (
             <div key={product.id}>
               <button type="button" className="pick-row" onClick={() => openProduct(product)}>
-                {product.image ? (
-                  <img className="ph" src={product.image} alt={product.name} />
-                ) : (
-                  <span className="ph" />
-                )}
+                <ProductPhoto src={product.image} name={product.name} />
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="bold" style={{ display: "block", fontSize: 13.5 }}>
                     {product.name}
@@ -112,7 +109,7 @@ export default function PilihProduk({
                     <b className="bold">{rupiah(product.buy_price)}</b> (−{product.discount_percent}%)
                   </span>
                   <span className="small muted" style={{ display: "block" }}>
-                    Stok {totalStock}
+                    {totalStock < 1 ? "Stok habis" : `Stok ${totalStock}`}
                   </span>
                 </span>
                 <span className="btn ghost sm">{isOpen ? "Tutup" : "Pilih"}</span>

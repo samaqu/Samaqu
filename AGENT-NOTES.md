@@ -543,3 +543,29 @@ Struktur baris hold tidak pernah berubah (append-only) — status hidup di tabel
 akun/data uji; halaman temp dihapus sebelum commit) — status pending/paid/rejected, top up,
 kekurangan, nomor lengkap & badge tampil benar, 0 console error. RPC saldo, ledger append-only,
 approve/tolak, notifikasi, dan perhitungan saldo TIDAK diubah.
+
+### 8.16 Katalog reseller: produk Open Order/tersembunyi + foto (30 Oktober 2026)
+
+**Bug 1 — produk Open Order tidak muncul.** `src/lib/reseller/katalog.ts` memfilter
+`.eq("is_published", true)`, jadi hanya produk "Katalog website" yang lolos. Cek produksi:
+7 produk `reseller_enabled = true` → 1 katalog + **6 Open Order**; katalog portal hanya
+menampilkan 1. Perbaikan: filter `is_published` DIHAPUS — syarat tampil = `reseller_enabled = true`
+saja (Open Order, tersembunyi, add-on ikut). Stok 0 tetap tampil (UI "Stok habis", tombol Pesan
+nonaktif). Aturan katalog website & Open Order customer tidak disentuh; `orders.ts` memang tidak
+pernah memfilter `is_published` saat validasi pesanan.
+
+**Bug 2 — foto tampil sebagai teks alt "Thobe Broken White".** Katalog memakai `products.image`
+mentah; di produksi kolom itu berisi URL **video `.mp4`** → `<img>` gagal dan browser menampilkan
+teks alt. Sekarang `getResellerCatalog()` memakai helper bersama `loadOrderPhotoLookup`
+(`product_images` menurut `display_order`, lewati video → `products.images` → `products.image`),
+satu proses dengan katalog website/order. Komponen baru `src/components/reseller/ProductPhoto.tsx`
+menampilkan placeholder netral `NEUTRAL_ITEM_PHOTO` saat URL kosong ATAU `onError`, dengan `alt=""`
+(tanpa teks) — dipakai di kartu `KatalogPanel` dan `PilihProduk` (Buat Pesanan). 6 produk
+Thobe Black enabled memang belum punya foto → placeholder netral.
+
+**Cache:** `/api/reseller/katalog` sudah `dynamic = "force-dynamic"` dan klien `cache: "no-store"`,
+jadi toggle & foto dari admin langsung terlihat saat halaman dibuka ulang.
+
+**Verifikasi:** cek read-only produksi lewat route temp (dihapus sebelum commit): 7/7 enabled masuk
+katalog, foto Thobe Broken White kini PNG `02_semua_foto.png`; `tsc` EXIT=0; render mock 1280 & 375
+(foto asli, placeholder tanpa alt, stok habis + tombol nonaktif) tanpa error aplikasi.

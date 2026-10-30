@@ -2,9 +2,16 @@
  * Katalog reseller — produk yang boleh dijual reseller beserta varian,
  * stok efektif (WAJIB lewat resolveStock / aturan produk basis), harga
  * katalog, harga beli, dan batas harga jual. Semua harga dihitung server.
+ *
+ * Syarat tampil HANYA `reseller_enabled = true` — apa pun tempat tampil
+ * produknya (katalog website, Open Order, tersembunyi, add-on). Stok 0 tetap
+ * tampil (UI menandai "Stok habis"). Foto memakai rantai bersama
+ * `loadOrderPhotoLookup` (product_images → products.images → products.image,
+ * video dilewati).
  */
 
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { effectiveDiscountPercent, resellerBuyPrice } from "./pricing";
 import { getResellerSettings } from "./settings";
 
@@ -34,7 +41,6 @@ type ProductBaseRow = {
   name: string;
   category: string;
   series: string | null;
-  image: string | null;
   price: number;
   reseller_enabled: boolean;
   reseller_discount_percent: number | string | null;
@@ -58,11 +64,12 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
   const { data: rawProducts, error: productError } = await supabase
     .from("products")
     .select(
-      "id, name, category, series, image, price, reseller_enabled, reseller_discount_percent"
+      "id, name, category, series, price, reseller_enabled, reseller_discount_percent"
     )
-    // Hanya series yang DIAKTIFKAN admin di tab Produk & Harga yang dijual ke reseller.
+    // Hanya series yang DIAKTIFKAN admin di tab Produk & Harga yang dijual ke
+    // reseller — tanpa filter is_published: Open Order & produk tersembunyi
+    // tetap tampil selama diaktifkan.
     .eq("reseller_enabled", true)
-    .eq("is_published", true)
     .order("created_at", { ascending: true });
 
   if (productError) {
@@ -75,11 +82,14 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
 
   const ids = products.map((p) => String(p.id));
 
-  const { data: rawVariants, error: variantError } = await supabase
-    .from("product_variants")
-    .select("product_id, color, size, stock, base_product_id, hex")
-    .in("product_id", ids)
-    .order("display_order");
+  const [{ data: rawVariants, error: variantError }, photoLookup] = await Promise.all([
+    supabase
+      .from("product_variants")
+      .select("product_id, color, size, stock, base_product_id, hex")
+      .in("product_id", ids)
+      .order("display_order"),
+    loadOrderPhotoLookup(ids),
+  ]);
 
   if (variantError) {
     console.error("[RESELLER-KATALOG] Gagal membaca varian:", variantError.message);
@@ -110,7 +120,7 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
       name: product.name,
       category: product.category,
       series: product.series ?? null,
-      image: product.image ?? null,
+      image: photoLookup.main?.[String(product.id)] || null,
       price: Math.round(Number(product.price) || 0),
       discount_percent: effectiveDiscountPercent(product, defaultDiscount),
       buy_price: resellerBuyPrice(product, defaultDiscount),

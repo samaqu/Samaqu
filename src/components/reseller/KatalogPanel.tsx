@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { resellerApi, type KatalogProduct } from "@/lib/reseller/client";
 import { rupiah } from "@/lib/reseller/format";
+import ProductPhoto from "./ProductPhoto";
 import { EmptyState, Note, SkeletonRows } from "./ui";
 
 /** Katalog produk yang boleh dijual reseller + tombol Pesan langsung. */
@@ -58,13 +59,10 @@ export default function KatalogPanel() {
         <div className="prod-grid">
           {filtered.map((product) => {
             const stock = product.variants.reduce((sum, v) => sum + v.stock, 0);
+            const habis = stock < 1;
             return (
               <div className="prod-card" key={product.id}>
-                {product.image ? (
-                  <img className="ph" src={product.image} alt={product.name} />
-                ) : (
-                  <span className="ph" />
-                )}
+                <ProductPhoto src={product.image} name={product.name} />
                 <div className="bd">
                   <div className="nm">
                     {product.name}
@@ -76,14 +74,20 @@ export default function KatalogPanel() {
                   <div className="small">
                     Beli kamu <b className="bold">{rupiah(product.buy_price)}</b> (−{product.discount_percent}%)
                   </div>
-                  <div className="small muted">Stok {stock}</div>
-                  <Link
-                    className="btn sm blk"
-                    href={`/reseller/pesanan/baru?produk=${encodeURIComponent(product.id)}`}
-                    style={{ marginTop: 4 }}
-                  >
-                    Pesan
-                  </Link>
+                  <div className="small muted">{habis ? "Stok habis" : `Stok ${stock}`}</div>
+                  {habis ? (
+                    <button type="button" className="btn sm blk" disabled style={{ marginTop: 4 }}>
+                      Pesan
+                    </button>
+                  ) : (
+                    <Link
+                      className="btn sm blk"
+                      href={`/reseller/pesanan/baru?produk=${encodeURIComponent(product.id)}`}
+                      style={{ marginTop: 4 }}
+                    >
+                      Pesan
+                    </Link>
+                  )}
                 </div>
               </div>
             );
