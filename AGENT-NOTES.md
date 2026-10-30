@@ -508,3 +508,38 @@ terdeteksi → penarikan ke BSI lama tetap kena biaya Rp2.500.
 - **Verifikasi:** `npx tsc --noEmit` EXIT=0; render mock Playwright 1280 & 375 (tanpa akun uji,
   halaman temp dihapus sebelum commit) — 0 console error, tanpa foto/min jual/kolom status, tanpa
   scroll horizontal di 1280. Catatan §8.11 bagian "input min jual" dan "kolom status" tidak berlaku.
+
+### 8.15 Status mutasi reseller di admin — satu helper portal + admin (30 Oktober 2026)
+
+**Bug:** drawer "Detail reseller" (ops & panel admin) dan tab "Mutasi Saldo" membaca `reseller_ledger`
+mentah, sehingga penarikan yang sudah ditransfer tetap tampil "Saldo ditahan / penarikan diajukan".
+Struktur baris hold tidak pernah berubah (append-only) — status hidup di tabel sumbernya.
+
+**Perbaikan (tampilan + data API saja, tanpa mutasi baru):**
+- `describeLedgerRow(row, opts)` di `src/lib/reseller/format.ts` = SATU helper label/badge untuk
+  portal & admin. Opsi `fullAccount` (nomor rekening utuh) dan `showActor` ("oleh {admin}") hanya
+  dipakai sisi admin; portal tetap tersamar tanpa nama admin.
+  - Penarikan menunggu: "Menunggu transfer admin · {waktu ajukan}" + badge kuning "Menunggu".
+  - Penarikan ditransfer: "Ditransfer ke {bank} {nomor} · {waktu transfer} · oleh {admin}" +
+    "Diterima Rp{bersih} · biaya admin Rp{biaya}" + badge hijau "Ditransfer". Nomor lengkap di
+    admin, `••••{4 digit}` di portal.
+  - Penarikan ditolak: badge merah "Ditolak" + alasan; baris `withdrawal_release` tetap tampil
+    "Penarikan ditolak, saldo dikembalikan".
+  - Top up & bayar kekurangan: badge Menunggu / Dikonfirmasi / Ditolak (label topup pending kini
+    "Menunggu"); bayar kekurangan ditempelkan ke baris `order_debit` lewat nomor pesanan.
+- `src/lib/reseller/ledger-enrich.ts` (baru): `enrichResellerLedger(rows, { revealAccount })`
+  menempelkan status terkini dari `reseller_withdrawals`, `reseller_topups`, dan
+  `reseller_order_payments` (via `orders.order_number` → `order_id`). Dipakai API portal
+  (`/api/reseller/ledger`) dan API admin (`/api/ops/reseller/ledger`,
+  `/api/ops/reseller/resellers/[id]`) — hanya SELECT, tidak menulis apa pun.
+- Drawer admin: 3 kotak saldo → "Saldo bisa dipakai" (RPC `saldo_tersedia`), "Ditahan (penarikan
+  menunggu)" (RPC menghitung HANYA status `pending`), "Total sudah ditarik" (SUM penarikan `paid`,
+  field baru `total_withdrawn`). Label "Total" ambigu dihapus. Nomor rekening di drawer & antrean
+  penarikan tampil LENGKAP (dibutuhkan admin untuk transfer); penyamaran hanya portal & WA.
+- Tab Mutasi Saldo: kolom "Jenis/Catatan" diganti "Mutasi" (judul + badge + deskripsi + baris
+  rincian), tetap dengan jumlah dan saldo akhir. Filter jenis/bulan/reseller tidak berubah.
+
+**Verifikasi:** `npx tsc --noEmit` EXIT=0; render mock Playwright 1280 & 375 (drawer + tab, tanpa
+akun/data uji; halaman temp dihapus sebelum commit) — status pending/paid/rejected, top up,
+kekurangan, nomor lengkap & badge tampil benar, 0 console error. RPC saldo, ledger append-only,
+approve/tolak, notifikasi, dan perhitungan saldo TIDAK diubah.

@@ -4,10 +4,12 @@ import { isOpsAdmin, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { normalizeWhatsappTarget } from "@/lib/fonnte";
 import { getResellerBalance } from "@/lib/reseller/saldo";
 import { normalizeBankValue } from "@/lib/reseller/banks";
+import { enrichResellerLedger } from "@/lib/reseller/ledger-enrich";
 
 /**
  * Detail satu reseller untuk drawer admin: profil + saldo + mutasi terakhir
- * + pesanan terakhir. Semua dibaca dengan service role.
+ * (status terkini penarikan/top up/kekurangan, nomor rekening lengkap)
+ * + total penarikan yang sudah ditransfer. Semua dibaca dengan service role.
  */
 export async function GET(
   req: NextRequest,
@@ -30,7 +32,7 @@ export async function GET(
   }
   if (!reseller) return NextResponse.json({ error: "Reseller tidak ditemukan" }, { status: 404 });
 
-  const [balance, ledger, orders] = await Promise.all([
+  const [balance, ledger, orders, paidWithdrawals] = await Promise.all([
     getResellerBalance(id),
     supabase
       .from("reseller_ledger")
@@ -44,12 +46,24 @@ export async function GET(
       .eq("reseller_id", id)
       .order("created_at", { ascending: false })
       .limit(5),
+    supabase
+      .from("reseller_withdrawals")
+      .select("amount")
+      .eq("reseller_id", id)
+      .eq("status", "paid"),
   ]);
+
+  const enrichedLedger = await enrichResellerLedger(ledger.data ?? [], { revealAccount: true });
+  const totalWithdrawn = (paidWithdrawals.data ?? []).reduce(
+    (sum, row) => sum + (Number(row.amount) || 0),
+    0
+  );
 
   return NextResponse.json({
     reseller,
     saldo: balance ?? { saldo_tersedia: 0, saldo_ditahan: 0, saldo_total: 0 },
-    ledger: ledger.data ?? [],
+    total_withdrawn: totalWithdrawn,
+    ledger: enrichedLedger,
     orders: orders.data ?? [],
   });
 }

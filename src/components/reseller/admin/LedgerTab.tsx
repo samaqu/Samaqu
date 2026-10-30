@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AdminApiError, opsResellerApi, type LedgerRow, type ResellerAdminRow } from "./api";
-import { ledgerTypeLabel, rupiah, tglJamID } from "@/lib/reseller/format";
+import { describeLedgerRow, rupiah, tglJamID } from "@/lib/reseller/format";
+import MutationBadge from "./MutationBadge";
 import RupiahInput from "@/components/reseller/RupiahInput";
 import { Modal } from "./Modal";
 
@@ -115,32 +116,37 @@ export default function LedgerTab({
                 <tr className="text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-200 bg-slate-50">
                   <th className="px-4 py-2.5">Tanggal</th>
                   <th className="px-4 py-2.5">Reseller</th>
-                  <th className="px-4 py-2.5">Jenis</th>
+                  <th className="px-4 py-2.5">Mutasi</th>
                   <th className="px-4 py-2.5 text-right">Jumlah</th>
                   <th className="px-4 py-2.5 text-right">Saldo akhir</th>
-                  <th className="px-4 py-2.5">Catatan</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id} className="border-b border-slate-100">
-                    <td className="px-4 py-3 text-[12px] text-slate-500">{tglJamID(row.created_at)}</td>
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-slate-900 text-[13px]">{row.resellers?.store_name || "—"}</div>
-                      <div className="text-[11px] text-slate-500">{row.resellers?.owner_name || ""}</div>
-                    </td>
-                    <td className="px-4 py-3 text-[12px] font-semibold text-slate-700">{ledgerTypeLabel(row.type)}</td>
-                    <td className={`px-4 py-3 text-right font-bold ${row.amount >= 0 ? "text-emerald-600" : "text-slate-900"}`}>
-                      {row.amount >= 0 ? "+" : "−"}
-                      {rupiah(Math.abs(row.amount))}
-                    </td>
-                    <td className="px-4 py-3 text-right text-[12px] font-semibold text-slate-700">{rupiah(row.balance_after)}</td>
-                    <td className="px-4 py-3 text-[12px] text-slate-500">
-                      {row.note || row.reference || "—"}
-                      {row.created_by ? <div className="text-[11px] text-slate-400">oleh {row.created_by}</div> : null}
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((row) => {
+                  const view = describeLedgerRow(row, { fullAccount: true, showActor: true });
+                  return (
+                    <tr key={row.id} className="border-b border-slate-100">
+                      <td className="px-4 py-3 text-[12px] text-slate-500">{tglJamID(row.created_at)}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-bold text-slate-900 text-[13px]">{row.resellers?.store_name || "—"}</div>
+                        <div className="text-[11px] text-slate-500">{row.resellers?.owner_name || ""}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[12px] font-bold text-slate-800">{view.title}</span>
+                          <MutationBadge status={view.badge} />
+                        </div>
+                        <div className="text-[11px] text-slate-500">{view.description}</div>
+                        {view.extra ? <div className="text-[11px] text-slate-400">{view.extra}</div> : null}
+                      </td>
+                      <td className={`px-4 py-3 text-right font-bold ${row.amount >= 0 ? "text-emerald-600" : "text-slate-900"}`}>
+                        {row.amount >= 0 ? "+" : "−"}
+                        {rupiah(Math.abs(row.amount))}
+                      </td>
+                      <td className="px-4 py-3 text-right text-[12px] font-semibold text-slate-700">{rupiah(row.balance_after)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             {total > rows.length ? (

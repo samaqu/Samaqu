@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, opsIdentity, unauthorized } from "@/lib/ops-auth";
+import { enrichResellerLedger } from "@/lib/reseller/ledger-enrich";
 
 /**
  * Mutasi saldo SEMUA reseller (filter reseller/jenis/bulan) + koreksi
  * manual (adjustment) yang WAJIB memakai catatan. Adjustment memakai RPC
  * `samaqu_reseller_adjust` supaya `balance_after` dihitung atomik.
+ *
+ * Baris penarikan/top up/kekurangan ditempelkan status TERKINI dari tabel
+ * sumbernya (nomor rekening lengkap untuk admin) — tanpa mutasi baru.
  */
 export async function GET(req: NextRequest) {
   if (!(await isOpsAdmin(req))) return unauthorized();
@@ -39,7 +43,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Gagal memuat mutasi saldo" }, { status: 500 });
   }
 
-  return NextResponse.json({ data: data ?? [], total: count ?? 0, page, pageSize });
+  const rows = data ?? [];
+  const enriched = await enrichResellerLedger(rows, { revealAccount: true });
+
+  return NextResponse.json({ data: enriched, total: count ?? 0, page, pageSize });
 }
 
 /** Koreksi saldo manual — catatan wajib, pelaku & waktu tercatat. */

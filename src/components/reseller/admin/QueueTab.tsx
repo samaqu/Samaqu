@@ -43,11 +43,6 @@ function methodBadge(method: string | null | undefined) {
   );
 }
 
-function maskAccountNumber(value: string | null | undefined): string {
-  const digits = String(value || "").replace(/\D/g, "");
-  return digits.length > 4 ? `••••${digits.slice(-4)}` : digits || "—";
-}
-
 function resellerCell(row: { resellers: { store_name: string; owner_name: string; whatsapp: string | null } | null }) {
   const name = row.resellers?.store_name || "—";
   return (
@@ -240,7 +235,7 @@ export default function QueueTab({
                       </td>
                       <td className="px-4 py-3">{resellerCell(row)}</td>
                       <td className="px-4 py-3 text-[12px] text-slate-500">
-                        {bankDisplayName(row.bank_name)} {maskAccountNumber(row.bank_number)} a.n. {row.bank_holder}
+                        {bankDisplayName(row.bank_name)} <b>{row.bank_number || "—"}</b> a.n. {row.bank_holder}
                         <br />
                         Biaya admin {rupiah(row.admin_fee)} · transfer <b>{rupiah(row.transfer_amount)}</b>
                       </td>
@@ -299,7 +294,7 @@ export default function QueueTab({
                   ? `Konfirmasi transfer ${rupiah((action.row as QueueOrderPayment).amount)} untuk pesanan ${(action.row as QueueOrderPayment).orders?.order_number || ""}? Pesanan langsung diproses.`
                   : `Pesanan ${(action.row as QueueOrderPayment).orders?.order_number || ""} akan dibatalkan, saldo dan stok dikembalikan. Tulis alasan untuk reseller.`
                 : action.kind === "penarikan-approve"
-                  ? `Sudah transfer ${rupiah((action.row as QueueWithdrawal).transfer_amount)} ke ${(action.row as QueueWithdrawal).bank_name} ${maskAccountNumber((action.row as QueueWithdrawal).bank_number)} a.n. ${(action.row as QueueWithdrawal).bank_holder}? Tindakan ini tidak bisa dibatalkan.`
+                  ? `Sudah transfer ${rupiah((action.row as QueueWithdrawal).transfer_amount)} ke ${(action.row as QueueWithdrawal).bank_name} ${(action.row as QueueWithdrawal).bank_number || "—"} a.n. ${(action.row as QueueWithdrawal).bank_holder}? Tindakan ini tidak bisa dibatalkan.`
                   : `Tolak penarikan ${rupiah((action.row as QueueWithdrawal).amount)} dari ${(action.row as QueueWithdrawal).resellers?.store_name || "reseller"}? Saldo yang ditahan kembali ke saldo reseller.`
           }
           tone={action.kind.endsWith("approve") ? "primary" : "danger"}

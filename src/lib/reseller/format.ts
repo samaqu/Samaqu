@@ -39,7 +39,7 @@ export function topupStatus(status: string): RsStatus {
   if (status === "kedaluwarsa") return { label: "Kedaluwarsa", tone: "muted" };
   if (status === "dibatalkan") return { label: "Dibatalkan", tone: "muted" };
   // pending = bukti sudah diupload, menunggu konfirmasi admin.
-  return { label: "Menunggu konfirmasi", tone: "warn" };
+  return { label: "Menunggu", tone: "warn" };
 }
 
 export function withdrawalStatus(status: string): RsStatus {
@@ -116,22 +116,40 @@ export interface MutationDisplay {
   badge?: RsStatus | null;
 }
 
-/** Data penarikan yang ditempelkan API ledger ke baris withdrawal_*. */
+/** Data penarikan yang ditempelkan API ke baris withdrawal_*. */
 export interface LedgerWithdrawalInfo {
   status: "pending" | "paid" | "rejected";
   bank_name: string | null;
-  bank_last4: string;
+  /** Nomor rekening lengkap — hanya dikirim API admin (portal memakai bank_last4). */
+  bank_number?: string | null;
+  bank_last4?: string;
   transfer_amount: number;
   admin_fee: number;
   created_at: string;
   paid_at: string | null;
+  reviewed_by?: string | null;
   reject_reason: string | null;
 }
 
-/** Data top up yang ditempelkan API ledger ke baris topup. */
+/** Data top up yang ditempelkan API ke baris topup. */
 export interface LedgerTopupInfo {
+  code?: string;
   status: string;
+  amount?: number;
+  created_at?: string;
   reviewed_at: string | null;
+  reviewed_by?: string | null;
+  reject_reason?: string | null;
+}
+
+/** Data pembayaran kekurangan yang ditempelkan ke baris order_debit. */
+export interface LedgerOrderPaymentInfo {
+  status: string;
+  amount: number;
+  created_at?: string;
+  reviewed_at: string | null;
+  reviewed_by?: string | null;
+  reject_reason?: string | null;
 }
 
 export interface LedgerRowView {
@@ -140,9 +158,18 @@ export interface LedgerRowView {
   balance_after?: number;
   note: string | null;
   reference: string | null;
+  created_by?: string | null;
   created_at: string;
   withdrawal?: LedgerWithdrawalInfo | null;
   topup?: LedgerTopupInfo | null;
+  order_payment?: LedgerOrderPaymentInfo | null;
+}
+
+export interface DescribeLedgerOptions {
+  /** Sisi admin: tampilkan nomor rekening lengkap (portal tetap tersamar). */
+  fullAccount?: boolean;
+  /** Sisi admin: tampilkan "oleh {admin}" pada baris yang sudah diproses. */
+  showActor?: boolean;
 }
 
 /** Empat digit terakhir rekening. */
@@ -151,20 +178,32 @@ export function last4Account(number: string | null | undefined): string {
   return digits.slice(-4) || "????";
 }
 
+function accountLabel(wd: LedgerWithdrawalInfo, fullAccount: boolean): string {
+  const digits = String(wd.bank_number || "").replace(/\D/g, "");
+  const number = fullAccount && digits ? digits : `••••${wd.bank_last4 || last4Account(wd.bank_number)}`;
+  return `${bankDisplayName(wd.bank_name) || "Rekening"} ${number}`;
+}
+
+function actorSuffix(name: string | null | undefined, showActor: boolean): string {
+  return showActor && name ? ` · oleh ${name}` : "";
+}
+
 /**
  * Label/badge satu baris mutasi saldo. Baris penarikan memakai STATUS TERKINI
  * dari data `reseller_withdrawals` (bukan sekadar catatan hold), tanpa
- * menambah mutasi baru.
+ * menambah mutasi baru. Satu helper dipakai portal reseller & admin —
+ * admin mengirim `fullAccount` + `showActor` supaya nomor rekening utuh.
  */
-export function describeLedgerRow(row: LedgerRowView): MutationDisplay {
+export function describeLedgerRow(row: LedgerRowView, options: DescribeLedgerOptions = {}): MutationDisplay {
   const date = tglJamID(row.created_at);
+  const { fullAccount = false, showActor = false } = options;
 
   if (row.type === "withdrawal_hold") {
     const wd = row.withdrawal;
     if (wd?.status === "paid") {
       return {
         title: "Tarik saldo",
-        description: `Ditransfer ke ${bankDisplayName(wd.bank_name) || "Rekening"} ••••${wd.bank_last4} · ${tglJamID(wd.paid_at || row.created_at)}`,
+        description: `Ditransfer ke ${accountLabel(wd, fullAccount)} · ${tglJamID(wd.paid_at || wd.created_at || row.created_at)}${actorSuffix(wd.reviewed_by, showActor)}`,
         extra: `Diterima ${rupiah(wd.transfer_amount)} · biaya admin ${rupiah(wd.admin_fee)}`,
         badge: { label: "Ditransfer", tone: "ok" },
       };
@@ -172,7 +211,7 @@ export function describeLedgerRow(row: LedgerRowView): MutationDisplay {
     if (wd?.status === "rejected") {
       return {
         title: "Tarik saldo",
-        description: `Penarikan ditolak admin · ${tglJamID(wd.created_at || row.created_at)}`,
+        description: `Ditolak: ${wd.reject_reason || "—"} · ${tglJamID(wd.created_at || row.created_at)}`,
         badge: { label: "Ditolak", tone: "err" },
       };
     }
@@ -195,14 +234,32 @@ export function describeLedgerRow(row: LedgerRowView): MutationDisplay {
   if (row.type === "topup") {
     return {
       title: "Top up",
-      description: `${row.reference || ""} · Dikonfirmasi ${tglJamID(row.topup?.reviewed_at || row.created_at)}`,
+      description: `${row.reference || row.topup?.code || "Top up"} · ${date}`,
+      extra:
+        row.topup?.status === "rejected" && row.topup.reject_reason
+          ? `Alasan: ${row.topup.reject_reason}`
+          : null,
       badge: topupStatus(row.topup?.status || "approved"),
+    };
+  }
+
+  if (row.type === "order_debit" && row.order_payment) {
+    const payment = row.order_payment;
+    const extra = [`Kekurangan ${rupiah(payment.amount)}`];
+    if (payment.status === "rejected" && payment.reject_reason) {
+      extra.push(`Alasan: ${payment.reject_reason}`);
+    }
+    return {
+      title: "Pesanan",
+      description: `${row.reference ? `${row.reference} · ` : ""}${date}`,
+      extra: extra.join(" · "),
+      badge: shortfallStatus(payment.status),
     };
   }
 
   return {
     title: ledgerTypeLabel(row.type),
-    description: `${row.note || row.reference || "—"} · ${date}`,
+    description: `${row.note || row.reference || "—"} · ${date}${actorSuffix(row.created_by, showActor)}`,
     badge: null,
   };
 }

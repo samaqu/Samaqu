@@ -6,6 +6,11 @@
  */
 
 import { supabase } from "@/lib/supabase";
+import type {
+  LedgerOrderPaymentInfo,
+  LedgerTopupInfo,
+  LedgerWithdrawalInfo,
+} from "@/lib/reseller/format";
 
 export class AdminApiError extends Error {
   status: number;
@@ -116,9 +121,8 @@ export interface QueuePayload {
   withdrawals: QueueWithdrawal[];
 }
 
-export interface LedgerRow {
+export interface LedgerMutation {
   id: number;
-  reseller_id: string;
   type: string;
   amount: number;
   balance_after: number;
@@ -126,6 +130,13 @@ export interface LedgerRow {
   note: string | null;
   created_by: string | null;
   created_at: string;
+  withdrawal?: LedgerWithdrawalInfo | null;
+  topup?: LedgerTopupInfo | null;
+  order_payment?: LedgerOrderPaymentInfo | null;
+}
+
+export interface LedgerRow extends LedgerMutation {
+  reseller_id: string;
   resellers: { store_name: string; owner_name: string } | null;
 }
 
@@ -158,14 +169,9 @@ export interface CatalogUpdate {
 export interface ResellerDetail {
   reseller: ResellerAdminRow;
   saldo: { saldo_tersedia: number; saldo_ditahan: number; saldo_total: number };
-  ledger: {
-    id: number;
-    type: string;
-    amount: number;
-    balance_after: number;
-    note: string | null;
-    created_at: string;
-  }[];
+  /** Jumlah penarikan berstatus paid (sudah ditransfer). */
+  total_withdrawn: number;
+  ledger: LedgerMutation[];
   orders: { id: string; order_number: string; status: string; total: number; customer_name: string | null; created_at: string }[];
 }
 

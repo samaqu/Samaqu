@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { opsResellerApi, type ResellerAdminRow, type ResellerDetail } from "./api";
-import { ledgerTypeLabel, rupiah, tglJamID } from "@/lib/reseller/format";
+import { describeLedgerRow, rupiah, tglJamID } from "@/lib/reseller/format";
 import { bankDisplayName } from "@/lib/reseller/banks";
+import MutationBadge from "./MutationBadge";
 import { Modal } from "./Modal";
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -57,16 +58,22 @@ export default function ResellerDrawer({
 
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Saldo</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold leading-tight">
+                Saldo bisa dipakai
+              </p>
               <p className="font-extrabold text-slate-900 text-[15px]">{rupiah(detail.saldo.saldo_tersedia)}</p>
             </div>
             <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Ditahan</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold leading-tight">
+                Ditahan (penarikan menunggu)
+              </p>
               <p className="font-extrabold text-slate-900 text-[15px]">{rupiah(detail.saldo.saldo_ditahan)}</p>
             </div>
             <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Total</p>
-              <p className="font-extrabold text-slate-900 text-[15px]">{rupiah(detail.saldo.saldo_total)}</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold leading-tight">
+                Total sudah ditarik
+              </p>
+              <p className="font-extrabold text-slate-900 text-[15px]">{rupiah(detail.total_withdrawn)}</p>
             </div>
           </div>
 
@@ -76,21 +83,28 @@ export default function ResellerDrawer({
               <p className="text-[12px] text-slate-400">Belum ada mutasi saldo.</p>
             ) : (
               <div className="divide-y divide-slate-100">
-                {detail.ledger.map((item) => (
-                  <div key={item.id} className="flex justify-between gap-3 py-2">
-                    <div>
-                      <p className="text-[12px] font-bold text-slate-800">{ledgerTypeLabel(item.type)}</p>
-                      <p className="text-[11px] text-slate-500">{item.note || "—"} · {tglJamID(item.created_at)}</p>
+                {detail.ledger.map((item) => {
+                  const view = describeLedgerRow(item, { fullAccount: true, showActor: true });
+                  return (
+                    <div key={item.id} className="flex justify-between gap-3 py-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-[12px] font-bold text-slate-800">{view.title}</p>
+                          <MutationBadge status={view.badge} />
+                        </div>
+                        <p className="text-[11px] text-slate-500">{view.description}</p>
+                        {view.extra ? <p className="text-[11px] text-slate-400">{view.extra}</p> : null}
+                      </div>
+                      <div className="text-right flex-none">
+                        <p className={`text-[12px] font-extrabold ${item.amount >= 0 ? "text-emerald-600" : "text-slate-900"}`}>
+                          {item.amount >= 0 ? "+" : "−"}
+                          {rupiah(Math.abs(item.amount))}
+                        </p>
+                        <p className="text-[11px] text-slate-500">saldo {rupiah(item.balance_after)}</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className={`text-[12px] font-extrabold ${item.amount >= 0 ? "text-emerald-600" : "text-slate-900"}`}>
-                        {item.amount >= 0 ? "+" : "−"}
-                        {rupiah(Math.abs(item.amount))}
-                      </p>
-                      <p className="text-[11px] text-slate-500">saldo {rupiah(item.balance_after)}</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
