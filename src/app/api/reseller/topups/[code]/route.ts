@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resellerSession, resellerUnauthorized } from "@/lib/reseller/auth";
 import { expireOverdueTopups, isPastDeadline } from "@/lib/reseller/topups";
+import { validateProofUrl } from "@/lib/upload-url";
 
 /**
  * Detail & aksi satu top up milik reseller (alur 3 langkah).
@@ -94,10 +95,14 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ code:
       );
     }
 
-    const proofUrl = typeof body.proof_url === "string" ? body.proof_url.trim() : "";
-    if (!/^https?:\/\/\S+$/i.test(proofUrl)) {
-      return NextResponse.json({ error: "Upload bukti pembayaran dulu" }, { status: 400 });
+    const checked = validateProofUrl(body.proof_url);
+    if (!checked.ok) {
+      return NextResponse.json(
+        { error: checked.error === "URL bukti harus dari Cloudinary" ? "Upload bukti pembayaran dulu" : checked.error },
+        { status: 400 }
+      );
     }
+    const proofUrl = checked.url;
     const paymentMethod = body.payment_method === "qris" ? "qris" : "bsi";
 
     const { error } = await supabase

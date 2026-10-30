@@ -165,6 +165,19 @@ export async function POST(request: Request) {
           ? "reseller"
           : "product";
 
+  // Guard Origin paling awal: signature hanya diberikan ke permintaan dari host ini.
+  // Request tanpa Origin (curl/server) ditolak untuk scope yang mengubah storage.
+  const origin = request.headers.get("origin");
+  const host = request.headers.get("host");
+  let sameOrigin = false;
+  if (origin) {
+    try {
+      sameOrigin = Boolean(host) && new URL(origin).host === host;
+    } catch {
+      sameOrigin = false;
+    }
+  }
+
   // Upload foto ulasan hanya untuk customer yang login.
   if (scope === "review" && !(await isCustomerRequest(request))) {
     return NextResponse.json({ error: "Silakan masuk dulu." }, { status: 401 });
@@ -173,6 +186,17 @@ export async function POST(request: Request) {
   // Bukti transfer reseller hanya untuk sesi reseller yang sah.
   if (scope === "reseller" && !(await isResellerRequest(request))) {
     return NextResponse.json({ error: "Silakan masuk dulu." }, { status: 401 });
+  }
+
+  // Foto/gambar chat: pengunjung boleh mengunggah lampiran, tapi signature tidak boleh
+  // diberikan ke skrip mana pun — wajib datang dari halaman kita sendiri.
+  if (scope === "chat" && !sameOrigin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Produk (katalog/Instagram/biolink): hanya admin. Sebelumnya terbuka tanpa login.
+  if (scope === "product" && !(await isOpsAdmin(request as NextRequest))) {
+    return NextResponse.json({ error: "Silakan masuk sebagai admin." }, { status: 401 });
   }
 
   const { cloudName, apiKey, apiSecret, folder, kind } = resolveScope(scope);
@@ -184,19 +208,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // Guard ringan: tolak kalau Origin tidak sama dengan host (cegah endpoint
-  // signing dipakai dari situs lain). Request tanpa Origin (server-side) tetap lolos.
-  const origin = request.headers.get("origin");
-  if (origin) {
-    const host = request.headers.get("host");
-    try {
-      if (!host || new URL(origin).host !== host) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-    } catch {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-  }
+  // Guard Origin sudah diperiksa di awal (lihat blok `sameOrigin`).
 
   let resourceType: "image" | "video" = "image";
   if (kind === "product" && body?.resourceType === "video") resourceType = "video";

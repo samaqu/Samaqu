@@ -12,7 +12,43 @@ const allowedDevOrigins =
     ? [`3000-${previewHostSuffix}`]
     : undefined;
 
+/**
+ * Header keamanan untuk semua respons.
+ *
+ * Sengaja tanpa `Content-Security-Policy` yang memblokir: aplikasi memuat Meta Pixel,
+ * Vercel Analytics, Supabase Storage, Cloudinary, dan iframe embed. CSP ketat akan
+ * memutus salah satunya. Rekomendasi CSP ada di laporan audit (mode report-only dulu).
+ *
+ * `X-Frame-Options: SAMEORIGIN` + `frame-ancestors 'self'` menjaga klikjacking tanpa
+ * memblokir embed internal. Kalau suatu saat butuh embed lintas domain, ubah di sini.
+ */
+const securityHeaders = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Permissions-Policy",
+    // Kamera hanya untuk pengunjung biasa; kamera/mikrofon tidak dipakai fitur lain.
+    value: "camera=(self), microphone=(), geolocation=(self), payment=(), usb=(), interest-cohort=()",
+  },
+  {
+    key: "Strict-Transport-Security",
+    // 2 tahun, berlaku untuk subdomain. Domain produksi selalu HTTPS (Vercel).
+    value: "max-age=63072000; includeSubDomains",
+  },
+  { key: "X-DNS-Prefetch-Control", value: "on" },
+];
+
 const nextConfig: NextConfig = {
+  async headers() {
+    return [
+      {
+        // Semua route, termasuk API dan aset statis.
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+    ];
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [

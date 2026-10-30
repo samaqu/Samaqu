@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { verifyOrderLookupToken } from "@/lib/order-token";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 /**
  * Baca SATU pesanan untuk halaman sukses checkout — termasuk untuk customer tamu (belum login).
@@ -13,6 +14,15 @@ import { verifyOrderLookupToken } from "@/lib/order-token";
  *   GET /api/orders/lookup?order=SMQ-…&t=<token>
  */
 export async function GET(req: NextRequest) {
+  // Endpoint publik: batasi supaya token tidak bisa ditebak berulang-ulang dari satu IP.
+  const limit = await checkRateLimit(req, "order-lookup", 60, 15 * 60 * 1000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Terlalu banyak permintaan. Coba lagi nanti." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+    );
+  }
+
   const sp = new URL(req.url).searchParams;
   const orderNumber = String(sp.get("order") || "").trim();
   const token = String(sp.get("t") || "").trim();

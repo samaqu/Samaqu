@@ -22,6 +22,7 @@ import { recordCommissionForOrder } from "@/lib/affiliate/commission";
 import { snapshotOrderHpp } from "@/lib/produksi-order-hpp";
 import { validateVoucherServer } from "@/lib/voucher-server";
 import { verifyJntShipping } from "@/lib/shipping-verify";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 /**
  * Semua baca/tulis pesanan di route ini memakai service role (server-side), supaya policy RLS
@@ -45,6 +46,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Masuk dulu untuk melanjutkan checkout" }, { status: 401 });
     }
 
+    // Checkout memotong stok dan memanggil J&T + Mayar; batasi per IP supaya akun yang
+    // sah sekalipun tidak bisa membanjiri pembuatan pesanan.
+    const limit = await checkRateLimit(request, "orders-create", 30, 60 * 60 * 1000);
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: "Terlalu banyak percobaan membuat pesanan. Coba lagi nanti." },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+      );
+    }
+
     const body = await request.json();
     const { customer, shipping, items } = body;
 
@@ -61,21 +72,14 @@ export async function POST(request: NextRequest) {
     const metaClientIp = getClientIp(request);
     const metaUserAgent = request.headers.get("user-agent") || undefined;
 
-    console.log("[ORDERS] === NEW ORDER REQUEST ===");
-    console.log("[ORDERS] Customer:", { name: customer?.name, whatsapp: customer?.whatsapp?.slice(0, 6) + "***" });
-    console.log("[ORDERS] Shipping:", {
-      address: shipping?.address?.slice(0, 30) + "...",
+    // Log ringkas tanpa data pribadi: nama, nomor HP, alamat lengkap, dan kode pos
+    // tidak ditulis ke log (log Vercel bisa dibaca banyak orang & tersimpan lama).
+    console.log("[ORDERS] Pesanan baru diterima:", {
+      items: Array.isArray(items) ? items.length : 0,
       city: shipping?.city,
-      district: shipping?.district,
-      postalCode: shipping?.postalCode,
       method: shipping?.method,
-      clientCost: shipping?.cost,
-      originDistrictId: shipping?.originDistrictId,
-      destinationDistrictId: shipping?.destinationDistrictId,
-      weight: shipping?.weight,
+      hasPaymentMethod: Boolean(body?.paymentMethod),
     });
-    console.log("[ORDERS] Items count:", items?.length);
-    console.log("[ORDERS] Payment:", body.paymentMethod, "Discount: dihitung server (voucher)");
 
     if (!customer?.name || !customer?.whatsapp || !shipping?.address || !shipping?.city) {
       console.log("[ORDERS] ERROR: Data wajib tidak lengkap");

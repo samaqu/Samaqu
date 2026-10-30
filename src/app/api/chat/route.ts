@@ -5,6 +5,7 @@ import { getKnowledgeContext } from "@/lib/chat-knowledge";
 import { maybeAlertErrorSpike, ERROR_ALERT_THRESHOLD } from "@/lib/chat-alerts";
 import { CHAT_TOOLS, executeChatTool, type ChatProductCard } from "@/lib/chat-tools";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // Live chat AI SAMAQU (Xiaomi MiMo, endpoint OpenAI-compatible).
 //
@@ -76,6 +77,16 @@ export async function POST(req: NextRequest) {
   const profile = await getCustomerProfile();
   if (!profile.enabled) {
     return NextResponse.json({ error: "Live chat belum aktif." }, { status: 503 });
+  }
+
+  // Setiap panggilan memakai token MiMo berbayar (dan bisa memicu tool hubungi_admin).
+  // Batasnya longgar untuk pengunjung normal, tapi menghentikan skrip yang membanjiri.
+  const limit = await checkRateLimit(req, "chat", 40, 60 * 60 * 1000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Terlalu banyak permintaan. Coba lagi nanti ya." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+    );
   }
 
   let body: { messages?: unknown; sessionId?: unknown; locale?: unknown };

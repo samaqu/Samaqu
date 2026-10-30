@@ -127,9 +127,13 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const awb = searchParams.get("awb");
+  const rawAwb = searchParams.get("awb");
   const forceRefresh = searchParams.get("refresh") === "1";
+  // Nomor resi J&T: alfanumerik 8–30 karakter. Divalidasi sebelum cache maupun panggilan
+  // upstream supaya endpoint publik ini tidak dipakai sebagai alat enumerasi/proxy bebas.
+  const awb = String(rawAwb || "").trim().toUpperCase();
   if (!awb) return fail("Nomor resi wajib diisi");
+  if (!/^[A-Z0-9]{8,30}$/.test(awb)) return fail("Format nomor resi tidak valid");
 
   // Cache dipisah per versi: jawaban untuk admin ops (dengan data kurir/penerima) tidak boleh
   // tercampur dengan versi publik yang lebih bersih.

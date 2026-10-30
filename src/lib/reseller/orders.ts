@@ -13,6 +13,7 @@ import { sumWeightGramsBySize, productWeightMapFromRows, variantWeightMapFromRow
 import { orderItemPhoto } from "@/lib/order-photo";
 import { loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { notifyAdminNewOrder } from "@/lib/fonnte";
+import { validateProofUrl } from "@/lib/upload-url";
 import { resellerBuyPrice, resellerMinSellInfo } from "./pricing";
 import { getResellerSettings } from "./settings";
 import { notifyResellerOrderCreated } from "./notify";
@@ -473,10 +474,11 @@ export async function uploadShortfallProof(
   proofUrl: string,
   paymentMethod: "bsi" | "qris" = "bsi"
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
-  const url = String(proofUrl || "").trim();
-  if (!/^https?:\/\/\S+$/i.test(url)) {
-    return { ok: false, error: "URL bukti tidak valid", status: 400 };
+  const checked = validateProofUrl(proofUrl);
+  if (!checked.ok) {
+    return { ok: false, error: checked.error, status: 400 };
   }
+  const url = checked.url;
 
   const supabase = getSupabaseAdmin();
   const { data: order } = await supabase
