@@ -271,9 +271,10 @@ export default function Transaksi({ variant = "ops" }) {
   }, [orders]);
 
   // Tab = TAHAP resmi aplikasi (`ORDER_STAGE_TABS_VISIBLE` order-flow — SAMA dengan halaman
-  // Pesanan admin). "Belum di Packing" tetap jadi filter cepat di bar bawah (sub-status
-  // pesanan `diproses`), angkanya dari helper yang sama.
-  const stageTabs = useMemo(() => stageTabsWithCounts(orders, { includeBelumDipacking: true }), [orders]);
+  // Pesanan admin). "Belum di Packing" SENGAJA tidak jadi tab: ia sub-status dari `diproses`
+  // dan tampil sebagai chip filter di baris filter (lihat `belumDipacking` di bawah).
+  // Angkanya tetap dari helper yang sama, jadi chip dan isi tabel tidak mungkin berbeda.
+  const stageTabs = useMemo(() => stageTabsWithCounts(orders), [orders]);
 
   const belumDipacking = useMemo(() => countByStage(orders, "belum_dipacking"), [orders]);
 

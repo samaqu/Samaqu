@@ -173,7 +173,9 @@ export default function OrdersView({
     };
   }, [orders]);
 
-  const stageTabs = useMemo(() => stageTabsWithCounts(orders, { includeBelumDipacking: true }), [orders]);
+  // "Belum di Packing" SENGAJA bukan tab (ia sub-status dari `diproses`); tampil sebagai
+  // chip filter di baris filter dengan angka dari helper yang sama (`countByStage`).
+  const stageTabs = useMemo(() => stageTabsWithCounts(orders), [orders]);
 
   const belumDipacking = useMemo(() => countByStage(orders, "belum_dipacking"), [orders]);
 
@@ -227,22 +229,20 @@ export default function OrdersView({
 
       <div className="bar">
         <div className="tabs">
-          {stageTabs
-            .filter((tab) => tab.key !== "belum_dipacking")
-            .map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                className={`tab${orderFilter === tab.key ? " on" : ""}`}
-                onClick={() => setOrderFilter(tab.key)}
-              >
-                <span className="ti">
-                  <StageIcon stage={tab.key} />
-                </span>
-                <span className="tl2">{tab.label}</span>
-                <em>{tab.count}</em>
-              </button>
-            ))}
+          {stageTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={`tab${orderFilter === tab.key ? " on" : ""}`}
+              onClick={() => setOrderFilter(tab.key)}
+            >
+              <span className="ti">
+                <StageIcon stage={tab.key} />
+              </span>
+              <span className="tl2">{tab.label}</span>
+              <em>{tab.count}</em>
+            </button>
+          ))}
         </div>
 
         <div className="f">
