@@ -311,3 +311,23 @@ lewat `priceFieldsFor`; harga minimum non-CYP kini ikut tersimpan. Peringatan ku
 Jebakan: halaman admin ini belum diverifikasi visual dengan sesi admin (tidak boleh membuat akun
 uji di produksi) — yang terverifikasi: tsc bersih + semua route compile 200 di dev server.
 Uji manual klik ada di catatan vault [[Sistem Reseller]].
+
+### 8.6 Routing reseller per host (perbaikan 30 Oktober 2026)
+
+**Bug yang pernah terjadi:** menu "Reseller" di office.samaqu.id membuka portal reseller
+(`/reseller/login`), bukan halaman admin. Penyebab: `middleware.ts` mengecualikan `reseller`
+di MATCHER — sehingga cabang rewrite per host (office → `/ops/...`, admin → `/panel-admin/...`)
+tidak pernah berjalan dan request jatuh ke route portal apa adanya.
+
+**Aturan sekarang (satu tempat: `src/middleware.ts`):**
+- Portal `/reseller/**` HANYA di domain website (www/samaqu.id). Bypass locale ada di
+  `handleRequest` tepat sebelum `intlMiddleware` (bukan lagi lewat matcher).
+- office.samaqu.id `/reseller` → rewrite `/ops/reseller` (halaman ADMIN reseller).
+- admin.samaqu.id `/reseller` → rewrite `/panel-admin/reseller`.
+- `/reseller` ditambahkan ke `SKIP_PREFIXES` pelacak trafik (`web-visit-tracker.ts`) supaya
+  kunjungan portal tidak dihitung sebagai trafik toko (perilaku lama saat masih di matcher).
+- JANGAN menambahkan `reseller` kembali ke matcher exclusion — itu yang mematikan rewrite host.
+
+**Parity ops ↔ panel admin:** halaman reseller admin satu komponen (`ResellerAdminPage`) tanpa
+gating `variant`; guard API sama (`isOpsAdmin`, tabel `admins`). Sudah dicek: tab, tombol
+Tambah Reseller, dan modal terbuka normal (render tanpa sesi admin; API 401 seperti seharusnya).

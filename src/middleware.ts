@@ -82,6 +82,13 @@ function handleRequest(request: NextRequest) {
     return NextResponse.rewrite(url, { request: { headers } });
   }
 
+  // Portal reseller hidup TANPA prefix locale dan HANYA di domain website. Di subdomain
+  // internal (office.samaqu.id / admin.samaqu.id) path /reseller sudah di-rewrite ke halaman
+  // ADMIN reseller pada cabang host di atas — jadi yang sampai ke sini adalah portalnya.
+  if (/^\/reseller(\/|$)/.test(request.nextUrl.pathname)) {
+    return NextResponse.next({ request: { headers } });
+  }
+
   // Halaman Bio Link hidup TANPA prefix locale (samaqu.id/bio). Jalur lama /id/bio & /en/bio
   // diarahkan ke /bio supaya cuma ada satu URL untuk satu halaman (kebas double).
   if (/^\/(id|en)\/bio(\/|$)/.test(request.nextUrl.pathname)) {
@@ -103,6 +110,6 @@ export const config = {
   matcher: [
     "/",
     "/(id|en)/:path*",
-    "/((?!_next|admin|panel-admin|ops|affiliate|reseller|bio|r/|api|opengraph-image|twitter-image|icon|apple-icon|manifest|\\.well-known|.*\\..*).*)",
+    "/((?!_next|admin|panel-admin|ops|affiliate|bio|r/|api|opengraph-image|twitter-image|icon|apple-icon|manifest|\\.well-known|.*\\..*).*)",
   ],
 };

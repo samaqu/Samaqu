@@ -27,6 +27,7 @@ const SKIP_PREFIXES = [
   "/panel-admin",
   "/admin",
   "/affiliate",
+  "/reseller",
   "/favicon.ico",
   "/robots.txt",
   "/sitemap.xml",
