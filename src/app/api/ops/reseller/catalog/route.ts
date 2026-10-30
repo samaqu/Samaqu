@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
-import { getResellerSettings } from "@/lib/reseller/settings";
-import { resellerBuyPrice, resellerMinSellPrice, type ResellerPriceable } from "@/lib/reseller/pricing";
+import { listAdminCatalog } from "@/lib/reseller/admin-catalog";
 
 /**
  * Tab admin "Produk & Harga" — pengaturan harga reseller PER SERIES
@@ -21,51 +20,12 @@ const MAX_UPDATES = 500;
 export async function GET(req: NextRequest) {
   if (!(await isOpsAdmin(req))) return unauthorized();
 
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("products")
-    .select(
-      "id, name, category, series, image, price, is_published, created_at, reseller_enabled, reseller_discount_percent, reseller_min_sell_price, jenis_kain(name)"
-    )
-    .order("category", { ascending: true })
-    .order("name", { ascending: true })
-    .order("series", { ascending: true });
-
-  if (error) {
-    console.error("[OPS-RESELLER] Gagal membaca produk:", error.message);
+  try {
+    const { rows, defaultDiscount } = await listAdminCatalog();
+    return NextResponse.json({ data: rows, default_discount: defaultDiscount });
+  } catch {
     return NextResponse.json({ error: "Gagal memuat produk" }, { status: 500 });
   }
-
-  const settings = await getResellerSettings();
-  const defaultDiscount = settings.defaultDiscountPercent;
-
-  const rows = (data ?? []).map((row) => {
-    const priceable: ResellerPriceable = {
-      price: Number(row.price) || 0,
-      reseller_discount_percent: row.reseller_discount_percent as number | string | null,
-      reseller_min_sell_price: row.reseller_min_sell_price as number | null,
-    };
-    return {
-    id: String(row.id),
-    name: String(row.name || ""),
-    category: String(row.category || ""),
-    series: row.series == null ? null : String(row.series),
-    image: (row.image as string | null) ?? null,
-    kain: (row as { jenis_kain?: { name?: string | null } | null }).jenis_kain?.name ?? null,
-    price: Math.round(Number(row.price) || 0),
-    is_published: row.is_published !== false,
-    created_at: row.created_at as string | null,
-    reseller_enabled: row.reseller_enabled === true,
-    reseller_discount_percent:
-      row.reseller_discount_percent == null ? null : Number(row.reseller_discount_percent),
-    reseller_min_sell_price:
-      row.reseller_min_sell_price == null ? null : Math.round(Number(row.reseller_min_sell_price)),
-    buy_price: resellerBuyPrice(priceable, defaultDiscount),
-    min_sell_price: resellerMinSellPrice(priceable, defaultDiscount),
-  };
-  });
-
-  return NextResponse.json({ data: rows, default_discount: defaultDiscount });
 }
 
 export async function PATCH(req: NextRequest) {

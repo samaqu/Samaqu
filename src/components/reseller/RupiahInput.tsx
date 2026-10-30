@@ -27,8 +27,10 @@ export default function RupiahInput({
   autoFocus,
   max,
   invalid,
+  compact,
   className = "",
   ariaLabel,
+  onBlur,
 }: {
   value: number;
   onChange: (value: number) => void;
@@ -40,6 +42,10 @@ export default function RupiahInput({
   max?: number;
   /** true = garis merah (nilai tidak valid). */
   invalid?: boolean;
+  /** Varian ringkas untuk tabel (tinggi ±34px, teks lebih kecil). */
+  compact?: boolean;
+  /** Dipanggil saat input kehilangan fokus (dipakai simpan otomatis di tabel). */
+  onBlur?: () => void;
   className?: string;
   ariaLabel?: string;
 }) {
@@ -67,21 +73,29 @@ export default function RupiahInput({
 
   return (
     <div
-      className={`flex w-full items-center gap-2 rounded-xl border-2 bg-white px-3 focus-within:ring-2 focus-within:ring-slate-900/5 ${
+      className={`flex w-full items-center gap-2 border-2 bg-white focus-within:ring-2 focus-within:ring-slate-900/5 ${
+        compact ? "rounded-lg px-2" : "rounded-xl px-3"
+      } ${
         invalid ? "border-red-400 focus-within:border-red-500" : "border-slate-200 focus-within:border-slate-400"
       } ${disabled ? "opacity-60" : ""} ${className}`}
     >
-      <span className="text-[13px] font-bold text-slate-500 select-none">Rp</span>
+      <span className={`font-bold text-slate-500 select-none ${compact ? "text-[11.5px]" : "text-[13px]"}`}>Rp</span>
       <input
         ref={inputRef}
         id={id}
-        className="w-full min-w-0 bg-transparent py-2.5 text-sm font-semibold text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400"
+        className={`w-full min-w-0 bg-transparent font-semibold text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400 ${
+          compact ? "py-1.5 text-[12.5px]" : "py-2.5 text-sm"
+        }`}
         inputMode="numeric"
         autoComplete="off"
         aria-label={ariaLabel}
         disabled={disabled}
         autoFocus={autoFocus}
         placeholder={placeholder}
+        onBlur={onBlur}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") (event.target as HTMLInputElement).blur();
+        }}
         value={display}
         onChange={(event) => {
           const el = event.target;

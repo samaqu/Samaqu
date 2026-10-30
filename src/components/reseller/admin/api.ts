@@ -134,10 +134,12 @@ export interface CatalogRow {
   name: string;
   category: string;
   series: string | null;
-  image: string | null;
+  /** Foto utama (product_images → images → image, tanpa video). */
+  thumbnail: string | null;
   kain: string | null;
   price: number;
   is_published: boolean;
+  open_order_enabled: boolean;
   created_at: string | null;
   reseller_enabled: boolean;
   reseller_discount_percent: number | null;

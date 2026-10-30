@@ -411,3 +411,22 @@ Menunggu / Dikonfirmasi / Ditransfer / Ditolak (muted "Dikembalikan" untuk baris
 "Ditahan untuk penarikan" di dashboard tetap dari RPC `samaqu_reseller_saldo` yang menghitung
 HANYA penarikan `status = 'pending'` (diverifikasi di SQL — tidak ada perubahan).
 Template WA "penarikan ditransfer" menyamarkan rekening jadi "{bank} ••••{4 digit}".
+
+### 8.11 Tab Produk & Harga: foto, semua produk, tabel rapi (30 Oktober 2026)
+
+- **Foto grup rusak:** sebelumnya thumbnail memakai `products.image` mentah (sering kosong/video/URL
+  mati) sehingga yang tampil teks alt. Sekarang query di `src/lib/reseller/admin-catalog.ts`
+  memakai rantai foto bersama — `product_images` (display_order, lewati video) → `products.images`
+  → `products.image` lewat `loadOrderPhotoLookup` + `isVideoUrl`; komponen `ProductThumb` menampilkan
+  kotak abu + ikon saat kosong ATAU gagal dimuat (`onError`), `alt=""` (tanpa teks alt).
+- **Semua produk masuk:** daftar admin memakai `listAdminCatalog()` di src/lib/reseller (bukan di
+  komponen), query TANPA filter visibilitas (katalog website, Open Order, add-on, tersembunyi,
+  series turunan semua ikut). API mengirim `is_published` + `open_order_enabled`; UI punya filter
+  "Tampil di" (Semua/Katalog website/Open Order/Tersembunyi) dan label visibilitas kecil di tiap
+  baris. Aturan tampil katalog website & Open Order tidak diubah.
+- **Tabel dirombak:** sel vertical-align middle, baris series ±48px, input min jual compact 140px
+  (`RupiahInput compact`, placeholder "Belum diatur"), kolom [checkbox · Series · Harga katalog
+  (kanan) · Diskon · Harga beli (kanan) · Min jual · Toggle (tengah) · status], header sticky,
+  tanpa scroll horizontal di 1280/panel. Kolom "—" diganti ikon status simpan.
+- **Simpan otomatis:** toggle langsung menyimpan; harga minimum tersimpan saat blur/Enter; ikon
+  spinner → centang hijau (fade 2 dtk) / tanda gagal + toast. Aksi massal tetap seperti sebelumnya.

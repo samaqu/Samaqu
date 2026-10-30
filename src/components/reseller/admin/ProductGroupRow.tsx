@@ -1,13 +1,14 @@
 "use client";
 
 import type { CatalogRow } from "./api";
-import SeriesRow, { type SeriesDraft } from "./SeriesRow";
+import ProductThumb from "./ProductThumb";
+import SeriesRow, { type RowSaveState } from "./SeriesRow";
 
 export interface CatalogGroup {
   key: string;
   name: string;
   category: string;
-  image: string | null;
+  thumbnail: string | null;
   kain: string | null;
   rows: CatalogRow[];
 }
@@ -16,33 +17,31 @@ export interface CatalogGroup {
 export default function ProductGroupRow({
   group,
   defaultDiscount,
-  drafts,
   selected,
-  busyId,
+  rowStatus,
   onSelectGroup,
   onSelectRow,
-  onDraftChange,
-  onSaveRow,
+  onToggle,
+  onMinSellCommit,
   isNewRow,
 }: {
   group: CatalogGroup;
   defaultDiscount: number;
-  drafts: Record<string, SeriesDraft>;
   selected: Set<string>;
-  busyId: string | null;
+  rowStatus: Record<string, RowSaveState>;
   onSelectGroup: (checked: boolean) => void;
   onSelectRow: (id: string, checked: boolean) => void;
-  onDraftChange: (id: string, patch: Partial<SeriesDraft>) => void;
-  onSaveRow: (id: string) => void;
+  onToggle: (row: CatalogRow) => void;
+  onMinSellCommit: (row: CatalogRow, value: number | null) => void;
   isNewRow: (row: CatalogRow) => boolean;
 }) {
   const allSelected = group.rows.every((row) => selected.has(row.id));
 
   return (
     <>
-      <tr className="bg-slate-50/80 border-y border-slate-200">
-        <td className="px-3 py-2.5" colSpan={8}>
-          <div className="flex items-center gap-3">
+      <tr className="bg-slate-50 border-y border-slate-200">
+        <td className="px-3 py-2 align-middle" colSpan={8}>
+          <div className="flex items-center gap-2.5">
             <input
               type="checkbox"
               checked={allSelected}
@@ -50,21 +49,15 @@ export default function ProductGroupRow({
               aria-label={`Pilih semua series ${group.name}`}
               style={{ accentColor: "#2563eb", width: 15, height: 15 }}
             />
-            {group.image ? (
-              <img
-                src={group.image}
-                alt={group.name}
-                style={{ width: 34, height: 42, objectFit: "cover", borderRadius: 8, flex: "none" }}
-              />
-            ) : (
-              <span style={{ width: 34, height: 42, borderRadius: 8, background: "#e2e8f0", flex: "none" }} />
-            )}
+            <ProductThumb src={group.thumbnail} className="w-9 h-[42px] rounded-lg flex-none" />
             <div className="min-w-0">
               <p className="font-extrabold text-slate-900 text-[13px] leading-tight">
                 {group.name}
-                <span className="ml-2 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">{group.category}</span>
+                <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                  {group.category}
+                </span>
               </p>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-slate-500 leading-tight">
                 {group.kain ? `Kain ${group.kain} · ` : ""}
                 {group.rows.length} series
               </p>
@@ -72,34 +65,26 @@ export default function ProductGroupRow({
             <button
               type="button"
               onClick={() => onSelectGroup(true)}
-              className="ml-auto px-2.5 py-1.5 rounded-lg text-[11.5px] font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 whitespace-nowrap"
+              className="ml-auto px-2 py-1 rounded-lg text-[11px] font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 whitespace-nowrap"
             >
               Atur semua series produk ini
             </button>
           </div>
         </td>
       </tr>
-      {group.rows.map((row) => {
-        const rowDraft = drafts[row.id] || { enabled: row.reseller_enabled, minSell: row.reseller_min_sell_price };
-        const dirty =
-          rowDraft.enabled !== row.reseller_enabled ||
-          (rowDraft.minSell ?? null) !== (row.reseller_min_sell_price ?? null);
-        return (
-          <SeriesRow
-            key={row.id}
-            row={row}
-            defaultDiscount={defaultDiscount}
-            draft={rowDraft}
-            selected={selected.has(row.id)}
-            isNew={isNewRow(row)}
-            dirty={dirty}
-            busy={busyId === row.id}
-            onSelect={(checked) => onSelectRow(row.id, checked)}
-            onDraftChange={(patch) => onDraftChange(row.id, patch)}
-            onSave={() => onSaveRow(row.id)}
-          />
-        );
-      })}
+      {group.rows.map((row) => (
+        <SeriesRow
+          key={row.id}
+          row={row}
+          defaultDiscount={defaultDiscount}
+          selected={selected.has(row.id)}
+          isNew={isNewRow(row)}
+          status={rowStatus[row.id] || "idle"}
+          onSelect={(checked) => onSelectRow(row.id, checked)}
+          onToggle={() => onToggle(row)}
+          onMinSellCommit={(value) => onMinSellCommit(row, value)}
+        />
+      ))}
     </>
   );
 }
