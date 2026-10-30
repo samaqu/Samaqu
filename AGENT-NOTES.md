@@ -727,3 +727,27 @@ min_sell = harga katalog; admin 67 baris katalog website (0 Open Order/tersembun
 portal hanya produk Katalog website; 0 produk Open Order/tersembunyi saat ini masih enabled.
 Daftar historis yang pernah enabled: 6 series Thobe Black (tersembunyi) → padanan Thobe
 Superblack (sudah dialihkan pada tugas sebelumnya, bukan otomatis oleh kode baru).
+
+### 8.21 Buat Pesanan: daftar produk terlipat + item card (30 Oktober 2026)
+
+**Tujuan:** satu fokus per tahap. Daftar produk tidak lagi memanjang; setelah series dipilih
+daftar menutup dan Penerima/Pengiriman langsung dekat kartu item.
+
+**Perubahan UI (logic tidak berubah):**
+- `ProdukPicker`: daftar TERLIPAT per produk (foto, nama, kategori, jumlah series). Ketuk baris
+  membuka chip series; hanya satu produk terbuka. Series stok 0 tetap chip disabled "Stok habis".
+  Saat kolom cari terisi, hasil pertama otomatis terbuka.
+- `ItemCard` (baru): item aktif = kartu `ItemEditor` + tombol "Ganti produk"/"Tutup"; item lain
+  ringkas satu baris (nama, ukuran × qty, harga jual, Ubah, hapus). Tombol "+ Tambah produk" di
+  bawah daftar item.
+- `OrderForm`: state picker terpisah dari item (`picker: add/replace/null`, `openUid`, `scrollUid`).
+  Memilih series menutup picker, membuka item target, dan menggulir halus ke kartu item. "Ganti
+  produk" menimpa item (uid tetap), "+ Tambah" menambah item; preset `?produk=` langsung terpilih
+  + daftar tertutup. Ubah dari baris ringkas mobile (langkah 2/3) membuka item di langkah 1.
+- Penerima/Pengiriman tetap tepat di bawah kartu item; mobile tetap stepper 1-2-3 + bar bawah.
+  Target sentuh mobile ≥44px; CSS baru `.prod-group-head`, `.item-compact`, `.item-card-actions`.
+
+**Verifikasi:** `tsc` EXIT=0; mock desktop 1280: daftar terlipat, buka satu produk, pilih series →
+daftar tutup + kartu item + Penerima dekat; Ganti produk menimpa; +Tambah menambah (item lama
+ringkas, item baru terbuka); cari "Broken" auto-buka. Mobile 390/360: item ringkas + editor,
+langkah 2 menampilkan baris ringkas + Ubah, tanpa scroll horizontal (`scrollWidth < innerWidth`).

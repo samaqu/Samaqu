@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import type { KatalogProduct } from "@/lib/reseller/client";
 import { rupiah } from "@/lib/reseller/format";
@@ -14,7 +14,10 @@ interface ProductGroup {
   rows: KatalogProduct[];
 }
 
-/** Pemilih produk: grup per produk induk, series sebagai chip. */
+/**
+ * Pemilih produk terlipat: satu baris per produk induk. Ketuk untuk membuka
+ * series; hanya satu produk terbuka. Saat mencari, hasil pertama otomatis terbuka.
+ */
 export default function ProdukPicker({
   products,
   lines,
@@ -25,6 +28,7 @@ export default function ProdukPicker({
   onPick: (product: KatalogProduct) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [openKey, setOpenKey] = useState<string | null>(null);
 
   const groups = useMemo<ProductGroup[]>(() => {
     const map = new Map<string, ProductGroup>();
@@ -53,6 +57,12 @@ export default function ProdukPicker({
       .filter((group) => group.rows.length > 0);
   }, [products, query]);
 
+  // Produk yang cocok saat mencari langsung terbuka (hanya satu).
+  useEffect(() => {
+    if (!query.trim()) return;
+    setOpenKey(groups[0]?.key ?? null);
+  }, [query, groups]);
+
   const selectedIds = useMemo(() => new Set(lines.map((line) => line.product.id)), [lines]);
 
   if (products.length === 0) {
@@ -60,7 +70,7 @@ export default function ProdukPicker({
   }
 
   return (
-    <div className="stack" style={{ gap: 14 }}>
+    <div className="stack" style={{ gap: 12 }}>
       <div style={{ position: "relative" }}>
         <Search size={15} style={{ position: "absolute", left: 12, top: 14, color: "var(--rs-mut)" }} />
         <input
@@ -74,46 +84,55 @@ export default function ProdukPicker({
 
       {groups.length === 0 ? <p className="muted small">Produk tidak ditemukan.</p> : null}
 
-      <div className="stack" style={{ gap: 10 }}>
+      <div className="stack" style={{ gap: 7 }}>
         {groups.map((group) => {
           const rep = group.rows.find((row) => row.image) || group.rows[0];
+          const open = openKey === group.key;
           return (
-            <div className="prod-group" key={group.key}>
-              <div className="prod-group-head">
+            <div className={`prod-group ${open ? "open" : ""}`} key={group.key}>
+              <button
+                type="button"
+                className="prod-group-head"
+                aria-expanded={open}
+                onClick={() => setOpenKey(open ? null : group.key)}
+              >
                 <ProductPhoto src={rep.image} name={group.name} />
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className="bold" style={{ fontSize: 13.5 }}>
-                    {group.name}
-                  </div>
-                  <div className="small muted">
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span className="pg-name">{group.name}</span>
+                  <span className="pg-meta">
                     {group.category} · {group.rows.length} series
-                  </div>
-                </div>
-              </div>
+                  </span>
+                </span>
+                <span className="pg-toggle" aria-hidden="true">
+                  {open ? "−" : "+"}
+                </span>
+              </button>
 
-              <div className="series-grid">
-                {group.rows.map((row) => {
-                  const stock = row.variants.reduce((sum, variant) => sum + variant.stock, 0);
-                  const active = selectedIds.has(row.id);
-                  const habis = stock < 1;
-                  const label = row.series || "Standar";
-                  return (
-                    <button
-                      key={row.id}
-                      type="button"
-                      className={`series-chip ${active ? "on" : ""} ${habis ? "off" : ""}`}
-                      disabled={habis}
-                      aria-pressed={active}
-                      onClick={() => onPick(row)}
-                    >
-                      <span className="nm">{label}</span>
-                      <span className="meta">
-                        {rupiah(row.buy_price)} · {habis ? "Stok habis" : `Stok ${stock}`}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              {open ? (
+                <div className="series-grid" style={{ padding: "0 10px 10px" }}>
+                  {group.rows.map((row) => {
+                    const stock = row.variants.reduce((sum, variant) => sum + variant.stock, 0);
+                    const active = selectedIds.has(row.id);
+                    const habis = stock < 1;
+                    const label = row.series || "Standar";
+                    return (
+                      <button
+                        key={row.id}
+                        type="button"
+                        className={`series-chip ${active ? "on" : ""} ${habis ? "off" : ""}`}
+                        disabled={habis}
+                        aria-pressed={active}
+                        onClick={() => onPick(row)}
+                      >
+                        <span className="nm">{label}</span>
+                        <span className="meta">
+                          {rupiah(row.buy_price)} · {habis ? "Stok habis" : `Stok ${stock}`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
           );
         })}

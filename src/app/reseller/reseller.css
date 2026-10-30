@@ -416,3 +416,41 @@
 }
 
 .rs-root .min-hint { font-size: 10.5px; color: var(--rs-mut); margin-top: 3px; }
+/* ── Picker terlipat + kartu item ringkas ── */
+.rs-root .prod-group { padding: 0; overflow: hidden; }
+.rs-root .prod-group.open { border-color: #d4d4cf; }
+.rs-root .prod-group-head {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px;
+  border: 0; background: none; text-align: left; cursor: pointer; border-radius: 14px;
+}
+.rs-root .prod-group-head .pg-name { display: block; font-size: 13.5px; font-weight: 800; color: var(--rs-ink); line-height: 1.25; }
+.rs-root .prod-group-head .pg-meta { display: block; font-size: 10.5px; color: var(--rs-mut); margin-top: 2px; }
+.rs-root .prod-group-head .pg-toggle {
+  width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  background: var(--rs-soft); color: var(--rs-ink); font-size: 18px; font-weight: 700; line-height: 1;
+}
+.rs-root .prod-group.open .pg-toggle { background: var(--rs-black); color: #fff; }
+.rs-root .prod-group-head .ph { width: 46px; height: 58px; border-radius: 8px; object-fit: cover; background: var(--rs-soft); flex: none; }
+.rs-root .prod-group-head .ph-empty .wm, .rs-root .prod-group-head .ph-empty .sub { display: none; }
+.rs-root .prod-group-head .ph-empty .init { font-size: 16px; }
+
+.rs-root .item-compact {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  border: 1px solid var(--rs-bd); border-radius: 12px; background: #fff; padding: 9px 10px; min-height: 58px;
+}
+.rs-root .item-compact .ic-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.rs-root .item-compact .ic-price { font-size: 12.5px; font-weight: 800; color: var(--rs-ink); white-space: nowrap; }
+.rs-root .item-compact .ic-btn {
+  min-height: 36px; padding: 6px 10px; border-radius: 9px; border: 1px solid var(--rs-bd);
+  background: #fff; font-size: 11.5px; font-weight: 800; color: var(--rs-ink); cursor: pointer;
+}
+.rs-root .item-compact .ic-btn.danger { color: var(--rs-err); border-color: #fecaca; background: #fff7f7; }
+.rs-root .item-card-actions { display: flex; gap: 8px; margin-top: 8px; }
+.rs-root .item-card-actions .btn { flex: 1; }
+.rs-root .item-card-actions .btn.ghost { background: #fff; border-color: var(--rs-bd); color: var(--rs-ink); }
+
+@media (max-width: 767px) {
+  .rs-root .item-compact .ic-btn { min-height: 44px; }
+  .rs-root .item-card-actions .btn { min-height: 44px; }
+  .rs-root .prod-group-head { min-height: 64px; }
+}

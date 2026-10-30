@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { ApiError, resellerApi, type KatalogProduct, type ShippingOption } from "@/lib/reseller/client";
 import { useReseller } from "../ResellerShell";
 import { Note } from "../ui";
-import ItemEditor from "./ItemEditor";
+import ItemCard from "./ItemCard";
 import OrderBottomBar from "./OrderBottomBar";
 import OrderStepper from "./OrderStepper";
 import OrderSuccess from "./OrderSuccess";
@@ -30,6 +30,8 @@ type CreateResult = {
   status: string;
 };
 
+type PickerState = { mode: "add" } | { mode: "replace"; uid: string } | null;
+
 /** Halaman Buat Pesanan: produk → penerima → pengiriman → ringkasan. */
 export default function OrderForm({ preselectProductId }: { preselectProductId?: string }) {
   const { me, refreshMe } = useReseller();
@@ -41,6 +43,9 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
   const [shipping, setShipping] = useState<ShippingOption | null>(null);
   const [showLabel, setShowLabel] = useState(false);
   const [step, setStep] = useState(0);
+  const [picker, setPicker] = useState<PickerState>({ mode: "add" });
+  const [openUid, setOpenUid] = useState<string | null>(null);
+  const [scrollUid, setScrollUid] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [result, setResult] = useState<CreateResult | null>(null);
@@ -70,10 +75,37 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
   const pickProduct = useCallback(
     (product: KatalogProduct) => {
       const line = createOrderLine(product);
-      if (line) addLine(line);
+      if (!line) return;
+
+      if (picker?.mode === "replace") {
+        const target = picker.uid;
+        setLines((prev) => prev.map((item) => (item.uid === target ? { ...line, uid: target } : item)));
+        setOpenUid(target);
+        setScrollUid(target);
+      } else {
+        const existing = lines.find((item) => item.key === line.key);
+        addLine(line);
+        const target = existing?.uid || line.uid;
+        setOpenUid(target);
+        setScrollUid(target);
+      }
+      setPicker(null);
     },
-    [addLine]
+    [addLine, lines, picker]
   );
+
+  // Setelah series dipilih, gulir halus ke kartu item (bukan ke atas).
+  useEffect(() => {
+    if (!scrollUid) return;
+    const uid = scrollUid;
+    const timer = window.setTimeout(() => {
+      document
+        .querySelector(`[data-line-uid="${uid}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setScrollUid(null);
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [scrollUid]);
 
   // Link "Pesan" dari katalog: otomatis pilih series + ukuran pertama yang ada stok.
   useEffect(() => {
@@ -82,7 +114,12 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
     if (!product) return;
     preselected.current = true;
     const line = createOrderLine(product);
-    if (line) addLine(line);
+    if (line) {
+      addLine(line);
+      setOpenUid(line.uid);
+      setScrollUid(line.uid);
+      setPicker(null);
+    }
   }, [preselectProductId, products, addLine]);
 
   const updateLine = useCallback((uid: string, patch: Partial<OrderLine>) => {
@@ -259,6 +296,9 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
           setShowLabel(false);
           setSubmitError("");
           setStep(0);
+          setPicker({ mode: "add" });
+          setOpenUid(null);
+          setScrollUid(null);
         }}
       />
     );
@@ -294,7 +334,16 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
               {line.size} × {line.quantity}
             </div>
           </div>
-          <button type="button" className="link-btn" onClick={() => setStep(0)}>
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => {
+              setPicker(null);
+              setStep(0);
+              setOpenUid(line.uid);
+              setScrollUid(line.uid);
+            }}
+          >
             Ubah
           </button>
         </div>
@@ -312,29 +361,51 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
             <div className="card-h">
               <h2>Produk</h2>
               <span className="small muted">
-                {lines.length > 0 ? `${lines.length} item dipilih` : "Pilih series dulu"}
+                {picker
+                  ? picker.mode === "replace"
+                    ? "Pilih produk pengganti"
+                    : "Pilih series dulu"
+                  : `${lines.length} item dipilih`}
               </span>
             </div>
-            <div className="card-b stack" style={{ gap: 14 }}>
-              <ProdukPicker products={products} lines={lines} onPick={pickProduct} />
-              {lines.length > 0 ? (
-                <div className="selected-block">
-                  <div className="item-label" style={{ marginBottom: 8 }}>
-                    Item dipilih
-                  </div>
-                  <div className="stack" style={{ gap: 10 }}>
-                    {lines.map((line) => (
-                      <ItemEditor
-                        key={line.uid}
-                        line={line}
-                        onChange={(patch) => updateLine(line.uid, patch)}
-                        onVariant={(patch) => changeVariant(line.uid, patch)}
-                        onRemove={() => removeLine(line.uid)}
-                      />
-                    ))}
-                  </div>
+            <div className="card-b stack" style={{ gap: 12 }}>
+              {picker ? (
+                <div className="stack" style={{ gap: 10 }}>
+                  {picker.mode === "replace" ? (
+                    <p className="small bold" style={{ color: "var(--rs-ink)" }}>
+                      Pilih series pengganti untuk item ini.
+                    </p>
+                  ) : null}
+                  <ProdukPicker products={products} lines={lines} onPick={pickProduct} />
+                  {lines.length > 0 ? (
+                    <button type="button" className="btn ghost sm" onClick={() => setPicker(null)}>
+                      Batal
+                    </button>
+                  ) : null}
                 </div>
-              ) : null}
+              ) : (
+                <div className="stack" style={{ gap: 10 }}>
+                  {lines.map((line) => (
+                    <ItemCard
+                      key={line.uid}
+                      line={line}
+                      open={openUid === line.uid}
+                      onToggle={() => setOpenUid((current) => (current === line.uid ? null : line.uid))}
+                      onChange={(patch) => updateLine(line.uid, patch)}
+                      onVariant={(patch) => changeVariant(line.uid, patch)}
+                      onRemove={() => removeLine(line.uid)}
+                      onReplace={() => setPicker({ mode: "replace", uid: line.uid })}
+                    />
+                  ))}
+                  <button
+                    type="button"
+                    className="btn ghost sm blk"
+                    onClick={() => setPicker({ mode: "add" })}
+                  >
+                    + Tambah produk
+                  </button>
+                </div>
+              )}
             </div>
           </section>
 
