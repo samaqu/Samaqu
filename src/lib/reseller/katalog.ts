@@ -56,29 +56,6 @@ type VariantRow = {
   hex: string | null;
 };
 
-function normalizeToken(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-/** Warna dari nama produk: "Thobe Black" → "black", "Thobe Superblack" → "superblack". */
-function colorToken(name: string, category: string, series: string | null): string {
-  let value = normalizeToken(name);
-  const cat = normalizeToken(category);
-  if (cat && value.startsWith(cat)) value = value.slice(cat.length).trim();
-  const seriesToken = normalizeToken(series || "");
-  if (seriesToken) {
-    const escaped = seriesToken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    value = value.replace(new RegExp(`\\b${escaped}\\b`, "g"), " ").replace(/\s+/g, " ").trim();
-  }
-  return value;
-}
-
-/** "black" cocok dengan "superblack"; "broken white" cocok dengan "broken white". */
-function colorsMatch(candidate: string, target: string): boolean {
-  if (!candidate || !target) return false;
-  return candidate === target || candidate.includes(target) || target.includes(candidate);
-}
-
 export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
   const supabase = getSupabaseAdmin();
 
@@ -170,52 +147,6 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
     }
   }
 
-  // Cadangan terakhir sebelum placeholder: foto dari produk PUBLISHED dengan
-  // kategori + series yang sama dan warna terdekat di nama (mis. "Thobe Black"
-  // memakai foto "Thobe Superblack" — sumber yang sama dengan katalog publik).
-  // Hanya tampilan; produk, harga, dan stok yang dijual tetap baris reseller.
-  const publicPhotoByProduct = new Map<string, string>();
-  const stillMissing = products.filter(
-    (product) =>
-      !photoLookup.main?.[String(product.id)] &&
-      !groupPhotoByKey.get(catalogGroupKey(product))
-  );
-  const missingSeries = [
-    ...new Set(stillMissing.map((product) => product.series).filter((series): series is string => Boolean(series))),
-  ];
-  if (stillMissing.length > 0 && missingSeries.length > 0) {
-    const categories = [...new Set(stillMissing.map((product) => product.category))];
-    const { data: publicRows, error: publicError } = await supabase
-      .from("products")
-      .select("id, name, category, series")
-      .eq("is_published", true)
-      .in("category", categories)
-      .in("series", missingSeries)
-      .order("created_at", { ascending: true });
-
-    if (publicError) {
-      console.error("[RESELLER-KATALOG] Gagal membaca foto katalog publik:", publicError.message);
-    } else {
-      const candidates = publicRows ?? [];
-      if (candidates.length > 0) {
-        const publicLookup = await loadOrderPhotoLookup(candidates.map((row) => String(row.id)));
-        for (const product of stillMissing) {
-          if (!product.series) continue;
-          const targetColor = colorToken(product.name, product.category, product.series);
-          const match = candidates.find((row) => {
-            if (String(row.category) !== product.category || String(row.series) !== product.series) return false;
-            if (!publicLookup.main?.[String(row.id)]) return false;
-            return (
-              targetColor.length > 0 &&
-              colorsMatch(colorToken(String(row.name), String(row.category), String(row.series)), targetColor)
-            );
-          });
-          if (match) publicPhotoByProduct.set(String(product.id), publicLookup.main![String(match.id)]);
-        }
-      }
-    }
-  }
-
   return products.map((product) => {
     const own = variants.filter((v) => v.product_id === product.id);
     return {
@@ -226,7 +157,6 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
       image:
         photoLookup.main?.[String(product.id)] ||
         groupPhotoByKey.get(catalogGroupKey(product)) ||
-        publicPhotoByProduct.get(String(product.id)) ||
         null,
       price: Math.round(Number(product.price) || 0),
       discount_percent: effectiveDiscountPercent(product, defaultDiscount),
