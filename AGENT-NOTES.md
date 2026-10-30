@@ -632,10 +632,10 @@ Thobe Broken White Bayati). Sebelum koreksi, 6 series **Thobe Black** (tersembun
 enabled; padanan katalog website-nya **Thobe Superblack** (B-01). Pengalihan Black → Superblack
 sudah dilakukan pada tugas sebelumnya (di luar commit ini), bukan otomatis oleh kode baru.
 
-**Harga minimum jual kembali aktif** (menggantikan §8.14 bagian min jual): `pricing.ts`
-`resellerMinSellPrice = max(reseller_min_sell_price, harga beli)`; kolom dibaca/ditulis di admin,
-katalog portal, validasi order server & portal, PATCH `/api/ops/reseller/catalog`. Input admin
-auto-save saat blur/Enter + peringatan "Di bawah harga beli" (tetap boleh simpan, seperti dulu).
+**Harga minimum jual kembali aktif** (menggantikan §8.14 bagian min jual): rumus final ada di
+§8.20 (`resellerMinSellInfo`); kolom dibaca/ditulis di admin, katalog portal, validasi order server
+& portal, PATCH `/api/ops/reseller/catalog`. Input admin auto-save saat blur/Enter + peringatan
+"Di bawah harga beli (batas tetap harga beli)" (tetap boleh simpan).
 
 **Tab Produk & Harga (satu series = satu baris):**
 - Single-series: langsung satu baris "Nama produk — Series" (tanpa header grup).
@@ -694,3 +694,36 @@ item terpilih + "Ubah" muncul di langkah Penerima/Kirim. Tampilan shell portal t
 ukuran/qty/harga/untung → auto-isi alamat → ringkasan 3 baris → EZ/ECO auto EZ → ringkasan lengkap
 → CTA; ukuran chip 58px, size box 52px, qty 44px, tombol bar 46px; `scrollWidth < innerWidth` di
 360/430 (tidak ada scroll horizontal). Tidak ada perubahan pada payload createOrder.
+
+### 8.20 Aturan baru harga minimum jual reseller (30 Oktober 2026)
+
+**Rumus final — SATU sumber `resellerMinSellInfo` di `src/lib/reseller/pricing.ts`:**
+- `reseller_min_sell_price` kosong/null → batas bawah = **harga katalog** (`products.price`).
+- Kolom diisi → batas bawah = nilai itu, tetapi **tidak pernah di bawah harga beli reseller**
+  (`max(nilai, harga beli)`).
+- Tidak ada batas atas; pesanan lama tidak berubah. `resellerMinSellPrice` hanya memanggil
+  `resellerMinSellInfo().value`.
+
+Helper ini juga mengembalikan `source` + `reason` + `message`:
+- `catalog`: "harga katalog SAMAQU" → "Harga jual minimal Rp X (harga katalog SAMAQU)".
+- `configured`: "batas harga dari SAMAQU" → "Harga jual minimal Rp X (batas harga dari SAMAQU)".
+- `buy` (nilai tersimpan di bawah harga beli): "sama dengan harga beli kamu" →
+  "Harga jual minimal Rp X (sama dengan harga beli kamu)".
+
+**Pemakai:** validasi server `orders.ts` memakai `info.value` + `info.message`; katalog portal
+mengirim `min_sell_price` + `min_sell_source` + `min_sell_reason`; form Buat Pesanan menampilkan
+"Minimal Rp X · {reason}" di bawah harga jual, border merah saat di bawah batas, dan alasan tombol
+"Harga jual di bawah batas minimal."; harga jual awal tiap item = **harga katalog**. Tab admin:
+placeholder kosong = "359.000 (harga katalog)" (prefix Rp dari RupiahInput), warning
+"Di bawah harga beli (batas tetap harga beli)" hanya bila angka < harga beli; angka di bawah
+harga katalog tetap boleh.
+
+**Verifikasi:** cek read-only helper 3 kasus (344.000 kosong → 344.000 catalog; 300.000 → 300.000
+configured; 200.000 → 258.000 buy + pesan benar); katalog portal 13 produk/13 foto dengan
+min_sell = harga katalog; admin 67 baris katalog website (0 Open Order/tersembunyi); mock UI admin
+(placeholder/warning) + ItemEditor (hint, border merah, pesan) 1280. `tsc` bersih.
+
+**Catatan aturan "Tampil di" (tugas gabungan):** implementasi §8.18 tetap berlaku — admin &
+portal hanya produk Katalog website; 0 produk Open Order/tersembunyi saat ini masih enabled.
+Daftar historis yang pernah enabled: 6 series Thobe Black (tersembunyi) → padanan Thobe
+Superblack (sudah dialihkan pada tugas sebelumnya, bukan otomatis oleh kode baru).
