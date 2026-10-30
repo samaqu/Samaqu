@@ -16,6 +16,7 @@ import { PAKET_SIZE, isCoverHangerKategori, isKabakKategori, isPaketKategori, is
 import { uploadToCloudinary, validateMediaFile } from "@/lib/cloudinary";
 import { useStoreSettings } from "@/lib/store-settings";
 import { usePageUrl } from "@/lib/ops-router";
+import ProductResellerFields from "@/components/reseller/admin/ProductResellerFields";
 import { duplicateSkus, generateBaseSku, generateVariantSku, resolveColorName, seriesCode } from "@/lib/sku";
 
 const CATEGORIES = ["Thobe", "Kandora", "Koko", "Vest", "Kabak", "Cover & Hanger"] as const;
@@ -581,6 +582,8 @@ export default function TambahProdukPage({
   // Create Your Price
   const [cypEnabled, setCypEnabled] = useState(false);
   const [minimumPrice, setMinimumPrice] = useState("");
+  /** Diskon reseller (%) — "" = produk tidak dijual ke reseller. */
+  const [resellerDiscount, setResellerDiscount] = useState("");
   const [recommendedPrice, setRecommendedPrice] = useState("");
   const [useCustomCypMicrocopy, setUseCustomCypMicrocopy] = useState(false);
   const [cypMicrocopyOverride, setCypMicrocopyOverride] = useState("");
@@ -709,6 +712,9 @@ export default function TambahProdukPage({
         setSelectedJenisKainId(product.jenis_kain_id || "");
         setCypEnabled(cypValue || false);
         setMinimumPrice(minimumValue ? String(minimumValue) : "");
+        setResellerDiscount(
+          !isOpenOrderPrice && product.reseller_discount_percent != null ? String(product.reseller_discount_percent) : ""
+        );
         setRecommendedPrice(recommendedValue ? String(recommendedValue) : "");
         setCypMicrocopyOverride(microcopyValue || "");
         setUseCustomCypMicrocopy(!!microcopyValue);
@@ -1470,6 +1476,11 @@ export default function TambahProdukPage({
               recommended_price: p.recommended ? parseInt(p.recommended) : null,
               create_your_price_enabled: p.cyp,
               cyp_microcopy_override: p.microcopyOn && p.microcopy.trim() ? p.microcopy.trim() : null,
+              // Diskon reseller per produk; NULL = produk tidak dijual ke reseller.
+              reseller_discount_percent:
+                resellerDiscount.trim() === ""
+                  ? null
+                  : Math.min(100, Math.max(0, parseFloat(resellerDiscount) || 0)),
             };
       if (category === "Thobe" && selectedSeries.length > 0) {
         // ── Thobe multi-series: create 1 product row per series ──
@@ -1957,6 +1968,20 @@ export default function TambahProdukPage({
                   )}
                 </div>
                 )}
+                {!isOpenOrderPrice ? (
+                  <ProductResellerFields
+                    catalogPrice={
+                      category === "Thobe" && activeSeriesTab && seriesBlocks[activeSeriesTab]
+                        ? parseInt(seriesBlocks[activeSeriesTab].price) || 0
+                        : parseInt(basePrice) || 0
+                    }
+                    minimumPrice={minimumPrice}
+                    onMinimumPriceChange={setMinimumPrice}
+                    showMinimumField={category !== "Thobe" && !cypEnabled}
+                    discount={resellerDiscount}
+                    onDiscountChange={setResellerDiscount}
+                  />
+                ) : null}
                 {(category === "Thobe" || category === "Kandora") && (
                 <div>
                   <label className="pf-label">Jenis Kain</label>

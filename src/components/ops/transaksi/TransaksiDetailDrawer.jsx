@@ -26,6 +26,7 @@ import JntBadge from "@/components/JntBadge";
 import { SOURCE_STYLES, STATUS_STYLES, formatRupiah, formatTanggalJamID } from "@/components/ops/transaksi/transaksi-format";
 import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
 import PanelDetailPesanan, { PanelDetailShell, PanelLacakModal, jamWIB } from "@/components/ops/transaksi/PanelDetailPesanan";
+import ResellerOrderBlock from "@/components/reseller/admin/ResellerOrderBlock";
 
 export default function TransaksiDetailDrawer({ open, order, variant = "ops", owner = "panel", onClose, onEdit, onCancel, onDelete, onResiCreated }) {
   const isPanel = variant === "panel";
@@ -400,6 +401,8 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
             ) : null
           }
         >
+          {/* Blok reseller — hanya untuk pesanan ber-reseller_id (RSL-). */}
+          {order.reseller_id ? <ResellerOrderBlock order={order} /> : null}
           {/* Panel resi asli: buat resi, resi HBO, tandai dikirim, cetak (logic lama, tidak diubah).
               `compact` karena nomor resi sudah tampil di blok resi bergradasi. */}
           <TransaksiResiPanel
@@ -470,6 +473,9 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
                   {order.source_label}
                 </span>
               </div>
+
+              {/* Blok reseller — hanya untuk pesanan ber-reseller_id (RSL-). */}
+              {order.reseller_id ? <ResellerOrderBlock order={order} /> : null}
 
               {order.status !== "dibatalkan" ? (
                 <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-3">

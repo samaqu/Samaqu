@@ -32,11 +32,12 @@ const IconRecipe: any = (LucideIcons as any).NotebookPen ?? (LucideIcons as any)
 const IconCalendar: any = (LucideIcons as any).CalendarDays ?? (LucideIcons as any).Calendar ?? FileText;
 const IconTraffic: any =
   (LucideIcons as any).ChartNoAxesCombined ?? (LucideIcons as any).TrendingUp ?? (LucideIcons as any).LineChart ?? BarChart3;
+const IconReseller: any = (LucideIcons as any).Store ?? ShoppingBag;
 import { supabase } from "@/lib/supabase";
 import { Toaster } from "@/components/ops/ui/toaster";
 import OpsFooter from "@/components/ops/OpsFooter";
 
-type MenuItem = { title: string; href: string; icon: any; soon?: boolean };
+type MenuItem = { title: string; href: string; icon: any; soon?: boolean; /** Menampilkan badge merah jumlah antrean. */ badgeKey?: "reseller" };
 type MenuGroup = { label: string; items: MenuItem[] };
 
 const BASE_MENU_GROUPS: MenuGroup[] = [
@@ -51,6 +52,7 @@ const BASE_MENU_GROUPS: MenuGroup[] = [
     label: "Penjualan",
     items: [
       { title: "Transaksi", href: "/ops/transaksi", icon: FileText },
+      { title: "Reseller", href: "/ops/reseller", icon: IconReseller, badgeKey: "reseller" },
       { title: "Return", href: "/ops/retur", icon: RotateCcw },
       { title: "Leads", href: "/ops/leads", icon: Users },
       { title: "Follow-up", href: "/ops/follow-up", icon: IconPhoneCall },
@@ -100,11 +102,13 @@ function SidebarContent({
   onNavigate,
   stripOps,
   groups,
+  resellerQueue,
 }: {
   pathname: string;
   onNavigate?: () => void;
   stripOps?: boolean;
   groups: MenuGroup[];
+  resellerQueue: number;
 }) {
   const router = useRouter();
   // Prefetch halaman begitu kursor menyentuh menu → klik jadi instan.
@@ -147,6 +151,11 @@ function SidebarContent({
                 >
                   <Icon size={17} />
                   <span className="flex-1 text-left">{item.title}</span>
+                  {item.badgeKey === "reseller" && resellerQueue > 0 ? (
+                    <span className="min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-black">
+                      {resellerQueue}
+                    </span>
+                  ) : null}
                 </Link>
               );
             })}
@@ -173,6 +182,8 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
     allowed: false,
     role: "other",
   });
+  /** Jumlah antrean reseller "perlu dicek" untuk badge menu. */
+  const [resellerQueue, setResellerQueue] = useState(0);
 
   useEffect(() => {
     setOnOpsHost(window.location.hostname === "office.samaqu.id");
@@ -229,6 +240,30 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
     groups.splice(3, 0, { label: "Produksi", items: visible });
     return groups;
   }, [prodAccess]);
+
+  useEffect(() => {
+    if (!authorized) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (!token) return;
+        const res = await fetch("/api/ops/reseller/stats", { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const json = await res.json().catch(() => null);
+        if (!cancelled && typeof json?.perlu_dicek === "number") setResellerQueue(json.perlu_dicek);
+      } catch {
+        /* badge hanya penanda */
+      }
+    };
+    load();
+    const timer = window.setInterval(load, 120000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [authorized]);
 
   useEffect(() => {
     let cancelled = false;
@@ -341,7 +376,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
             <img src="/logo.svg" alt="SAMAQU" className="h-8 w-auto object-contain" />
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center">Internal</p>
           </div>
-          <SidebarContent pathname={pathname} stripOps={onOpsHost} groups={menuGroups} />
+          <SidebarContent pathname={pathname} stripOps={onOpsHost} groups={menuGroups} resellerQueue={resellerQueue} />
           <div className="p-3 border-t border-slate-200 dark:border-slate-800 shrink-0">
             <button
               onClick={handleLogout}
@@ -366,7 +401,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
                   <X size={18} className="text-slate-500" />
                 </button>
               </div>
-              <SidebarContent pathname={pathname} stripOps={onOpsHost} groups={menuGroups} onNavigate={() => setDrawer(false)} />
+              <SidebarContent pathname={pathname} stripOps={onOpsHost} groups={menuGroups} resellerQueue={resellerQueue} onNavigate={() => setDrawer(false)} />
               <div className="p-3 border-t border-slate-200 dark:border-slate-800">
                 <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100">
                   <LogOut size={17} /> Keluar

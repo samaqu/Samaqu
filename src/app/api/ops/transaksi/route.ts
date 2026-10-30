@@ -489,7 +489,7 @@ export async function GET(req: NextRequest) {
   let query = admin
     .from("orders")
     .select(
-      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, stock_reserved, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel",
+      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, stock_reserved, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel, reseller_id, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -537,7 +537,7 @@ export async function GET(req: NextRequest) {
   const { data: lineItems } = await admin
     .from("order_items")
     .select(
-      "id, order_id, product_id, product_name, series, kain, color, size, quantity, price, product_image, customer_price, minimum_price",
+      "id, order_id, product_id, product_name, series, kain, color, size, quantity, price, product_image, customer_price, minimum_price, reseller_buy_price, reseller_sell_price",
     )
     .in("order_id", list.map((o) => o.id));
 
@@ -563,6 +563,23 @@ export async function GET(req: NextRequest) {
     variantWeights = variantWeightMapFromRows(
       variantRows as { product_id?: string | null; color?: string | null; size?: string | null; weight?: number | null }[],
     );
+  }
+
+  // Nama toko reseller untuk badge baris RSL- & blok "Reseller" di drawer.
+  const resellerIds = [...new Set(list.map((order: any) => order.reseller_id).filter(Boolean))];
+  const resellerById = new Map<string, { store_name: string; owner_name: string; whatsapp: string | null }>();
+  if (resellerIds.length > 0) {
+    const { data: resellerRows } = await admin
+      .from("resellers")
+      .select("id, store_name, owner_name, whatsapp")
+      .in("id", resellerIds);
+    for (const row of resellerRows || []) {
+      resellerById.set(String((row as any).id), {
+        store_name: String((row as any).store_name || ""),
+        owner_name: String((row as any).owner_name || ""),
+        whatsapp: ((row as any).whatsapp as string | null) ?? null,
+      });
+    }
   }
 
   const byOrder = new Map<string, any[]>();
@@ -596,6 +613,15 @@ export async function GET(req: NextRequest) {
       source: key,
       source_key: resolvedKey,
       source_label: orderSourceLabel(order),
+      // Atribut reseller (null untuk pesanan biasa — tidak mengubah perilaku lama).
+      reseller_id: order.reseller_id ?? null,
+      reseller_store_name: order.reseller_id ? resellerById.get(String(order.reseller_id))?.store_name || "" : "",
+      reseller_whatsapp: order.reseller_id ? resellerById.get(String(order.reseller_id))?.whatsapp || "" : "",
+      reseller_owner_name: order.reseller_id ? resellerById.get(String(order.reseller_id))?.owner_name || "" : "",
+      reseller_balance_deduction: Number(order.reseller_balance_deduction) || 0,
+      reseller_shortfall_amount: Number(order.reseller_shortfall_amount) || 0,
+      reseller_shortfall_status: order.reseller_shortfall_status || "none",
+      show_reseller_name_on_label: order.show_reseller_name_on_label === true,
       status,
       status_label: statusLabel(status),
       subtotal: Number(order.subtotal) || 0,

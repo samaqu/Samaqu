@@ -9,6 +9,7 @@ import Link from "next/link";
 import * as LucideIcons from "lucide-react";
 import GlassCard from "@/components/ops/GlassCard";
 import WebTrafficCard from "@/components/ops/WebTrafficCard";
+import ResellerQueueCard from "@/components/reseller/admin/ResellerQueueCard";
 
 const IconDashboard: any = (LucideIcons as any).LayoutDashboard ?? (LucideIcons as any).Gauge;
 const IconRefresh: any = (LucideIcons as any).RefreshCw;
@@ -444,6 +445,9 @@ export default function OpsDashboardPage() {
           tone={r.margin >= 0 ? "text-slate-900" : "text-red-600"}
         />
       </div>
+
+      {/* ── Antrean reseller (top up / kekurangan / penarikan) ── */}
+      <ResellerQueueCard />
 
       {/* ── Trafik web publik (pencatat sisi server, bukan script browser) ── */}
       <WebTrafficCard />

@@ -27,6 +27,9 @@ interface OrderData {
   /** `voided` = resi sudah dibatalkan di J&T (kolom `orders.jnt_void_status`). */
   jnt_void_status?: string | null;
   created_at: string;
+  /** Pesanan reseller: ganti blok pengirim dengan nama toko + WA saat toggle aktif. */
+  show_reseller_name_on_label?: boolean | null;
+  reseller?: { store_name: string; owner_name?: string | null; whatsapp?: string | null } | null;
   order_items?: { product_id?: string; product_name: string; color: string; size: string; series?: string | null; kain?: string | null; quantity: number; price: number }[];
 }
 
@@ -245,6 +248,9 @@ export default function LabelPage() {
   const printDate = new Date().toLocaleString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
   const serviceCode = trackedService || jntServiceCodeFromShippingMethod(order.shipping_method) || "EZ";
   const serviceLabel = `Service ${serviceCode}`;
+  // Label reseller: pengirim = nama toko + WA reseller (resi tetap atas nama SAMAQU).
+  const resellerSender =
+    order.show_reseller_name_on_label === true && order.reseller?.store_name ? order.reseller : null;
 
   return (
     <>
@@ -296,8 +302,21 @@ export default function LabelPage() {
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "3mm 3.5mm 2mm", borderBottom: "2.5px solid #000" }}>
           <div>
-            <div style={{ fontSize: "20px", fontWeight: "900", letterSpacing: "2px" }}>SAMAQU</div>
-            <div style={{ fontSize: "7px", color: "#333", marginTop: "0.5px" }}>@samaqu.id | 0812-3456-7890</div>
+            {resellerSender ? (
+              <>
+                <div style={{ fontSize: "16px", fontWeight: "900", lineHeight: 1.1, wordBreak: "break-word", maxWidth: "60mm" }}>
+                  {resellerSender.store_name}
+                </div>
+                <div style={{ fontSize: "7px", color: "#333", marginTop: "0.5px" }}>
+                  Pengirim{resellerSender.whatsapp ? `: ${resellerSender.whatsapp}` : ""}
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: "20px", fontWeight: "900", letterSpacing: "2px" }}>SAMAQU</div>
+                <div style={{ fontSize: "7px", color: "#333", marginTop: "0.5px" }}>@samaqu.id | 0812-3456-7890</div>
+              </>
+            )}
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: "14px", fontWeight: "900" }}>J&T <span style={{ fontSize: "9px", fontWeight: "400" }}>EXPRESS</span></div>
@@ -409,7 +428,18 @@ export default function LabelPage() {
       }}>
         {/* Header ringkas — nama toko + layanan J&T sebaris */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.1mm 2.5mm 0.9mm", borderBottom: "2px solid #000" }}>
-          <div style={{ fontSize: "12px", fontWeight: "900", letterSpacing: "1px" }}>SAMAQU</div>
+          {resellerSender ? (
+            <div style={{ minWidth: 0, maxWidth: "46mm" }}>
+              <div style={{ fontSize: "10px", fontWeight: "900", lineHeight: 1.1, wordBreak: "break-word" }}>
+                {resellerSender.store_name}
+              </div>
+              {resellerSender.whatsapp ? (
+                <div style={{ fontSize: "6.5px", fontWeight: "700", marginTop: "0.2mm" }}>{resellerSender.whatsapp}</div>
+              ) : null}
+            </div>
+          ) : (
+            <div style={{ fontSize: "12px", fontWeight: "900", letterSpacing: "1px" }}>SAMAQU</div>
+          )}
           <div style={{ textAlign: "right", lineHeight: "1.12" }}>
             <div style={{ fontSize: "8px", fontWeight: "900" }}>J&amp;T <span style={{ fontSize: "6px", fontWeight: "400" }}>EXPRESS</span></div>
             <div style={{ fontSize: "6px", fontWeight: "700", marginTop: "0.1mm" }}>{serviceLabel} · REGULAR SERVICE</div>

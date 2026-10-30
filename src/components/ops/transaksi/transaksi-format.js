@@ -21,6 +21,7 @@ export const SOURCE_STYLES = {
   tiktok: { label: "TikTok Shop", icon: Music2, badge: "bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300" },
   offline: { label: "Offline", icon: Store, badge: "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300" },
   open_order: { label: "Open Order", icon: ShoppingBag, badge: "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300" },
+  reseller: { label: "Reseller", icon: Store, badge: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300" },
   unknown: { label: "Tidak diketahui", icon: Clock, badge: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300" },
 };
 

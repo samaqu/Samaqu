@@ -34,6 +34,17 @@ export async function GET(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!data) return NextResponse.json({ error: "Pesanan tidak ditemukan" }, { status: 404 });
+
+    // Pesanan reseller: sertakan nama toko + WA untuk label pengirim & blok reseller.
+    if ((data as { reseller_id?: string | null }).reseller_id) {
+      const { data: reseller } = await client
+        .from("resellers")
+        .select("store_name, owner_name, whatsapp")
+        .eq("id", String((data as { reseller_id: string }).reseller_id))
+        .maybeSingle();
+      if (reseller) (data as Record<string, unknown>).reseller = reseller;
+    }
+
     return NextResponse.json({ order: data });
   }
 

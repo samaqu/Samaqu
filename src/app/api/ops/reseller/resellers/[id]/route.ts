@@ -2,6 +2,56 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { normalizeWhatsappTarget } from "@/lib/fonnte";
+import { getResellerBalance } from "@/lib/reseller/saldo";
+
+/**
+ * Detail satu reseller untuk drawer admin: profil + saldo + mutasi terakhir
+ * + pesanan terakhir. Semua dibaca dengan service role.
+ */
+export async function GET(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  if (!(await isOpsAdmin(req))) return unauthorized();
+
+  const { id } = await context.params;
+  const supabase = getSupabaseAdmin();
+
+  const { data: reseller, error } = await supabase
+    .from("resellers")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[OPS-RESELLER] Gagal membaca reseller:", error.message);
+    return NextResponse.json({ error: "Gagal memuat reseller" }, { status: 500 });
+  }
+  if (!reseller) return NextResponse.json({ error: "Reseller tidak ditemukan" }, { status: 404 });
+
+  const [balance, ledger, orders] = await Promise.all([
+    getResellerBalance(id),
+    supabase
+      .from("reseller_ledger")
+      .select("id, type, amount, balance_after, reference, note, created_by, created_at")
+      .eq("reseller_id", id)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("orders")
+      .select("id, order_number, status, total, customer_name, created_at")
+      .eq("reseller_id", id)
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ]);
+
+  return NextResponse.json({
+    reseller,
+    saldo: balance ?? { saldo_tersedia: 0, saldo_ditahan: 0, saldo_total: 0 },
+    ledger: ledger.data ?? [],
+    orders: orders.data ?? [],
+  });
+}
 
 /**
  * Ubah data reseller / aktif-nonaktifkan. Setiap perubahan status mencatat

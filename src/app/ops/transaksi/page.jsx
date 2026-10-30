@@ -501,6 +501,22 @@ export default function Transaksi({ variant = "ops" }) {
                     <tr key={order.id} onClick={() => setDetail(order)}>
                       <td data-label="No. Pesanan">
                         <span className="id">{order.order_number}</span>
+                        {order.reseller_store_name ? (
+                          <small
+                            style={{
+                              display: "inline-block",
+                              marginTop: 2,
+                              padding: "1px 6px",
+                              borderRadius: 999,
+                              background: "#ecfdf3",
+                              color: "#15803d",
+                              fontSize: 10,
+                              fontWeight: 800,
+                            }}
+                          >
+                            {order.reseller_store_name}
+                          </small>
+                        ) : null}
                         <small>
                           {formatTanggalSingkatID(order.date_wib)} · {order.time_wib}
                         </small>

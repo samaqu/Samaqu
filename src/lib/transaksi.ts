@@ -46,18 +46,23 @@ export function sourceLabel(value: unknown): string {
  */
 export const OPEN_ORDER_SOURCE_KEY = "open_order";
 export const UNKNOWN_SOURCE_KEY = "unknown";
+/** Pesanan reseller (`RSL-…`) — bukan sumber pilihan form manual. */
+export const RESELLER_SOURCE_KEY = "reseller";
 
 export const ORDER_SOURCE_LABEL: Record<string, string> = {
   ...SOURCE_LABEL,
   [OPEN_ORDER_SOURCE_KEY]: "Open Order",
   [UNKNOWN_SOURCE_KEY]: "Tidak diketahui",
+  [RESELLER_SOURCE_KEY]: "Reseller",
 };
 
 export function orderSourceKey(order?: { order_number?: string | null; source?: unknown } | null): string {
   const number = String(order?.order_number ?? "").trim().toUpperCase();
   if (number.startsWith("CYO-")) return OPEN_ORDER_SOURCE_KEY;
+  if (number.startsWith("RSL-")) return RESELLER_SOURCE_KEY;
 
   const raw = String(order?.source ?? "").trim().toLowerCase();
+  if (raw === RESELLER_SOURCE_KEY) return RESELLER_SOURCE_KEY;
   if (SOURCE_KEYS.includes(raw)) return raw;
 
   if (number.startsWith("SMQ-")) return "website";

@@ -275,3 +275,39 @@ wajib sesi reseller), `types/lucide-react.d.ts` (daftar ikon baru portal).
 Jebakan UI: jangan pakai inline `gridTemplateColumns` untuk halaman 2 kolom — pakai class
 `.form-grid` supaya mobile jatuh ke satu kolom; bar ringkasan mobile `.review-sticky` disembunyikan
 di desktop lewat CSS.
+
+### 8.5 Sisi admin reseller + integrasi (tahap 4 — 30 Oktober 2026)
+
+Halaman admin: `src/app/ops/reseller/page.tsx` (variant "ops") + pembungkus tipis
+`src/app/panel-admin/(panel)/reseller/page.tsx` (variant "panel", pola yang sama dengan Transaksi).
+Isi di `src/components/reseller/admin/`: `ResellerAdminPage` (kartu atas + 4 tab),
+`QueueTab` (antrean top up/bayar kekurangan/penarikan + modal konfirmasi wajib menyebut
+reseller & jumlah), `ResellersTab` + `ResellerFormModal` (tambah/ubah/aktif-nonaktif),
+`ResellerDrawer` (profil+saldo+mutasi+pesanan), `LedgerTab` + koreksi saldo (catatan wajib),
+`SettingsTab` (biaya admin non-BSI + BSI). Pemanggil API admin: `admin/api.ts` (satu file).
+
+Endpoint admin baru (additif): `GET /api/ops/reseller/stats` (kartu + badge) dan
+`GET /api/ops/reseller/resellers/[id]` (drawer). PATCH di route yang sama tidak berubah.
+
+Menu: `OpsShell` (Penjualan → Reseller, badge merah antrean) dan `PanelShell`
+(Operasional → Reseller, badge via `src/lib/use-reseller-queue.ts`). Dashboard ops punya kartu
+"Reseller perlu dicek" → `/ops/reseller?tab=perlu-dicek`.
+
+Integrasi Transaksi: sumber `reseller` di `src/lib/transaksi.ts` (`RSL-` → Reseller) +
+`SOURCE_STYLES`; API `/api/ops/transaksi` ikut mengirim `reseller_store_name` dkk. dan
+`reseller_sell_price` per item; baris RSL- dapat badge nama toko; drawer detail merender
+`ResellerOrderBlock` HANYA kalau `order.reseller_id` terisi.
+
+Label (`/admin/label/[orderNumber]`, re-export dipakai `/panel-admin/label`): kalau
+`show_reseller_name_on_label` true DAN API `/api/ops/orders?order_number=` mengirim `reseller`,
+blok pengirim diganti nama toko + WA reseller (resi tetap SAMAQU). Tanpa toggle → tampilan lama persis.
+
+Form produk (% diskon reseller + harga minimum semua produk): komponen
+`src/components/reseller/admin/ProductResellerFields.tsx` disisip di `ProductForm.tsx` (mode
+katalog saja, BUKAN menu Open Order). Menyimpan `reseller_discount_percent` (NULL = tidak dijual)
+lewat `priceFieldsFor`; harga minimum non-CYP kini ikut tersimpan. Peringatan kuning bila
+`minimum_price < harga beli reseller` — hanya peringatan, tetap bisa simpan.
+
+Jebakan: halaman admin ini belum diverifikasi visual dengan sesi admin (tidak boleh membuat akun
+uji di produksi) — yang terverifikasi: tsc bersih + semua route compile 200 di dev server.
+Uji manual klik ada di catatan vault [[Sistem Reseller]].

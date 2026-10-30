@@ -19,6 +19,7 @@ import { OpsPageMapProvider } from "@/lib/ops-router";
 import { useWibLongDate } from "./wib-date";
 import styles from "./panel.module.css";
 import { usePendingReviewCount } from "@/lib/use-pending-reviews";
+import { useResellerQueueCount } from "@/lib/use-reseller-queue";
 
 const AVATAR =
   "https://res.cloudinary.com/j4ka1ty6/image/upload/w_96,h_96,c_fill,f_auto,q_auto/v1792158930/Avatar_Hijab_Merah_Muda_dalam_Lencana.png";
@@ -46,7 +47,7 @@ const THEME_SWATCH_CLASS: Record<PanelTheme, string> = {
 };
 const themeLabel = (id: PanelTheme) => THEMES.find((option) => option.id === id)?.label ?? "Berry";
 
-type IconName = "home" | "card" | "box" | "users" | "spark" | "return" | "star";
+type IconName = "home" | "card" | "box" | "users" | "spark" | "return" | "star" | "reseller";
 
 function NavIcon({ name }: { name: IconName }) {
   switch (name) {
@@ -96,10 +97,18 @@ function NavIcon({ name }: { name: IconName }) {
           <path d="M12 3l2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />
         </svg>
       );
+    case "reseller":
+      return (
+        <svg viewBox="0 0 24 24">
+          <path d="M3 9l2-5h14l2 5" />
+          <path d="M3 9h18v2a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z" />
+          <path d="M5 13v8h14v-8" />
+        </svg>
+      );
   }
 }
 
-type NavItem = { label: string; href: string; icon: IconName; soon?: boolean; badge?: "reviews" };
+type NavItem = { label: string; href: string; icon: IconName; soon?: boolean; badge?: "reviews" | "reseller" };
 
 const NAV: { section: string; items: NavItem[] }[] = [
   {
@@ -107,6 +116,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
     items: [
       { label: "Beranda", href: "/panel-admin", icon: "home" },
       { label: "Transaksi", href: "/panel-admin/transaksi", icon: "card" },
+      { label: "Reseller", href: "/panel-admin/reseller", icon: "reseller", badge: "reseller" },
       { label: "Return", href: "/panel-admin/retur", icon: "return" },
       { label: "Ulasan Pelanggan", href: "/panel-admin/ulasan", icon: "star", badge: "reviews" },
     ],
@@ -146,6 +156,8 @@ export default function PanelShell({ children }: { children: ReactNode }) {
   const [authorized, setAuthorized] = useState(false);
   /** Ulasan menunggu persetujuan -> badge menu "Ulasan Pelanggan". */
   const pendingReviews = usePendingReviewCount(authorized);
+  /** Antrean reseller yang perlu dicek -> badge menu "Reseller". */
+  const resellerQueue = useResellerQueueCount(authorized);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -423,6 +435,9 @@ export default function PanelShell({ children }: { children: ReactNode }) {
                     <span className={styles.navLabel}>{item.label}</span>
                     {item.badge === "reviews" && pendingReviews > 0 && (
                       <span className={styles.navBadge}>{pendingReviews}</span>
+                    )}
+                    {item.badge === "reseller" && resellerQueue > 0 && (
+                      <span className={styles.navBadge}>{resellerQueue}</span>
                     )}
                   </Link>
                 );
