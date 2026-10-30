@@ -38,5 +38,61 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Gagal memuat mutasi saldo" }, { status: 500 });
   }
 
-  return NextResponse.json({ data: data ?? [], total: count ?? 0, page, pageSize });
+  const rows = data ?? [];
+  const admin = getSupabaseAdmin();
+
+  // Gabungkan STATUS TERKINI dari tabel sumber (penarikan & top up) — hanya
+  // data tampilan; tidak ada mutasi/penulisan saldo baru di sini.
+  const withdrawalIds = [
+    ...new Set(
+      rows
+        .filter((row) => String(row.type).startsWith("withdrawal_") && row.reference)
+        .map((row) => String(row.reference))
+    ),
+  ];
+  const topupCodes = [
+    ...new Set(rows.filter((row) => row.type === "topup" && row.reference).map((row) => String(row.reference))),
+  ];
+
+  const [withdrawals, topups] = await Promise.all([
+    withdrawalIds.length
+      ? admin
+          .from("reseller_withdrawals")
+          .select("id, status, bank_name, bank_number, admin_fee, transfer_amount, created_at, paid_at, reject_reason")
+          .in("id", withdrawalIds)
+      : Promise.resolve({ data: [] as never[] }),
+    topupCodes.length
+      ? admin.from("reseller_topups").select("code, status, reviewed_at").in("code", topupCodes)
+      : Promise.resolve({ data: [] as never[] }),
+  ]);
+
+  const withdrawalById = new Map(
+    (withdrawals.data ?? []).map((row) => [
+      String(row.id),
+      {
+        status: String(row.status) as "pending" | "paid" | "rejected",
+        bank_name: (row.bank_name as string | null) ?? null,
+        bank_last4: String(row.bank_number || "").replace(/\D/g, "").slice(-4) || "????",
+        transfer_amount: Number(row.transfer_amount) || 0,
+        admin_fee: Number(row.admin_fee) || 0,
+        created_at: row.created_at as string,
+        paid_at: (row.paid_at as string | null) ?? null,
+        reject_reason: (row.reject_reason as string | null) ?? null,
+      },
+    ])
+  );
+  const topupByCode = new Map(
+    (topups.data ?? []).map((row) => [
+      String(row.code),
+      { status: String(row.status), reviewed_at: (row.reviewed_at as string | null) ?? null },
+    ])
+  );
+
+  const enriched = rows.map((row) => ({
+    ...row,
+    withdrawal: row.reference ? withdrawalById.get(String(row.reference)) ?? null : null,
+    topup: row.reference && row.type === "topup" ? topupByCode.get(String(row.reference)) ?? null : null,
+  }));
+
+  return NextResponse.json({ data: enriched, total: count ?? 0, page, pageSize });
 }
