@@ -91,7 +91,7 @@ function MinSellField({
         compact
         disabled={saving}
         placeholder={
-          row.reseller_min_sell_price == null
+          !row.reseller_min_sell_price
             ? `${row.price.toLocaleString("id-ID")} (harga katalog)`
             : "Belum diatur"
         }
