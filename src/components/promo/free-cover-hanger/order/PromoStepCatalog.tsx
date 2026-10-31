@@ -187,15 +187,19 @@ export default function PromoStepCatalog({
         </section>
       ) : null}
 
-      {/* Timer — siklus 24 jam yang reset tiap tengah malam WIB (bukan tanggal berakhir). */}
-      <section className="oo-fade-up mx-auto max-w-2xl" style={{ animationDelay: ".1s" }}>
-        <Countdown
-          target={midnight?.target ?? null}
-          phase="live"
-          variant="card"
-          endInfo={midnight?.label}
-        />
-      </section>
+      {/* Timer — siklus 24 jam yang reset tiap tengah malam WIB (bukan tanggal berakhir).
+          Disembunyikan saat promo dimatikan: hitung mundur "buruan" tidak berlaku kalau
+          bonusnya sendiri sedang tidak ditawarkan. */}
+      {promoActive ? (
+        <section className="oo-fade-up mx-auto max-w-2xl" style={{ animationDelay: ".1s" }}>
+          <Countdown
+            target={midnight?.target ?? null}
+            phase="live"
+            variant="card"
+            endInfo={midnight?.label}
+          />
+        </section>
+      ) : null}
 
       {/* Filter kategori */}
       {categories.length > 1 && (
