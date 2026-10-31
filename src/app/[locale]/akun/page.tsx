@@ -147,7 +147,14 @@ export default function DashboardAkunPage() {
     const key = orderStatusKey(o);
     return key === "pending" || key === "diproses" || key === "dikirim";
   }).length;
-  const totalSpend = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+  /*
+   * Total Belanja = HANYA pesanan yang sudah selesai.
+   * Pesanan yang masih menunggu pembayaran / diproses / dikirim / dibatalkan tidak dihitung,
+   * supaya angkanya benar-benar uang yang sudah masuk dan transaksinya tuntas.
+   */
+  const totalSpend = orders
+    .filter((o) => String(o.status || "").toLowerCase() === "selesai")
+    .reduce((sum, o) => sum + (o.total || 0), 0);
   const recentOrders = orders.slice(0, 5);
 
   /*
