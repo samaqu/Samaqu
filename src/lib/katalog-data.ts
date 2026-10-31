@@ -50,6 +50,11 @@ export interface Product {
   cyp_microcopy_override?: string | null;
   /** Ikut tampil di katalog halaman /open-order (kolom `products.open_order_enabled`). */
   open_order_enabled?: boolean;
+  /**
+   * Ikut tampil di katalog promo Free Cover Hanger (kolom `products.promo_fch_enabled`).
+   * Terpisah dari `open_order_enabled` — promo punya jalur produknya sendiri.
+   */
+  promo_fch_enabled?: boolean;
   /** Harga khusus Open Order (kampanye). Null = pakai harga katalog di atas. */
   open_order_price?: number | null;
   open_order_minimum_price?: number | null;

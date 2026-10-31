@@ -272,13 +272,15 @@ export default function PromoOrderWizard({
   }, [step]);
 
   // Penawaran (produk/warna/series/harga) diturunkan dari baris katalog — bukan hardcode.
-  // Katalog promo = semua produk yang TAYANG di website. `open_order_enabled` sengaja tidak
-  // dipakai: itu sakelar program Open Order, dan sebagian kategori (mis. Kandora) dimatikan
-  // di sana padahal tetap harus bisa dibeli lewat promo.
+  // Katalog promo memakai sakelar SENDIRI (`products.promo_fch_enabled`), terpisah dari
+  // `open_order_enabled`. Nilai `open_order_enabled` dinormalkan ke true karena
+  // `buildOpenOrderProducts` menyaring dengannya — penyaringan promo di bawah.
   const products = useMemo(
     () =>
       buildOpenOrderProducts(
-        catalog.map((row) => ({ ...row, open_order_enabled: true })),
+        catalog
+          .filter((row) => (row as unknown as { promo_fch_enabled?: boolean }).promo_fch_enabled !== false)
+          .map((row) => ({ ...row, open_order_enabled: true })),
         stockRows,
       ),
     [catalog, stockRows],

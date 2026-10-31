@@ -27,6 +27,8 @@ export interface DbProduct {
   cyp_microcopy_override: string | null;
   // Open Order
   open_order_enabled?: boolean | null;
+  /** Sakelar katalog promo "Free Cover Hanger" — terpisah dari `open_order_enabled`. */
+  promo_fch_enabled?: boolean | null;
   // Tampil di website (katalog). Kolom `products.is_published`.
   is_published?: boolean | null;
   // Harga khusus Open Order (kampanye) — null = pakai harga katalog biasa.
@@ -74,6 +76,8 @@ function dbProductToProduct(db: DbProduct): Product {
     cyp_microcopy_override: db.cyp_microcopy_override || null,
     // Baris lama sebelum kolomnya ada → dianggap ikut Open Order (default kolomnya true).
     open_order_enabled: db.open_order_enabled !== false,
+    // Kolom belum dibuat (migrasi belum jalan) → dianggap ikut promo.
+    promo_fch_enabled: db.promo_fch_enabled !== false,
     // Harga khusus Open Order — diteruskan apa adanya (null = pakai harga katalog).
     open_order_price: db.open_order_price ?? null,
     open_order_minimum_price: db.open_order_minimum_price ?? null,

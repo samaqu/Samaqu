@@ -131,15 +131,26 @@ export async function POST(request: NextRequest) {
 
     const stockRows = (stockData ?? []) as OpenOrderStockRow[];
 
-    // `open_order_enabled` adalah sakelar untuk program Open Order, BUKAN untuk promo — jadi
-    // nilainya dinormalkan ke `true` sebelum grouping. Tanpa ini, produk yang sengaja
-    // dimatikan dari Open Order (mis. seluruh Kandora) ikut hilang dari katalog promo.
-    const promoRows = (catalogRows ?? []).map((row) => ({
-      ...(row as Record<string, unknown>),
-      open_order_enabled: true,
-    }));
+    /*
+     * Dua sakelar berbeda, JANGAN dicampur:
+     *  - `products.promo_fch_enabled` → produk mana yang ikut promo Free Cover Hanger,
+     *  - `products.open_order_enabled` → produk mana yang ikut program Open Order.
+     *
+     * `buildOpenOrderProducts` menyaring dengan `open_order_enabled`, jadi nilainya
+     * dinormalkan ke `true` — penyaringan promo dilakukan lewat `promo_fch_enabled` di bawah.
+     */
+    const promoRows = (catalogRows ?? []).map((row) => {
+      const value = (row as Record<string, unknown>).promo_fch_enabled;
+      return {
+        ...(row as Record<string, unknown>),
+        open_order_enabled: true,
+        // Kolom belum dibuat (migrasi belum jalan) → `undefined` → produk tetap ikut.
+        _promo_enabled: value !== false,
+      };
+    });
 
-    const products = buildOpenOrderProducts(promoRows as never, stockRows);
+    const filtered = promoRows.filter((row) => row._promo_enabled !== false);
+    const products = buildOpenOrderProducts(filtered as never, stockRows);
     if (products.length === 0) return bad("Katalog promo belum tersedia");
 
     // ── Validasi item: produk, varian, ukuran, jumlah, harga dari katalog ──
