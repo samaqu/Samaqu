@@ -28,7 +28,7 @@ import { KuotaCard } from "./promo-fch/KuotaCard";
 import { PeriodeCard } from "./promo-fch/PeriodeCard";
 import { PreviewCard } from "./promo-fch/PreviewCard";
 import { RingkasanCard } from "./promo-fch/RingkasanCard";
-import { ProdukCard, type PromoProduct } from "./promo-fch/ProdukCard";
+import { ProdukCard, type PromoProduct, type PromoVariant } from "./promo-fch/ProdukCard";
 import { SaveBar } from "./promo-fch/SaveBar";
 import { PROMO_FORM_CSS, TEXT, TEXT_MUTED } from "./promo-fch/primitives";
 
@@ -106,6 +106,10 @@ export default function PromoFchSettingsForm() {
   const [bonusStock, setBonusStock] = useState<number | null>(null);
   /** Stok per produk (id baris → total stok semua varian) — sumber `product_variants`. */
   const [stockByProduct, setStockByProduct] = useState<Record<string, number>>({});
+  /** Varian per produk (id baris → daftar ukuran) — sumber sakelar promo per ukuran. */
+  const [variantsByProduct, setVariantsByProduct] = useState<Record<string, PromoVariant[]>>({});
+  /** id varian (`product_id|color|size`) yang sedang disimpan. */
+  const [savingVariantId, setSavingVariantId] = useState<string | null>(null);
   const savedRef = useRef<Settings>(EMPTY_SETTINGS);
 
   useEffect(() => {
@@ -165,18 +169,21 @@ export default function PromoFchSettingsForm() {
         setBonusStock(typeof data?.stock === "number" ? data.stock : 0);
       });
 
-    // Total stok per produk untuk badge stok di tabel promo (sumber: `product_variants`).
+    // Varian per produk: total stok untuk badge + daftar ukuran untuk sakelar promo per ukuran.
     supabase
       .from("product_variants")
-      .select("product_id, stock")
+      .select("product_id, color, size, stock, promo_fch_enabled")
       .then(({ data }) => {
         if (!active || !data) return;
         const totals: Record<string, number> = {};
-        for (const row of data as { product_id?: string; stock?: number }[]) {
+        const sizes: Record<string, PromoVariant[]> = {};
+        for (const row of data as PromoVariant[]) {
           if (!row.product_id) continue;
           totals[row.product_id] = (totals[row.product_id] ?? 0) + (row.stock ?? 0);
+          (sizes[row.product_id] ??= []).push(row);
         }
         setStockByProduct(totals);
+        setVariantsByProduct(sizes);
       });
 
     return () => {
@@ -288,6 +295,44 @@ export default function PromoFchSettingsForm() {
           : product,
       ),
     );
+  }
+
+  /**
+   * Sakelar promo PER UKURAN — menulis `product_variants.promo_fch_enabled` pada satu baris
+   * (produk + warna + ukuran). Ukuran yang dimatikan otomatis hilang dari pilihan ukuran di
+   * halaman pesan promo, tapi produknya tetap tampil selama masih ada ukuran yang ikut.
+   */
+  async function toggleVariant(variant: PromoVariant) {
+    const next = variant.promo_fch_enabled === false;
+    setSavingVariantId(`${variant.product_id}|${variant.color}|${variant.size}`);
+    setProductNotice(null);
+    const { error } = await supabase
+      .from("product_variants")
+      .update({ promo_fch_enabled: next })
+      .eq("product_id", variant.product_id)
+      .eq("color", variant.color)
+      .eq("size", variant.size);
+    setSavingVariantId(null);
+
+    if (error) {
+      setProductNotice({ kind: "err", text: `Gagal mengubah ukuran: ${error.message}` });
+      return;
+    }
+    setProductNotice({
+      kind: "ok",
+      text: `${variant.color} ${variant.size} ${next ? "ikut" : "tidak ikut"} promo`,
+    });
+    setVariantsByProduct((prev) => {
+      const list = prev[variant.product_id] ?? [];
+      return {
+        ...prev,
+        [variant.product_id]: list.map((row) =>
+          row.color === variant.color && row.size === variant.size
+            ? { ...row, promo_fch_enabled: next }
+            : row,
+        ),
+      };
+    });
   }
 
   /** Aktifkan/matikan SEMUA produk promo (dipanggil setelah konfirmasi modal). */
@@ -421,6 +466,9 @@ export default function PromoFchSettingsForm() {
             notice={productNotice}
             onToggle={toggleProduct}
             onBulk={bulkToggle}
+            variants={variantsByProduct}
+            savingVariantId={savingVariantId}
+            onToggleVariant={toggleVariant}
           />
           <SaveBar dirty={dirty} saving={saving} onReset={resetSettings} onSave={saveSettings} />
         </div>

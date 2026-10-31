@@ -121,7 +121,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { label: "Dashboard", icon: LayoutDashboard, panel: "dashboard" },
       { label: "Order Management", icon: ShoppingBag, panel: "orders", badge: "orders" },
       { label: "Open Order", icon: Shirt, href: "/admin/open-order" },
-      { label: "Promo Free Cover Hanger", icon: Tag, href: "/admin/promo" },
+      { label: "Promo", icon: Tag, href: "/admin/promo" },
       { label: "Ulasan Pelanggan", icon: Star, href: "/admin/testimoni", badge: "reviews" },
       { label: "Produk", icon: Package, panel: "products" },
       { label: "Pelanggan", icon: Users, panel: "customers" },

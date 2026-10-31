@@ -233,9 +233,17 @@ export default function PromoOrderWizard({
       .catch(() => {});
     supabase
       .from("product_variants")
-      .select("product_id, color, size, stock, weight")
+      // `promo_fch_enabled` = sakelar promo PER UKURAN (diatur di panel admin "Promo").
+      .select("product_id, color, size, stock, weight, promo_fch_enabled")
       .then(({ data }) => {
-        if (active && data) setStockRows(data as OpenOrderStockRow[]);
+        if (!active || !data) return;
+        // Ukuran yang dimatikan admin dibuang di sini → otomatis hilang dari pilihan ukuran
+        // di langkah detail produk. Produk tetap tampil selama masih ada ukuran yang ikut.
+        setStockRows(
+          (data as (OpenOrderStockRow & { promo_fch_enabled?: boolean | null })[])
+            .filter((row) => row.promo_fch_enabled !== false)
+            .map(({ product_id, color, size, stock, weight }) => ({ product_id, color, size, stock, weight })),
+        );
       });
     return () => {
       active = false;

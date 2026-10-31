@@ -10,7 +10,7 @@
  * Toggle menulis ke `products.promo_fch_enabled` (field inklusi promo) — BUKAN field Open Order.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, Image as ImageIcon, Loader2, Search } from "lucide-react";
 import ConfirmModal from "@/components/ConfirmModal";
 import { cloudinaryUrl } from "@/lib/cloudinary";
@@ -24,6 +24,32 @@ export type PromoProduct = Product & {
   /** Total stok seluruh varian grup (tidak ada di `Product`, dihitung `ProductsCatalog`). */
   totalStock?: number;
 };
+
+/** Satu baris `product_variants` = satu kombinasi produk + warna + ukuran. */
+export type PromoVariant = {
+  product_id: string;
+  color: string;
+  size: string;
+  stock?: number | null;
+  promo_fch_enabled?: boolean | null;
+};
+
+/** Kelompokkan varian per warna supaya tampil rapi: "Black — S M L XL". */
+function groupByColor(rows: PromoVariant[]): Array<{ color: string; sizes: PromoVariant[] }> {
+  const map = new Map<string, PromoVariant[]>();
+  for (const row of rows) {
+    (map.get(row.color) ?? map.set(row.color, []).get(row.color)!)!.push(row);
+  }
+  const order = ["S", "M", "L", "XL", "XXL", "XXXL", "ALL SIZE"];
+  return [...map.entries()].map(([color, sizes]) => ({
+    color,
+    sizes: [...sizes].sort((a, b) => {
+      const ia = order.indexOf(a.size.toUpperCase());
+      const ib = order.indexOf(b.size.toUpperCase());
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.size.localeCompare(b.size);
+    }),
+  }));
+}
 
 const INITIAL_VISIBLE = 8;
 
@@ -82,16 +108,24 @@ export function ProdukCard({
   notice,
   onToggle,
   onBulk,
+  variants,
+  savingVariantId,
+  onToggleVariant,
 }: {
   products: PromoProduct[];
   savingId: string | null;
   notice: { kind: "ok" | "err"; text: string } | null;
   onToggle: (product: PromoProduct) => void;
   onBulk: (enabled: boolean) => Promise<void> | void;
+  /** Varian per produk (id baris → daftar ukuran) untuk sakelar promo per ukuran. */
+  variants: Record<string, PromoVariant[]>;
+  savingVariantId: string | null;
+  onToggleVariant: (variant: PromoVariant) => void;
 }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Semua");
   const [showAll, setShowAll] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [bulkConfirm, setBulkConfirm] = useState<boolean | null>(null);
   const [bulkSaving, setBulkSaving] = useState(false);
 
@@ -241,44 +275,113 @@ export function ProdukCard({
           <tbody>
             {visible.map((product) => {
               const saving = savingId === product.id;
+              const productVariants = product.memberIds.flatMap((id) => variants[id] ?? []);
+              const byColor = groupByColor(productVariants);
+              const isOpen = expanded === product.id;
+              const jenis = product.kain ? `Kain ${product.kain}` : "—";
+
               return (
-                <tr key={product.id} style={{ borderTop: "1px solid var(--bd)" }}>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-2.5">
-                      <Thumb src={product.image} name={product.name} />
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold" style={{ color: TEXT }}>
-                          {product.name}
-                        </p>
-                        <p className="truncate text-[11px]" style={{ color: TEXT_MUTED }}>
-                          {product.kain ? `Kain ${product.kain}` : "—"}
-                        </p>
+                <Fragment key={product.id}>
+                  <tr style={{ borderTop: "1px solid #ECE4D8" }}>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2.5">
+                        <Thumb src={product.image} name={product.name} />
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold" style={{ color: TEXT }}>
+                            {product.name}
+                          </p>
+                          <p className="truncate text-[11px]" style={{ color: TEXT_MUTED }}>
+                            {jenis}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2" style={{ color: TEXT_MUTED }}>
-                    {product.category}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums" style={{ color: TEXT }}>
-                    {rupiah(product.price)}
-                  </td>
-                  <td className="px-3 py-2">
-                    <StockBadge stock={product.totalStock ?? 0} />
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center justify-end gap-2">
-                      {saving ? <Loader2 size={13} className="animate-spin" style={{ color: "#9a9a98" }} /> : null}
-                      <ToggleSwitch
-                        checked={product.promoFchEnabled}
-                        disabled={saving}
-                        onChange={() => onToggle(product)}
-                        label={`Ikut promo ${product.name}`}
-                      />
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                    <td className="px-3 py-2" style={{ color: TEXT_MUTED }}>
+                      {product.category}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums" style={{ color: TEXT }}>
+                      {rupiah(product.price)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <StockBadge stock={product.totalStock ?? 0} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center justify-end gap-2">
+                        {byColor.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setExpanded(isOpen ? null : product.id)}
+                            aria-expanded={isOpen}
+                            className="rounded-md px-2 py-1 text-[10.5px] font-semibold"
+                            style={{
+                              border: "1px solid #D9CFC1",
+                              background: isOpen ? "#EFF6FB" : "#FFFFFF",
+                              color: "#1F3B4D",
+                            }}
+                          >
+                            {isOpen ? "Tutup ukuran" : `Atur ukuran (${productVariants.length})`}
+                          </button>
+                        ) : null}
+                        {saving ? <Loader2 size={13} className="animate-spin" style={{ color: "#9a9a98" }} /> : null}
+                        <ToggleSwitch
+                          checked={product.promoFchEnabled}
+                          disabled={saving}
+                          onChange={() => onToggle(product)}
+                          label={`Ikut promo ${product.name}`}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+
+                  {isOpen ? (
+                    <tr style={{ background: "#FCFAF7" }}>
+                      <td colSpan={5} className="px-3 py-3">
+                        <p className="mb-2 text-[11px]" style={{ color: TEXT_MUTED }}>
+                          Matikan ukuran yang tidak mau ditawarkan di halaman promo. Produk tetap
+                          tampil selama masih ada ukuran yang menyala.
+                        </p>
+                        <div className="flex flex-col gap-2">
+                          {byColor.map(({ color, sizes }) => (
+                            <div key={color} className="flex flex-wrap items-center gap-1.5">
+                              <span
+                                className="w-[92px] shrink-0 truncate text-[11.5px] font-semibold"
+                                style={{ color: TEXT }}
+                                title={color}
+                              >
+                                {color === "default" ? "Semua warna" : color}
+                              </span>
+                              {sizes.map((variant) => {
+                                const on = variant.promo_fch_enabled !== false;
+                                const vid = `${variant.product_id}|${variant.color}|${variant.size}`;
+                                const busy = savingVariantId === vid;
+                                return (
+                                  <button
+                                    key={vid}
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => onToggleVariant(variant)}
+                                    aria-pressed={on}
+                                    title={`${variant.size} · stok ${variant.stock ?? 0}`}
+                                    className="rounded-md px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50"
+                                    style={
+                                      on
+                                        ? { background: PROMO_COLORS.chipBg, border: `1px solid ${PROMO_COLORS.chipBorder}`, color: PROMO_COLORS.chipText }
+                                        : { background: "#FFFFFF", border: "1px solid #D9CFC1", color: "#8A96A1", textDecoration: "line-through" }
+                                    }
+                                  >
+                                    {variant.size}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               );
-            })}
+             })}
             {visible.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-3 py-10 text-center" style={{ color: TEXT_MUTED }}>

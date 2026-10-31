@@ -127,9 +127,13 @@ export async function POST(request: NextRequest) {
 
     const { data: stockData } = await supabaseAdmin
       .from("product_variants")
-      .select("product_id, color, size, stock, weight");
+      // `promo_fch_enabled` = sakelar promo PER UKURAN. Varian yang dimatikan dibuang di sini
+      // supaya tidak bisa dipesan lewat request manual (UI & server memakai aturan yang sama).
+      .select("product_id, color, size, stock, weight, promo_fch_enabled");
 
-    const stockRows = (stockData ?? []) as OpenOrderStockRow[];
+    const stockRows = ((stockData ?? []) as (OpenOrderStockRow & { promo_fch_enabled?: boolean | null })[])
+      .filter((row) => row.promo_fch_enabled !== false)
+      .map(({ product_id, color, size, stock, weight }) => ({ product_id, color, size, stock, weight }));
 
     /*
      * Dua sakelar berbeda, JANGAN dicampur:

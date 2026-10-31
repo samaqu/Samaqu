@@ -125,7 +125,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { label: "Transaksi", href: "/panel-admin/transaksi", icon: "card" },
       { label: "Reseller", href: "/panel-admin/reseller", icon: "reseller", badge: "reseller" },
       { label: "Return", href: "/panel-admin/retur", icon: "return" },
-      { label: "Promo Free Cover Hanger", href: "/panel-admin/promo", icon: "tag" },
+      { label: "Promo", href: "/panel-admin/promo", icon: "tag" },
       { label: "Ulasan Pelanggan", href: "/panel-admin/ulasan", icon: "star", badge: "reviews" },
     ],
   },
