@@ -17,7 +17,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Check, ExternalLink, Loader2, Tag } from "lucide-react";
-import { getProducts } from "@/lib/db";
+import { getCatalogProducts } from "@/lib/db";
 import type { Product } from "@/lib/katalog-data";
 import { PROMO_ORDER_PATH } from "@/lib/promo/free-cover-hanger";
 import { OPEN_ORDER_ADDON_TARGET_ID, OPEN_ORDER_ADDON_VARIANT } from "@/lib/open-order-config";
@@ -148,7 +148,10 @@ export default function PromoFchSettingsForm() {
         setLoading(false);
       });
 
-    getProducts()
+    // Produk yang bisa diatur di promo = produk yang AKTIF di katalog (`is_published = true`).
+    // Halaman pesan promo juga hanya menarik produk aktif, jadi daftar di sini mencerminkan
+    // isi promo yang sebenarnya. Produk nonaktif (mis. Kabak, Cover & Hanger) tidak ditampilkan.
+    getCatalogProducts()
       .then((rows) => {
         if (active) setProducts(rows);
       })
@@ -335,12 +338,24 @@ export default function PromoFchSettingsForm() {
     });
   }
 
-  /** Aktifkan/matikan SEMUA produk promo (dipanggil setelah konfirmasi modal). */
+  /**
+   * Aktifkan/matikan SEMUA produk promo (dipanggil setelah konfirmasi modal).
+   *
+   * Dibatasi ke produk yang AKTIF di katalog (`is_published = true`) — sama dengan daftar
+   * yang tampil. Tanpa batas ini, aksi massal diam-diam menyalakan promo untuk produk yang
+   * tidak dijual di katalog (mis. Kabak).
+   */
   async function bulkToggle(enabled: boolean) {
     setProductNotice(null);
+    const ids = [...new Set(products.map((product) => product.id))];
+    if (ids.length === 0) {
+      setProductNotice({ kind: "err", text: "Belum ada produk aktif di katalog." });
+      return;
+    }
     const { error } = await supabase
       .from("products")
       .update({ promo_fch_enabled: enabled })
+      .in("id", ids)
       .select("id");
     if (error) {
       setProductNotice({ kind: "err", text: `Gagal mengubah produk: ${error.message}` });
@@ -348,7 +363,7 @@ export default function PromoFchSettingsForm() {
     }
     setProductNotice({
       kind: "ok",
-      text: enabled ? "Semua produk sekarang ikut promo" : "Semua produk dimatikan dari promo",
+      text: enabled ? "Semua produk aktif sekarang ikut promo" : "Semua produk dimatikan dari promo",
     });
     setProducts((prev) => prev.map((product) => ({ ...product, promo_fch_enabled: enabled }) as Product));
   }
