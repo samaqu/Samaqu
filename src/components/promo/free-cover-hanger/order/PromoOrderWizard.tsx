@@ -769,6 +769,8 @@ export default function PromoOrderWizard({
             heroTitle={heroTitle}
             heroDescription={heroDescription}
             bonus={bonus ?? null}
+            /* Kuota 0 atau stok Cover & Hanger 0 → bar bonus diganti "Bonus sudah habis". */
+            bonusAvailable={(bonus ? bonus.left > 0 : true) && addonCatalog.available}
           />
         )}
 

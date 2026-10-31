@@ -24,6 +24,11 @@ export interface CancelableOrder {
   jnt_order_id: string | null;
   /** Kolom `orders.stock_reserved` — true kalau pesanan ini sudah memotong stok. */
   stock_reserved?: boolean | null;
+  /**
+   * Kolom `orders.promo_bonus_given` — true kalau pesanan ini mendapat bonus Cover Hanger.
+   * Pembatalan mengembalikan kuota promo +1 (kolom ini juga yang mencegah pengembalian dobel).
+   */
+  promo_bonus_given?: boolean | null;
   /** Dipakai notifikasi pembatalan (WhatsApp customer + admin). */
   customer_name?: string | null;
   customer_whatsapp?: string | null;
@@ -119,6 +124,18 @@ export async function cancelOrderCompletely(
         }))
       );
       if (stockInError) console.error("[CANCEL] gagal mencatat barang masuk:", order.order_number, stockInError);
+    }
+  }
+
+  // ── Kuota bonus promo Free Cover Hanger ──
+  // Stok bonus sudah dikembalikan lewat `samaqu_restore_stock` di atas (baris bonus ikut
+  // tercatat di `order_items`). Yang belum: kuota promo. `orders.promo_bonus_given` memastikan
+  // kuota hanya dikembalikan SEKALI untuk pesanan yang memang pernah mendapat bonus.
+  if (order.promo_bonus_given === true) {
+    const { error: quotaError } = await supabase.rpc("samaqu_restore_promo_quota");
+    if (quotaError) {
+      // Sama seperti pencatatan stok: pembatalan tetap dianggap sukses, cukup dicatat di log.
+      console.error("[CANCEL] gagal mengembalikan kuota promo:", order.order_number, quotaError);
     }
   }
 

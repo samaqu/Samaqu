@@ -3,33 +3,34 @@
 /**
  * Pengaturan promo "Free Cover Hanger" — isi halaman /admin/promo dan /panel-admin/promo.
  *
- * Dua bagian, mengikuti bentuk menu admin "Open Order":
- *  1. **Pengaturan program** — status aktif, judul & deskripsi katalog, kuota bonus, dan
- *     periode. Tersimpan di baris tunggal `store_settings` (id = 1) kolom `promo_fch_*`.
- *  2. **Produk di promo** — memakai `ProductsCatalog` yang SAMA dengan menu Produk /
- *     Open Order, hanya aksinya diganti sakelar "Tampil di promo". Menulis ke
- *     `products.promo_fch_enabled` untuk semua baris satu grup (kategori + nama).
+ * Dipecah jadi komponen kecil di folder `promo-fch/` supaya gampang ditambah bagian baru.
  *
- * Sakelar produk ini SENGAJA terpisah dari `open_order_enabled`: produk bisa ikut promo
- * tanpa ikut Open Order, dan sebaliknya.
+ * LOGIC TIDAK BERUBAH:
+ *  - Pengaturan disimpan lewat `saveSettings()` ke `store_settings` (baris id = 1, kolom promo_fch_*).
+ *  - Produk promo dibaca dari `products` dan ditulis ke `products.promo_fch_enabled`.
+ *  - Sakelar produk ini SENGAJA terpisah dari `open_order_enabled`.
+ *
+ * Perubahan perilaku yang disengaja (sesuai permintaan):
+ *  - Ubah "Total kuota" TIDAK me-reset sisa. Sisa baru = total baru − terpakai.
+ *  - "Sisa bonus" tidak bisa diketik lagi; kuota berkurang otomatis di server.
  */
 
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Check, Loader2, Tag } from "lucide-react";
-import ProductsCatalog, { type CatalogCard } from "@/components/admin/ProductsCatalog";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Check, ExternalLink, Loader2, Tag } from "lucide-react";
 import { getProducts } from "@/lib/db";
 import type { Product } from "@/lib/katalog-data";
-import { PROMO_ORDER_PATH, PROMO_FCH_SOURCE } from "@/lib/promo/free-cover-hanger";
+import { PROMO_ORDER_PATH } from "@/lib/promo/free-cover-hanger";
+import { OPEN_ORDER_ADDON_TARGET_ID, OPEN_ORDER_ADDON_VARIANT } from "@/lib/open-order-config";
 import { supabase } from "@/lib/supabase";
-
-/**
- * `CatalogCard` dari `ProductsCatalog` belum punya field promo; tambahkan lewat augmentasi
- * lokal supaya tidak perlu mengubah tipe komponen bersama.
- */
-type PromoCard = CatalogCard & { promoFchEnabled?: boolean };
-
-const LABEL = "text-[11px] font-medium uppercase tracking-[0.14em]";
-const LABEL_COLOR = "var(--text-muted)";
+import { StatusCard } from "./promo-fch/StatusCard";
+import { TeksCard } from "./promo-fch/TeksCard";
+import { KuotaCard } from "./promo-fch/KuotaCard";
+import { PeriodeCard } from "./promo-fch/PeriodeCard";
+import { PreviewCard } from "./promo-fch/PreviewCard";
+import { RingkasanCard } from "./promo-fch/RingkasanCard";
+import { ProdukCard, type PromoProduct } from "./promo-fch/ProdukCard";
+import { SaveBar } from "./promo-fch/SaveBar";
+import { TEXT, TEXT_MUTED } from "./promo-fch/primitives";
 
 const COLUMNS =
   "promo_fch_active, promo_fch_title, promo_fch_eyebrow, promo_fch_description, promo_fch_quota_total, promo_fch_quota_left, promo_fch_quota_note, promo_fch_start_date, promo_fch_end_date";
@@ -59,72 +60,53 @@ const EMPTY_SETTINGS: Settings = {
 };
 
 /** Kelompokkan baris `products` per produk utama (kategori + nama) — aturan yang sama dengan
- *  menu Produk & Open Order, jadi satu Thobe dengan beberapa series = satu kartu. */
-function groupCatalog(products: Product[]): PromoCard[] {
+ *  menu Produk & Open Order, jadi satu Thobe dengan beberapa series = satu baris. */
+function groupCatalog(products: Product[]): PromoProduct[] {
   const groups = new Map<string, Product[]>();
   for (const product of products) {
     const key = `${product.category}::${product.name}`;
     groups.set(key, [...(groups.get(key) ?? []), product]);
   }
 
-  const items: PromoCard[] = [];
+  const items: PromoProduct[] = [];
   for (const group of groups.values()) {
-    const rep: PromoCard = {
-      ...group[0],
+    const rep = group[0] as Product & { promo_fch_enabled?: boolean };
+    const cheapest = group.reduce((best, member) =>
+      effectivePrice(member) < effectivePrice(best) ? member : best,
+    );
+    items.push({
+      ...rep,
+      // Harga termurah dari grup supaya sama dengan yang tampil di halaman pesan.
+      price: effectivePrice(cheapest),
       memberIds: group.map((member) => member.id),
-      // Tampil di promo kalau minimal satu barisnya masih diikutkan.
+      // Tampil di promo kalau minimal satu barisnya masih diikutkan (default true).
       promoFchEnabled: group.some(
         (member) => (member as unknown as { promo_fch_enabled?: boolean }).promo_fch_enabled !== false,
       ),
-    };
-    if (group.length > 1) {
-      let cheapest = group[0];
-      for (const member of group) {
-        if (effectivePrice(member) < effectivePrice(cheapest)) cheapest = member;
-      }
-      rep.price = effectivePrice(cheapest);
-      rep.minimum_price = cheapest.minimum_price;
-      rep.create_your_price_enabled = cheapest.create_your_price_enabled;
-      rep.availableSeries = [...new Set(group.map((m) => m.series).filter((s): s is string => !!s))].sort();
-    }
-    items.push(rep);
+    });
   }
-  return items;
+  return items.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function effectivePrice(p: Product): number {
-  return p.create_your_price_enabled && p.minimum_price ? p.minimum_price : p.price;
-}
-
-function Section({
-  title,
-  icon,
-  children,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--bd)" }}>
-      <p className="mb-4 flex items-center gap-2 text-[13px] font-bold" style={{ color: "var(--fg)" }}>
-        {icon}
-        {title}
-      </p>
-      {children}
-    </div>
-  );
+function effectivePrice(product: Product): number {
+  return product.create_your_price_enabled && product.minimum_price ? product.minimum_price : product.price;
 }
 
 export default function PromoFchSettingsForm() {
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [productNotice, setProductNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<Settings>(EMPTY_SETTINGS);
+  /** Salinan terakhir yang tersimpan — dipakai tombol Batal & indikator perubahan. */
+  const [saved, setSaved] = useState<Settings>(EMPTY_SETTINGS);
   const [missingColumn, setMissingColumn] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [bonusStock, setBonusStock] = useState<number | null>(null);
+  /** Stok per produk (id baris → total stok semua varian) — sumber `product_variants`. */
+  const [stockByProduct, setStockByProduct] = useState<Record<string, number>>({});
+  const savedRef = useRef<Settings>(EMPTY_SETTINGS);
 
   useEffect(() => {
     let active = true;
@@ -144,7 +126,7 @@ export default function PromoFchSettingsForm() {
         if (data) {
           const row = data as Record<string, unknown>;
           const total = Number(row.promo_fch_quota_total) || 100;
-          setSettings({
+          const next: Settings = {
             active: row.promo_fch_active !== false,
             title: String(row.promo_fch_title ?? ""),
             eyebrow: String(row.promo_fch_eyebrow ?? ""),
@@ -154,7 +136,10 @@ export default function PromoFchSettingsForm() {
             quotaNote: String(row.promo_fch_quota_note ?? ""),
             startDate: String(row.promo_fch_start_date ?? ""),
             endDate: String(row.promo_fch_end_date ?? ""),
-          });
+          };
+          savedRef.current = next;
+          setSettings(next);
+          setSaved(next);
         }
         setLoading(false);
       });
@@ -167,15 +152,80 @@ export default function PromoFchSettingsForm() {
         if (active) setProducts([]);
       });
 
+    // Stok Cover & Hanger (produk bonus) — dipakai peringatan di Ringkasan.
+    supabase
+      .from("product_variants")
+      .select("stock")
+      .eq("product_id", OPEN_ORDER_ADDON_TARGET_ID)
+      .eq("color", OPEN_ORDER_ADDON_VARIANT.color)
+      .eq("size", OPEN_ORDER_ADDON_VARIANT.size)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!active) return;
+        setBonusStock(typeof data?.stock === "number" ? data.stock : 0);
+      });
+
+    // Total stok per produk untuk badge stok di tabel promo (sumber: `product_variants`).
+    supabase
+      .from("product_variants")
+      .select("product_id, stock")
+      .then(({ data }) => {
+        if (!active || !data) return;
+        const totals: Record<string, number> = {};
+        for (const row of data as { product_id?: string; stock?: number }[]) {
+          if (!row.product_id) continue;
+          totals[row.product_id] = (totals[row.product_id] ?? 0) + (row.stock ?? 0);
+        }
+        setStockByProduct(totals);
+      });
+
     return () => {
       active = false;
     };
   }, []);
 
-  const cards = useMemo(() => groupCatalog(products), [products]);
+  const cards = useMemo(() => {
+    const grouped = groupCatalog(products);
+    // Total stok = jumlah stok semua baris (series) dalam grup.
+    return grouped.map((card) => ({
+      ...card,
+      totalStock: card.memberIds.reduce((sum, id) => sum + (stockByProduct[id] ?? 0), 0),
+    }));
+  }, [products, stockByProduct]);
+  const productsOn = cards.filter((card) => card.promoFchEnabled).length;
+
+  const dirty = useMemo(
+    () =>
+      settings.active !== saved.active ||
+      settings.title !== saved.title ||
+      settings.eyebrow !== saved.eyebrow ||
+      settings.description !== saved.description ||
+      settings.quotaTotal !== saved.quotaTotal ||
+      settings.quotaNote !== saved.quotaNote ||
+      settings.startDate !== saved.startDate ||
+      settings.endDate !== saved.endDate,
+    [settings, saved],
+  );
+
+  function patch(next: Partial<Settings>) {
+    setSettings((prev) => ({ ...prev, ...next }));
+  }
+
+  /**
+   * Ubah Total kuota: sisa TIDAK di-reset ke total baru.
+   * Sisa baru = total baru − terpakai, minimal 0.
+   */
+  function patchQuotaTotal(value: number) {
+    const total = Math.max(0, Math.round(Number(value) || 0));
+    setSettings((prev) => {
+      const used = Math.max(0, prev.quotaTotal - prev.quotaLeft);
+      return { ...prev, quotaTotal: total, quotaLeft: Math.max(0, total - used) };
+    });
+  }
 
   async function saveSettings() {
     setSaving(true);
+    setNotice(null);
     const { error } = await supabase
       .from("store_settings")
       .update({
@@ -184,6 +234,7 @@ export default function PromoFchSettingsForm() {
         promo_fch_eyebrow: settings.eyebrow.trim() || null,
         promo_fch_description: settings.description.trim() || null,
         promo_fch_quota_total: Math.max(1, Math.round(settings.quotaTotal)),
+        // Sisa ikut disimpan karena bisa berubah saat Total kuota diubah (total − terpakai).
         promo_fch_quota_left: Math.max(0, Math.round(settings.quotaLeft)),
         promo_fch_quota_note: settings.quotaNote.trim() || null,
         promo_fch_start_date: settings.startDate || null,
@@ -196,17 +247,24 @@ export default function PromoFchSettingsForm() {
       setNotice({ kind: "err", text: `Gagal menyimpan: ${error.message}` });
       return;
     }
+    savedRef.current = settings;
+    setSaved(settings);
     setNotice({ kind: "ok", text: "Pengaturan promo tersimpan" });
+  }
+
+  function resetSettings() {
+    setSettings(savedRef.current);
+    setNotice(null);
   }
 
   /**
    * Sakelar produk promo — menulis `products.promo_fch_enabled` untuk SEMUA baris dalam satu
-   * grup (kategori + nama), sama seperti sakelar Open Order.
+   * grup (kategori + nama). Bukan field Open Order.
    */
-  async function toggleProduct(card: PromoCard) {
-    const current = card.promoFchEnabled !== false;
-    const next = !current;
+  async function toggleProduct(card: PromoProduct) {
+    const next = !card.promoFchEnabled;
     setSavingId(card.id);
+    setProductNotice(null);
     const { error } = await supabase
       .from("products")
       .update({ promo_fch_enabled: next })
@@ -215,248 +273,178 @@ export default function PromoFchSettingsForm() {
     setSavingId(null);
 
     if (error) {
-      setNotice({ kind: "err", text: `Gagal mengubah produk: ${error.message}` });
+      setProductNotice({ kind: "err", text: `Gagal mengubah produk: ${error.message}` });
       return;
     }
+    setProductNotice({
+      kind: "ok",
+      text: next ? `${card.name} ikut promo` : `${card.name} tidak ikut promo`,
+    });
     // Perbarui state lokal hanya setelah server mengonfirmasi.
     setProducts((prev) =>
-      prev.map((p) =>
-        p.category === card.category && p.name === card.name
-          ? ({ ...p, promo_fch_enabled: next } as Product)
-          : p,
+      prev.map((product) =>
+        product.category === card.category && product.name === card.name
+          ? ({ ...product, promo_fch_enabled: next } as Product)
+          : product,
       ),
     );
   }
 
+  /** Aktifkan/matikan SEMUA produk promo (dipanggil setelah konfirmasi modal). */
+  async function bulkToggle(enabled: boolean) {
+    setProductNotice(null);
+    const { error } = await supabase
+      .from("products")
+      .update({ promo_fch_enabled: enabled })
+      .select("id");
+    if (error) {
+      setProductNotice({ kind: "err", text: `Gagal mengubah produk: ${error.message}` });
+      return;
+    }
+    setProductNotice({
+      kind: "ok",
+      text: enabled ? "Semua produk sekarang ikut promo" : "Semua produk dimatikan dari promo",
+    });
+    setProducts((prev) => prev.map((product) => ({ ...product, promo_fch_enabled: enabled }) as Product));
+  }
+
   if (loading) {
     return (
-      <div className="flex items-center gap-2 py-16 text-[13px]" style={{ color: LABEL_COLOR }}>
+      <div className="flex items-center gap-2 py-16 text-[13px]" style={{ color: TEXT_MUTED }}>
         <Loader2 size={16} className="animate-spin" /> Memuat pengaturan promo…
       </div>
     );
   }
 
-  const onCount = cards.filter((c) => (c as unknown as { promoFchEnabled?: boolean }).promoFchEnabled !== false).length;
+  const bonusExhausted = settings.quotaLeft <= 0;
+  const status = !settings.active ? "Nonaktif" : bonusExhausted ? "Bonus habis" : "Sedang berjalan";
+  const statusTone = !settings.active
+    ? { bg: "#F1F1F1", bd: "#DDDDDD", fg: "#6b6b6b" }
+    : bonusExhausted
+      ? { bg: "#FEF6E7", bd: "#F5DDA8", fg: "#8a4b08" }
+      : { bg: "#EAF7F0", bd: "#BFE6D2", fg: "#1F6F45" };
 
   return (
-    <div className="flex flex-col gap-5 pb-16">
-      <header>
-        <p className={LABEL} style={{ color: LABEL_COLOR }}>
-          Pengaturan
-        </p>
-        <h1 className="mt-1 flex items-center gap-2 text-[22px] font-bold" style={{ color: "var(--fg)" }}>
-          <Tag size={20} strokeWidth={2.2} /> Promo Free Cover Hanger
-        </h1>
-        <p className="mt-1 text-[13px]" style={{ color: "var(--fg2)" }}>
-          Program bonus Cover Hanger untuk pembelian pertama. Halaman pesan:{" "}
-          <code style={{ fontSize: 12 }}>{PROMO_ORDER_PATH}</code>
-        </p>
+    <div className="flex flex-col gap-5 pb-4">
+      {/* ── Header halaman ── */}
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="flex items-center gap-2 text-[22px] font-bold" style={{ color: TEXT }}>
+              <Tag size={20} strokeWidth={2.2} /> Promo Free Cover Hanger
+            </h1>
+            <span
+              className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+              style={{ background: statusTone.bg, border: `1px solid ${statusTone.bd}`, color: statusTone.fg }}
+            >
+              {status}
+            </span>
+          </div>
+          <p className="mt-1.5 max-w-2xl text-[12.5px] leading-relaxed" style={{ color: TEXT_MUTED }}>
+            Bonus Cover Hanger gratis untuk pembelian pertama. Atur teks, kuota, periode, dan produk yang ikut promo.
+          </p>
+        </div>
+        <a
+          href={PROMO_ORDER_PATH}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[12px] font-semibold"
+          style={{ border: "1px solid var(--bd)", color: TEXT, background: "var(--card)" }}
+        >
+          Lihat halaman promo <ExternalLink size={13} />
+        </a>
       </header>
 
       {notice ? (
         <div
           role="status"
-          className="flex items-start gap-2 rounded-xl p-3.5 text-[12.5px]"
+          className="flex items-start gap-2 rounded-xl px-3.5 py-2.5 text-[12.5px]"
           style={
             notice.kind === "ok"
-              ? { background: "rgba(31,111,69,.09)", border: "1px solid rgba(31,111,69,.35)", color: "#1f6f45" }
-              : { background: "rgba(185,28,28,.08)", border: "1px solid rgba(185,28,28,.35)", color: "#b91c1c" }
+              ? { background: "#EAF7F0", border: "1px solid #BFE6D2", color: "#1F6F45" }
+              : { background: "#FDECEC", border: "1px solid #F5C2C2", color: "#B42318" }
           }
         >
           {notice.kind === "ok" ? (
-            <Check size={16} className="mt-0.5 shrink-0" />
+            <Check size={15} className="mt-0.5 shrink-0" />
           ) : (
-            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+            <AlertTriangle size={15} className="mt-0.5 shrink-0" />
           )}
           <span>{notice.text}</span>
         </div>
       ) : null}
 
-      {missingColumn && (
+      {missingColumn ? (
         <div
           className="flex items-start gap-2 rounded-xl p-4 text-[12.5px]"
-          style={{ background: "rgba(180,83,9,.08)", border: "1px solid rgba(180,83,9,.35)", color: "#8a4b08" }}
+          style={{ background: "#FEF6E7", border: "1px solid #F5DDA8", color: "#8a4b08" }}
         >
           <AlertTriangle size={16} className="mt-0.5 shrink-0" />
           <span>
             Kolom <code>promo_fch_*</code> belum ada di database. Jalankan{" "}
-            <code>supabase/migrations/20261031_promo_free_cover_hanger.sql</code> dulu — sebelum itu
-            penyimpanan akan gagal.
+            <code>supabase/migrations/20261031_promo_free_cover_hanger.sql</code> dan{" "}
+            <code>20261101_promo_fch_quota_logic.sql</code> dulu — sebelum itu penyimpanan akan gagal.
           </span>
         </div>
-      )}
+      ) : null}
 
-      <Section title="Status program" icon={<Tag size={14} strokeWidth={2.2} />}>
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-[13px] font-semibold" style={{ color: "var(--fg)" }}>
-              Promo aktif
-            </p>
-            <p className="mt-0.5 text-[12px]" style={{ color: "var(--fg2)" }}>
-              Saat dimatikan, bonus tidak ditawarkan di halaman pesan.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSettings((s) => ({ ...s, active: !s.active }))}
-            aria-pressed={settings.active}
-            className="rounded-full px-4 py-2 text-[12px] font-bold"
-            style={{
-              background: settings.active ? "#111" : "transparent",
-              color: settings.active ? "#fff" : "var(--fg)",
-              border: "1px solid var(--bd)",
+      {/* ── Layout 2 kolom: form di kiri, preview sticky di kanan ── */}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+        <div className="flex min-w-0 flex-col gap-5">
+          <StatusCard
+            active={settings.active}
+            onChange={(active) => patch({ active })}
+            bonusExhausted={bonusExhausted}
+          />
+          <TeksCard
+            eyebrow={settings.eyebrow}
+            title={settings.title}
+            description={settings.description}
+            onChange={patch}
+          />
+          <KuotaCard
+            quotaTotal={settings.quotaTotal}
+            quotaLeft={settings.quotaLeft}
+            quotaNote={settings.quotaNote}
+            onChange={(next) => {
+              if (next.quotaTotal !== undefined) patchQuotaTotal(next.quotaTotal);
+              if (next.quotaNote !== undefined) patch({ quotaNote: next.quotaNote });
             }}
-          >
-            {settings.active ? "Aktif" : "Nonaktif"}
-          </button>
-        </div>
-      </Section>
-
-      <Section title="Teks katalog promo" icon={<Tag size={14} strokeWidth={2.2} />}>
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="block">
-            <span className={LABEL} style={{ color: LABEL_COLOR }}>
-              Judul besar
-            </span>
-            <input
-              value={settings.title}
-              onChange={(e) => setSettings((s) => ({ ...s, title: e.target.value }))}
-              placeholder="Free Cover Hanger"
-              className="mt-1 w-full rounded-lg px-3 py-2.5 text-[13px]"
-              style={{ background: "var(--bg)", border: "1px solid var(--bd)", color: "var(--fg)" }}
-            />
-          </label>
-          <label className="block">
-            <span className={LABEL} style={{ color: LABEL_COLOR }}>
-              Teks kecil di atas judul
-            </span>
-            <input
-              value={settings.eyebrow}
-              onChange={(e) => setSettings((s) => ({ ...s, eyebrow: e.target.value }))}
-              placeholder="Pembelian Pertama"
-              className="mt-1 w-full rounded-lg px-3 py-2.5 text-[13px]"
-              style={{ background: "var(--bg)", border: "1px solid var(--bd)", color: "var(--fg)" }}
-            />
-          </label>
-        </div>
-        <label className="mt-4 block">
-          <span className={LABEL} style={{ color: LABEL_COLOR }}>
-            Deskripsi
-          </span>
-          <textarea
-            value={settings.description}
-            onChange={(e) => setSettings((s) => ({ ...s, description: e.target.value }))}
-            rows={3}
-            placeholder="Beli Thobe, Kandora, atau Koko pertamamu dan Cover Hanger senilai Rp35.000 masuk otomatis…"
-            className="mt-1 w-full rounded-lg px-3 py-2.5 text-[13px]"
-            style={{ background: "var(--bg)", border: "1px solid var(--bd)", color: "var(--fg)" }}
           />
-        </label>
-      </Section>
-
-      <Section title="Kuota bonus" icon={<Tag size={14} strokeWidth={2.2} />}>
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="block">
-            <span className={LABEL} style={{ color: LABEL_COLOR }}>
-              Total bonus
-            </span>
-            <input
-              type="number"
-              min={1}
-              value={settings.quotaTotal}
-              onChange={(e) => setSettings((s) => ({ ...s, quotaTotal: Number(e.target.value) || 0 }))}
-              className="mt-1 w-full rounded-lg px-3 py-2.5 text-[13px] tabular-nums"
-              style={{ background: "var(--bg)", border: "1px solid var(--bd)", color: "var(--fg)" }}
-            />
-          </label>
-          <label className="block">
-            <span className={LABEL} style={{ color: LABEL_COLOR }}>
-              Sisa bonus (angka di bar)
-            </span>
-            <input
-              type="number"
-              min={0}
-              max={settings.quotaTotal}
-              value={settings.quotaLeft}
-              onChange={(e) => setSettings((s) => ({ ...s, quotaLeft: Number(e.target.value) || 0 }))}
-              className="mt-1 w-full rounded-lg px-3 py-2.5 text-[13px] tabular-nums"
-              style={{ background: "var(--bg)", border: "1px solid var(--bd)", color: "var(--fg)" }}
-            />
-          </label>
-        </div>
-        <label className="mt-4 block">
-          <span className={LABEL} style={{ color: LABEL_COLOR }}>
-            Keterangan di bawah bar
-          </span>
-          <input
-            value={settings.quotaNote}
-            onChange={(e) => setSettings((s) => ({ ...s, quotaNote: e.target.value }))}
-            placeholder="Bonus terbatas. Begitu kuotanya habis, program selesai."
-            className="mt-1 w-full rounded-lg px-3 py-2.5 text-[13px]"
-            style={{ background: "var(--bg)", border: "1px solid var(--bd)", color: "var(--fg)" }}
+          <PeriodeCard startDate={settings.startDate} endDate={settings.endDate} onChange={patch} />
+          <ProdukCard
+            products={cards}
+            savingId={savingId}
+            notice={productNotice}
+            onToggle={toggleProduct}
+            onBulk={bulkToggle}
           />
-        </label>
-      </Section>
-
-      <Section title="Periode (opsional)" icon={<Tag size={14} strokeWidth={2.2} />}>
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="block">
-            <span className={LABEL} style={{ color: LABEL_COLOR }}>
-              Mulai
-            </span>
-            <input
-              type="date"
-              value={settings.startDate}
-              onChange={(e) => setSettings((s) => ({ ...s, startDate: e.target.value }))}
-              className="mt-1 w-full rounded-lg px-3 py-2.5 text-[13px]"
-              style={{ background: "var(--bg)", border: "1px solid var(--bd)", color: "var(--fg)" }}
-            />
-          </label>
-          <label className="block">
-            <span className={LABEL} style={{ color: LABEL_COLOR }}>
-              Selesai
-            </span>
-            <input
-              type="date"
-              value={settings.endDate}
-              onChange={(e) => setSettings((s) => ({ ...s, endDate: e.target.value }))}
-              className="mt-1 w-full rounded-lg px-3 py-2.5 text-[13px]"
-              style={{ background: "var(--bg)", border: "1px solid var(--bd)", color: "var(--fg)" }}
-            />
-          </label>
+          <SaveBar dirty={dirty} saving={saving} onReset={resetSettings} onSave={saveSettings} />
         </div>
-      </Section>
 
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={saveSettings}
-          disabled={saving}
-          className="rounded-lg px-6 py-3 text-[12px] font-bold uppercase tracking-[0.14em] disabled:opacity-50"
-          style={{ background: "var(--fg)", color: "var(--bg)" }}
-        >
-          {saving ? "Menyimpan…" : "Simpan pengaturan"}
-        </button>
+        <div className="flex flex-col gap-5 lg:sticky lg:top-4">
+          <PreviewCard
+            active={settings.active}
+            eyebrow={settings.eyebrow}
+            title={settings.title}
+            description={settings.description}
+            quotaTotal={settings.quotaTotal}
+            quotaLeft={settings.quotaLeft}
+            quotaNote={settings.quotaNote}
+            startDate={settings.startDate}
+            endDate={settings.endDate}
+          />
+          <RingkasanCard
+            productsOn={productsOn}
+            productsTotal={cards.length}
+            quotaTotal={settings.quotaTotal}
+            quotaLeft={settings.quotaLeft}
+            bonusStock={bonusStock}
+            startDate={settings.startDate}
+            endDate={settings.endDate}
+          />
+        </div>
       </div>
-
-      <Section title={`Produk di promo (${onCount} dari ${cards.length})`} icon={<Tag size={14} strokeWidth={2.2} />}>
-        <p className="mb-4 text-[12px]" style={{ color: "var(--fg2)" }}>
-          Sakelar ini <b>terpisah</b> dari Open Order — produk bisa tampil di promo tanpa ikut
-          Open Order. Penanda di menu Transaksi: <b>{PROMO_FCH_SOURCE}</b>.
-        </p>
-        <ProductsCatalog
-          items={cards}
-          total={cards.length}
-          thumbnails={{}}
-          search={search}
-          setSearch={setSearch}
-          openOrder={{
-            isEnabled: (p) => (p as PromoCard).promoFchEnabled !== false,
-            onToggle: (p) => toggleProduct(p as PromoCard),
-            savingId,
-          }}
-        />
-      </Section>
     </div>
   );
 }

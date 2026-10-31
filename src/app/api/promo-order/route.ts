@@ -208,13 +208,31 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
     const { data: addonSetting } = await supabaseAdmin
       .from("store_settings")
-      .select("open_order_addon_weight")
+      .select("open_order_addon_weight, promo_fch_active, promo_fch_quota_left, promo_fch_quota_total, promo_fch_start_date, promo_fch_end_date")
       .eq("id", 1)
       .maybeSingle();
 
     // Stok bonus: bila habis, bonus dilewati — pesanan tetap jalan.
     const bonusStock = typeof addonVariant?.stock === "number" ? addonVariant.stock : 0;
-    const giveBonus = bonusEligible && Boolean(addonProduct) && Boolean(addonVariant) && bonusStock > 0;
+
+    /**
+     * Syarat bonus: pelanggan baru + produk/varian bonus ada + stok bonus + **kuota promo**
+     * + promo aktif + masih dalam periode (kalau periodenya diisi).
+     *
+     * Kuota dikunci (sisa > 0) DULU di sini hanya sebagai pratinjau; pengambilan yang benar-benar
+     * atomik terjadi setelah stok dipotong (lihat `samaqu_consume_promo_quota`).
+     */
+    const promoActive = (addonSetting as { promo_fch_active?: boolean } | null)?.promo_fch_active !== false;
+    const quotaLeft = Number((addonSetting as { promo_fch_quota_left?: number } | null)?.promo_fch_quota_left ?? 0);
+    const promoStart = (addonSetting as { promo_fch_start_date?: string | null } | null)?.promo_fch_start_date ?? null;
+    const promoEnd = (addonSetting as { promo_fch_end_date?: string | null } | null)?.promo_fch_end_date ?? null;
+    // Tanggal WIB — disamakan dengan tanggal yang diisi admin (YYYY-MM-DD).
+    const todayWib = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+    const inPeriod = (!promoStart || todayWib >= promoStart) && (!promoEnd || todayWib <= promoEnd);
+
+    const quotaAvailable = quotaLeft > 0;
+    const giveBonus =
+      bonusEligible && promoActive && inPeriod && quotaAvailable && Boolean(addonProduct) && Boolean(addonVariant) && bonusStock > 0;
 
     const addonWeight = resolveAddonWeightFromCatalog(
       addonVariant?.weight,
@@ -326,6 +344,46 @@ export async function POST(request: NextRequest) {
       decremented.push({ productId: item.productId, color: item.color, size: item.size, quantity: item.quantity });
     }
 
+    // ── Ambil kuota bonus (atomik) ──
+    // Dicek SETELAH stok dipotong karena RPC mengurangi kuota hanya bila sisa > 0 — kalau dua
+    // checkout berbarengan, yang kalah balapan tidak akan mendapat bonus dan stoknya dikembalikan.
+    // `bonusGranted` = bonus yang benar-benar diberikan (bukan sekadar niat dari pratinjau).
+    let bonusGranted = false;
+    let bonusReason: string | null = null;
+
+    if (giveBonus) {
+      const { data: quotaOk, error: quotaError } = await supabaseAdmin.rpc("samaqu_consume_promo_quota");
+
+      if (quotaError) {
+        console.error("[PROMO-ORDER] Quota RPC error:", quotaError);
+        await rollbackStock();
+        return bad("Gagal memvalidasi kuota bonus. Silakan coba lagi.", 500);
+      }
+
+      if (quotaOk === true) {
+        bonusGranted = true;
+        // Stok bonus ikut dipotong: bonus sudah masuk `validatedItems` dan didekrementasi di loop
+        // di atas, jadi tidak perlu potong ulang. Longgarkan hanya bila ternyata tidak dipotong
+        // (varian tak dikelola) supaya kuota tidak berkurang tanpa stok bergerak.
+        const addonDecremented = decremented.some((row) => row.productId === OPEN_ORDER_ADDON_TARGET_ID);
+        if (!addonDecremented) {
+          await supabaseAdmin.rpc("samaqu_restore_promo_quota");
+          bonusGranted = false;
+          bonusReason = "out-of-stock";
+        }
+      } else {
+        // Kuota habis tepat saat checkout (kalah balapan dengan pembeli lain).
+        bonusGranted = false;
+        bonusReason = "quota-exhausted";
+      }
+    }
+
+    // Bonus batal diberikan → buang barisnya supaya tidak ikut tersimpan/terkirim.
+    if (giveBonus && !bonusGranted) {
+      const addonIndex = validatedItems.findIndex((item) => item.isBonus);
+      if (addonIndex >= 0) validatedItems.splice(addonIndex, 1);
+    }
+
     // ── Simpan pesanan ──
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
@@ -350,6 +408,8 @@ export async function POST(request: NextRequest) {
         weight: totalWeight,
         stock_reserved: true,
         shipping_notes: note,
+        // Penanda bonus: dipakai pembatalan untuk mengembalikan kuota + stok tepat sekali.
+        promo_bonus_given: bonusGranted,
         // Penanda sumber: dipakai filter & laporan di menu Transaksi.
         source: PROMO_FCH_SOURCE,
       })
@@ -359,6 +419,8 @@ export async function POST(request: NextRequest) {
     if (orderError || !order) {
       console.error("[PROMO-ORDER] Order insert error:", orderError);
       await rollbackStock();
+      // Kuota sudah diambil tapi pesanan gagal → kembalikan supaya tidak hangus.
+      if (bonusGranted) await supabaseAdmin.rpc("samaqu_restore_promo_quota");
       return bad("Gagal menyimpan pesanan", 500);
     }
 
@@ -395,6 +457,7 @@ export async function POST(request: NextRequest) {
       console.error("[PROMO-ORDER] Order items insert error:", itemsError);
       await supabaseAdmin.from("orders").delete().eq("id", order.id);
       await rollbackStock();
+      if (bonusGranted) await supabaseAdmin.rpc("samaqu_restore_promo_quota");
       return bad("Gagal menyimpan detail pesanan", 500);
     }
 
@@ -443,7 +506,7 @@ export async function POST(request: NextRequest) {
         items: notificationItems,
         shippingCity: [district, city].filter(Boolean).join(", "),
         notes: note || null,
-        source: giveBonus ? "Promo Free Cover Hanger (+bonus)" : "Promo Free Cover Hanger",
+        source: bonusGranted ? "Promo Free Cover Hanger (+bonus)" : "Promo Free Cover Hanger",
       }),
     ]);
 
@@ -488,8 +551,21 @@ export async function POST(request: NextRequest) {
       total,
       productTotal: subtotal,
       weight: totalWeight,
-      bonus: giveBonus,
-      bonusReason: giveBonus ? null : bonusEligible ? "out-of-stock" : "not-new-customer",
+      // Status bonus yang BENAR-BENAR diberikan (bukan niat awal) — lihat `samaqu_consume_promo_quota`.
+      bonus: bonusGranted,
+      bonusReason:
+        bonusGranted
+          ? null
+          : bonusReason ??
+            (!bonusEligible
+              ? "not-new-customer"
+              : !promoActive
+                ? "promo-inactive"
+                : !inPeriod
+                  ? "out-of-period"
+                  : !quotaAvailable
+                    ? "quota-exhausted"
+                    : "out-of-stock"),
     });
   } catch (error) {
     console.error("[PROMO-ORDER] Failed:", error);

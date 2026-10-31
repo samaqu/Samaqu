@@ -46,7 +46,7 @@ export async function PATCH(
 
   const { data: order } = await supabase
     .from("orders")
-    .select("id, order_number, status, awb_no, jnt_order_id, stock_reserved, customer_name, customer_whatsapp")
+    .select("id, order_number, status, awb_no, jnt_order_id, stock_reserved, promo_bonus_given, customer_name, customer_whatsapp")
     .eq("id", payment.order_id)
     .maybeSingle();
 
@@ -98,6 +98,7 @@ export async function PATCH(
       awb_no: (order.awb_no as string | null) ?? null,
       jnt_order_id: (order.jnt_order_id as string | null) ?? null,
       stock_reserved: order.stock_reserved === true,
+      promo_bonus_given: order.promo_bonus_given === true,
       customer_name: (order.customer_name as string | null) ?? null,
       customer_whatsapp: (order.customer_whatsapp as string | null) ?? null,
     },

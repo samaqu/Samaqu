@@ -897,7 +897,7 @@ export async function PATCH(req: NextRequest) {
     const admin = getSupabaseAdmin();
     const { data: order, error } = await admin
       .from("orders")
-      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, customer_name, customer_whatsapp, customer_id, shipping_status, weight, subtotal, total, discount, shipping_cost, paid_at, reseller_id")
+      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, promo_bonus_given, customer_name, customer_whatsapp, customer_id, shipping_status, weight, subtotal, total, discount, shipping_cost, paid_at, reseller_id")
       .eq("order_number", orderNumber)
       .maybeSingle();
 
@@ -917,6 +917,7 @@ export async function PATCH(req: NextRequest) {
           awb_no: order.awb_no,
           jnt_order_id: order.jnt_order_id,
           stock_reserved: order.stock_reserved,
+          promo_bonus_given: order.promo_bonus_given,
           customer_name: order.customer_name,
           customer_whatsapp: order.customer_whatsapp,
         } as CancelableOrder,

@@ -44,6 +44,7 @@ export default function PromoStepCatalog({
   heroTitle,
   heroDescription,
   bonus,
+  bonusAvailable = true,
 }: {
   products: OpenOrderProduct[];
   /** Periode Open Order — dibaca dari store_settings (diatur di menu admin "Open Order"). */
@@ -71,6 +72,11 @@ export default function PromoStepCatalog({
   heroDescription?: string;
   /** Bar sisa bonus dari pengaturan promo admin. `null`/kosong = tidak ditampilkan. */
   bonus?: { left: number; total: number; note: string } | null;
+  /**
+   * Bonus masih bisa ditawarkan (kuota > 0, promo aktif, dalam periode, stok bonus ada).
+   * Bila false → bar bonus disembunyikan dan diganti teks "Bonus sudah habis".
+   */
+  bonusAvailable?: boolean;
 }) {
   const [category, setCategory] = useState<string>(ALL);
 
@@ -133,8 +139,10 @@ export default function PromoStepCatalog({
         </p>
       </section>
 
-      {/* Bar sisa bonus — hanya untuk promo. Angkanya dari pengaturan admin. */}
-      {bonus ? (
+      {/* Bar sisa bonus — hanya untuk promo. Angkanya dari pengaturan admin.
+          Kuota habis / promo nonaktif / di luar periode → bar diganti teks "Bonus sudah habis"
+          supaya customer tidak menunggu bonus yang tidak akan datang. */}
+      {bonus && bonusAvailable ? (
         <section className="oo-fade-up mx-auto mb-8 max-w-2xl" style={{ animationDelay: ".05s" }}>
           <div className="rounded-2xl border border-black/15 px-5 py-4">
             <div className="flex items-baseline justify-between gap-3">
@@ -154,6 +162,17 @@ export default function PromoStepCatalog({
               />
             </div>
             <p className="mt-3 text-sm text-neutral-600">{bonus.note}</p>
+          </div>
+        </section>
+      ) : null}
+
+      {bonus && !bonusAvailable ? (
+        <section className="oo-fade-up mx-auto mb-8 max-w-2xl" style={{ animationDelay: ".05s" }}>
+          <div className="rounded-2xl border border-black/15 px-5 py-4 text-center">
+            <p className="text-sm font-semibold">Bonus sudah habis</p>
+            <p className="mt-1 text-sm text-neutral-600">
+              Kuota Cover Hanger gratis periode ini sudah terpakai semua. Kamu tetap bisa memesan seperti biasa.
+            </p>
           </div>
         </section>
       ) : null}

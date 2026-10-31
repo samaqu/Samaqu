@@ -23,6 +23,11 @@ export interface PromoFchSettings {
   quotaNote: string;
   startDate: string | null;
   endDate: string | null;
+  /**
+   * Bonus masih bisa ditawarkan (kuota > 0, promo aktif, dalam periode).
+   * Dipakai halaman pesan untuk menyembunyikan bar bonus dan menampilkan "Bonus sudah habis".
+   */
+  bonusAvailable: boolean;
 }
 
 /** Nilai bawaan = teks yang sekarang dipakai katalog promo & landing. */
@@ -37,6 +42,7 @@ export const DEFAULT_PROMO_FCH: PromoFchSettings = {
   quotaNote: PROMO_QUOTA.note,
   startDate: null,
   endDate: null,
+  bonusAvailable: true,
 };
 
 const COLUMNS =
@@ -50,17 +56,28 @@ function toInt(value: unknown, fallback: number): number {
 function mapRow(row: Record<string, unknown> | null): PromoFchSettings {
   if (!row) return DEFAULT_PROMO_FCH;
   const total = Math.max(1, toInt(row.promo_fch_quota_total, DEFAULT_PROMO_FCH.quotaTotal));
+  const left = Math.min(total, toInt(row.promo_fch_quota_left, DEFAULT_PROMO_FCH.quotaLeft));
+  const active = row.promo_fch_active !== false;
+  const startDate = (row.promo_fch_start_date as string | null) ?? null;
+  const endDate = (row.promo_fch_end_date as string | null) ?? null;
+
+  // Tanggal WIB — sama dengan tanggal yang diisi admin (YYYY-MM-DD).
+  const todayWib = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+  const inPeriod = (!startDate || todayWib >= startDate) && (!endDate || todayWib <= endDate);
+
   return {
-    active: row.promo_fch_active !== false,
+    active,
     title: String(row.promo_fch_title ?? "").trim() || DEFAULT_PROMO_FCH.title,
     eyebrow: String(row.promo_fch_eyebrow ?? "").trim() || DEFAULT_PROMO_FCH.eyebrow,
     description: String(row.promo_fch_description ?? "").trim() || DEFAULT_PROMO_FCH.description,
     quotaTotal: total,
     // Sisa tidak boleh melebihi total.
-    quotaLeft: Math.min(total, toInt(row.promo_fch_quota_left, DEFAULT_PROMO_FCH.quotaLeft)),
+    quotaLeft: left,
     quotaNote: String(row.promo_fch_quota_note ?? "").trim() || DEFAULT_PROMO_FCH.quotaNote,
-    startDate: (row.promo_fch_start_date as string | null) ?? null,
-    endDate: (row.promo_fch_end_date as string | null) ?? null,
+    startDate,
+    endDate,
+    // Bonus hanya ditawarkan bila kuota masih ada, promo aktif, dan dalam periode.
+    bonusAvailable: active && inPeriod && left > 0,
   };
 }
 
