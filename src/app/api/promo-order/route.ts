@@ -26,7 +26,6 @@ import { orderItemPhoto } from "@/lib/order-photo";
 import { loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { snapshotOrderHpp } from "@/lib/produksi-order-hpp";
 import { checkPurchaseEligibility } from "@/lib/affiliate/eligibility";
-import { localPhone, waNumber } from "@/lib/whatsapp";
 import {
   buildFbc,
   getClientIp,
@@ -93,6 +92,27 @@ export async function POST(request: NextRequest) {
     if (contentLength > MAX_BODY_BYTES) return bad("Payload terlalu besar", 413);
 
     const supabaseAdmin = getSupabaseAdmin();
+
+    /*
+     * WAJIB LOGIN — tidak ada pesanan tamu.
+     * Akun pemesan diambil dari token (bukan dari body), lalu divalidasi ke tabel
+     * `customers`. Tanpa ini, pesanan tersimpan dengan `customer_id: null` dan tidak
+     * pernah muncul di dashboard customer.
+     */
+    const bearer = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    if (!bearer) return bad("Silakan masuk atau daftar dulu untuk memesan.", 401);
+    const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(bearer);
+    const authUser = authData?.user;
+    if (authError || !authUser?.id) return bad("Sesi kamu sudah berakhir. Silakan masuk lagi.", 401);
+
+    const { data: accountRow } = await supabaseAdmin
+      .from("customers")
+      .select("id, email")
+      .eq("id", authUser.id)
+      .maybeSingle();
+    if (!accountRow?.id) return bad("Akun ini bukan akun pelanggan.", 403);
+    const accountId = String(accountRow.id);
+    const accountEmail = String((accountRow as { email?: string | null }).email || authUser.email || "").trim().toLowerCase() || null;
 
     const body = await request.json();
     const rawCustomer = body.customer ?? {};
@@ -198,29 +218,12 @@ export async function POST(request: NextRequest) {
     });
     const bonusEligible = eligibility.status !== "eligible";
 
-    /**
-     * Tautkan pesanan ke akun customer (kalau nomor WhatsApp-nya terdaftar).
-     *
-     * Promo sengaja bisa dipesan TANPA login, jadi dulu `customer_id` selalu null dan
-     * pesanannya tidak pernah muncul di dashboard customer. Nomor WhatsApp tetap
-     * dicocokkan ke tabel `customers`; kalau ketemu, pesanan ikut masuk riwayat akun.
-     * Gagal mencocokkan → tetap null, alur pesanan tidak terpengaruh.
+    /*
+     * Penautan ke akun sudah pasti: pesanan hanya bisa dibuat oleh pelanggan yang login
+     * (lihat validasi token di awal). `linkedCustomerId`/`linkedEmail` dipakai saat insert.
      */
-    let linkedCustomerId: string | null = null;
-    if (whatsapp) {
-      // Dua bentuk yang mungkin tersimpan di `customers.whatsapp`: 08… (lokal) atau 62… .
-      const local = localPhone(whatsapp);
-      const international = waNumber(whatsapp);
-      if (local || international) {
-        const { data: matched } = await supabaseAdmin
-          .from("customers")
-          .select("id")
-          .or(`whatsapp.eq.${local},whatsapp.eq.${international}`)
-          .limit(1)
-          .maybeSingle();
-        if (matched?.id) linkedCustomerId = String(matched.id);
-      }
-    }
+    const linkedCustomerId: string = accountId;
+    const linkedEmail: string | null = accountEmail;
 
     // Berat & harga add-on dari katalog, fallback ke setting admin.
     const { data: addonProduct } = await supabaseAdmin
@@ -420,7 +423,7 @@ export async function POST(request: NextRequest) {
         order_number: orderNumber,
         customer_id: linkedCustomerId,
         customer_name: name,
-        customer_email: String(rawCustomer.email ?? "").trim() || null,
+        customer_email: linkedEmail,
         customer_whatsapp: whatsapp,
         shipping_address: address,
         shipping_city: [district, city].filter(Boolean).join(", "),

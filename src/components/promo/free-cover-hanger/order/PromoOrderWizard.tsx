@@ -607,14 +607,28 @@ export default function PromoOrderWizard({
     }
     setSubmitting(true);
     try {
-      // Promo TIDAK butuh sesi: pengunjung baru boleh memesan tanpa akun. Server menyimpan
-      // `customer_id: null` dan tetap mencocokkan lewat nomor WhatsApp.
-      //
-      // `extraCover` sengaja tidak dikirim — bonus Cover Hanger diputuskan SERVER setelah
-      // memeriksa apakah nomor ini pelanggan baru (`checkPurchaseEligibility`).
+      /*
+       * WAJIB LOGIN: server menolak pesanan tanpa token. Sesi diambil dari Supabase Auth
+       * lalu dikirim sebagai Bearer — `customer_id` & `customer_email` diisi server dari
+       * akun ini, sehingga pesanan selalu muncul di dashboard customer.
+       *
+       * `extraCover` sengaja tidak dikirim — bonus Cover Hanger diputuskan SERVER setelah
+       * memeriksa apakah nomor ini pelanggan baru (`checkPurchaseEligibility`).
+       */
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setError("Sesi kamu sudah berakhir. Silakan masuk lagi.");
+        return;
+      }
+
       const res = await fetch("/api/promo-order", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({
           customer: {
             name: customer.name,
