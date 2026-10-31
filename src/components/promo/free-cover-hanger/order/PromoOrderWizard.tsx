@@ -22,9 +22,9 @@ import {
   OPEN_ORDER_ADDON,
   OPEN_ORDER_ADDON_TARGET_ID,
   OPEN_ORDER_ADDON_VARIANT,
+  OPEN_ORDER_PERIOD,
   resolveAddonWeightFromCatalog,
 } from "@/lib/open-order-config";
-import { PROMO_ORDER_PATH } from "@/lib/promo/free-cover-hanger";
 import { sumWeightGramsBySize, variantWeightMapFromRows } from "@/lib/shipping-weight";
 import {
   buildOpenOrderProducts,
@@ -36,6 +36,8 @@ import {
 import {
   formatDateLabel,
   formatOpenOrderMoment,
+  formatOpenOrderPeriod,
+  formatOpenOrderPeriodCompact,
   resolveOpenOrderState,
   type OpenOrderState,
 } from "@/lib/open-order-window";
@@ -133,6 +135,7 @@ export default function PromoOrderWizard({
   initialState,
   startDeadline,
   endDeadline,
+  period: periodProp,
   startDate: startDateProp,
   endDate: endDateProp,
   heroEyebrow,
@@ -146,6 +149,8 @@ export default function PromoOrderWizard({
   startDeadline: number | null;
   /** 23:59:59.999 WIB tanggal tutup (epoch ms) — untuk hitung mundur "Berakhir dalam". */
   endDeadline: number | null;
+  /** Teks periode — dikirim dari server supaya SSR tidak nampilin teks fallback lama. */
+  period?: string;
   /** Tanggal mulai (YYYY-MM-DD) — untuk caption "Buka <tanggal>", dikirim dari server. */
   startDate?: string | null;
   /** Tanggal tutup (YYYY-MM-DD) — untuk label "Berakhir …", dikirim dari server. */
@@ -186,8 +191,15 @@ export default function PromoOrderWizard({
   const [paymentMethod, setPaymentMethod] = useState("");
 
   const locale = useSafeLocale();
-  // Status jendela Open Order diatur dari dashboard admin (store_settings).
+  // Periode & status Open Order diatur dari dashboard admin (store_settings).
   const settings = useStoreSettings();
+  // Periode & status datang dari tanggal yang diatur admin; teks periode lama jadi fallback
+  // selama tanggalnya belum diisi.
+  // Periode: versi server (route halaman) yang jadi acuan awal — hook `useStoreSettings()`
+  // baru terisi setelah hydration, jadi tanpa ini SSR sempat nampilin teks fallback lama
+  // ("8-15 Agustus 2026") padahal tanggal jendelanya sudah lain.
+  const period = periodProp ?? formatOpenOrderPeriod(settings, settings.open_order_period || OPEN_ORDER_PERIOD);
+  const periodCompact = formatOpenOrderPeriodCompact(settings, settings.open_order_period || OPEN_ORDER_PERIOD);
 
   // Status jendela: server (route halaman) yang jadi acuan awal supaya tidak "pop-in" —
   // hook `useStoreSettings()` baru terisi setelah hydration, dan selama itu statusnya masih
@@ -697,73 +709,71 @@ export default function PromoOrderWizard({
 
   return (
     <section
-      className="fch-root min-h-screen"
-      style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+      className="min-h-screen bg-[#f6f5f2] text-[#111]"
+      style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}
     >
-      {/* Header + progres langkah — gaya mockup promo (garis hitam, logo Display). */}
-      <header className="fch-order sticky top-0 z-30">
-        <div className="fch-order-wrap">
-          <div className="fch-order-head">
-            {backTo ? (
-              <button
-                type="button"
-                onClick={() => setStep(backTo)}
-                aria-label="Kembali"
-                className="fch-chip"
-                style={{ width: 44, height: 44, padding: 0 }}
-              >
-                <ChevronLeft size={18} strokeWidth={2.2} />
-              </button>
-            ) : (
-              <Link href="/" aria-label="Tutup" className="fch-chip" style={{ width: 44, height: 44, padding: 0 }}>
-                <X size={18} strokeWidth={2.2} />
-              </Link>
-            )}
-
-            <Link href={`/${locale}${PROMO_ORDER_PATH}`} className="fch-order-log" style={{ textDecoration: "none" }}>
-              SAMAQU
+      {/* Header + progres langkah */}
+      <header className="sticky top-0 z-30 border-b border-black/5 bg-[#f4f4f2]/90 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5">
+          {backTo ? (
+            <button
+              type="button"
+              onClick={() => setStep(backTo)}
+              aria-label="Kembali"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/15 transition hover:bg-white"
+            >
+              <ChevronLeft size={16} strokeWidth={2} />
+            </button>
+          ) : (
+            <Link
+              href="/"
+              aria-label="Tutup"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/15 transition hover:bg-white"
+            >
+              <X size={16} strokeWidth={2} />
             </Link>
+          )}
 
-            <span className="fch-order-step">
-              <span style={{ color: "#3D3D3D", textTransform: "uppercase", letterSpacing: ".14em", fontSize: 11 }}>
-                {stepTitle}
-              </span>
-              <span style={{ fontVariantNumeric: "tabular-nums" }}>{step}/6</span>
-            </span>
-          </div>
+          <span className="text-xs font-semibold uppercase tracking-[.25em]">{stepTitle}</span>
+
+          <span className="w-9 shrink-0 text-right text-xs text-neutral-500">
+            {step}/6
+          </span>
         </div>
-        <div className="fch-order-track">
-          <span style={{ width: `${(step / 6) * 100}%` }} />
+        <div className="mx-auto max-w-6xl px-5 pb-2.5">
+          <div className="h-[2px] overflow-hidden rounded bg-black/10">
+            <div
+              className="h-full rounded bg-black transition-all duration-1000"
+              style={{ width: `${(step / 6) * 100}%` }}
+            />
+          </div>
         </div>
       </header>
 
-      <main className={step === 1 ? "" : "mx-auto max-w-6xl px-5 pb-20"}>
+      <main className="mx-auto max-w-6xl px-5 pb-20">
         {step === 1 && (
           <StepCatalog
             products={products}
+            period={period}
             phase={phase}
             countdownTarget={phase === "ended" ? null : phase === "upcoming" ? startDeadline : endDeadline}
             startInfo={formatOpenOrderMoment(startDateProp ?? settings.open_order_start_date, settings.open_order_start_time)}
             startInfoShort={formatOpenOrderMoment(startDateProp ?? settings.open_order_start_date, settings.open_order_start_time, true)}
             endInfo={formatOpenOrderMoment(endDateProp ?? settings.open_order_end_date, settings.open_order_end_time, true)}
-            onRemind={() => showToast(phase === "ended" ? "Siap! Kami kabari periode berikutnya" : "Siap! Kami ingatkan saat promo dibuka")}
+            onRemind={() => showToast(phase === "ended" ? "Siap! Kami kabari periode berikutnya" : "Siap! Kami ingatkan saat Open Order dibuka")}
             cartCount={lines.reduce((sum, line) => sum + line.quantity, 0)}
             onOpen={(product, color) => openDetail(product.id, color)}
             onViewCart={() => setStep(3)}
             /* Promo: judul sendiri + bar sisa bonus dari pengaturan admin. */
-            promo={{
-              eyebrow: heroEyebrow || "Pembelian pertama",
-              title: heroTitle || "Free Cover Hanger",
-              description:
-                heroDescription ||
-                "Beli Thobe, Kandora, atau Koko pertamamu dan Cover Hanger senilai Rp35.000 masuk otomatis ke paket — tanpa kode promo.",
-            }}
+            heroEyebrow={heroEyebrow}
+            heroTitle={heroTitle}
+            heroDescription={heroDescription}
             bonus={bonus ?? null}
           />
         )}
 
         {(step === 2 || step === 3 || step === 4 || step === 5) && (
-          <div className={step === 2 ? "mx-auto max-w-6xl pt-6" : "mx-auto max-w-2xl pt-6"}>
+          <div className={step === 2 ? "mx-auto max-w-6xl" : "mx-auto max-w-2xl"}>
             {step === 2 && draft && (
               <StepProduct
                 draft={draft}
