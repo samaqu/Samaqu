@@ -5,6 +5,7 @@ import { jakartaDayBounds, jakartaMonthBounds, BIZ_OFFSET_MS } from "@/lib/ops-f
 import { resolveStock } from "@/lib/ops-stock";
 import { rankTopProducts, isSaleOrder } from "@/lib/top-products";
 import { SALE_STATUSES, orderRevenue } from "@/lib/transaksi";
+import { loadMayarFees } from "@/lib/mayar-fees";
 
 /**
  * Dashboard ops — ringkasan lintas modul dalam satu request.
@@ -69,7 +70,7 @@ export async function GET(req: NextRequest) {
     countOf((q) => q.is("do_not_contact", false).gte("next_followup_at", startIso).lt("next_followup_at", endIso).or(activeLead)),
     countOf((q) => q.is("do_not_contact", false).not("next_followup_at", "is", null).lt("next_followup_at", startIso).or(activeLead)),
     countOf((q) => q.eq("outcome", "bought").gte("last_contact_at", month.startIso).lt("last_contact_at", month.endIso)),
-    admin.from("orders").select("id, total, shipping_cost, status, created_at").gte("created_at", month.startIso).lt("created_at", month.endIso),
+    admin.from("orders").select("id, total, shipping_cost, status, created_at, payment_provider, payment_ref").gte("created_at", month.startIso).lt("created_at", month.endIso),
     admin.from("product_variants").select("product_id, stock, base_product_id"),
     admin.from("lead_activities").select("id, lead_id, action, note, created_at, actor").order("created_at", { ascending: false }).limit(6),
     // Order 7 hari terakhir (WIB) — sumber grafik `trendHarian` (batas bulan ≠ jendela 7 hari).
@@ -131,9 +132,28 @@ export async function GET(req: NextRequest) {
     limit: 5,
   });
 
-  // BIAYA operasional & packing: belum ada modul Pengeluaran → 0.
-  // (Menunggu modul Pengeluaran supaya netProfit tidak dikarang.)
-  const biaya = 0;
+  /*
+   * BIAYA = biaya transaksi Mayar (potongan gateway + layanan) untuk pesanan sah bulan ini.
+   * Fee baru tersedia setelah transaksi `settled`; yang belum cair tidak ditaksir, tetapi
+   * jumlahnya dilaporkan (`mayarPendingCount`) supaya laba tidak dibaca sebagai angka final.
+   */
+  const mayarFees = await loadMayarFees();
+  let mayarFee = 0;
+  let mayarPendingCount = 0;
+  for (const order of valid) {
+    if (String(order.payment_provider || "").toLowerCase() !== "mayar") continue;
+    const ref = String(order.payment_ref || "").trim();
+    const detail = ref ? mayarFees.get(ref) : undefined;
+    if (detail && detail.status === "settled" && Number.isFinite(detail.fee)) {
+      mayarFee += detail.fee;
+    } else {
+      mayarPendingCount += 1;
+    }
+  }
+
+  // Biaya operasional & packing: modul Pengeluaran belum ada → 0. Tidak dikarang.
+  const biayaOperasional = 0;
+  const biaya = biayaOperasional + mayarFee;
 
   const netProfit = omset - hpp - biaya;
   const margin = omset > 0 ? Math.round((netProfit / omset) * 100) : 0;
@@ -211,6 +231,10 @@ export async function GET(req: NextRequest) {
       omset,
       hpp,
       biaya,
+      /* Rincian biaya — dipakai kartu "Total Biaya" di dashboard. */
+      mayarFee,
+      mayarPendingCount,
+      biayaOperasional,
       netProfit,
       margin,
       transaksi,

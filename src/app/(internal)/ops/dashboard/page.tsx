@@ -55,6 +55,11 @@ type DashboardData = {
     omset: number;
     hpp: number;
     biaya: number;
+    /** Rincian biaya Mayar (potongan gateway + layanan) — opsional untuk respons lama. */
+    mayarFee?: number;
+    /** Transaksi Mayar yang sudah dibayar tapi belum cair (biayanya belum terpotong). */
+    mayarPendingCount?: number;
+    biayaOperasional?: number;
     netProfit: number;
     margin: number;
     transaksi: number;
@@ -411,7 +416,18 @@ export default function OpsDashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <GlassCard icon={IconWallet} label="Omzet Bruto" value={rp(r.omset)} caption="Pendapatan kotor" />
             <GlassCard icon={IconPackage} label="Total HPP" value={rp(r.hpp)} caption="Modal produk terjual" />
-            <GlassCard icon={IconReceipt} label="Total Biaya" value={rp(r.biaya)} caption="Operasional & packing" />
+            {/* Biaya = potongan transaksi Mayar. Kalau masih ada yang belum cair, angkanya
+                disebut belum final supaya laba tidak dibaca sebagai angka pasti. */}
+            <GlassCard
+              icon={IconReceipt}
+              label="Total Biaya"
+              value={rp(r.biaya)}
+              caption={
+                (r.mayarPendingCount ?? 0) > 0
+                  ? `Biaya Mayar · ${r.mayarPendingCount} transaksi belum cair`
+                  : "Biaya transaksi Mayar"
+              }
+            />
 
             <div className="relative bg-white border border-slate-200 rounded-2xl p-5 flex flex-col">
               <span
