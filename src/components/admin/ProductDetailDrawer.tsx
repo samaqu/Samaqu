@@ -21,7 +21,7 @@ import { useEffect, useRef, useState } from "react";
 import { useBodyScrollLock } from "@/lib/use-scroll-lock";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Box, DollarSign, Edit, Image as ImageIcon, Layers, Package, Shirt, ShoppingCart, TrendingUp, X } from "lucide-react";
+import { Box, DollarSign, Edit, Image as ImageIcon, Layers, Package, Shirt, ShoppingCart, Tag, TrendingUp, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { requestRevalidate } from "@/lib/admin-revalidate";
 import { useToast } from "@/components/AdminToast";
@@ -41,6 +41,11 @@ interface ProductData {
   kain?: string | null;
   /** Ikut tampil di katalog /open-order (kolom `products.open_order_enabled`, default true). */
   open_order_enabled?: boolean | null;
+  /**
+   * Ikut tampil di katalog promo Free Cover Hanger (kolom `products.promo_fch_enabled`).
+   * Terpisah dari `open_order_enabled`.
+   */
+  promo_fch_enabled?: boolean | null;
   /** Tampil di katalog website (kolom `products.is_published`, default true). */
   is_published?: boolean | null;
 }
@@ -111,6 +116,7 @@ export function ProductDetailPanel({
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [savingOpenOrder, setSavingOpenOrder] = useState(false);
+  const [savingPromoFch, setSavingPromoFch] = useState(false);
   const [savingPublish, setSavingPublish] = useState(false);
   const savingPublishRef = useRef(false);
 
@@ -180,6 +186,7 @@ export function ProductDetailPanel({
   const sku = tabVariants.map((v) => v.sku).find(Boolean) || variants.map((v) => v.sku).find(Boolean) || "—";
   const activeTag = showSeriesTabs ? activeTab : uniqueColors.length === 1 ? uniqueColors[0] : activeTab;
   const openOrderEnabled = product?.open_order_enabled !== false;
+  const promoFchEnabled = product?.promo_fch_enabled !== false;
   const isPublished = product?.is_published !== false;
 
   /**
@@ -202,6 +209,30 @@ export function ProductDetailPanel({
       return;
     }
     setProduct((prev) => (prev ? { ...prev, open_order_enabled: next } : prev));
+  }
+
+  /**
+   * Sakelar katalog PROMO "Free Cover Hanger" — kolom `products.promo_fch_enabled`.
+   *
+   * Jalur sendiri, terpisah dari Open Order: produk bisa tampil di promo tanpa ikut
+   * /open-order, dan sebaliknya. Satu nama + kategori = satu produk, jadi semua baris
+   * series-nya ikut diubah (sama seperti `toggleOpenOrder`).
+   */
+  async function togglePromoFch() {
+    if (!product) return;
+    const next = product.promo_fch_enabled === false;
+    setSavingPromoFch(true);
+    const { error } = await supabase
+      .from("products")
+      .update({ promo_fch_enabled: next })
+      .eq("category", product.category)
+      .eq("name", product.name);
+    setSavingPromoFch(false);
+    if (error) {
+      console.error("[PD] Gagal mengubah status promo Free Cover Hanger:", error);
+      return;
+    }
+    setProduct((prev) => (prev ? { ...prev, promo_fch_enabled: next } : prev));
   }
 
   /**
@@ -359,6 +390,31 @@ export function ProductDetailPanel({
                 {openOrderEnabled
                   ? "Produk ini muncul di katalog Open Order."
                   : "Produk ini disembunyikan dari katalog Open Order."}
+              </p>
+            </div>
+
+            {/* Promo Free Cover Hanger — sakelar TERPISAH dari Open Order */}
+            <div className="pd-card pd-stats">
+              <p className="pd-section-title">
+                <Tag size={14} strokeWidth={2.2} /> Promo Free Cover Hanger
+              </p>
+              <div className="pd-row">
+                <span>Tampil di katalog promo</span>
+                <button
+                  type="button"
+                  onClick={togglePromoFch}
+                  disabled={savingPromoFch}
+                  aria-pressed={promoFchEnabled}
+                  aria-label="Tampilkan produk ini di katalog promo Free Cover Hanger"
+                  className={`pd-oo${promoFchEnabled ? " is-on" : ""}`}
+                >
+                  {savingPromoFch ? "…" : promoFchEnabled ? "Tampil" : "Tersembunyi"}
+                </button>
+              </div>
+              <p className="pd-empty">
+                {promoFchEnabled
+                  ? "Produk ini bisa dipilih di halaman pesan promo."
+                  : "Produk ini disembunyikan dari katalog promo."}
               </p>
             </div>
 
