@@ -231,6 +231,62 @@ function Badge({ tone = "gray", children }: { tone?: string; children: ReactNode
   );
 }
 
+/**
+ * Kartu ringkasan biaya Mayar.
+ *
+ * Dua kartu pertama bisa diklik → membuka tabel rinciannya di bawah (selection sendiri,
+ * terpisah dari Retur/Tukar Size/Penjualan). Kartu ketiga hanya informasi total.
+ * Gaya mengikuti kartu "Metode Pembayaran" di halaman yang sama: label kecil, angka besar,
+ * bar tipis, keterangan di bawah — supaya bahasanya seragam.
+ */
+function MayarSummaryCard({
+  label,
+  value,
+  caption,
+  bar,
+  tone,
+  active,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  caption: string;
+  /** 0–100; kosong = tanpa bar (kartu informasi). */
+  bar?: number;
+  tone: "emerald" | "amber" | "slate";
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  const palette = {
+    emerald: { text: "text-emerald-600", barBg: "bg-emerald-500", ring: "border-emerald-300" },
+    amber: { text: "text-amber-600", barBg: "bg-amber-500", ring: "border-amber-300" },
+    slate: { text: "text-slate-900", barBg: "bg-slate-400", ring: "border-slate-300" },
+  }[tone];
+
+  const Wrapper = onClick ? "button" : "div";
+
+  return (
+    <Wrapper
+      {...(onClick ? { type: "button" as const, onClick } : {})}
+      className={`flex w-full flex-col rounded-2xl border p-4 text-left transition-colors ${
+        active ? `${palette.ring} bg-white ring-2 ring-slate-900/5` : "border-[#E5E7EB] bg-white"
+      } ${onClick ? "cursor-pointer hover:border-slate-300 hover:bg-slate-50" : ""}`}
+    >
+      <span className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">{label}</span>
+      <span className={`mt-1 text-xl font-black tabular-nums ${palette.text}`}>{value}</span>
+      {typeof bar === "number" ? (
+        <span className="mt-2 block h-1.5 w-full overflow-hidden rounded-full bg-[#F3F4F6]">
+          <span
+            className={`block h-full rounded-full ${palette.barBg}`}
+            style={{ width: `${Math.max(2, Math.min(100, bar))}%` }}
+          />
+        </span>
+      ) : null}
+      <span className="mt-2 text-[11px] font-semibold text-slate-500">{caption}</span>
+    </Wrapper>
+  );
+}
+
 async function fetchReport(month: string): Promise<ReportData> {
   const { supabase } = await import("@/lib/supabase");
   const { data } = await supabase.auth.getSession();
@@ -317,6 +373,20 @@ export default function LaporanKeuanganPage() {
   const s = data.summary;
   const payments = data.payments || [];
   const sources = data.sources || [];
+
+  /* ── Ringkasan Biaya Mayar (kartu) ── */
+  const mayarSettledRows = data.tables.mayarSettled || [];
+  const mayarPendingRows = data.tables.mayarPending || [];
+  /** Total biaya transaksi yang sudah cair — angka final dari Mayar. */
+  const mayarSettledTotal = mayarSettledRows.reduce((sum, row) => sum + (Number(row.fee) || 0), 0);
+  /** Total nominal yang dibayar customer tetapi dananya belum cair. */
+  const mayarPendingTotal = mayarPendingRows.reduce((sum, row) => sum + (Number(row.total) || 0), 0);
+  /** Jumlah transaksi Mayar bulan ini = yang sudah cair + yang menunggu cair. */
+  const mayarAllCount = mayarSettledRows.length + mayarPendingRows.length;
+  /** Porsi transaksi yang sudah cair (untuk bar di kartu). */
+  const mayarSettledShare =
+    mayarAllCount > 0 ? Math.round((mayarSettledRows.length / mayarAllCount) * 100) : 0;
+
   const profitPositive = (s.profit ?? 0) >= 0;
   const pendingEmpty = s.refundsPendingCount === 0 && s.exchangePendingCount === 0;
   const profitBadge =
@@ -791,6 +861,59 @@ export default function LaporanKeuanganPage() {
 
       {/* TABLES */}
       <section ref={tableRef} id="report-tables" className="rounded-3xl border border-[#E5E7EB] bg-white p-5 shadow-sm md:p-6">
+        {/*
+          ── Ringkasan Biaya Transaksi Mayar ──
+          Dua kartu (cair / belum cair) + satu kartu total transaksi bulan ini.
+          Klik kartu cair/belum cair untuk membuka tabel rinciannya di bawah —
+          "selection" sendiri, tanpa mencampurnya dengan Retur/Tukar Size/Penjualan.
+        */}
+        <div className="mb-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-black tracking-tight text-[#374151]">Biaya Transaksi Mayar</h2>
+            <p className="text-[11px] font-medium text-slate-500">Semua nominal berasal dari API Mayar.</p>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <MayarSummaryCard
+              active={tab === "mayar-settled"}
+              onClick={() => setTab("mayar-settled")}
+              label="Sudah Cair"
+              value={rp(mayarSettledTotal)}
+              caption={
+                mayarSettledRows.length > 0
+                  ? `${mayarSettledRows.length} transaksi · biaya final`
+                  : "Belum ada transaksi cair"
+              }
+              bar={mayarSettledShare}
+              tone="emerald"
+            />
+            <MayarSummaryCard
+              active={tab === "mayar-pending"}
+              onClick={() => setTab("mayar-pending")}
+              label="Belum Cair"
+              value={rp(mayarPendingTotal)}
+              caption={
+                mayarPendingRows.length > 0
+                  ? `${mayarPendingRows.length} transaksi menunggu cair`
+                  : "Semua transaksi sudah cair"
+              }
+              bar={100 - mayarSettledShare}
+              tone="amber"
+            />
+            <MayarSummaryCard
+              active={false}
+              label="Total Transaksi"
+              value={String(mayarAllCount)}
+              caption={`${
+                mayarSettledRows.length + mayarPendingRows.length > 0
+                  ? `${mayarSettledRows.length} cair · ${mayarPendingRows.length} belum`
+                  : "Transaksi Mayar bulan ini"
+              }`}
+              tone="slate"
+            />
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
             {[
