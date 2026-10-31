@@ -36,11 +36,8 @@ import {
 import {
   formatDateLabel,
   formatOpenOrderMoment,
-  formatOpenOrderPeriod,
-  formatOpenOrderPeriodCompact,
-  resolveOpenOrderState,
-  type OpenOrderState,
 } from "@/lib/open-order-window";
+import type { PromoFchSettings } from "@/lib/promo/free-cover-hanger-settings";
 import { useSafeLocale } from "@/lib/safe-i18n";
 import { useStoreSettings } from "@/lib/store-settings";
 import { getCurrentCustomer } from "@/lib/customer-auth";
@@ -132,30 +129,19 @@ function defaultDraft(products: OpenOrderProduct[], productId: string, color: st
 }
 
 export default function PromoOrderWizard({
-  initialState,
-  startDeadline,
-  endDeadline,
-  period: periodProp,
-  startDate: startDateProp,
-  endDate: endDateProp,
   heroEyebrow,
   heroTitle,
   heroDescription,
   bonus,
   promoActive = true,
   promoBonusAvailable = true,
+  promoPhase: initialPromoPhase = "open",
+  promoStartDate = null,
+  promoEndDate = null,
 }: {
-  /** Status jendela Open Order — dibaca di server (route halaman) supaya tidak pop-in. */
-  initialState: OpenOrderState;
-  /** 00:00:00 WIB tanggal mulai (epoch ms) — untuk hitung mundur "Buka dalam". */
-  startDeadline: number | null;
-  /** 23:59:59.999 WIB tanggal tutup (epoch ms) — untuk hitung mundur "Berakhir dalam". */
-  endDeadline: number | null;
-  /** Teks periode — dikirim dari server supaya SSR tidak nampilin teks fallback lama. */
-  period?: string;
-  /** Tanggal mulai (YYYY-MM-DD) — untuk caption "Buka <tanggal>", dikirim dari server. */
+  /** Tanggal mulai promo (YYYY-MM-DD) — caption "Buka <tanggal>". */
   startDate?: string | null;
-  /** Tanggal tutup (YYYY-MM-DD) — untuk label "Berakhir …", dikirim dari server. */
+  /** Tanggal tutup promo (YYYY-MM-DD) — label "Berakhir …". */
   endDate?: string | null;
   /**
    * Judul hero katalog promo — dibaca dari pengaturan promo (`promo_fch_*` di
@@ -174,6 +160,14 @@ export default function PromoOrderWizard({
    * `false` → halaman pesan menampilkan "Bonus sudah habis" (bukan menawarkan bonus).
    */
   promoBonusAvailable?: boolean;
+  /**
+   * Status program promo menurut aturan promo sendiri (bukan jadwal Open Order).
+   * Dikirim dari server supaya tidak "pop-in" sebelum data klien termuat.
+   */
+  promoPhase?: PromoFchSettings["phase"];
+  /** Tanggal periode promo (`promo_fch_start_date` / `promo_fch_end_date`). */
+  promoStartDate?: string | null;
+  promoEndDate?: string | null;
 }) {
   const [step, setStep] = useState<Step>(1);
   const [catalog, setCatalog] = useState<Product[]>([]);
@@ -202,25 +196,27 @@ export default function PromoOrderWizard({
   const locale = useSafeLocale();
   // Periode & status Open Order diatur dari dashboard admin (store_settings).
   const settings = useStoreSettings();
-  // Periode & status datang dari tanggal yang diatur admin; teks periode lama jadi fallback
-  // selama tanggalnya belum diisi.
-  // Periode: versi server (route halaman) yang jadi acuan awal — hook `useStoreSettings()`
-  // baru terisi setelah hydration, jadi tanpa ini SSR sempat nampilin teks fallback lama
-  // ("8-15 Agustus 2026") padahal tanggal jendelanya sudah lain.
-  const period = periodProp ?? formatOpenOrderPeriod(settings, settings.open_order_period || OPEN_ORDER_PERIOD);
-  const periodCompact = formatOpenOrderPeriodCompact(settings, settings.open_order_period || OPEN_ORDER_PERIOD);
+  /* Teks periode promo untuk katalog — dari tanggal promo yang diatur admin. */
+  const period =
+    promoStartDate && promoEndDate
+      ? `${formatDateLabel(promoStartDate)} – ${formatDateLabel(promoEndDate)}`
+      : promoEndDate
+        ? `Sampai ${formatDateLabel(promoEndDate)}`
+        : "";
 
-  // Status jendela: server (route halaman) yang jadi acuan awal supaya tidak "pop-in" —
-  // hook `useStoreSettings()` baru terisi setelah hydration, dan selama itu statusnya masih
-  // default (dibuka), jadi tombol yang seharusnya terkunci sempat bisa diklik.
-  const [openState, setOpenState] = useState<OpenOrderState>(initialState);
-  // Begitu setting-nya termuat (tanggalnya berubah dari default), status dihitung ulang
-  // di klien — jadi kalau admin mengubah jendela tanpa customer me-refresh, halamannya
-  // ikut menyesuaikan. Kalau admin belum pernah mengisi tanggal, status server yang dipakai.
+  // Status program promo — memakai ATURAN PROMO (`promo_fch_active` + periode promo),
+  // BUKAN jadwal Open Order. Dulu promo ikut `open_order_*`, sehingga produk tampil
+  // "Sudah ditutup" begitu jadwal Open Order lewat padahal promo masih aktif.
+  const [promoPhase, setPromoPhase] = useState<PromoFchSettings["phase"]>(initialPromoPhase);
   useEffect(() => {
-    if (!settings.open_order_start_date && !settings.open_order_end_date) return;
-    setOpenState(resolveOpenOrderState(settings));
-  }, [settings.open_order_start_date, settings.open_order_end_date, settings.open_order_active]);
+    // Begitu pengaturan termuat dari server, hitung ulang di klien supaya perubahan
+    // yang dilakukan admin langsung terasa tanpa customer me-refresh.
+    const todayWib = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+    const start = promoStartDate || null;
+    const end = promoEndDate || null;
+    const inPeriod = (!start || todayWib >= start) && (!end || todayWib <= end);
+    setPromoPhase(!promoActive || !inPeriod ? "closed" : start && todayWib < start ? "before" : "open");
+  }, [promoActive, promoStartDate, promoEndDate]);
 
   // Produk + varian dibaca dari katalog yang sama dengan halaman detail (harga, warna, series,
   // stok). Produk yang diikutkan admin (`open_order_enabled`) yang tampil di sini.
@@ -704,9 +700,19 @@ export default function PromoOrderWizard({
    * mulai). Katalog tetap bisa dilihat (produk, harga, Create Your Price), tapi "Tambah ke
    * Pesanan" mati dan yang tampil instead-of-tombol adalah hitung mundur "Dibuka dalam …".
    */
-  const locked = openState === "before";
-  // Fase event untuk tampilan (mockup): belum dibuka / sedang berjalan / sudah berakhir.
-  const phase: OpenOrderPhase = openState === "open" ? "live" : openState === "before" ? "upcoming" : "ended";
+  // Terkunci = promo dimatikan admin atau sudah lewat periode promo.
+  const locked = promoPhase !== "open";
+  // Fase untuk tampilan: belum dibuka / sedang berjalan / sudah berakhir — dari aturan PROMO.
+  const phase: OpenOrderPhase =
+    promoPhase === "open" ? "live" : promoPhase === "before" ? "upcoming" : "ended";
+
+  /* Hitung mundur periode promo (epoch ms). `null` kalau tanggalnya tidak diisi. */
+  const promoStartDeadline = promoStartDate
+    ? new Date(`${promoStartDate}T00:00:00+07:00`).getTime()
+    : null;
+  const promoEndDeadline = promoEndDate
+    ? new Date(`${promoEndDate}T23:59:59+07:00`).getTime()
+    : null;
 
   // Toast lokal ala mockup (pengingat / kabari periode berikutnya / klik tombol terkunci).
   const [toast, setToast] = useState("");
@@ -716,7 +722,7 @@ export default function PromoOrderWizard({
   }
 
   // Tanggal mulai & tutup (label "21 Oktober 2026 · 10.00 WIB" di bawah timer).
-  const startLabel = formatDateLabel(startDateProp ?? settings.open_order_start_date);
+  const startLabel = formatDateLabel(promoStartDate);
 
   /**
    * Jendela yang sudah lewat TIDAK lagi memakai layar pesan terpisah — sesuai mockup,
@@ -773,11 +779,12 @@ export default function PromoOrderWizard({
             products={products}
             period={period}
             phase={phase}
-            countdownTarget={phase === "ended" ? null : phase === "upcoming" ? startDeadline : endDeadline}
-            startInfo={formatOpenOrderMoment(startDateProp ?? settings.open_order_start_date, settings.open_order_start_time)}
-            startInfoShort={formatOpenOrderMoment(startDateProp ?? settings.open_order_start_date, settings.open_order_start_time, true)}
-            endInfo={formatOpenOrderMoment(endDateProp ?? settings.open_order_end_date, settings.open_order_end_time, true)}
-            onRemind={() => showToast(phase === "ended" ? "Siap! Kami kabari periode berikutnya" : "Siap! Kami ingatkan saat Open Order dibuka")}
+            /* Hitung mundur memakai PERIODE PROMO, bukan jadwal Open Order. */
+            countdownTarget={phase === "ended" ? null : phase === "upcoming" ? promoStartDeadline : promoEndDeadline}
+            startInfo={formatOpenOrderMoment(promoStartDate, null)}
+            startInfoShort={formatOpenOrderMoment(promoStartDate, null, true)}
+            endInfo={formatOpenOrderMoment(promoEndDate, null, true)}
+            onRemind={() => showToast(phase === "ended" ? "Siap! Kami kabari periode berikutnya" : "Siap! Kami ingatkan saat promo dibuka")}
             cartCount={lines.reduce((sum, line) => sum + line.quantity, 0)}
             onOpen={(product, color) => openDetail(product.id, color)}
             onViewCart={() => setStep(3)}
@@ -801,8 +808,8 @@ export default function PromoOrderWizard({
                 draft={draft}
                 products={products}
                 phase={phase}
-                countdownTarget={phase === "ended" ? null : phase === "upcoming" ? startDeadline : endDeadline}
-                endInfo={formatOpenOrderMoment(endDateProp ?? settings.open_order_end_date, settings.open_order_end_time, true)}
+                countdownTarget={phase === "ended" ? null : phase === "upcoming" ? promoStartDeadline : promoEndDeadline}
+                endInfo={formatOpenOrderMoment(promoEndDate, null, true)}
                 onChange={(patch) => setDraft((prev) => (prev ? { ...prev, ...patch } : prev))}
                 onAdd={addDraftToCart}
               />

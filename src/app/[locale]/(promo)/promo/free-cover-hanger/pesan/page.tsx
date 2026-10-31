@@ -1,45 +1,35 @@
-import { readOpenOrderWindow } from "@/lib/open-order-settings";
-import {
-  formatOpenOrderPeriod,
-  openOrderDeadline,
-  openOrderStartDeadline,
-  resolveOpenOrderState,
-} from "@/lib/open-order-window";
-import { OPEN_ORDER_PERIOD } from "@/lib/open-order-config";
-import { readPromoFchSettings } from "@/lib/promo/free-cover-hanger-settings";
+﻿import { readPromoFchSettings } from "@/lib/promo/free-cover-hanger-settings";
 import PromoOrderWizard from "@/components/promo/free-cover-hanger/order/PromoOrderWizard";
 
 /**
  * Halaman pesan promo Free Cover Hanger.
  *
- * Memakai `PromoOrderWizard` — SALINAN wizard Open Order di folder promo, jadi file
- * `src/components/open-order/*` tidak tersentuh sama sekali. Tampilan, alur, ongkir J&T,
- * pemotongan stok, dan pembayaran tetap sama dengan Open Order.
+ * Status buka/tutup ditentukan oleh ATURAN PROMO SENDIRI (`promo_fch_active` +
+ * `promo_fch_start_date` / `promo_fch_end_date` di `store_settings`), BUKAN jadwal
+ * Open Order. Dulu halaman ini meminjam jendela Open Order, sehingga produk tampil
+ * "Sudah ditutup" begitu jadwal Open Order lewat — padahal promo masih aktif.
  *
- * Judul katalog & bar sisa bonus dibaca dari pengaturan promo di `store_settings`
- * (`promo_fch_*`, diatur nanti di menu admin "Promo"). Kolom itu belum ada → nilai bawaan.
+ * Alur pesanan (ongkir J&T, pemotongan stok, pembayaran) memakai `PromoOrderWizard`
+ * yang merupakan salinan wizard Open Order, jadi `src/components/open-order/*` tidak
+ * tersentuh.
  */
 export const revalidate = 60;
 
 export default async function PromoOrderPage() {
-  const [window, promo] = await Promise.all([readOpenOrderWindow(), readPromoFchSettings()]);
-  const state = resolveOpenOrderState(window);
+  const promo = await readPromoFchSettings();
 
   return (
     <PromoOrderWizard
-      initialState={state}
-      startDeadline={openOrderStartDeadline(window)}
-      endDeadline={openOrderDeadline(window)}
-      period={formatOpenOrderPeriod(window, OPEN_ORDER_PERIOD)}
-      startDate={window.open_order_start_date}
-      endDate={window.open_order_end_date}
       heroEyebrow={promo.eyebrow}
       heroTitle={promo.title}
       heroDescription={promo.description}
       bonus={{ left: promo.quotaLeft, total: promo.quotaTotal, note: promo.quotaNote }}
-      /* Status promo dibaca di server: nonaktif / di luar periode / kuota habis
-         harus langsung tampil "Bonus sudah habis" tanpa menunggu data di klien. */
+      /* Status program promo, dibaca di server supaya tidak "pop-in" di klien. */
       promoActive={promo.active}
+      promoPhase={promo.phase}
+      promoStartDate={promo.startDate}
+      promoEndDate={promo.endDate}
+      /* Bonus habis (kuota 0 / di luar periode) -> tampil "Bonus sudah habis". */
       promoBonusAvailable={promo.bonusAvailable}
     />
   );

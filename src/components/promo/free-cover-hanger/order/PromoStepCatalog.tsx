@@ -123,7 +123,8 @@ export default function PromoStepCatalog({
 
   // Event belum dibuka / sudah berakhir → produk dikunci (overlay + tombol nonaktif).
   const locked = phase !== "live";
-  const lockMessage = phase === "ended" ? "Follow untuk info batch berikutnya" : "Belum dibuka";
+  const lockMessage =
+    phase === "ended" ? "Promo sudah berakhir, tunggu periode berikutnya" : "Promo belum dibuka";
 
   return (
     <div>
@@ -294,7 +295,7 @@ export default function PromoStepCatalog({
                       className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-black shadow-md md:gap-2 md:px-4 md:py-2 md:text-sm"
                     >
                       <Lock size={12} strokeWidth={2.5} className="shrink-0 md:h-[14px] md:w-[14px]" />
-                      {phase === "ended" ? "Sudah ditutup" : "Segera dibuka"}
+                      {phase === "ended" ? "Promo berakhir" : "Segera dibuka"}
                     </span>
                   </div>
                 )}

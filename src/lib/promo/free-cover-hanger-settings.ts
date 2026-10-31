@@ -24,6 +24,19 @@ export interface PromoFchSettings {
   startDate: string | null;
   endDate: string | null;
   /**
+   * Status program promo menurut ATURAN PROMO SENDIRI
+   * (`promo_fch_active` + `promo_fch_start_date` / `promo_fch_end_date`).
+   *
+   * Halaman pesan promo memakai ini — BUKAN jadwal Open Order. Dulu promo ikut
+   * jendela `open_order_start_date`/`open_order_end_date`, sehingga promo berhenti
+   * ("Sudah ditutup") begitu jadwal Open Order lewat, walau promo masih aktif.
+   *
+   * - `before` → belum masuk tanggal mulai
+   * - `open`   → boleh dipesan
+   * - `closed` → promo dimatikan admin, atau sudah lewat tanggal selesai
+   */
+  phase: "before" | "open" | "closed";
+  /**
    * Bonus masih bisa ditawarkan (kuota > 0, promo aktif, dalam periode).
    * Dipakai halaman pesan untuk menyembunyikan bar bonus dan menampilkan "Bonus sudah habis".
    */
@@ -42,6 +55,7 @@ export const DEFAULT_PROMO_FCH: PromoFchSettings = {
   quotaNote: PROMO_QUOTA.note,
   startDate: null,
   endDate: null,
+  phase: "open",
   bonusAvailable: true,
 };
 
@@ -64,6 +78,9 @@ function mapRow(row: Record<string, unknown> | null): PromoFchSettings {
   // Tanggal WIB — sama dengan tanggal yang diisi admin (YYYY-MM-DD).
   const todayWib = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
   const inPeriod = (!startDate || todayWib >= startDate) && (!endDate || todayWib <= endDate);
+  // Belum masuk tanggal mulai → belum dibuka. Selebihnya ditentukan `active`.
+  const beforeStart = Boolean(startDate && todayWib < startDate);
+  const phase: PromoFchSettings["phase"] = !active || !inPeriod ? "closed" : beforeStart ? "before" : "open";
 
   return {
     active,
@@ -76,6 +93,7 @@ function mapRow(row: Record<string, unknown> | null): PromoFchSettings {
     quotaNote: String(row.promo_fch_quota_note ?? "").trim() || DEFAULT_PROMO_FCH.quotaNote,
     startDate,
     endDate,
+    phase,
     // Bonus hanya ditawarkan bila kuota masih ada, promo aktif, dan dalam periode.
     bonusAvailable: active && inPeriod && left > 0,
   };
