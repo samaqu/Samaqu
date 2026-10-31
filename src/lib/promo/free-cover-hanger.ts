@@ -260,6 +260,14 @@ export const ADMIN_WA_NUMBER = waNumber(ADMIN_WHATSAPP_RAW);
 export const PROMO_ORDER_PATH = "/promo/free-cover-hanger/pesan";
 
 /**
+ * Nilai `orders.source` untuk pesanan yang datang dari promo ini.
+ *
+ * Dipakai filter & laporan di menu Transaksi, supaya pesanan promo bisa dipisah dari
+ * `Open Order`, website (`SMY-`), dan transaksi ops (`OPS-`).
+ */
+export const PROMO_FCH_SOURCE = "Promo Free Cover Hanger";
+
+/**
  * Tautan CTA utama landing promo.
  *
  * Semua tombol "Pilih Baju & Ambil Bonus" / "Ambil Bonus" / kartu koleksi mengarah ke

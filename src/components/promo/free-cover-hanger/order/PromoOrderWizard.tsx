@@ -271,9 +271,18 @@ export default function PromoOrderWizard({
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [step]);
 
-  // Penawaran (produk/warna/series/harga) diturunkan dari baris katalog — bukan hardcode —
-  // semuanya yang diikutkan admin (`open_order_enabled`), lintas kategori.
-  const products = useMemo(() => buildOpenOrderProducts(catalog, stockRows), [catalog, stockRows]);
+  // Penawaran (produk/warna/series/harga) diturunkan dari baris katalog — bukan hardcode.
+  // Katalog promo = semua produk yang TAYANG di website. `open_order_enabled` sengaja tidak
+  // dipakai: itu sakelar program Open Order, dan sebagian kategori (mis. Kandora) dimatikan
+  // di sana padahal tetap harus bisa dibeli lewat promo.
+  const products = useMemo(
+    () =>
+      buildOpenOrderProducts(
+        catalog.map((row) => ({ ...row, open_order_enabled: true })),
+        stockRows,
+      ),
+    [catalog, stockRows],
+  );
 
   /** Baris katalog asli + penanda series untuk mapping ID item katalog Meta. */
   function metaCatalogRefForLine(line: ProductDraft) {
@@ -583,19 +592,14 @@ export default function PromoOrderWizard({
     }
     setSubmitting(true);
     try {
-      // Pesanan Open Order selalu milik akun customer: token sesi dikirim ke route, yang
-      // memverifikasinya lalu menyimpan `customer_id` (lihat /api/open-order).
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        setAccount(null);
-        setError("Sesi login berakhir. Masuk lagi ya supaya pesananmu tersimpan di akun.");
-        return;
-      }
-      const res = await fetch("/api/open-order", {
+      // Promo TIDAK butuh sesi: pengunjung baru boleh memesan tanpa akun. Server menyimpan
+      // `customer_id: null` dan tetap mencocokkan lewat nomor WhatsApp.
+      //
+      // `extraCover` sengaja tidak dikirim — bonus Cover Hanger diputuskan SERVER setelah
+      // memeriksa apakah nomor ini pelanggan baru (`checkPurchaseEligibility`).
+      const res = await fetch("/api/promo-order", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customer: {
             name: customer.name,
@@ -605,22 +609,22 @@ export default function PromoOrderWizard({
             city: customer.city,
             postalCode: customer.postalCode,
             notes: customer.notes,
+            // Ongkir: layanan & biaya dari J&T, diverifikasi ulang di server.
+            shippingMethod: shipping?.service ?? "",
+            shippingCost: shipping?.cost ?? 0,
           },
-          extraCover,
           paymentMethod,
           // Meta CAPI: identifier browser (fbp/fbc) + URL halaman, dipakai server saat Purchase.
           meta: {
             ...getMetaBrowserIds(),
             eventSourceUrl: typeof window !== "undefined" ? window.location.href : undefined,
           },
-          shipping: shipping ? { method: `J&T - ${shipping.service}`, cost: shipping.cost } : null,
           items: lines.map((line) => ({
             productId: line.productId,
             series: line.series,
             color: line.color,
             size: line.size,
             quantity: line.quantity,
-            price: line.price,
           })),
         }),
       });
