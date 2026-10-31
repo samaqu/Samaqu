@@ -18,7 +18,22 @@ export function PromoClosing({ locale }: { locale: string }) {
         className="fch-wrap fch-sec"
         style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 28 }}
       >
-        <h2 className="fch-disp fch-rv" style={{ fontWeight: 900, fontSize: "clamp(54px, 10cqw, 150px)" }}>
+        {/*
+          Ukuran memakai `min(…vw…)` bukan `cqw`: `10cqw` pada 1920px = 192px lalu
+          dijepit 150px sehingga baris "JADIKAN PEMBELIAN" melebar keluar layar dan
+          terpotong. Batas atas 96px + `text-wrap:balance` membuat baris turun rapi
+          di tengah, tidak terpotong di desktop maupun tablet.
+        */}
+        <h2
+          className="fch-disp fch-rv"
+          style={{
+            fontWeight: 900,
+            fontSize: "clamp(38px, 7.4vw, 96px)",
+            lineHeight: 0.92,
+            textWrap: "balance",
+            maxWidth: "16em",
+          }}
+        >
           {PROMO_CLOSING.headlineTop}
           <br />
           <span style={{ WebkitTextStroke: "2.5px #000000", color: "transparent" }}>
@@ -28,10 +43,7 @@ export function PromoClosing({ locale }: { locale: string }) {
         <p style={{ margin: 0, fontSize: 19, color: "#3D3D3D", maxWidth: "32em", lineHeight: 1.6 }}>
           {PROMO_CLOSING.description}
         </p>
-        <div
-          className="fch-cta-row"
-          style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center", width: "100%" }}
-        >
+        <div className="fch-cta-row" style={{ justifyContent: "center", width: "100%" }}>
           <a
             href={katalogHref(locale)}
             data-katalog-link=""

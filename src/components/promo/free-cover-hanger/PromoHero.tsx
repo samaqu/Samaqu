@@ -7,11 +7,11 @@ import {
 import { HeroStageSvg } from "./illustrations";
 import { QuotaBar } from "./QuotaBar";
 
+/** Gaya dasar tautan CTA — ukuran/padding/radius diatur `.fch-cta-row > a` di CSS. */
 const ctaBase: React.CSSProperties = {
   textDecoration: "none",
   fontWeight: 600,
   fontSize: 17,
-  height: 58,
   borderRadius: 999,
   display: "inline-flex",
   alignItems: "center",
@@ -45,13 +45,13 @@ export function PromoHero({ locale }: { locale: string }) {
 
         {PROMO_FLAGS.showQuota ? <QuotaBar /> : null}
 
-        <div className="fch-fu3 fch-cta-row" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <div className="fch-fu3 fch-cta-row">
           <a
             href={katalogHref(locale)}
             data-katalog-link=""
             data-fch-placement="hero"
             className="fch-btn-ink"
-            style={{ ...ctaBase, background: "#000000", color: "#FFFFFF", padding: "0 30px" }}
+            style={{ ...ctaBase, background: "#000000", color: "#FFFFFF" }}
           >
             {PROMO_HERO.primaryCta}
           </a>
@@ -64,8 +64,6 @@ export function PromoHero({ locale }: { locale: string }) {
               background: "#FFFFFF",
               color: "#000000",
               border: "1.5px solid #000000",
-              padding: "0 26px",
-              boxSizing: "border-box",
             }}
           >
             {PROMO_HERO.secondaryCta}

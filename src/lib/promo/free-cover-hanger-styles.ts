@@ -38,6 +38,22 @@ export const FREE_COVER_HANGER_CSS = `
 .fch-btn-ink:active,.fch-btn-line:active,.fch-tap:active{transform:scale(0.97)}
 .fch-btn-line{transition:background .2s ease,transform .15s ease}
 .fch-btn-line:hover{background:#EEEDE8}
+
+/* ── Baris CTA (hero & closing) ──
+   Dirapikan jadi satu aturan supaya dua tombol selalu sejajar rapi dan tidak
+   melebar sendiri-sendiri saat ruang sempit. Sebelumnya tombol memakai padding
+   kiri-kanan berbeda dan flex-wrap tanpa penguncian lebar, sehingga di layar
+   sedang salah satu tombol bisa turun sendirian dengan lebar aneh. */
+.fch-cta-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.fch-cta-row>a{
+  display:inline-flex;align-items:center;justify-content:center;
+  white-space:nowrap;box-sizing:border-box;
+  min-height:56px;padding:0 30px;border-radius:999px;
+  font-size:17px;font-weight:600;line-height:1;
+  transition:background .2s ease,transform .2s ease;
+}
+.fch-cta-row>a:hover{transform:translateY(-2px)}
+.fch-cta-row>a:active{transform:scale(.97)}
 .fch-tile-img{transition:transform .6s cubic-bezier(.2,.7,.2,1)}
 .fch-tile:hover .fch-tile-img{transform:scale(1.03)}
 
@@ -108,7 +124,10 @@ export const FREE_COVER_HANGER_CSS = `
 .fch-hero-copy{gap:22px !important}
 .fch-hero-sub{font-size:17px !important}
 .fch-stage{max-width:340px !important}
-.fch-cta-row a{flex:1 1 100%;justify-content:center;height:56px !important}
+/* Dua tombol jadi setumpuk penuh-lebar di HP: lebih mudah dijangkau jempol dan
+   tidak ada tombol yang melebar setengah. min-height 52px = target sentuh nyaman. */
+.fch-cta-row{flex-direction:column;align-items:stretch;width:100%}
+.fch-cta-row>a{width:100%;min-height:52px;font-size:16px;padding:0 20px;}
 .fch-quota{padding:16px 18px !important;border-radius:20px !important}
 .fch-sheet{border-radius:28px 28px 0 0;margin-top:-28px;position:relative}
 .fch-sheet-gap{padding-bottom:28px}
