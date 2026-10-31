@@ -41,10 +41,18 @@ function DetailRow({ label, value, strong = false }) {
 
 export default function StockOutDetailDrawer({ open, item, product, sku, colorLabel, onClose }) {
   const status = String(item?.status || "completed");
+  /*
+   * Baris PENJUALAN punya nomor pesanan di `order_id` (SMQ- / CYO- / FCH- / OPS- / EP-).
+   * Baris RETUR/TUKAR SIZE juga menaruh nomor retur di field yang sama, jadi WAJIB dibedakan
+   * dengan `is_stock_movement` — kalau tidak, drawer mengambil cabang "retur" dan menampilkan
+   * "Nomor retur" + "Jenis: Tidak diketahui" untuk pesanan promo (FCH-…).
+   * Awalan `FCH-` sebelumnya juga tidak dikenali sehingga pesanan promo dianggap tanpa pesanan.
+   */
   const orderNumber = useMemo(() => {
-    const value = String(item?.order_id || "");
-    return /^(?:OPS|SMQ|CYO)-[0-9]{8}-[0-9]+$/i.test(value) ? value.toUpperCase() : "";
-  }, [item?.order_id]);
+    if (item?.is_stock_movement) return "";
+    const value = String(item?.order_id || "").trim();
+    return /^(?:OPS|SMQ|CYO|FCH|EP|RSL)-[0-9]{8}-[0-9]+$/i.test(value) ? value.toUpperCase() : "";
+  }, [item?.order_id, item?.is_stock_movement]);
   const [order, setOrder] = useState(null);
   const [orderLoading, setOrderLoading] = useState(false);
 
@@ -175,8 +183,11 @@ export default function StockOutDetailDrawer({ open, item, product, sku, colorLa
                 <section>
                   <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Referensi</p>
                   <div className="rounded-2xl border border-slate-200 px-4 dark:border-slate-800">
-                    <DetailRow label="Nomor retur" value={item.order_id} />
-                    <DetailRow label="Jenis" value={item.platform} />
+                    <DetailRow label="Nomor retur" value={item.order_id !== "-" ? item.order_id : null} />
+                    <DetailRow label="Jenis" value={item.platform || STATUS_LABEL[status] || "-"} />
+                    {item.is_stock_movement ? (
+                      <DetailRow label="Keterangan" value={item.notes || "-"} />
+                    ) : null}
                   </div>
                 </section>
               )}

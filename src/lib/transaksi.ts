@@ -56,17 +56,25 @@ export const OPEN_ORDER_SOURCE_KEY = "open_order";
 export const UNKNOWN_SOURCE_KEY = "unknown";
 /** Pesanan reseller (`EP-…` baru, `RSL-…` lama) — bukan sumber pilihan form manual. */
 export const RESELLER_SOURCE_KEY = "reseller";
+/**
+ * Pesanan promo Free Cover Hanger (`FCH-…`). Sama seperti Open Order: dikenali dari awalan
+ * nomor pesanan, karena kolom `orders.source` menyimpan "Promo Free Cover Hanger" yang bukan
+ * kunci sumber biasa. Tanpa ini promonya jatuh ke "Tidak diketahui".
+ */
+export const PROMO_FCH_SOURCE_KEY = "promo_fch";
 
 export const ORDER_SOURCE_LABEL: Record<string, string> = {
   ...SOURCE_LABEL,
   [OPEN_ORDER_SOURCE_KEY]: "Open Order",
   [UNKNOWN_SOURCE_KEY]: "Tidak diketahui",
   [RESELLER_SOURCE_KEY]: "Reseller",
+  [PROMO_FCH_SOURCE_KEY]: "Promo Free Cover Hanger",
 };
 
 export function orderSourceKey(order?: { order_number?: string | null; source?: unknown } | null): string {
   const number = String(order?.order_number ?? "").trim().toUpperCase();
   if (number.startsWith("CYO-")) return OPEN_ORDER_SOURCE_KEY;
+  if (number.startsWith("FCH-")) return PROMO_FCH_SOURCE_KEY;
   if (isResellerOrderNumber(number)) return RESELLER_SOURCE_KEY;
 
   const raw = String(order?.source ?? "").trim().toLowerCase();

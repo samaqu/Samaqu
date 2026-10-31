@@ -26,6 +26,7 @@ import { orderItemPhoto } from "@/lib/order-photo";
 import { loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { snapshotOrderHpp } from "@/lib/produksi-order-hpp";
 import { checkPurchaseEligibility } from "@/lib/affiliate/eligibility";
+import { localPhone, waNumber } from "@/lib/whatsapp";
 import {
   buildFbc,
   getClientIp,
@@ -196,6 +197,30 @@ export async function POST(request: NextRequest) {
       phone: whatsapp,
     });
     const bonusEligible = eligibility.status !== "eligible";
+
+    /**
+     * Tautkan pesanan ke akun customer (kalau nomor WhatsApp-nya terdaftar).
+     *
+     * Promo sengaja bisa dipesan TANPA login, jadi dulu `customer_id` selalu null dan
+     * pesanannya tidak pernah muncul di dashboard customer. Nomor WhatsApp tetap
+     * dicocokkan ke tabel `customers`; kalau ketemu, pesanan ikut masuk riwayat akun.
+     * Gagal mencocokkan → tetap null, alur pesanan tidak terpengaruh.
+     */
+    let linkedCustomerId: string | null = null;
+    if (whatsapp) {
+      // Dua bentuk yang mungkin tersimpan di `customers.whatsapp`: 08… (lokal) atau 62… .
+      const local = localPhone(whatsapp);
+      const international = waNumber(whatsapp);
+      if (local || international) {
+        const { data: matched } = await supabaseAdmin
+          .from("customers")
+          .select("id")
+          .or(`whatsapp.eq.${local},whatsapp.eq.${international}`)
+          .limit(1)
+          .maybeSingle();
+        if (matched?.id) linkedCustomerId = String(matched.id);
+      }
+    }
 
     // Berat & harga add-on dari katalog, fallback ke setting admin.
     const { data: addonProduct } = await supabaseAdmin
@@ -393,7 +418,7 @@ export async function POST(request: NextRequest) {
       .from("orders")
       .insert({
         order_number: orderNumber,
-        customer_id: null,
+        customer_id: linkedCustomerId,
         customer_name: name,
         customer_email: String(rawCustomer.email ?? "").trim() || null,
         customer_whatsapp: whatsapp,
