@@ -1,11 +1,5 @@
 import { readOpenOrderWindow } from "@/lib/open-order-settings";
-import {
-  formatOpenOrderPeriod,
-  openOrderDeadline,
-  openOrderStartDeadline,
-  resolveOpenOrderState,
-} from "@/lib/open-order-window";
-import { OPEN_ORDER_PERIOD } from "@/lib/open-order-config";
+import { openOrderDeadline, openOrderStartDeadline, resolveOpenOrderState } from "@/lib/open-order-window";
 import { readPromoFchSettings } from "@/lib/promo/free-cover-hanger-settings";
 import PromoOrderWizard from "@/components/promo/free-cover-hanger/order/PromoOrderWizard";
 
@@ -30,7 +24,6 @@ export default async function PromoOrderPage() {
       initialState={state}
       startDeadline={openOrderStartDeadline(window)}
       endDeadline={openOrderDeadline(window)}
-      period={formatOpenOrderPeriod(window, OPEN_ORDER_PERIOD)}
       startDate={window.open_order_start_date}
       endDate={window.open_order_end_date}
       heroEyebrow={promo.eyebrow}

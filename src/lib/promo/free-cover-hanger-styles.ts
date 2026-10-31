@@ -77,6 +77,67 @@ export const FREE_COVER_HANGER_CSS = `
 .fch-rv{animation:fch-reveal linear both;animation-timeline:view();animation-range:entry 0% cover 28%}
 }
 
+/* ── Halaman pesan (/promo/free-cover-hanger/pesan) ──
+   Katalog langkah 1 memakai token mockup: garis hitam 1.5px, radius besar, pil hitam,
+   judul Display. Hanya berlaku di alur pesan, landing tidak terpengaruh. */
+.fch-order{border-bottom:1.5px solid #000000;background:#FFFFFF}
+.fch-order-wrap{max-width:1240px;margin:0 auto;padding:0 24px;box-sizing:border-box}
+.fch-order-log{font-family:var(--font-big-shoulders),Impact,sans-serif;font-size:28px;letter-spacing:.14em;line-height:1;text-transform:uppercase}
+.fch-order-head{display:flex;align-items:center;justify-content:space-between;height:68px;gap:16px}
+.fch-order-step{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;letter-spacing:.02em}
+.fch-order-track{height:2px;background:#D6D5CF;overflow:hidden}
+.fch-order-track>span{display:block;height:100%;background:#000000;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.fch-hero-2{padding-top:44px;padding-bottom:36px;border-bottom:1.5px solid #000000}
+.fch-eyebrow{font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#3D3D3D;margin:0 0 14px}
+.fch-title-xl{font-size:76px;font-weight:900;margin:0}
+.fch-lead{margin:16px 0 0;font-size:17px;line-height:1.65;color:#3D3D3D;max-width:34em}
+.fch-quota-line{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:22px;max-width:520px}
+.fch-quota-line span{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.fch-quota-line b{font-family:var(--font-big-shoulders),Impact,sans-serif;font-size:34px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+.fch-quota-line em{font-style:normal;font-size:14px;color:#3D3D3D}
+.fch-quota-track{height:10px;margin-top:10px;max-width:520px;background:#EEEDE8;border-radius:999px;overflow:hidden}
+.fch-quota-track>i{display:block;height:100%;background:#000000;border-radius:999px;transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.fch-body{padding-top:32px;padding-bottom:56px}
+.fch-chips{display:flex;flex-wrap:wrap;gap:8px;padding:20px 0 28px;border-bottom:1.5px solid #000000}
+.fch-chip{height:42px;padding:0 20px;border-radius:999px;border:1.5px solid #000000;background:#FFFFFF;font:inherit;font-size:14px;font-weight:600;color:#000000;display:inline-flex;align-items:center;gap:8px;cursor:pointer;transition:background .2s ease,color .2s ease}
+.fch-chip:hover{background:#EEEDE8}
+.fch-chip[data-active="true"]{background:#000000;color:#FFFFFF}
+.fch-chip[data-active="true"]:hover{background:#2B2B2B}
+.fch-chip:disabled{opacity:.45;cursor:not-allowed}
+.fch-chip:disabled:hover{background:#FFFFFF}
+.fch-chip em{font-style:normal;font-size:12px;color:#3D3D3D;font-weight:500}
+.fch-chip[data-active="true"] em{color:#BDBDB8}
+.fch-count{font-size:13px;color:#3D3D3D;margin:22px 0 0;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.fch-count b{color:#000000;font-weight:600}
+.fch-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px;margin-top:24px}
+.fch-card{display:flex;flex-direction:column;border:1.5px solid #000000;border-radius:24px;overflow:hidden;background:#FFFFFF;text-align:left;padding:0;font:inherit;color:#000000;cursor:pointer;transition:transform .2s ease,box-shadow .2s ease}
+.fch-card:hover{transform:translateY(-3px);box-shadow:8px 8px 0 #000000}
+.fch-card:active{transform:scale(.99)}
+.fch-card[data-locked="true"]{cursor:not-allowed}
+.fch-card[data-locked="true"]:hover{transform:none;box-shadow:none}
+.fch-card-media{position:relative;aspect-ratio:3/4;background:#EEEDE8;overflow:hidden}
+.fch-card-media img{width:100%;height:100%;object-fit:contain;padding:6px;display:block;transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+.fch-card:hover .fch-card-media img{transform:scale(1.03)}
+.fch-card-flag{position:absolute;top:12px;left:12px;background:#000000;color:#FFFFFF;font-size:11px;font-weight:600;letter-spacing:.02em;padding:7px 12px;border-radius:999px}
+.fch-card-lock{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.28)}
+.fch-card-lock span{display:inline-flex;align-items:center;gap:7px;background:#FFFFFF;color:#000000;font-size:12px;font-weight:600;padding:8px 14px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.fch-card-body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:4px;flex:1}
+.fch-card-name{font-family:var(--font-big-shoulders),Impact,sans-serif;font-size:30px;font-weight:900;text-transform:uppercase;line-height:.9;letter-spacing:.005em;margin:0}
+.fch-card-sub{font-size:13px;color:#3D3D3D;line-height:1.45;margin:0}
+.fch-card-price{margin-top:auto;padding-top:14px;display:flex;align-items:baseline;justify-content:space-between;gap:10px;border-top:1px solid #D6D5CF}
+.fch-card-price small{font-size:11px;color:#3D3D3D;text-transform:uppercase;letter-spacing:.12em;font-weight:600}
+.fch-card-price b{font-size:0;line-height:0}
+.fch-card-price strong{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fch-card-cta{margin-top:12px;height:44px;border-radius:999px;background:#000000;color:#FFFFFF;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:600}
+.fch-card[data-locked="true"] .fch-card-cta{background:#FFFFFF;color:#3D3D3D;border:1.5px solid #D6D5CF}
+.fch-empty{border:1.5px dashed #000000;border-radius:24px;padding:56px 24px;text-align:center;margin-top:24px}
+.fch-empty b{display:block;font-family:var(--font-big-shoulders),Impact,sans-serif;font-size:34px;font-weight:900;text-transform:uppercase;line-height:.9}
+.fch-empty span{display:block;margin-top:10px;font-size:14px;color:#3D3D3D}
+.fch-cart-bar{margin-top:40px;border:1.5px solid #000000;border-radius:999px;padding:10px 10px 10px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;background:#000000;color:#FFFFFF}
+.fch-cart-bar span{font-size:14px;font-weight:600}
+.fch-cart-bar button{height:48px;padding:0 26px;border-radius:999px;background:#FFFFFF;color:#000000;border:none;font:inherit;font-size:14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:background .2s ease}
+.fch-cart-bar button:hover{background:#EEEDE8}
+
 /* tablet */
 @container fch (max-width:900px){
 .fch-hero,.fch-two{grid-template-columns:minmax(0,1fr) !important;gap:40px !important}
@@ -86,6 +147,8 @@ export const FREE_COVER_HANGER_CSS = `
 .fch-sec{padding-top:88px;padding-bottom:88px}
 .fch-hide-m{display:none !important}
 .fch-wrap{padding-left:32px;padding-right:32px}
+.fch-title-xl{font-size:58px}
+.fch-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 
 /* phone: app-like */
@@ -124,6 +187,28 @@ export const FREE_COVER_HANGER_CSS = `
 .fch-faq-a{padding:0 0 22px 0 !important;font-size:15px !important}
 .fch-sticky-cta{display:flex;position:sticky;bottom:0;z-index:30;animation:fch-slideIn .5s ease 1.2s both}
 .fch-footer-pad{padding-bottom:28px !important}
+.fch-order-wrap{padding-left:18px;padding-right:18px}
+.fch-order-head{height:60px}
+.fch-order-log{font-size:22px !important}
+.fch-hero-2{padding-top:28px;padding-bottom:26px}
+.fch-title-xl{font-size:44px}
+.fch-lead{font-size:15px}
+.fch-quota-line b{font-size:28px}
+.fch-body{padding-top:20px;padding-bottom:40px}
+.fch-chips{gap:6px;padding:14px 0 18px;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none;margin:0 -18px;padding-left:18px;padding-right:18px}
+.fch-chips::-webkit-scrollbar{display:none}
+.fch-chip{height:38px;padding:0 16px;font-size:13px;flex-shrink:0}
+.fch-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}
+.fch-card{border-radius:18px}
+.fch-card-body{padding:12px 12px 14px}
+.fch-card-name{font-size:23px}
+.fch-card-sub{font-size:11.5px}
+.fch-card-price{padding-top:10px}
+.fch-card-price small{font-size:9.5px}
+.fch-card-price strong{font-size:14px}
+.fch-card-cta{height:38px;font-size:12px;margin-top:10px}
+.fch-cart-bar{border-radius:20px;padding:10px;flex-direction:column;align-items:stretch;gap:10px;text-align:center}
+.fch-cart-bar button{width:100%;justify-content:center}
 }
 @media (prefers-reduced-motion:reduce){
 .fch-root *,.fch-root *::before,.fch-root *::after{animation:none !important;transition:none !important}
