@@ -15,8 +15,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Loader2, Tag } from "lucide-react";
-import { useToast } from "@/components/AdminToast";
+import { AlertTriangle, Check, Loader2, Tag } from "lucide-react";
 import ProductsCatalog, { type CatalogCard } from "@/components/admin/ProductsCatalog";
 import { getProducts } from "@/lib/db";
 import type { Product } from "@/lib/katalog-data";
@@ -118,7 +117,7 @@ function Section({
 }
 
 export default function PromoFchSettingsForm() {
-  const toast = useToast();
+  const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<Settings>(EMPTY_SETTINGS);
@@ -194,10 +193,10 @@ export default function PromoFchSettingsForm() {
     setSaving(false);
 
     if (error) {
-      toast.showToast("error", `Gagal menyimpan: ${error.message}`);
+      setNotice({ kind: "err", text: `Gagal menyimpan: ${error.message}` });
       return;
     }
-    toast.showToast("success", "Pengaturan promo tersimpan");
+    setNotice({ kind: "ok", text: "Pengaturan promo tersimpan" });
   }
 
   /**
@@ -216,7 +215,7 @@ export default function PromoFchSettingsForm() {
     setSavingId(null);
 
     if (error) {
-      toast.showToast("error", `Gagal mengubah produk: ${error.message}`);
+      setNotice({ kind: "err", text: `Gagal mengubah produk: ${error.message}` });
       return;
     }
     // Perbarui state lokal hanya setelah server mengonfirmasi.
@@ -253,6 +252,25 @@ export default function PromoFchSettingsForm() {
           <code style={{ fontSize: 12 }}>{PROMO_ORDER_PATH}</code>
         </p>
       </header>
+
+      {notice ? (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-xl p-3.5 text-[12.5px]"
+          style={
+            notice.kind === "ok"
+              ? { background: "rgba(31,111,69,.09)", border: "1px solid rgba(31,111,69,.35)", color: "#1f6f45" }
+              : { background: "rgba(185,28,28,.08)", border: "1px solid rgba(185,28,28,.35)", color: "#b91c1c" }
+          }
+        >
+          {notice.kind === "ok" ? (
+            <Check size={16} className="mt-0.5 shrink-0" />
+          ) : (
+            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          )}
+          <span>{notice.text}</span>
+        </div>
+      ) : null}
 
       {missingColumn && (
         <div
