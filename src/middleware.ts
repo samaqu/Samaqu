@@ -92,6 +92,15 @@ function handleRequest(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
+  // Landing promo juga bisa dibuka TANPA prefix bahasa (samaqu.id/promo/free-cover-hanger)
+  // selain versi ber-locale (/id/promo/free-cover-hanger). Path tanpa locale di-rewrite ke
+  // locale default secara internal, jadi URL di address bar tetap bersih.
+  if (/^\/promo(\/|$)/.test(request.nextUrl.pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/${routing.defaultLocale}${request.nextUrl.pathname}`;
+    return NextResponse.rewrite(url);
+  }
+
   return intlMiddleware(request);
 }
 
