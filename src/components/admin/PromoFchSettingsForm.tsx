@@ -20,6 +20,7 @@ import { AlertTriangle, Check, ExternalLink, Loader2, Tag } from "lucide-react";
 import { getCatalogProducts } from "@/lib/db";
 import type { Product } from "@/lib/katalog-data";
 import { PROMO_ORDER_PATH } from "@/lib/promo/free-cover-hanger";
+import { SITE_URL } from "@/lib/site-config";
 import { OPEN_ORDER_ADDON_TARGET_ID, OPEN_ORDER_ADDON_VARIANT } from "@/lib/open-order-config";
 import { supabase } from "@/lib/supabase";
 import { StatusCard } from "./promo-fch/StatusCard";
@@ -408,7 +409,14 @@ export default function PromoFchSettingsForm() {
           </p>
         </div>
         <a
-          href={PROMO_ORDER_PATH}
+          /*
+           * URL ABSOLUT ke domain website (bukan path relatif).
+           * Panel admin juga dibuka lewat subdomain `admin.samaqu.id`, dan di sana
+           * middleware me-rewrite setiap path ke `/panel-admin/...` — sehingga path relatif
+           * `/promo/free-cover-hanger/pesan` jadi 404. Halaman promo hanya ada di domain
+           * website, jadi selalu arahkan ke SITE_URL.
+           */
+          href={`${SITE_URL}${PROMO_ORDER_PATH}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[12px] font-semibold"
