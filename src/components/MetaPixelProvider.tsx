@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback } f
 import { usePathname } from "next/navigation";
 import Script from "next/script";
 import { supabase } from "@/lib/supabase";
+import { SITE_URL } from "@/lib/site-config";
 import {
   flushMetaPixelQueue,
   getMetaBrowserIds,
@@ -41,6 +42,48 @@ function validPixelId(value: string | null | undefined): string {
 function validTestEventCode(value: string | null | undefined): string {
   const code = (value || "").trim();
   return /^[A-Za-z0-9]{1,32}$/.test(code) ? code : "";
+}
+
+/* ── Batas domain pixel ──
+   Pixel hanya boleh berjalan di domain TOKO publik. Tanpa batas ini, dashboard internal
+   (admin.samaqu.id / office.samaqu.id), portal affiliate, preview deploy Vercel, dan
+   `localhost` ikut mengirim PageView. Akibatnya di Meta Events Manager muncul domain
+   sampah (localhost, *.vercel.app, admin.samaqu.id, dst) yang mencemari data event —
+   persis yang terlihat di laporan "Total Peristiwa dalam 28 hari".
+
+   Daftar domain diambil dari `NEXT_PUBLIC_SITE_URL` (mis. https://www.samaqu.id) plus
+   domain tanpa "www". Domain lain = pixel tidak dimuat sama sekali. */
+function buildAllowedHosts(): string[] {
+  const hosts = new Set<string>();
+  for (const raw of [process.env.NEXT_PUBLIC_SITE_URL, SITE_URL]) {
+    const value = (raw || "").trim();
+    if (!value) continue;
+    try {
+      const url = new URL(value.includes("://") ? value : `https://${value}`);
+      const host = url.hostname.toLowerCase();
+      if (!host) continue;
+      hosts.add(host);
+      // "www.samaqu.id" → "samaqu.id" (dan sebaliknya) supaya keduanya diterima.
+      hosts.add(host.startsWith("www.") ? host.slice(4) : `www.${host}`);
+    } catch {
+      // Nilai tidak valid → abaikan, jangan sampai memblokir semuanya.
+    }
+  }
+  return Array.from(hosts);
+}
+
+const ALLOWED_HOSTS = buildAllowedHosts();
+
+/** True kalau halaman ini boleh mengirim event (produksi + domain toko saja). */
+function isTrackingHost(): boolean {
+  if (typeof window === "undefined") return false;
+  // Preview/localhost: Vercel menandai preview dengan VERCEL_ENV=preview (tersedia saat build).
+  if (process.env.NEXT_PUBLIC_VERCEL_ENV && process.env.NEXT_PUBLIC_VERCEL_ENV !== "production") return false;
+  const host = window.location.hostname.toLowerCase();
+  // localhost / IP lokal selalu dikecualikan.
+  if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return false;
+  if (!ALLOWED_HOSTS.length) return false;
+  return ALLOWED_HOSTS.includes(host);
 }
 
 // ── Config cache (module-level, 5 min TTL) ──
@@ -93,11 +136,22 @@ async function fetchConfig(): Promise<MetaPixelConfig | null> {
 export default function MetaPixelProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<MetaPixelConfig | null>(null);
   const [scriptReady, setScriptReady] = useState(false);
+  /**
+   * Pixel hanya dimuat di domain toko publik. Nilai awal `null` = belum dicek; baru
+   * ditentukan setelah mount (`window` tersedia). Saat `false`, base code TIDAK
+   * dirender sama sekali sehingga tidak ada PageView dari dashboard/preview/localhost.
+   */
+  const [trackingHost, setTrackingHost] = useState<boolean | null>(null);
   const pathname = usePathname();
   const lastTrackedPath = useRef<string | null>(null);
 
+  useEffect(() => {
+    setTrackingHost(isTrackingHost());
+  }, []);
+
   // Fetch config on mount + on window focus (for pixel ID changes)
   const loadConfig = useCallback(async () => {
+    if (!isTrackingHost()) return;
     const cfg = await fetchConfig();
     setConfig(cfg);
     setMetaPixelConfig(cfg);
@@ -106,6 +160,7 @@ export default function MetaPixelProvider({ children }: { children: React.ReactN
   }, []);
 
   useEffect(() => {
+    if (trackingHost !== true) return;
     loadConfig();
 
     // Simpan `_fbc` dari parameter fbclid sejak landing page, supaya checkout/Open Order
@@ -115,7 +170,7 @@ export default function MetaPixelProvider({ children }: { children: React.ReactN
     const handleFocus = () => loadConfig();
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
-  }, [loadConfig]);
+  }, [loadConfig, trackingHost]);
 
   const handleScriptReady = useCallback(() => {
     setScriptReady(true);
@@ -126,16 +181,17 @@ export default function MetaPixelProvider({ children }: { children: React.ReactN
      `lastTrackedPath` memastikan tidak ada PageView dobel saat config/script baru siap
      (dulu efek "initial" + efek "route change" bisa menembak dua kali untuk halaman yang sama). */
   useEffect(() => {
+    if (trackingHost !== true) return;
     if (!scriptReady || !config?.enabled) return;
     if (lastTrackedPath.current === pathname) return;
     lastTrackedPath.current = pathname;
     trackPageView();
-  }, [pathname, scriptReady, config]);
+  }, [pathname, scriptReady, config, trackingHost]);
 
   return (
     <MetaPixelContext.Provider value={{ config, isReady: scriptReady && !!config?.enabled }}>
-      {/* Meta Pixel base code — satu kali di layout global */}
-      {config?.enabled && config.pixelId && (
+      {/* Meta Pixel base code — satu kali di layout global, HANYA di domain toko. */}
+      {trackingHost === true && config?.enabled && config.pixelId && (
         <Script
           id="meta-pixel"
           strategy="afterInteractive"

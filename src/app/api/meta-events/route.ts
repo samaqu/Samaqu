@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { SITE_URL } from "@/lib/site-config";
 import {
   buildFbc,
   checkCapiRateLimit,
@@ -47,6 +48,41 @@ function cleanUserString(value: unknown, max = 200): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : undefined;
 }
 
+/**
+ * Domain toko yang boleh mengirim event ke Meta.
+ *
+ * Tanpa ini, event dari dashboard internal (admin./office.), portal affiliate, preview
+ * Vercel, atau localhost ikut tercatat dan memunculkan domain sampah di Events Manager.
+ * Daftar diambil dari `NEXT_PUBLIC_SITE_URL`, plus versi tanpa/tanpa "www".
+ */
+const ALLOWED_TRACKING_HOSTS = (() => {
+  const hosts = new Set<string>();
+  for (const raw of [process.env.NEXT_PUBLIC_SITE_URL, SITE_URL]) {
+    const value = String(raw || "").trim();
+    if (!value) continue;
+    try {
+      const host = new URL(value.includes("://") ? value : `https://${value}`).hostname.toLowerCase();
+      if (!host) continue;
+      hosts.add(host);
+      hosts.add(host.startsWith("www.") ? host.slice(4) : `www.${host}`);
+    } catch {
+      /* nilai tidak valid → abaikan */
+    }
+  }
+  return hosts;
+})();
+
+/** True kalau `eventSourceUrl` berasal dari domain toko (atau kosong → dianggap sah). */
+function isTrackingHostAllowed(eventSourceUrl: string | undefined): boolean {
+  if (!eventSourceUrl) return true;
+  if (ALLOWED_TRACKING_HOSTS.size === 0) return true;
+  try {
+    return ALLOWED_TRACKING_HOSTS.has(new URL(eventSourceUrl).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const contentLength = Number(request.headers.get("content-length") || 0);
@@ -85,6 +121,12 @@ export async function POST(request: NextRequest) {
     const eventSourceUrl =
       cleanUserString(body.eventSourceUrl, 1000) ||
       cleanUserString(request.headers.get("referer"), 1000);
+
+    // Event dari domain non-toko (dashboard internal, preview, localhost) tidak diteruskan
+    // ke Meta — supaya Events Manager tidak terisi domain sampah.
+    if (!isTrackingHostAllowed(eventSourceUrl)) {
+      return NextResponse.json({ ok: false, skipped: true }, { status: 200 });
+    }
 
     const result = await sendMetaCapiEvent({
       eventName,
