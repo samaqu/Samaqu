@@ -73,6 +73,14 @@ type Summary = {
   hppNote: string;
   hppCoverage: { totalQty: number; knownQty: number; missingQty: number; missingOrders: number };
   biayaAvailable: boolean;
+  /**
+   * Biaya transaksi Mayar (potongan gateway + layanan) untuk transaksi yang sudah CAIR.
+   * Opsional: respons lama tanpa field ini tetap tampil normal.
+   */
+  mayarFee?: number;
+  /** Jumlah transaksi Mayar yang sudah dibayar tapi belum cair (biayanya belum terpotong). */
+  mayarPendingCount?: number;
+  biayaOperasional?: number;
   profitStatus: ProfitStatus;
   profitNote: string;
 };
@@ -427,10 +435,14 @@ export default function LaporanKeuanganPage() {
           />
           <GlassCard
             icon={IconReceipt}
-            label="Biaya Operasional"
-            value={s.biayaAvailable ? rp(s.biaya) : "—"}
-            tone={s.biayaAvailable ? "default" : "muted"}
-            caption={s.biayaAvailable ? "Biaya operasional tercatat." : "Data biaya operasional belum tersedia."}
+            label="Biaya Mayar"
+            value={rp(s.mayarFee || 0)}
+            tone={s.mayarFee ? "default" : "muted"}
+            caption={
+              s.mayarPendingCount
+                ? `${s.mayarPendingCount} transaksi belum cair — biaya belum terpotong.`
+                : "Potongan transaksi Mayar yang sudah cair."
+            }
           />
           <div
             className="relative bg-white border border-slate-200 rounded-2xl p-5 flex flex-col"
@@ -539,12 +551,24 @@ export default function LaporanKeuanganPage() {
               hint="Biaya operasional yang tercatat di sistem."
               caption={s.biayaAvailable ? undefined : "Data biaya operasional belum tersedia."}
             />
+            {/* Biaya Mayar dipisah: ini biaya transaksi nyata dari penyedia pembayaran. */}
+            <BreakdownRow
+              label="Biaya Transaksi Mayar"
+              value={s.mayarFee ? `− ${rp(s.mayarFee)}` : "Rp 0"}
+              tone={s.mayarFee ? "red" : "muted"}
+              hint="Potongan Mayar (biaya gateway + layanan) dari transaksi yang sudah cair."
+              caption={
+                s.mayarPendingCount
+                  ? `${s.mayarPendingCount} transaksi belum cair — biayanya belum ikut terpotong.`
+                  : undefined
+              }
+            />
             <BreakdownRow
               label="Estimasi Laba"
               value={s.profit !== null ? rp(s.profit) : "Belum dapat dihitung"}
               tone={s.profitStatus === "valid" ? (profitPositive ? "green" : "red") : "muted"}
               emphasis
-              hint="Penjualan Setelah Retur − Modal Barang Terjual − Biaya Operasional."
+              hint="Penjualan Setelah Retur − Modal Barang Terjual − Biaya Operasional − Biaya Mayar."
               caption={s.profitStatus === "valid" ? undefined : s.profitNote}
             />
           </div>

@@ -344,8 +344,39 @@ async function loadPeriod(
   const refundTotal = sumBy(settledRefunds, (row) => Number(row.refund_amount) || 0);
   const exchangeTotal = sumBy(settledExchanges, (row) => Number(row.price_difference_total) || 0);
   const net = gross - refundTotal + exchangeTotal;
-  const biaya = 0;
-  const biayaAvailable = EXPENSES_AVAILABLE;
+  /*
+   * ── Biaya Mayar masuk sebagai PENGELUARAN ──
+   * Fee transaksi Mayar memang uang yang tidak diterima, jadi harus mengurangi laba.
+   * Dihitung dari pesanan sah di periode ini (penjualan valid), bukan dari seluruh
+   * transaksi Mayar — supaya konsisten dengan angka Penjualan di atas.
+   *
+   * PENTING (kejujuran angka): `fee` baru ada setelah transaksi `settled`. Kalau masih ada
+   * transaksi yang belum cair, biaya sebenarnya LEBIH BESAR dari yang terhitung. Karena itu
+   * status laba tidak boleh disebut "valid" selama masih ada yang tertunda.
+   */
+  const mayarFeesPeriod = await loadMayarFees();
+  let mayarFee = 0;
+  let mayarPendingCount = 0;
+  for (const order of validOrders) {
+    const provider = String((order as { payment_provider?: string | null }).payment_provider || "").toLowerCase();
+    if (provider !== "mayar") continue;
+    const ref = String((order as { payment_ref?: string | null }).payment_ref || "").trim();
+    const detail = ref ? mayarFeesPeriod.get(ref) : undefined;
+    if (detail && detail.status === "settled" && Number.isFinite(detail.fee)) {
+      mayarFee += detail.fee;
+    } else {
+      // Dibayar tapi belum cair, atau belum tercatat di Mayar → biaya belum diketahui.
+      mayarPendingCount += 1;
+    }
+  }
+
+  const biayaOperasional = 0;
+  const biaya = biayaOperasional + mayarFee;
+  /**
+   * Biaya dianggap lengkap hanya bila data operasional tersedia DAN seluruh transaksi Mayar
+   * periode ini sudah cair. Kalau tidak, laba masih bisa bertambah turun setelah dana cair.
+   */
+  const biayaAvailable = EXPENSES_AVAILABLE && mayarPendingCount === 0;
 
   /**
    * Laba hanya boleh disebut final kalau modal DAN biaya lengkap.
@@ -369,7 +400,9 @@ async function loadPeriod(
       ? ""
       : profitStatus === "unavailable"
         ? `${hppNote} Estimasi laba belum dapat dihitung.`
-        : "Data biaya operasional belum tersedia; estimasi laba belum final.";
+        : mayarPendingCount > 0
+          ? `${mayarPendingCount} transaksi Mayar belum cair — biayanya belum dipotong, jadi laba masih bisa turun setelah dana masuk.`
+          : "Data biaya operasional belum tersedia; estimasi laba belum final.";
 
   const pendingReturns = returnsCreated.filter(
     (row) =>
@@ -406,6 +439,10 @@ async function loadPeriod(
     exchangeTotal,
     net,
     biaya,
+    /** Rincian biaya: Mayar dipisah dari operasional supaya sumbernya jelas. */
+    mayarFee,
+    mayarPendingCount,
+    biayaOperasional,
     biayaAvailable,
     hppStatus,
     hppNote,
@@ -650,9 +687,14 @@ export async function GET(req: NextRequest) {
 
       if (settled) {
         mayarSettled.push({ ...base, fee: detail!.fee, net: detail!.net });
-      } else {
-        // Belum cair (atau belum ada transaksi di Mayar) → biaya TIDAK ditebak.
-        mayarPending.push({ ...base, mayar_status: detail?.status ?? null });
+      } else if (detail?.status === "paid") {
+        /*
+         * Hanya transaksi yang SUDAH DIBAYAR tapi belum cair. Pesanan yang belum dibayar
+         * sama sekali (tidak ada transaksi / masih `unpaid`) sengaja TIDAK dimasukkan —
+         * laporan ini soal uang yang sudah masuk, bukan tagihan menggantung. Pesanan seperti
+         * itu tetap terlihat di menu Transaksi / Pesanan.
+         */
+        mayarPending.push({ ...base, mayar_status: detail.status });
       }
     }
     const returnTable = current.returnRows
