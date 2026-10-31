@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 
     const { data: customer } = await admin
       .from("customers")
-      .select("id, whatsapp")
+      .select("id, whatsapp, email")
       .eq("id", user.id)
       .maybeSingle();
     if (!customer) {
@@ -37,8 +37,13 @@ export async function GET(req: NextRequest) {
 
     // Email hanya boleh dipakai sebagai penghubung kalau sudah terverifikasi. Tanpa ini,
     // seseorang bisa mendaftar dengan email orang lain dan melihat riwayat pesanan tamunya.
+    // Sumber utama tetap `customers.email`; email Auth dipakai sebagai cadangan supaya akun
+    // lama (yang belum punya kolom email) tetap berfungsi.
     const emailVerified = Boolean((user as { email_confirmed_at?: string | null }).email_confirmed_at);
-    const emailKey = emailVerified ? String(user.email || "").trim().toLowerCase() : "";
+    const customerEmail = String((customer as { email?: string | null }).email ?? "").trim().toLowerCase();
+    const emailKey = emailVerified ? String(user.email || "").trim().toLowerCase() || customerEmail : "";
+    /** Email yang dicoba dicocokkan: milik akun + email login. */
+    const emailVariants = Array.from(new Set([emailKey, customerEmail].filter(Boolean)));
     const phoneKey = normalizeKontak(customer.whatsapp);
     const whatsapp = String(customer.whatsapp || "").trim();
     const digits = whatsapp.replace(/\D/g, "").replace(/^0+/, "");
@@ -48,7 +53,7 @@ export async function GET(req: NextRequest) {
 
     // Query hanya pesanan yang relevan — jangan ambil seluruh tabel `orders`.
     const filters = [`customer_id.eq.${user.id}`];
-    if (emailKey) filters.push(`customer_email.eq.${emailKey}`);
+    for (const value of emailVariants) filters.push(`customer_email.eq.${value}`);
     for (const value of phoneVariants) filters.push(`customer_whatsapp.eq.${value}`);
 
     const rawLimit = Number(new URL(req.url).searchParams.get("limit"));
@@ -65,7 +70,8 @@ export async function GET(req: NextRequest) {
     // Pengaman kalau PostgREST mengembalikan baris di luar filter.
     const orders = (data || []).filter((order: any) => {
       if (String(order.customer_id || "") === String(user.id)) return true;
-      if (emailKey && String(order.customer_email || "").trim().toLowerCase() === emailKey) return true;
+      const orderEmail = String(order.customer_email || "").trim().toLowerCase();
+      if (orderEmail && emailVariants.includes(orderEmail)) return true;
       if (phoneKey && normalizeKontak(order.customer_whatsapp) === phoneKey) return true;
       return false;
     });
