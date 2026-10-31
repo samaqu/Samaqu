@@ -30,7 +30,7 @@ import { PreviewCard } from "./promo-fch/PreviewCard";
 import { RingkasanCard } from "./promo-fch/RingkasanCard";
 import { ProdukCard, type PromoProduct } from "./promo-fch/ProdukCard";
 import { SaveBar } from "./promo-fch/SaveBar";
-import { TEXT, TEXT_MUTED } from "./promo-fch/primitives";
+import { PROMO_FORM_CSS, TEXT, TEXT_MUTED } from "./promo-fch/primitives";
 
 const COLUMNS =
   "promo_fch_active, promo_fch_title, promo_fch_eyebrow, promo_fch_description, promo_fch_quota_total, promo_fch_quota_left, promo_fch_quota_note, promo_fch_start_date, promo_fch_end_date";
@@ -325,7 +325,10 @@ export default function PromoFchSettingsForm() {
       : { bg: "#EAF7F0", bd: "#BFE6D2", fg: "#1F6F45" };
 
   return (
-    <div className="flex flex-col gap-5 pb-4">
+    <div className="pf-form flex flex-col gap-5 pb-4">
+      {/* Gaya isian & kartu halaman promo. Di-scope `.pf-form` supaya reset border dari
+          preflight Tailwind tidak ikut — CSS global tidak diubah. */}
+      <style>{PROMO_FORM_CSS}</style>
       {/* ── Header halaman ── */}
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">

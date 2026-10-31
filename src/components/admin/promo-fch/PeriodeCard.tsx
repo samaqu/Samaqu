@@ -8,7 +8,7 @@
  * ulang. Tidak ada library tanggal tambahan dan tidak ada perubahan format di database.
  */
 
-import { Card, FieldLabel, HelperText, inputStyle } from "./primitives";
+import { Card, FieldLabel, HelperText } from "./primitives";
 
 type Parts = { d: string; m: string; y: string };
 
@@ -19,11 +19,8 @@ function parseIso(value: string): Parts {
 }
 
 function toIso(parts: Parts): string {
-  const d = parts.d.padStart(2, "0");
-  const m = parts.m.padStart(2, "0");
-  const y = parts.y;
-  if (!d.trim() || !m.trim() || y.length !== 4) return "";
-  return `${y}-${m}-${d}`;
+  if (!parts.d || !parts.m || parts.y.length !== 4) return "";
+  return `${parts.y}-${parts.m.padStart(2, "0")}-${parts.d.padStart(2, "0")}`;
 }
 
 /** Isian tanggal dd/mm/yyyy sederhana. Kosong = tidak dibatasi. */
@@ -44,51 +41,47 @@ function DateField({
     if (iso || (!next.d && !next.m && !next.y)) onChange(iso);
   }
 
-  const cell = (style?: React.CSSProperties) => ({
-    ...inputStyle,
-    ...style,
-    textAlign: "center" as const,
-    fontVariantNumeric: "tabular-nums" as const,
-  });
-
   return (
     <div className="flex items-center gap-1.5">
       <input
         id={id}
+        className="pf-input pf-date"
         aria-label="Tanggal"
         inputMode="numeric"
         maxLength={2}
         placeholder="dd"
         value={parts.d}
         onChange={(e) => update({ ...parts, d: e.target.value.replace(/\D/g, "") })}
-        style={cell({ width: 52 })}
+        style={{ width: 56 }}
       />
-      <span style={{ color: "#9a9a98" }}>/</span>
+      <span style={{ color: "#9aa5ad" }}>/</span>
       <input
+        className="pf-input pf-date"
         aria-label="Bulan"
         inputMode="numeric"
         maxLength={2}
         placeholder="mm"
         value={parts.m}
         onChange={(e) => update({ ...parts, m: e.target.value.replace(/\D/g, "") })}
-        style={cell({ width: 52 })}
+        style={{ width: 56 }}
       />
-      <span style={{ color: "#9a9a98" }}>/</span>
+      <span style={{ color: "#9aa5ad" }}>/</span>
       <input
+        className="pf-input pf-date"
         aria-label="Tahun"
         inputMode="numeric"
         maxLength={4}
         placeholder="yyyy"
         value={parts.y}
         onChange={(e) => update({ ...parts, y: e.target.value.replace(/\D/g, "") })}
-        style={cell({ width: 76 })}
+        style={{ width: 82 }}
       />
       {value ? (
         <button
           type="button"
           onClick={() => onChange("")}
-          className="ml-1 rounded-md px-2 py-1 text-[11px]"
-          style={{ border: "1px solid var(--bd)", color: "var(--fg2)" }}
+          className="ml-1 rounded-lg px-2.5 py-2 text-[11px]"
+          style={{ border: "1px solid #D9CFC1", color: "#5B6B78", background: "#FFFFFF" }}
         >
           Kosongkan
         </button>

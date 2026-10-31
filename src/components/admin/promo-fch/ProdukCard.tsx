@@ -136,10 +136,7 @@ export function ProdukCard({
   }
 
   return (
-    <section
-      className="rounded-2xl p-5"
-      style={{ background: "var(--card)", border: "1px solid var(--bd)", boxShadow: "0 1px 2px rgba(0,0,0,.04)" }}
-    >
+    <section className="pf-card p-5">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-[13.5px] font-bold" style={{ color: TEXT }}>
@@ -185,15 +182,15 @@ export function ProdukCard({
 
       {/* Search + chip kategori */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[200px] flex-1">
-          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#9a9a98" }} />
+        <div className="relative min-w-[220px] flex-1">
+          <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: "#9aa5ad" }} />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari nama produk atau kain…"
             aria-label="Cari produk promo"
-            className="w-full rounded-lg py-2 pl-9 pr-3 text-[12.5px]"
-            style={{ background: "var(--sub)", border: "1px solid var(--bd)", color: TEXT, outline: "none" }}
+            className="pf-input"
+            style={{ paddingLeft: 38, paddingRight: 14 }}
           />
         </div>
         <div className="flex flex-wrap gap-1.5">

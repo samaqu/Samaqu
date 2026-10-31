@@ -8,7 +8,7 @@
  * setiap pesanan mendapat bonus (lihat `samaqu_consume_promo_quota`).
  */
 
-import { Card, FieldLabel, HelperText, inputStyle, PROMO_COLORS, TEXT, TEXT_MUTED } from "./primitives";
+import { Card, FieldLabel, HelperText, PROMO_COLORS, PromoInput, TEXT, TEXT_DIM, TEXT_MUTED } from "./primitives";
 
 export function KuotaCard({
   quotaTotal,
@@ -32,13 +32,13 @@ export function KuotaCard({
         <div>
           <FieldLabel htmlFor="promo-quota-total">Total kuota</FieldLabel>
           <div className="relative">
-            <input
+            <PromoInput
               id="promo-quota-total"
               type="number"
               min={1}
               value={quotaTotal}
               onChange={(e) => onChange({ quotaTotal: Number(e.target.value) || 0 })}
-              style={{ ...inputStyle, paddingRight: 44, fontVariantNumeric: "tabular-nums" }}
+              style={{ paddingRight: 48, fontVariantNumeric: "tabular-nums" }}
             />
             <span
               className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px]"
@@ -54,8 +54,8 @@ export function KuotaCard({
         <div>
           <FieldLabel>Sisa bonus</FieldLabel>
           <div
-            className="rounded-[10px] px-3 py-2.5"
-            style={{ background: "var(--sub)", border: "1px solid var(--bd)" }}
+            className="flex flex-col justify-center rounded-[10px] px-3.5"
+            style={{ minHeight: 44, background: "#F7F5F2", border: "1px solid #D9CFC1" }}
           >
             <p className="text-[12.5px]" style={{ color: TEXT }}>
               Terpakai <b className="tabular-nums">{used}</b>, Sisa{" "}
@@ -65,8 +65,8 @@ export function KuotaCard({
               <span style={{ color: TEXT_MUTED }}>dari {total}</span>
             </p>
             <div
-              className="mt-2 h-2 overflow-hidden rounded-full"
-              style={{ background: "#E4E4E4" }}
+              className="mt-1.5 h-2 overflow-hidden rounded-full"
+              style={{ background: "#E4DED6" }}
               role="progressbar"
               aria-valuemin={0}
               aria-valuemax={100}
@@ -84,13 +84,15 @@ export function KuotaCard({
 
       <div className="mt-4">
         <FieldLabel htmlFor="promo-quota-note">Keterangan di bawah bar</FieldLabel>
-        <input
+        <PromoInput
           id="promo-quota-note"
           value={quotaNote}
           onChange={(e) => onChange({ quotaNote: e.target.value })}
           placeholder="Bonus terbatas. Begitu kuotanya habis, program selesai."
-          style={inputStyle}
         />
+        <HelperText style={{ color: TEXT_DIM }}>
+          Kalimat kecil di bawah bar sisa bonus pada halaman pesan.
+        </HelperText>
       </div>
     </Card>
   );

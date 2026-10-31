@@ -51,14 +51,11 @@ export function RingkasanCard({
   const stokKurang = bonusStock !== null && bonusStock < quotaLeft;
 
   return (
-    <section
-      className="rounded-2xl p-5"
-      style={{ background: "var(--card)", border: "1px solid var(--bd)", boxShadow: "0 1px 2px rgba(0,0,0,.04)" }}
-    >
+    <section className="pf-card p-5">
       <h2 className="mb-2 text-[13.5px] font-bold" style={{ color: TEXT }}>
         Ringkasan
       </h2>
-      <div className="divide-y" style={{ borderColor: "var(--bd)" }}>
+      <div className="divide-y" style={{ borderColor: "#ECE4D8" }}>
         <Row label="Produk ikut promo" value={`${productsOn} dari ${productsTotal}`} />
         <Row label="Bonus terpakai" value={`${used} pcs`} />
         <Row label="Sisa kuota" value={`${Math.max(0, quotaLeft)} pcs`} strong />
