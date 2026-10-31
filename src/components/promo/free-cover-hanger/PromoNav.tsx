@@ -1,6 +1,7 @@
+import Image from "next/image";
 import { PROMO_NAV, katalogHref } from "@/lib/promo/free-cover-hanger";
 
-/** Navigasi atas: logo SAMAQU + tombol katalog. */
+/** Navigasi atas: logo SAMAQU (aset resmi `public/logo.svg`) + tombol katalog. */
 export function PromoNav({ locale }: { locale: string }) {
   return (
     <div style={{ borderBottom: "1.5px solid #000000", background: "#FFFFFF" }}>
@@ -8,9 +9,20 @@ export function PromoNav({ locale }: { locale: string }) {
         className="fch-wrap fch-nav"
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 76, gap: 16 }}
       >
-        <div className="fch-disp fch-nav-logo" style={{ fontSize: 32, letterSpacing: "0.14em", lineHeight: 1 }}>
-          {PROMO_NAV.logo}
-        </div>
+        {/*
+          Logo memakai aset resmi, bukan teks — konsisten dengan Navbar & Footer situs.
+          Rasio asli 2560×853 dipertahankan (`width:auto` + `height` tetap) supaya tidak
+          gepeng. `priority` karena elemen ini di atas fold.
+        */}
+        <Image
+          src="/logo.svg"
+          alt={PROMO_NAV.logo}
+          width={2560}
+          height={853}
+          priority
+          className="fch-nav-logo"
+          style={{ height: 28, width: "auto", display: "block" }}
+        />
         <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
           <span
             className="fch-hide-m"

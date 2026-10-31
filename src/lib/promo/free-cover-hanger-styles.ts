@@ -118,7 +118,8 @@ export const FREE_COVER_HANGER_CSS = `
 .fch-sec{padding-top:72px;padding-bottom:72px}
 .fch-only-m{display:block}
 .fch-nav{height:60px !important}
-.fch-nav-logo{font-size:26px !important}
+/* Logo kini aset gambar (logo.svg), bukan teks — jadi yang diatur tingginya. */
+.fch-nav-logo{height:24px !important;width:auto !important}
 .fch-nav-btn{height:40px !important;padding:0 16px !important;font-size:14px !important}
 .fch-hero-pad{padding-top:28px !important;padding-bottom:40px !important}
 .fch-hero-copy{gap:22px !important}
