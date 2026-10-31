@@ -11,9 +11,6 @@ import { waNumber, waLink } from "@/lib/whatsapp";
 /** Nomor admin SAMAQU — sumbernya dari store settings di `bio-page-content`. */
 const ADMIN_WHATSAPP_RAW = "62895635965400";
 
-/** Url katalog dengan prefix bahasa (mengikuti pola `/id/katalog`). */
-export const KATALOG_PATH = "/katalog";
-
 /** Aset promo (sudah ada di `public/promo`). */
 export const PROMO_ASSETS = {
   video: "/promo/free-cover-hanger.mp4",
@@ -160,7 +157,7 @@ export type PromoCollectionsConfig = {
 
 export const PROMO_COLLECTIONS: PromoCollectionsConfig = {
   title: "Pilih baju pertamamu.",
-  allLabel: "Lihat semua di katalog",
+  allLabel: "Lihat semua koleksi",
   mobileHint: "Geser untuk lihat koleksi lain",
   items: [
     {
@@ -259,9 +256,56 @@ export const ADMIN_WA_LINK = waLink(ADMIN_WHATSAPP_RAW, "Halo Samaqu, saya mau t
 
 export const ADMIN_WA_NUMBER = waNumber(ADMIN_WHATSAPP_RAW);
 
-/** Path katalog per bahasa, contoh `/id/katalog`. */
+/** Path halaman pesan promo (wizard katalog → keranjang → data). */
+export const PROMO_ORDER_PATH = "/promo/free-cover-hanger/pesan";
+
+/**
+ * Tautan CTA utama landing promo.
+ *
+ * Semua tombol "Pilih Baju & Ambil Bonus" / "Ambil Bonus" / kartu koleksi mengarah ke
+ * **halaman pesan promo**, bukan katalog toko biasa — supaya bonus Cover Hanger ikut
+ * terpasang di pesanan dan pengecekan pelanggan baru berjalan di alur yang benar.
+ */
 export function katalogHref(locale: string) {
-  return `/${locale}${KATALOG_PATH}`;
+  return `/${locale}${PROMO_ORDER_PATH}`;
+}
+
+/**
+ * ── Timer harian promo ──
+ *
+ * Countdown promo memakai siklus **24 jam yang reset tiap tengah malam WIB**, bukan tanggal
+ * berakhir. Alasannya: promo dikunci oleh sisa kuota, bukan oleh waktu; timer ini hanya
+ * pengingat "hari ini" yang jujur — setiap pengunjung melihat sisa hari yang sama.
+ *
+ * Dihitung murni dari waktu, tanpa state per pengunjung dan tanpa data tambahan.
+ */
+
+/** WIB = UTC+7. Sama dengan konstanta di `lib/open-order-window.ts`. */
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+/**
+ * Epoch ms tengah malam WIB **berikutnya** (00:00:00.000) untuk waktu `now`.
+ *
+ * Contoh: sekarang 31 Okt 2026 14:30 WIB → hasilnya 1 Nov 2026 00:00 WIB.
+ * Tepat tengah malam (00:00:00.000) hasilnya adalah tengah malam hari berikutnya.
+ */
+export function nextWibMidnight(now: number = Date.now()): number {
+  const wibNow = now + WIB_OFFSET_MS;
+  const dayMs = 24 * 60 * 60 * 1000;
+  const startOfWibDay = Math.floor(wibNow / dayMs) * dayMs;
+  // +1 hari WIB, lalu dikembalikan ke epoch UTC.
+  return startOfWibDay + dayMs - WIB_OFFSET_MS;
+}
+
+/**
+ * Teks tengah malam WIB berikutnya, mis. "malam ini · 24.00 WIB".
+ * Dipakai sebagai keterangan di bawah timer supaya tidak terasa mengambang.
+ */
+export function nextWibMidnightLabel(now: number = Date.now()): string {
+  const target = new Date(nextWibMidnight(now) + WIB_OFFSET_MS);
+  const hh = String(target.getUTCHours()).padStart(2, "0");
+  const mm = String(target.getUTCMinutes()).padStart(2, "0");
+  return `Berakhir malam ini · ${hh}.${mm} WIB`;
 }
 
 /**
