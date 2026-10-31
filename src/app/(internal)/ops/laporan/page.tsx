@@ -1024,7 +1024,7 @@ function TableBody({
         <table className="w-full min-w-[720px] border-collapse text-sm">
           <thead className="bg-[#F9FAFB]">
             <tr>
-              {tab === "sales" ? (
+              {tab === "sales" || tab === "mayar-settled" ? (
                 <>
                   {header("order_number", "No. Pesanan")}
                   {header("customer_name", "Pelanggan", "hidden md:table-cell")}
@@ -1071,7 +1071,7 @@ function TableBody({
                 onClick={() => onRow(row)}
                 className="cursor-pointer border-t border-[#E5E7EB] hover:bg-slate-50"
               >
-                {tab === "sales" ? (
+                {tab === "sales" || tab === "mayar-settled" ? (
                   <>
                     <td className="px-3 py-3 font-mono text-xs font-bold text-slate-800">{row.order_number}</td>
                     <td className="hidden px-3 py-3 text-xs font-semibold text-slate-600 md:table-cell">{row.customer_name || "-"}</td>
