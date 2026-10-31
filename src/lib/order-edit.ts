@@ -8,9 +8,9 @@
  * menyimpan `source = 'website'` di database. Awalan `CYO-` yang membedakannya.
  */
 
-import { MANUAL_SOURCE_KEYS, RESELLER_SOURCE_KEY, orderSourceKey } from "@/lib/transaksi";
+import { MANUAL_SOURCE_KEYS, PROMO_FCH_SOURCE_KEY, RESELLER_SOURCE_KEY, orderSourceKey } from "@/lib/transaksi";
 
-export type EditSourceGroup = "manual" | "website" | "open_order" | "reseller" | "unknown";
+export type EditSourceGroup = "manual" | "website" | "open_order" | "promo_fch" | "reseller" | "unknown";
 
 /** Teks aturan edit pesanan reseller — dipakai server & UI (satu sumber). */
 export const RESELLER_EDIT_NOTICE =
@@ -40,6 +40,9 @@ export type EditGuard = {
 export function editSourceGroup(order?: EditableOrder | null): EditSourceGroup {
   const key = orderSourceKey(order);
   if (key === "open_order") return "open_order";
+  // Promo Free Cover Hanger (`FCH-…`) diperlakukan seperti Open Order: boleh diedit,
+  // dengan baris bonus Cover Hanger yang tetap dipatok (lihat route PATCH).
+  if (key === PROMO_FCH_SOURCE_KEY) return "promo_fch";
   if (key === "website") return "website";
   if (key === RESELLER_SOURCE_KEY) return "reseller";
   if (MANUAL_SOURCE_KEYS.includes(key)) return "manual";

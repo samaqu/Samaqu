@@ -171,7 +171,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
    * `open_order_minimum_price` / `open_order_cyp_enabled` (menu Open Order), bukan harga katalog
    * (menu Produk). Pesanan website & transaksi manual tetap memakai harga katalog.
    */
-  const isOpenOrderEdit = isEdit && initialData?.source_key === "open_order";
+  const isOpenOrderEdit =
+    isEdit && (initialData?.source_key === "open_order" || initialData?.source_key === "promo_fch");
 
   /**
    * Stok yang sudah "dipesan" oleh pesanan ini (sudah dipotong dari stok katalog).
@@ -986,8 +987,12 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
   }
   const changeSummary = isEdit ? changeParts.join(" · ") : "";
 
-  // Website & Open Order: sumber tidak boleh diubah dari form ini; total wajib sama.
-  const managedSource = isEdit && (initialData?.source_key === "website" || initialData?.source_key === "open_order");
+  // Website, Open Order & Promo: sumber tidak boleh diubah dari form ini; total wajib sama.
+  const managedSource =
+    isEdit &&
+    (initialData?.source_key === "website" ||
+      initialData?.source_key === "open_order" ||
+      initialData?.source_key === "promo_fch");
   const lockedSourceLabel = managedSource ? initialData?.source_label || "Website" : "";
   const oldWeight = Number(initialData?.weight) || 0;
   const totalChanged = managedSource && Math.round(total) !== Math.round(originalTotal);

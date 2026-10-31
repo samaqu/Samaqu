@@ -17,7 +17,7 @@ import {
   type WeightMap,
 } from "@/lib/shipping-weight";
 import { computeOrderHppForItems, snapshotOrderHpp } from "@/lib/produksi-order-hpp";
-import { RESELLER_EDIT_NOTICE, orderEditGuard, weightEditError } from "@/lib/order-edit";
+import { RESELLER_EDIT_NOTICE, orderEditGuard, weightEditError, type EditSourceGroup } from "@/lib/order-edit";
 import {
   isOpenOrderAddonLine,
   isStockedAddonLine,
@@ -285,7 +285,7 @@ async function buildEditSnapshot(
   admin: Admin,
   input: ItemInput[],
   oldItems: OldItem[],
-  group: "manual" | "website" | "open_order" | "unknown",
+  group: EditSourceGroup,
 ): Promise<{ items?: Snapshot[]; error?: string }> {
   const cleaned = input
     .map((row) => ({
@@ -1040,10 +1040,11 @@ export async function PATCH(req: NextRequest) {
       });
     }
 
-    // Add-on Open Order tidak boleh berubah: jumlah baris, qty, dan harga harus sama.
+    // Add-on/bonus Cover & Hanger tidak boleh berubah: jumlah baris, qty, dan harga harus sama.
     // Pengenalannya lewat satu helper — format lama (`addon-cover-hanger`) dan format baru
     // (`cover-hanger` + varian add-on) sama-sama dipatok.
-    if (group === "open_order") {
+    // Berlaku untuk Open Order DAN Promo Free Cover Hanger (bonus promo memakai baris yang sama).
+    if (group === "open_order" || group === "promo_fch") {
       const oldAddon = oldItems.filter((row) => isOpenOrderAddonLine(row));
       const newAddon = inputItems.filter((row) =>
         isOpenOrderAddonLine({
@@ -1108,20 +1109,22 @@ export async function PATCH(req: NextRequest) {
     const items = snapshot.items;
 
     const allSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    // Baris bonus/add-on dipisah dari subtotal untuk Open Order & promo (harganya Rp 0).
+    const withAddon = group === "open_order" || group === "promo_fch";
     const addonTotal =
-      group === "open_order"
+      withAddon
         ? items
             .filter((item) => isOpenOrderAddonLine(item))
             .reduce((sum, item) => sum + item.price * item.quantity, 0)
         : 0;
-    const subtotal = group === "open_order" ? allSubtotal - addonTotal : allSubtotal;
+    const subtotal = withAddon ? allSubtotal - addonTotal : allSubtotal;
 
     let finalDiscount = 0;
     let total = 0;
     if (isManual) {
       finalDiscount = Math.min(discount, subtotal);
       total = subtotal + addonTotal + shippingCost - finalDiscount;
-    } else if (group === "open_order") {
+    } else if (withAddon) {
       finalDiscount = Number(order.discount) || 0;
       shippingCost = Number(order.shipping_cost) || 0;
       total = subtotal + addonTotal + shippingCost;
@@ -1145,7 +1148,7 @@ export async function PATCH(req: NextRequest) {
     //  - format BARU → berat varian katalognya sendiri (id `cover-hanger`), jadi ikut dihitung
     //    lewat jalur biasa dan TIDAK boleh ditambah setting lagi;
     //  - format LAMA → id bayangan tanpa baris varian; beratnya dari setting admin.
-    const isAddonItem = (item: Snapshot) => group === "open_order" && isOpenOrderAddonLine(item);
+    const isAddonItem = (item: Snapshot) => withAddon && isOpenOrderAddonLine(item);
     const countedForWeight = (item: Snapshot) => !isAddonItem(item) || isStockedAddonLine(item);
     const weightIds = [...new Set(items.filter(countedForWeight).map((item) => item.product_id))];
     let productWeights: WeightMap = {};
@@ -1171,7 +1174,7 @@ export async function PATCH(req: NextRequest) {
       return bad("Berat sebagian produk belum diisi. Lengkapi berat produk dulu sebelum mengubah item.");
     }
     let newWeight = weightResult.grams;
-    if (group === "open_order" && items.some((item) => isAddonItem(item) && !isStockedAddonLine(item))) {
+    if (withAddon && items.some((item) => isAddonItem(item) && !isStockedAddonLine(item))) {
       const { data: addonSetting } = await admin
         .from("store_settings")
         .select("open_order_addon_weight")
@@ -1244,9 +1247,9 @@ export async function PATCH(req: NextRequest) {
       p_hpp_items: hpp.items,
       p_hpp_goods: hpp.hpp_goods,
       p_new_weight: Math.round(newWeight),
-      p_addon_product_id: group === "open_order" ? OPEN_ORDER_ADDON.id : "",
+      p_addon_product_id: withAddon ? OPEN_ORDER_ADDON.id : "",
       p_addon_stocked_product_id:
-        group === "open_order" && stockedAddonPresent ? OPEN_ORDER_ADDON_TARGET_ID : "",
+        withAddon && stockedAddonPresent ? OPEN_ORDER_ADDON_TARGET_ID : "",
       p_header: manualHeader,
       p_note: order.awb_no ? "Item diubah setelah resi terbit; label internal perlu dicetak ulang." : null,
     });
