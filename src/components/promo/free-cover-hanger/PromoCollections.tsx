@@ -61,6 +61,7 @@ export function PromoCollections({ locale }: { locale: string }) {
         <a
           href={href}
           data-katalog-link=""
+          data-fch-placement="collections_all"
           className="fch-hide-m"
           style={{ fontWeight: 600, fontSize: 17, textUnderlineOffset: 5 }}
         >
@@ -76,6 +77,7 @@ export function PromoCollections({ locale }: { locale: string }) {
           <a
             href={href}
             data-katalog-link=""
+            data-fch-placement={`collection_${featured.name.toLowerCase()}`}
             className="fch-tile fch-coll-big fch-tap"
             style={{ textDecoration: "none", color: "#000000", display: "flex", flexDirection: "column", gap: 16 }}
           >
@@ -151,6 +153,7 @@ export function PromoCollections({ locale }: { locale: string }) {
             key={item.name}
             href={href}
             data-katalog-link=""
+            data-fch-placement={`collection_${item.name.toLowerCase()}`}
             className="fch-tile fch-tap"
             style={{ textDecoration: "none", color: "#000000", display: "flex", flexDirection: "column", gap: 16 }}
           >

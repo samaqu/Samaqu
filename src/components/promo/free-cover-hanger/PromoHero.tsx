@@ -49,6 +49,7 @@ export function PromoHero({ locale }: { locale: string }) {
           <a
             href={katalogHref(locale)}
             data-katalog-link=""
+            data-fch-placement="hero"
             className="fch-btn-ink"
             style={{ ...ctaBase, background: "#000000", color: "#FFFFFF", padding: "0 30px" }}
           >
@@ -56,6 +57,7 @@ export function PromoHero({ locale }: { locale: string }) {
           </a>
           <a
             href={ADMIN_WA_LINK}
+            data-fch-placement="hero"
             className="fch-btn-line"
             style={{
               ...ctaBase,

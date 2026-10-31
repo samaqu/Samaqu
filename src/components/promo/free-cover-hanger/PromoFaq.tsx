@@ -19,6 +19,8 @@ export function PromoFaq() {
           </p>
           <a
             href={ADMIN_WA_LINK}
+            data-wa-number=""
+            data-fch-placement="faq"
             className="fch-btn-line"
             style={{
               alignSelf: "flex-start",

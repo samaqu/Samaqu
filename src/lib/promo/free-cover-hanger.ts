@@ -20,7 +20,13 @@ export const PROMO_ASSETS = {
   poster: "/promo/free-cover-hanger-poster.jpg",
 } as const;
 
-/** Meta halaman. `noindex` dinyalakan lewat flag supaya nanti tinggal diubah. */
+/**
+ * Meta halaman. `noindex` dinyalakan lewat flag supaya nanti tinggal diubah.
+ *
+ * Karena halaman ini dipakai untuk kampanye iklan, `noindex`/`includeInSitemap`
+ * dibuka (2026-10-31) — sebelumnya `nofollow` membuat crawler preview (WhatsApp,
+ * Facebook) tidak mengambil kartu share-nya sama sekali.
+ */
 export const PROMO_META = {
   title: "Gratis Cover Hanger untuk Pelanggan Baru — SAMAQU",
   description:
@@ -28,10 +34,27 @@ export const PROMO_META = {
   ogTitle: "Gratis Cover Hanger untuk Pelanggan Baru — SAMAQU",
   ogDescription:
     "Setiap pembelian pertama Thobe, Kandora, atau Koko dapat Cover Hanger senilai Rp35.000 secara GRATIS. Otomatis masuk ke paketmu, tanpa kode promo.",
-  /** true = `robots: noindex, nofollow`. */
-  noindex: true,
+  keywords: [
+    "free cover hanger",
+    "cover hanger gratis",
+    "promo pelanggan baru samaqu",
+    "thobe premium",
+    "kandora",
+    "baju koko",
+    "busana muslim pria",
+  ],
+  /** true = `robots: noindex`. */
+  noindex: false,
   /** true = ikut masuk `sitemap.xml`. */
-  includeInSitemap: false,
+  includeInSitemap: true,
+  /**
+   * Dimensi ASLI `free-cover-hanger-poster.jpg` (1080×1920, rasio 9:16).
+   * Sebelumnya ditulis 1200×630 sehingga metadata tidak cocok dengan berkasnya dan
+   * preview share gagal dirender di sebagian aplikasi.
+   */
+  ogImageWidth: 1080,
+  ogImageHeight: 1920,
+  ogImageType: "image/jpeg",
 } as const;
 
 /**
@@ -229,4 +252,39 @@ export const ADMIN_WA_NUMBER = waNumber(ADMIN_WHATSAPP_RAW);
 /** Path katalog per bahasa, contoh `/id/katalog`. */
 export function katalogHref(locale: string) {
   return `/${locale}${KATALOG_PATH}`;
+}
+
+/**
+ * ── Meta Pixel untuk landing promo ──
+ *
+ * Aturan yang dipegang supaya data bersih dan tidak dobel:
+ *
+ * 1. **`event_id` deterministik**, bukan acak. ID dibentuk dari `event_source` + elemen
+ *    (`${source}-${event}-${suffix}`), jadi refresh halaman / re-render React / klik ganda
+ *    menghasilkan `event_id` yang SAMA → Meta men-dedupe dalam window 48 jam. `generateEventId()`
+ *    yang acak tidak bisa dipakai di sini karena setiap render akan membuat ID baru.
+ * 2. **Purchase TIDAK ditembak dari halaman ini.** Pembelian tetap ditangani flow normal
+ *    (`/checkout/success` & `/api/orders` & `/api/open-order`) dengan `event_id` = nomor pesanan
+ *    (`CYO-…` / `OPS-…`), yang juga identik dengan CAPI server-side. Menembak Purchase di landing
+ *    akan menghasilkan revenue ganda — landing ini hanya mengantar ke katalog/WhatsApp.
+ * 3. Tidak ada data pribadi di sini: hanya nama promo, kategori, dan sumber klik.
+ */
+export const PROMO_PIXEL = {
+  /** Nama sumber untuk membedakan event landing ini dari halaman lain. */
+  eventSource: "promo_free_cover_hanger",
+  contentCategory: "Promo",
+  contentName: "Free Cover Hanger — Pembelian Pertama",
+} as const;
+
+/**
+ * `event_id` stabil untuk satu jenis interaksi. Dipakai bersama oleh Pixel (browser) dan,
+ * bila nanti ditambahkan, CAPI supaya keduanya bisa dipasangkan.
+ *
+ * @param action  nama aksi singkat, mis. `view_content`, `cta_katalog`, `wa_click`
+ * @param suffix  pembeda opsional (mis. nama tombol/koleksi)
+ */
+export function promoEventId(action: string, suffix = ""): string {
+  const parts = [PROMO_PIXEL.eventSource, action, suffix].filter(Boolean);
+  // Hanya karakter yang lolos pola eventId CAPI (`/^[A-Za-z0-9._:-]{1,200}$/`).
+  return parts.join("-").replace(/[^A-Za-z0-9._:-]+/g, "_").slice(0, 200);
 }

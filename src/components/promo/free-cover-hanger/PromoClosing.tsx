@@ -35,6 +35,7 @@ export function PromoClosing({ locale }: { locale: string }) {
           <a
             href={katalogHref(locale)}
             data-katalog-link=""
+            data-fch-placement="closing"
             className="fch-btn-ink"
             style={{ ...ctaBase, background: "#000000", color: "#FFFFFF", padding: "0 32px" }}
           >
@@ -42,6 +43,8 @@ export function PromoClosing({ locale }: { locale: string }) {
           </a>
           <a
             href={ADMIN_WA_LINK}
+            data-wa-number=""
+            data-fch-placement="closing"
             className="fch-btn-line"
             style={{ ...ctaBase, color: "#000000", border: "1.5px solid #000000", padding: "0 28px", boxSizing: "border-box" }}
           >

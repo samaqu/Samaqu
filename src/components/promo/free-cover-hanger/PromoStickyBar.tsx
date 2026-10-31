@@ -29,6 +29,7 @@ export function PromoStickyBar({ locale }: { locale: string }) {
       <a
         href={katalogHref(locale)}
         data-katalog-link=""
+        data-fch-placement="sticky"
         className="fch-tap"
         style={{
           flex: 1,
@@ -49,6 +50,7 @@ export function PromoStickyBar({ locale }: { locale: string }) {
       <a
         href={ADMIN_WA_LINK}
         data-wa-number={ADMIN_WA_NUMBER}
+        data-fch-placement="sticky"
         className="fch-tap"
         aria-label={PROMO_STICKY.waLabel}
         style={{

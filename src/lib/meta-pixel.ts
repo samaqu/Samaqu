@@ -189,8 +189,13 @@ export function trackViewContent(product: {
   /** Ganti `content_ids` kalau butuh SKU, tapi harus konsisten dengan AddToCart/Purchase. */
   contentIds?: string[];
   contents?: MetaContentsItem[];
+  /**
+   * `eventID` eksplisit. Wajib untuk halaman yang event-nya harus DEDUPE antar-refresh
+   * (mis. landing promo) — kalau kosong dipakai ID acak seperti sebelumnya.
+   */
+  eventId?: string;
 }): TrackResult {
-  const eventId = generateEventId();
+  const eventId = product.eventId || generateEventId();
   const contentIds = product.contentIds?.length ? product.contentIds : [product.id];
   dispatch(
     "ViewContent",
@@ -365,8 +370,8 @@ export function trackCompleteRegistration(method: string): TrackResult {
 
 // ── Custom Events ──
 
-export function trackWhatsAppClick(source: string, productId?: string): TrackResult {
-  const eventId = generateEventId();
+export function trackWhatsAppClick(source: string, productId?: string, eventId?: string): TrackResult {
+  const id = eventId || generateEventId();
   if (isReady()) {
     fbq(
       "trackCustom",
@@ -375,10 +380,10 @@ export function trackWhatsAppClick(source: string, productId?: string): TrackRes
         source,
         ...(productId ? { content_ids: [productId], content_type: "product" } : {}),
       },
-      { eventID: eventId }
+      { eventID: id }
     );
   }
-  return { eventId };
+  return { eventId: id };
 }
 
 export function trackFormSubmit(formName: string): TrackResult {

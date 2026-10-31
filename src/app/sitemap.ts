@@ -1,6 +1,9 @@
 import { MetadataRoute } from "next";
 import { supabase } from "@/lib/supabase";
 import { SITE_URL, SITE_LOCALES, DEFAULT_LOCALE } from "@/lib/site-config";
+import { PROMO_META } from "@/lib/promo/free-cover-hanger";
+
+const PROMO_PATH = "/promo/free-cover-hanger";
 
 // Sitemap di-cache 1 jam supaya produk baru ikut terdaftar tanpa redeploy.
 export const revalidate = 3600;
@@ -70,6 +73,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: page.priority,
   }));
 
+  // Landing promo: masuk sitemap hanya kalau flag-nya menyala di config promonya
+  // (halaman dipakai untuk kampanye iklan, jadi boleh diindeks). URL tunggal tanpa locale.
+  const promoEntries: MetadataRoute.Sitemap = PROMO_META.includeInSitemap
+    ? [
+        {
+          url: `${SITE_URL}${PROMO_PATH}`,
+          lastModified: now,
+          changeFrequency: "weekly",
+          priority: 0.6,
+        },
+      ]
+    : [];
+
   const { data: products } = await supabase
     .from("products")
     .select("id, created_at")
@@ -85,5 +101,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ),
   );
 
-  return [...staticEntries, ...singleEntries, ...productEntries];
+  return [...staticEntries, ...singleEntries, ...promoEntries, ...productEntries];
 }

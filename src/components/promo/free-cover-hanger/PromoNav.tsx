@@ -22,6 +22,7 @@ export function PromoNav({ locale }: { locale: string }) {
           <a
             href={katalogHref(locale)}
             data-katalog-link=""
+            data-fch-placement="nav"
             className="fch-btn-ink fch-nav-btn"
             style={{
               background: "#000000",
