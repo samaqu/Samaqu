@@ -12,6 +12,8 @@ import { useSafeLocale } from "@/lib/safe-i18n";
 import { orderSourceLabel } from "@/lib/transaksi";
 import OrderDetailPanel from "@/components/ops/transaksi/OrderDetailPanel";
 import UlasanPesananSection from "@/components/akun/UlasanPesananSection";
+import { PayNowButton } from "@/components/akun/PayNowButton";
+import { useResolvedPaymentMethod } from "@/lib/use-payment-methods";
 import "@/app/(internal)/panel-admin/panel-transaksi.css";
 import "@/app/(internal)/panel-admin/panel-mono.css";
 
@@ -31,6 +33,8 @@ export default function DetailPesananPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const { customer, ready } = useAkunCustomer();
+  /** Metode pembayaran pesanan — menentukan tombol bayar mengarah ke instruksi atau tautan online. */
+  const { method: paymentMethod } = useResolvedPaymentMethod(order?.payment_method ?? null);
 
   useEffect(() => {
     if (!ready) return;
@@ -154,6 +158,14 @@ export default function DetailPesananPage() {
           ) : null}
 
           <footer className="flex flex-wrap gap-2 border-t border-slate-200 px-5 py-4">
+            {/* Tombol bayar hanya untuk pesanan yang masih menunggu pembayaran.
+                Metode manual → halaman instruksi; online → langsung tautan bayar. */}
+            <PayNowButton
+              order={order}
+              methodType={paymentMethod?.method_type}
+              payHref={to(`/akun/pesanan/${orderNo}/bayar`)}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#B45309] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#92400e]"
+            />
             <Link
               href={to(`/akun/pesanan/${orderNo}/lacak`)}
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800"

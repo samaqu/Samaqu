@@ -326,5 +326,8 @@ const AKUN_DESK_CSS = `
   .akun-pill.akun-pill-selesai{background:#000;color:#fff}
   .akun-row-go{display:inline-grid;place-items:center;width:24px;height:24px;border:0;border-radius:7px;background:#f5f3ee;color:#000;cursor:pointer;transition:background .15s}
   .akun-row-go:hover{background:#ebe7de}
+  /* Tombol "Bayar Sekarang" di tabel pesanan — sejajar tinggi dengan pill status. */
+  .akun-pay-btn{display:inline-flex;align-items:center;justify-content:center;padding:4px 11px;border:0;border-radius:999px;background:#B45309;color:#fff;font-size:10.5px;font-weight:800;line-height:1.4;white-space:nowrap;cursor:pointer;text-decoration:none;transition:background .15s}
+  .akun-pay-btn:hover{background:#92400e}
 }
 `;

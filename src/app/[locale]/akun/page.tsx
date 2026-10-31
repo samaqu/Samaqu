@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getCustomerOrders } from "@/lib/customer-auth";
@@ -17,6 +17,8 @@ import DashboardProductSection from "@/components/akun/DashboardProductSection";
 import { statusInfo, rupiah, tglID } from "@/lib/akun-format";
 import { orderStatusKey } from "@/lib/order-flow";
 import { getMyReviews } from "@/lib/ulasan-client";
+import { PayNowButton, isAwaitingPayment } from "@/components/akun/PayNowButton";
+import { fetchActivePaymentMethods } from "@/lib/payment-methods";
 
 interface OrderItem {
   id?: string;
@@ -53,6 +55,12 @@ interface Order {
   shipping_status?: string | null;
   tracking_status_code?: number | null;
   order_items: OrderItem[];
+  /* ── Pembayaran (dipakai tombol "Bayar Sekarang") ── */
+  payment_method?: string | null;
+  payment_provider?: string | null;
+  payment_url?: string | null;
+  payment_status?: string | null;
+  paid_at?: string | null;
 }
 interface Cust {
   id: string;
@@ -66,6 +74,8 @@ export default function DashboardAkunPage() {
   // Customer sudah dimuat oleh AkunProvider (layout) — pakai itu daripada query ulang.
   const { customer: cust, ready } = useAkunCustomer() as { customer: Cust | null; ready: boolean };
   const [orders, setOrders] = useState<Order[]>([]);
+  /** Daftar metode pembayaran aktif — sumber tipe metode untuk tombol "Bayar Sekarang". */
+  const [paymentMethods, setPaymentMethods] = useState<{ id: string; method_type?: string | null }[]>([]);
   const [wishCount, setWishCount] = useState(0);
   // status ulasan per item pesanan: pending / published / rejected
   const [reviewStatus, setReviewStatus] = useState<Map<string, string>>(new Map());
@@ -91,6 +101,12 @@ export default function DashboardAkunPage() {
           supabase.from("wishlists").select("product_id", { count: "exact", head: true }).eq("customer_id", id),
           getMyReviews(),
         ]);
+        // Metode pembayaran dipakai tombol "Bayar Sekarang" (online vs instruksi manual).
+        fetchActivePaymentMethods()
+          .then((rows) => {
+            if (alive) setPaymentMethods(rows.map((row) => ({ id: row.id, method_type: row.method_type })));
+          })
+          .catch(() => {});
         if (!alive) return;
         const list = (o as Order[]) || [];
         // Dashboard cuma menampilkan 5 pesanan terakhir — jangan resolve foto semua order.
@@ -133,6 +149,21 @@ export default function DashboardAkunPage() {
   }).length;
   const totalSpend = orders.reduce((sum, o) => sum + (o.total || 0), 0);
   const recentOrders = orders.slice(0, 5);
+
+  /*
+   * Tipe metode pembayaran tiap pesanan. Diambil sekali untuk semua pesanan yang tampil,
+   * supaya tombol "Bayar Sekarang" tahu harus membuka tautan online atau halaman instruksi.
+   * Gagal memuat → kosong; tombol memperlakukan metode tak dikenal sebagai manual.
+   */
+  const paymentTypes = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const row of paymentMethods) map.set(String(row.id), row.method_type ?? null);
+    return map;
+  }, [paymentMethods]);
+  const paymentTypeOf = (order: { payment_method?: string | null }) => {
+    const value = String(order.payment_method || "");
+    return paymentTypes.get(value) ?? null;
+  };
 
   return (
     <>
@@ -297,7 +328,20 @@ export default function DashboardAkunPage() {
                                 </div>
                               </td>
                               <td className="is-right"><span className="akun-cell-total">{rupiah(order.total)}</span></td>
-                              <td><span className={`akun-pill ${sc.pill}`}>{sc.label}</span></td>
+                              <td>
+                                {/* Menunggu pembayaran → tombol aksi langsung; selain itu pill status. */}
+                                {isAwaitingPayment(order) ? (
+                                  <PayNowButton
+                                    order={order}
+                                    methodType={paymentTypeOf(order)}
+                                    payHref={to(`/akun/pesanan/${order.order_number}/bayar`)}
+                                    className="akun-pay-btn"
+                                    label="Bayar Sekarang"
+                                  />
+                                ) : (
+                                  <span className={`akun-pill ${sc.pill}`}>{sc.label}</span>
+                                )}
+                              </td>
                               <td className="is-right">
                                 <button
                                   type="button"
@@ -360,7 +404,17 @@ export default function DashboardAkunPage() {
                                 <span className="mt-0.5 block text-[10.5px] font-semibold text-[#8b9793]">{state.label}</span>
                               ) : null}
                             </div>
-                            {actionItem ? (
+                            {/* Pesanan yang masih menunggu pembayaran → tombol bayar, bukan pill status.
+                                Metode manual diarahkan ke halaman instruksi pembayaran. */}
+                            {isAwaitingPayment(order) ? (
+                              <PayNowButton
+                                order={order}
+                                methodType={paymentTypeOf(order)}
+                                payHref={to(`/akun/pesanan/${order.order_number}/bayar`)}
+                                className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-[#B45309] px-4 text-[11.5px] font-extrabold text-white transition active:scale-[.98]"
+                                label="Bayar Sekarang"
+                              />
+                            ) : actionItem ? (
                               <button
                                 type="button"
                                 onClick={() => setReviewItem(toReviewItem(actionItem))}
