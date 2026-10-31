@@ -45,6 +45,7 @@ export default function PromoStepCatalog({
   heroDescription,
   bonus,
   bonusAvailable = true,
+  promoActive = true,
 }: {
   products: OpenOrderProduct[];
   /** Periode Open Order — dibaca dari store_settings (diatur di menu admin "Open Order"). */
@@ -77,6 +78,11 @@ export default function PromoStepCatalog({
    * Bila false → bar bonus disembunyikan dan diganti teks "Bonus sudah habis".
    */
   bonusAvailable?: boolean;
+  /**
+   * Promo dimatikan admin (`promo_fch_active = false`). Dipakai memilih pesan yang jujur:
+   * "bonus sudah habis" hanya untuk kuota/stok, bukan untuk promo yang dimatikan.
+   */
+  promoActive?: boolean;
 }) {
   const [category, setCategory] = useState<string>(ALL);
 
@@ -169,9 +175,13 @@ export default function PromoStepCatalog({
       {bonus && !bonusAvailable ? (
         <section className="oo-fade-up mx-auto mb-8 max-w-2xl" style={{ animationDelay: ".05s" }}>
           <div className="rounded-2xl border border-black/15 px-5 py-4 text-center">
-            <p className="text-sm font-semibold">Bonus sudah habis</p>
+            <p className="text-sm font-semibold">
+              {promoActive ? "Bonus sudah habis" : "Bonus sedang tidak tersedia"}
+            </p>
             <p className="mt-1 text-sm text-neutral-600">
-              Kuota Cover Hanger gratis periode ini sudah terpakai semua. Kamu tetap bisa memesan seperti biasa.
+              {promoActive
+                ? "Kuota Cover Hanger gratis periode ini sudah terpakai semua. Kamu tetap bisa memesan seperti biasa."
+                : "Program bonus Cover Hanger sedang tidak berjalan. Kamu tetap bisa memesan seperti biasa."}
             </p>
           </div>
         </section>

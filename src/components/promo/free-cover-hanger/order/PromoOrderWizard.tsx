@@ -142,6 +142,8 @@ export default function PromoOrderWizard({
   heroTitle,
   heroDescription,
   bonus,
+  promoActive = true,
+  promoBonusAvailable = true,
 }: {
   /** Status jendela Open Order — dibaca di server (route halaman) supaya tidak pop-in. */
   initialState: OpenOrderState;
@@ -165,6 +167,13 @@ export default function PromoOrderWizard({
   heroDescription?: string;
   /** Bar sisa bonus promo (angka dari pengaturan admin). */
   bonus?: { left: number; total: number; note: string } | null;
+  /** `store_settings.promo_fch_active` — promo dimatikan admin ≠ bonus ditawarkan. */
+  promoActive?: boolean;
+  /**
+   * Hasil gabungan dari server: promo aktif + dalam periode + kuota > 0.
+   * `false` → halaman pesan menampilkan "Bonus sudah habis" (bukan menawarkan bonus).
+   */
+  promoBonusAvailable?: boolean;
 }) {
   const [step, setStep] = useState<Step>(1);
   const [catalog, setCatalog] = useState<Product[]>([]);
@@ -769,8 +778,11 @@ export default function PromoOrderWizard({
             heroTitle={heroTitle}
             heroDescription={heroDescription}
             bonus={bonus ?? null}
-            /* Kuota 0 atau stok Cover & Hanger 0 → bar bonus diganti "Bonus sudah habis". */
-            bonusAvailable={(bonus ? bonus.left > 0 : true) && addonCatalog.available}
+            /* Bonus hanya ditawarkan bila: promo AKTIF, dalam periode, kuota > 0, dan stok
+               Cover & Hanger ada. Sebelumnya `active` tidak ikut dicek sehingga promo yang
+               sudah dimatikan admin tetap menampilkan bar bonus. */
+            bonusAvailable={promoBonusAvailable && promoActive && addonCatalog.available}
+            promoActive={promoActive}
           />
         )}
 

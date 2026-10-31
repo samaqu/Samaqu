@@ -37,6 +37,10 @@ export default async function PromoOrderPage() {
       heroTitle={promo.title}
       heroDescription={promo.description}
       bonus={{ left: promo.quotaLeft, total: promo.quotaTotal, note: promo.quotaNote }}
+      /* Status promo dibaca di server: nonaktif / di luar periode / kuota habis
+         harus langsung tampil "Bonus sudah habis" tanpa menunggu data di klien. */
+      promoActive={promo.active}
+      promoBonusAvailable={promo.bonusAvailable}
     />
   );
 }
