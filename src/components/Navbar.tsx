@@ -24,7 +24,6 @@ import ProfileDropdown from "@/components/ProfileDropdown";
 import { CartBadge } from "@/components/CartBadge";
 import CartDrawer from "@/components/CartDrawer";
 import { getWhatsAppLink } from "@/lib/store-settings";
-import { useIsCustomerLoggedIn } from "@/lib/use-customer-login";
 import { locales, type Locale } from "@/i18n/config";
 
 /* ── Language flag icons ── */
@@ -118,9 +117,12 @@ export default function Navbar() {
   const locale = useSafeLocale() as Locale;
   const t = useSafeTranslations();
   const isHome = pathname === `/${locale}` || pathname === "/";
-  const customerLoggedIn = useIsCustomerLoggedIn();
-  // Customer yang sudah login: Beranda/logo mengarah ke dashboard akun.
-  const homeHref = customerLoggedIn ? `/${locale}/akun` : `/${locale}`;
+  /*
+   * Beranda & logo SELALU menuju halaman utama (`/`), termasuk untuk customer yang sudah
+   * login. Dulu keduanya dialihkan ke dashboard akun (`/akun`), sehingga customer tidak bisa
+   * kembali ke beranda lewat logo/nav — dashboard tetap bisa dibuka dari ikon akun.
+   */
+  const homeHref = `/${locale}`;
   const [openDropdown, setOpenDropdown] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -204,7 +206,7 @@ export default function Navbar() {
               <a
                 href={homeHref}
                 className="inline-flex items-center leading-none shrink-0 cursor-pointer"
-                aria-label={customerLoggedIn ? "SAMAQU — ke dashboard akun" : "SAMAQU — kembali ke beranda"}
+                aria-label="SAMAQU — kembali ke beranda"
               >
                 <img
                   src="/logo.svg"
