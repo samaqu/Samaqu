@@ -104,6 +104,19 @@ export interface TrackScan {
   driverName?: string | null;
   /** Nama orang yang menerima paket (diisi J&T pada scan serah terima, mis. kode 200). */
   receiver?: string | null;
+  /** `"FALSE"` = paket tidak diserahkan ke penerima di waybill (dititipkan ke pihak lain). */
+  presenter?: string | null;
+  /** Nama pihak yang benar-benar menerima saat `presenter = "FALSE"`. */
+  presentername?: string | null;
+}
+
+/**
+ * Paket diterima lewat perantara (J&T `presenter = "FALSE"`), bukan oleh penerima di waybill.
+ * Termasuk kalau `presentername` terisi: yang menerima adalah pihak ketiga.
+ */
+export function isLeftWithThirdParty(item?: TrackScan | null): boolean {
+  if (String(item?.presenter ?? "").trim().toUpperCase() === "FALSE") return true;
+  return !!String(item?.presentername ?? "").trim();
 }
 
 /** Satu baris riwayat siap tampil. Teks asli J&T tetap disimpan untuk pemeriksaan. */
@@ -122,6 +135,13 @@ export interface TrackingRow {
   driver: string | null;
   /** Nama penerima dari J&T (`receiver`) apa adanya — mis. siapa yang menerima paket. */
   receiver: string | null;
+  /**
+   * Nama pihak yang benar-benar menerima saat paket dititipkan (`presenter = "FALSE"`).
+   * `null` = paket diserahkan langsung ke penerima, atau J&T tidak mencatat namanya.
+   */
+  receivedByThirdParty: string | null;
+  /** Teks penjelas bahwa paket tidak diterima langsung oleh penerima di waybill. */
+  handoverNote: string | null;
   /** `date_time` J&T apa adanya. */
   dateTime: string;
 }
@@ -143,6 +163,12 @@ export function trackingRow(item: TrackScan | null | undefined): TrackingRow {
     warning: Number(item?.status_code) === 150,
     driver: String(item?.driverName ?? "").trim() || null,
     receiver: String(item?.receiver ?? "").trim() || null,
+    receivedByThirdParty: isLeftWithThirdParty(item)
+      ? String(item?.presentername ?? "").trim() || null
+      : null,
+    handoverNote: isLeftWithThirdParty(item)
+      ? "Tidak diserahkan langsung ke penerima (dititipkan)"
+      : null,
     dateTime: item?.date_time ?? "",
   };
 }
@@ -185,6 +211,10 @@ export interface TrackingSummary {
   note: string | null;
   /** Nama penerima (`receiver`) event terbaru — mis. siapa yang menerima paket. */
   receiver: string | null;
+  /** Nama pihak yang menerima saat paket dititipkan (`presenter = "FALSE"`). */
+  receivedByThirdParty: string | null;
+  /** Penjelas bahwa paket tidak diterima langsung oleh penerima di waybill. */
+  handoverNote: string | null;
   /** `date_time` event terbaru — mengikuti timestamp dari sumber API. */
   updatedAt: string | null;
 }
@@ -200,6 +230,12 @@ export function trackingSummary(history: TrackHistoryItem[] | null | undefined):
     statusRaw,
     note: String(latest?.note ?? "").trim() || null,
     receiver: String(latest?.receiver ?? "").trim() || null,
+    receivedByThirdParty: isLeftWithThirdParty(latest)
+      ? String(latest?.presentername ?? "").trim() || null
+      : null,
+    handoverNote: isLeftWithThirdParty(latest)
+      ? "Tidak diserahkan langsung ke penerima (dititipkan)"
+      : null,
     updatedAt: latest?.date_time ?? null,
   };
 }

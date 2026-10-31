@@ -160,6 +160,12 @@ export default function OpsOrderDetailDrawer({ open, order, onClose, onEdit, onC
                       {row.receiver ? (
                         <p className="text-[11px] text-slate-500 dark:text-slate-400">Diterima oleh: {row.receiver}</p>
                       ) : null}
+                      {row.receivedByThirdParty ? (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Diterima oleh: {row.receivedByThirdParty}</p>
+                      ) : null}
+                      {row.handoverNote ? (
+                        <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">{row.handoverNote}</p>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

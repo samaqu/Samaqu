@@ -227,6 +227,16 @@ export default function LacakPage() {
                     {t("noteLabel")}: <span style={{ color: "#1a1a1a" }}>{summary.note}</span>
                   </p>
                 ) : null}
+                {summary.receivedByThirdParty ? (
+                  <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "#666666" }}>
+                    {t("receivedBy")}: <span style={{ color: "#1a1a1a" }}>{summary.receivedByThirdParty}</span>
+                  </p>
+                ) : null}
+                {summary.handoverNote ? (
+                  <p style={{ margin: "8px 0 0", fontSize: 12.5, fontWeight: 700, color: "#b45309" }}>
+                    {summary.handoverNote}
+                  </p>
+                ) : null}
               </div>
             ) : null}
 
@@ -274,6 +284,12 @@ export default function LacakPage() {
                         {/* Nama penerima dari J&T (`receiver`) — siapa yang menerima paket. */}
                         {row.receiver ? (
                           <i style={{ display: "block", marginTop: 2 }}>{t("receivedBy")}: {row.receiver}</i>
+                        ) : null}
+                        {row.receivedByThirdParty ? (
+                          <i style={{ display: "block", marginTop: 2 }}>{t("receivedBy")}: {row.receivedByThirdParty}</i>
+                        ) : null}
+                        {row.handoverNote ? (
+                          <i style={{ display: "block", marginTop: 2, color: "#b45309" }}>{row.handoverNote}</i>
                         ) : null}
                       </div>
                     </div>

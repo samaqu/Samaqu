@@ -343,6 +343,8 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
           meta: [row.location, formatTrackingTime(row.dateTime)].filter(Boolean).join(" · "),
           note: row.note,
           receiver: row.receiver,
+          receivedByThirdParty: row.receivedByThirdParty,
+          handoverNote: row.handoverNote,
           terbaru: index === 0,
         }))}
       />
@@ -634,6 +636,12 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
                                     {/* Nama penerima dari J&T apa adanya — mis. siapa yang menerima paket. */}
                                     {row.receiver ? (
                                       <p className="text-[11px] text-slate-500 dark:text-slate-400">Diterima oleh: {row.receiver}</p>
+                                    ) : null}
+                                    {row.receivedByThirdParty ? (
+                                      <p className="text-[11px] text-slate-500 dark:text-slate-400">Diterima oleh: {row.receivedByThirdParty}</p>
+                                    ) : null}
+                                    {row.handoverNote ? (
+                                      <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">{row.handoverNote}</p>
                                     ) : null}
                                   </li>
                                 ))}

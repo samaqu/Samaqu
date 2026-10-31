@@ -146,6 +146,10 @@ export interface TrackHistoryItem {
   receiver: string;
   driverName: string;
   driverPhone: string;
+  /** Penanda J&T pada scan serah terima: `"FALSE"` = paket TIDAK diserahkan ke penerima di waybill. */
+  presenter?: string;
+  /** Nama pihak yang benar-benar menerima saat `presenter = "FALSE"` — sering kosong dari J&T. */
+  presentername?: string;
 }
 
 export interface TrackResponse {

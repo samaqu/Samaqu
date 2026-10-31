@@ -440,6 +440,16 @@ export default function RincianPesanan({ order }: { order: RincianOrder }) {
                     <span>{t("receivedBy")}: {latestRow.receiver}</span>
                   </div>
                 ) : null}
+                {latestRow.receivedByThirdParty ? (
+                  <div className="rp-line rp-sub" style={{ marginLeft: 27 }}>
+                    <span>{t("receivedBy")}: {latestRow.receivedByThirdParty}</span>
+                  </div>
+                ) : null}
+                {latestRow.handoverNote ? (
+                  <div className="rp-line rp-sub" style={{ marginLeft: 27, color: "#b45309", fontWeight: 600 }}>
+                    <span>{latestRow.handoverNote}</span>
+                  </div>
+                ) : null}
               </>
             ) : (
               <div className="rp-line rp-sub" style={{ marginTop: 8 }}>

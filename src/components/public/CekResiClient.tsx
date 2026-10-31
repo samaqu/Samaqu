@@ -258,6 +258,16 @@ export default function CekResiClient() {
                       Catatan: <span style={{ color: "var(--espresso)" }}>{summary.note}</span>
                     </p>
                   ) : null}
+                  {summary.receivedByThirdParty ? (
+                    <p className="mt-2 text-[12.5px]" style={{ color: "var(--text-secondary)" }}>
+                      Diterima oleh: <span style={{ color: "var(--espresso)" }}>{summary.receivedByThirdParty}</span>
+                    </p>
+                  ) : null}
+                  {summary.handoverNote ? (
+                    <p className="mt-2 text-[12.5px] font-semibold" style={{ color: "#b45309" }}>
+                      {summary.handoverNote}
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -281,6 +291,15 @@ export default function CekResiClient() {
                           <b style={row.warning ? { color: "#b45309" } : undefined}>{row.status}</b>
                           <i>{[row.location, formatTrackingTime(row.dateTime)].filter(Boolean).join(" • ")}</i>
                           {row.note ? <i style={{ display: "block", marginTop: 2 }}>{row.note}</i> : null}
+                          {row.receiver ? (
+                            <i style={{ display: "block", marginTop: 2 }}>Diterima oleh: {row.receiver}</i>
+                          ) : null}
+                          {row.receivedByThirdParty ? (
+                            <i style={{ display: "block", marginTop: 2 }}>Diterima oleh: {row.receivedByThirdParty}</i>
+                          ) : null}
+                          {row.handoverNote ? (
+                            <i style={{ display: "block", marginTop: 2, color: "#b45309" }}>{row.handoverNote}</i>
+                          ) : null}
                         </div>
                       </div>
                     );

@@ -218,6 +218,12 @@ export default function CustomerOrderDrawer({
                       {row.receiver ? (
                         <p className="mt-0.5 text-[11px] text-slate-500">Diterima oleh: {row.receiver}</p>
                       ) : null}
+                      {row.receivedByThirdParty ? (
+                        <p className="mt-0.5 text-[11px] text-slate-500">Diterima oleh: {row.receivedByThirdParty}</p>
+                      ) : null}
+                      {row.handoverNote ? (
+                        <p className="mt-0.5 text-[11px] font-semibold text-amber-600">{row.handoverNote}</p>
+                      ) : null}
                     </li>
                   ))}
                 </ol>

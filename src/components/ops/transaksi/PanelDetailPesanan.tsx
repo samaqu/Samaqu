@@ -578,7 +578,16 @@ export function PanelLacakModal({
   resi: string;
   loading?: boolean;
   error?: string;
-  riwayat: { key: string; status: string; meta: string; note?: string | null; receiver?: string | null; terbaru?: boolean }[];
+  riwayat: {
+    key: string;
+    status: string;
+    meta: string;
+    note?: string | null;
+    receiver?: string | null;
+    receivedByThirdParty?: string | null;
+    handoverNote?: string | null;
+    terbaru?: boolean;
+  }[];
 }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -631,6 +640,8 @@ export function PanelLacakModal({
                 {r.meta ? <small>{r.meta}</small> : null}
                 {r.note ? <small>Catatan: {r.note}</small> : null}
                 {r.receiver ? <small>Diterima oleh: {r.receiver}</small> : null}
+                {r.receivedByThirdParty ? <small>Diterima oleh: {r.receivedByThirdParty}</small> : null}
+                {r.handoverNote ? <small style={{ color: "#b45309", fontWeight: 700 }}>{r.handoverNote}</small> : null}
               </li>
             ))}
           </ul>

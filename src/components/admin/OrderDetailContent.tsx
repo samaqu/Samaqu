@@ -700,6 +700,8 @@ export default function OrderDetailContent({
           meta: [row.location, formatTrackingTime(row.dateTime)].filter(Boolean).join(" · "),
           note: row.note,
           receiver: row.receiver,
+          receivedByThirdParty: row.receivedByThirdParty,
+          handoverNote: row.handoverNote,
           terbaru: i === 0,
         };
       })}
@@ -1095,6 +1097,12 @@ export default function OrderDetailContent({
                               {/* Nama penerima dari J&T (`receiver`) — mis. siapa yang menerima paket. */}
                               {row.receiver ? (
                                 <i style={{ display: "block", marginTop: 2 }}>{t("receivedBy")}: {row.receiver}</i>
+                              ) : null}
+                              {row.receivedByThirdParty ? (
+                                <i style={{ display: "block", marginTop: 2 }}>{t("receivedBy")}: {row.receivedByThirdParty}</i>
+                              ) : null}
+                              {row.handoverNote ? (
+                                <i style={{ display: "block", marginTop: 2, color: "#b45309" }}>{row.handoverNote}</i>
                               ) : null}
                             </div>
                           </div>

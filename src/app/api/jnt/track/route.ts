@@ -81,6 +81,8 @@ async function storedPayload(awb: string, fetchedAt: string, sertakanPetugas = f
         storeName: raw.storeName ?? "",
         nextSiteName: raw.nextSiteName ?? "",
         note: raw.note ?? "",
+        presenter: (raw as unknown as Record<string, unknown>).presenter ?? "",
+        presentername: (raw as unknown as Record<string, unknown>).presentername ?? "",
         ...(sertakanPetugas
           ? {
               driverName: (raw as unknown as Record<string, unknown>).driverName ?? "",
