@@ -4,59 +4,15 @@ import { useState, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, ShoppingBag, Package, Users, FileText, Settings,
-  Search, Bell, Menu, LogOut, X, Ticket, Ruler, Image, Shirt, ChevronDown,
-  MessageCircle, Star, Camera, Users2, TrendingUp, CreditCard, Percent,
+  Search, Bell, Menu, LogOut, X, ChevronDown, MessageCircle,
 } from "lucide-react";
 import { ADMIN_SHELL_CSS } from "@/components/admin/admin-theme";
+import { ADMIN_NAV_GROUPS, adminNavHref } from "@/components/admin/admin-nav";
 
-// Grup & urutan menu harus sama persis dengan sidebar dashboard admin
-// (navGroups di src/app/admin/page.tsx) — kalau beda, menu terlihat "berubah"
-// begitu admin membuka salah satu subhalaman (mis. Open Order).
-// Item panel (Order Management/Produk/Pelanggan/Pengaturan) mengarah ke
-// `/admin?panel=…` supaya dari subhalaman mana pun panelnya langsung terbuka;
-// `src/app/admin/page.tsx` membaca parameter itu saat mount.
-const navGroups = [
-  {
-    title: "Menu Utama",
-    items: [
-      { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/admin?panel=orders", label: "Order Management", icon: ShoppingBag },
-      { href: "/admin/open-order", label: "Open Order", icon: Shirt },
-      { href: "/admin/testimoni", label: "Ulasan Pelanggan", icon: Star },
-      { href: "/admin?panel=products", label: "Produk", icon: Package },
-      { href: "/admin?panel=customers", label: "Pelanggan", icon: Users },
-      { href: "/admin?panel=chats", label: "Live Chat", icon: MessageCircle },
-    ],
-  },
-  {
-    title: "Konten",
-    items: [
-      { href: "/admin/konten-website", label: "Konten Website", icon: FileText },
-      { href: "/admin/biolink", label: "Biolink", icon: FileText },
-      { href: "/admin/bio-carousel", label: "Foto Carousel", icon: Image },
-      { href: "/admin/instagram", label: "Kelola Foto Instagram", icon: Camera },
-      { href: "/admin/ukuran-produk", label: "Panduan Ukuran", icon: Ruler },
-      { href: "/admin/garansi-retur-page", label: "Halaman Garansi & Retur", icon: FileText },
-    ],
-  },
-  {
-    title: "Affiliate",
-    items: [
-      { href: "/admin/affiliate/data", label: "Data Affiliate", icon: Users2 },
-      { href: "/admin/affiliate/transaksi", label: "Transaksi & Komisi", icon: TrendingUp },
-      { href: "/admin/affiliate/pencairan", label: "Pencairan Komisi", icon: CreditCard },
-      { href: "/admin/affiliate/pengaturan", label: "Pengaturan Komisi", icon: Percent },
-    ],
-  },
-  {
-    title: "Lainnya",
-    items: [
-      { href: "/admin/voucher", label: "Voucher", icon: Ticket },
-      { href: "/admin?panel=settings", label: "Pengaturan", icon: Settings },
-    ],
-  },
-];
+/** Menu diambil dari SATU sumber (`admin-nav.ts`) supaya sidebar di subhalaman tidak pernah
+ *  berbeda dengan sidebar di /admin — dulu daftarnya disalin di sini dan jadi tidak sinkron
+ *  (menu Promo hilang saat membuka Ulasan Pelanggan). */
+const navGroups = ADMIN_NAV_GROUPS;
 
 export default function AdminShell({ children, onLogout }: { children: ReactNode; onLogout?: () => void }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -92,18 +48,26 @@ export default function AdminShell({ children, onLogout }: { children: ReactNode
             <div key={group.title} className={gi > 0 ? "mt-3 pt-3" : ""} style={gi > 0 ? { borderTop: "1px solid var(--bd)" } : undefined}>
               <p className="px-2 mb-1.5 text-[10px] font-extrabold uppercase tracking-[0.08em]" style={{ color: "var(--fg3)" }}>{group.title}</p>
               <ul className="space-y-0.5">
-                {group.items.map((item) => (
+                {group.items.map((item) => {
+                  const href = adminNavHref(item);
+                  return (
                   <li key={item.label}>
                     <Link
-                      href={item.href}
-                      className={`sidebar-link ${isActive(item.href) ? "active" : ""}`}
+                      href={href}
+                      // `prefetch` = Next memuat halaman tujuan lebih dulu saat link ini
+                      // terlihat di layar, jadi pindah menu terasa instan (bukan halaman
+                      // kosong menunggu server). Halaman tujuan juga memakai <AdminShell>
+                      // sehingga menu tetap sama.
+                      prefetch
+                      className={`sidebar-link ${isActive(href) ? "active" : ""}`}
                       onClick={() => setSidebarOpen(false)}
                     >
                       <item.icon size={16} strokeWidth={1.9} />
                       <span className="flex-1 truncate">{item.label}</span>
                     </Link>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </div>
           ))}

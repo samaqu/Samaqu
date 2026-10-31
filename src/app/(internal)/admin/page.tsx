@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { getThumbnailFromImages } from "@/lib/product-thumbnail";
+import { ADMIN_NAV_GROUPS } from "@/components/admin/admin-nav";
 import {
   LayoutDashboard, ShoppingBag, Package, Users, FileText, Settings,
   Search, Bell, Menu, X, ChevronDown, Plus, TrendingUp, Eye, Edit,
@@ -114,49 +115,9 @@ type NavItem =
   | { label: string; icon: LucideIcon; panel: Panel; badge?: "orders" | "reviews" }
   | { label: string; icon: LucideIcon; href: string; badge?: "reviews" };
 
-const navGroups: { title: string; items: NavItem[] }[] = [
-  {
-    title: "Menu Utama",
-    items: [
-      { label: "Dashboard", icon: LayoutDashboard, panel: "dashboard" },
-      { label: "Order Management", icon: ShoppingBag, panel: "orders", badge: "orders" },
-      { label: "Open Order", icon: Shirt, href: "/admin/open-order" },
-      { label: "Promo", icon: Tag, href: "/admin/promo" },
-      { label: "Ulasan Pelanggan", icon: Star, href: "/admin/testimoni", badge: "reviews" },
-      { label: "Produk", icon: Package, panel: "products" },
-      { label: "Pelanggan", icon: Users, panel: "customers" },
-      { label: "Live Chat", icon: MessageCircle, panel: "chats" },
-    ],
-  },
-  {
-    title: "Konten",
-    items: [
-      { label: "Konten Website", icon: FileText, panel: "content" },
-      { label: "Biolink", icon: FileText, href: "/admin/biolink" },
-      { label: "Foto Carousel", icon: Image, href: "/admin/bio-carousel" },
-      { label: "Kelola Foto Instagram", icon: Camera, href: "/admin/instagram" },
-      { label: "Panduan Ukuran", icon: Ruler, href: "/admin/ukuran-produk" },
-      { label: "Halaman Garansi & Retur", icon: FileText, href: "/admin/garansi-retur-page" },
-    ],
-  },
-  {
-    title: "Affiliate",
-    items: [
-      { label: "Data Affiliate", icon: Users2, href: "/admin/affiliate/data" },
-      { label: "Transaksi & Komisi", icon: TrendingUp, href: "/admin/affiliate/transaksi" },
-      { label: "Pencairan Komisi", icon: CreditCard, href: "/admin/affiliate/pencairan" },
-      { label: "Pengaturan Komisi", icon: Percent, href: "/admin/affiliate/pengaturan" },
-    ],
-  },
-  {
-    title: "Lainnya",
-    items: [
-      { label: "Voucher", icon: Ticket, href: "/admin/voucher" },
-      { label: "Template Notif", icon: Bell, panel: "notif-template" },
-      { label: "Pengaturan", icon: Settings, panel: "settings" },
-    ],
-  },
-];
+// Satu sumber menu bersama dengan `AdminShell` (subhalaman) — lihat admin-nav.ts.
+// Tanpa ini menu bisa berbeda saat admin pindah halaman.
+const navGroups: { title: string; items: NavItem[] }[] = ADMIN_NAV_GROUPS as { title: string; items: NavItem[] }[];
 
 const panelTitles: Record<Panel, { title: string; sub: string }> = {
   dashboard: { title: "Dashboard", sub: "Selamat datang kembali, kelola toko SAMAQU Anda." },
@@ -915,7 +876,7 @@ function AdminPageInner() {
                         )}
                       </button>
                     ) : (
-                      <Link href={item.href} className="sidebar-link" onClick={() => setSidebarOpen(false)}>
+                      <Link href={item.href} prefetch className="sidebar-link" onClick={() => setSidebarOpen(false)}>
                         <item.icon size={16} strokeWidth={1.9} />
                         <span className="flex-1">{item.label}</span>
                         {badgeFor(item.badge) > 0 && (
