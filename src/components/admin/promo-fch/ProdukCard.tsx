@@ -14,6 +14,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, Image as ImageIcon, Loader2, Search } from "lucide-react";
 import ConfirmModal from "@/components/ConfirmModal";
 import { cloudinaryUrl } from "@/lib/cloudinary";
+import { getProductThumbnail } from "@/lib/product-thumbnail";
 import type { Product } from "@/lib/katalog-data";
 import { PROMO_COLORS, TEXT, TEXT_MUTED } from "./primitives";
 import { ToggleSwitch } from "./ToggleSwitch";
@@ -285,7 +286,7 @@ export function ProdukCard({
                   <tr style={{ borderTop: "1px solid #ECE4D8" }}>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2.5">
-                        <Thumb src={product.image} name={product.name} />
+                        <Thumb src={getProductThumbnail(product)} name={product.name} />
                         <div className="min-w-0">
                           <p className="truncate font-semibold" style={{ color: TEXT }}>
                             {product.name}
