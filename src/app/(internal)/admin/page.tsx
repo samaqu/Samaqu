@@ -8,7 +8,7 @@ import { getThumbnailFromImages } from "@/lib/product-thumbnail";
 import {
   LayoutDashboard, ShoppingBag, Package, Users, FileText, Settings,
   Search, Bell, Menu, X, ChevronDown, Plus, TrendingUp, Eye, Edit,
-  DollarSign, ShoppingCart, UserPlus, Box, LogOut, Lock, Mail, Trash2, Ticket, Star, Ruler, Image, Shirt, MessageCircle, Camera,
+  DollarSign, ShoppingCart, UserPlus, Box, LogOut, Lock, Mail, Trash2, Ticket, Tag, Star, Ruler, Image, Shirt, MessageCircle, Camera,
   Users2, CreditCard, Percent,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -121,6 +121,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { label: "Dashboard", icon: LayoutDashboard, panel: "dashboard" },
       { label: "Order Management", icon: ShoppingBag, panel: "orders", badge: "orders" },
       { label: "Open Order", icon: Shirt, href: "/admin/open-order" },
+      { label: "Promo Free Cover Hanger", icon: Tag, href: "/admin/promo" },
       { label: "Ulasan Pelanggan", icon: Star, href: "/admin/testimoni", badge: "reviews" },
       { label: "Produk", icon: Package, panel: "products" },
       { label: "Pelanggan", icon: Users, panel: "customers" },
