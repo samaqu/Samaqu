@@ -17,7 +17,16 @@ export const KATALOG_PATH = "/katalog";
 /** Aset promo (sudah ada di `public/promo`). */
 export const PROMO_ASSETS = {
   video: "/promo/free-cover-hanger.mp4",
+  /** Poster untuk <video> — rasio 9:16 (potret), dipakai di dalam halaman. */
   poster: "/promo/free-cover-hanger-poster.jpg",
+  /**
+   * Gambar khusus share/OG — 1200×630 (1.91:1).
+   *
+   * DIPISAH dari `poster` dengan sengaja: WhatsApp hanya menerima rasio ≤ 4:1, dan
+   * gambar potret 9:16 (0,56:1) dipotong jadi thumbnail jangkung sehingga judul
+   * "FREE COVER HANGER" terpangkas. Versi lanskap ini menampilkan judul penuh.
+   */
+  ogImage: "/promo/free-cover-hanger-og.jpg",
 } as const;
 
 /**
@@ -48,12 +57,13 @@ export const PROMO_META = {
   /** true = ikut masuk `sitemap.xml`. */
   includeInSitemap: true,
   /**
-   * Dimensi ASLI `free-cover-hanger-poster.jpg` (1080×1920, rasio 9:16).
-   * Sebelumnya ditulis 1200×630 sehingga metadata tidak cocok dengan berkasnya dan
-   * preview share gagal dirender di sebagian aplikasi.
+   * Dimensi `PROMO_ASSETS.ogImage` (1200×630, 1.91:1).
+   *
+   * Sebelumnya ditulis 1200×630 untuk poster 1080×1920 (9:16) — metadata tidak cocok
+   * dengan berkasnya, dan WhatsApp tidak menerima rasio > 4:1 sehingga preview terpotong.
    */
-  ogImageWidth: 1080,
-  ogImageHeight: 1920,
+  ogImageWidth: 1200,
+  ogImageHeight: 630,
   ogImageType: "image/jpeg",
 } as const;
 

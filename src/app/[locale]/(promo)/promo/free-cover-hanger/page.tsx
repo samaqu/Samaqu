@@ -27,7 +27,7 @@ const PUBLIC_URL = `${SITE_URL}${PROMO_PATH}`;
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
-  const ogImage = `${SITE_URL}${PROMO_ASSETS.poster}`;
+  const ogImage = `${SITE_URL}${PROMO_ASSETS.ogImage}`;
   const alternates = localeAlternates(locale, PROMO_PATH);
 
   return {
@@ -94,7 +94,7 @@ function promoStructuredData(locale: string) {
         "@id": `${PUBLIC_URL}#promo`,
         name: "Free Cover Hanger — Pembelian Pertama",
         description: PROMO_META.description,
-        image: [`${SITE_URL}${PROMO_ASSETS.poster}`],
+        image: [`${SITE_URL}${PROMO_ASSETS.ogImage}`],
         brand: { "@type": "Brand", name: SITE_NAME },
         category: "Busana Muslim Pria",
         offers: {
