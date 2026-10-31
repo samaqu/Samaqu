@@ -103,6 +103,19 @@ export default function PromoStepProduct({
   /** Foto yang dipakai sebagai cover video — foto pertama di galeri. */
   const videoPoster = gallery.find((item) => item.type === "image")?.src ?? product?.image ?? "";
 
+  /*
+   * Rasio wadah galeri mengikuti FOTO ASLI, bukan dipaksa 3:4.
+   * Sebelumnya wadah dikunci `aspect-[3/4]` sementara foto memakai `object-contain`,
+   * sehingga foto yang rasionya beda tampil dengan ruang abu di kiri-kanan.
+   * Rasio dibaca saat gambar termuat lalu dipakai sebagai `aspectRatio` wadah; sebelum
+   * terbaca dipakai 3/4 sebagai cadangan supaya tidak ada lompatan layout.
+   */
+  const [mediaRatio, setMediaRatio] = useState<number | null>(null);
+  useEffect(() => {
+    setMediaRatio(null);
+  }, [currentMedia?.src]);
+  const galleryAspect = mediaRatio ?? 3 / 4;
+
   // Produk/warna/series berganti → harga & foto ikut menyesuaikan.
   useEffect(() => {
     setPrice(draft.price);
@@ -143,8 +156,9 @@ export default function PromoStepProduct({
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 lg:gap-14">
       {/* ── Galeri ── */}
       <div>
-        <div className="relative w-full aspect-[3/4] rounded-3xl overflow-hidden" style={{ background: "#e5e5e5" }}>
-          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,rgba(232,223,209,.5),rgba(0,0,0,.28))" }} />
+        <div className="relative w-full rounded-3xl overflow-hidden" style={{ aspectRatio: galleryAspect, background: "#e5e5e5" }}>
+          {/* Overlay gradasi tipis TIDAK dipakai lagi: ia memberi kesan "ruang" di tepi foto
+              dan menggelapkan produk. Foto dibiarkan bersih sesuai aslinya. */}
           {currentMedia?.type === "video" ? (
             playing ? (
               <video
@@ -163,7 +177,13 @@ export default function PromoStepProduct({
                   <img
                     src={cloudinaryUrl(videoPoster, { width: 1200 })}
                     alt={`${product.name} ${colorLabel}${series ? ` — ${series.name}` : ""}`}
-                    className="absolute inset-0 w-full h-full object-contain"
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onLoad={(e) => {
+                      const img = e.currentTarget;
+                      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                        setMediaRatio(img.naturalWidth / img.naturalHeight);
+                      }
+                    }}
                   />
                 ) : (
                   <div className="absolute inset-0" style={{ background: "#e5e5e5" }} />
@@ -191,7 +211,15 @@ export default function PromoStepProduct({
               key={currentMedia.src}
               src={cloudinaryUrl(currentMedia.src, { width: 1200 })}
               alt={`${product.name} ${colorLabel}${series ? ` — ${series.name}` : ""}`}
-              className="absolute inset-0 w-full h-full object-contain"
+              /* `object-cover` + wadah yang sudah mengikuti rasio foto = gambar memenuhi
+                 kotak tanpa ruang kosong, dan tanpa terpotong (rasio wadah = rasio foto). */
+              className="absolute inset-0 w-full h-full object-cover"
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                  setMediaRatio(img.naturalWidth / img.naturalHeight);
+                }
+              }}
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = "none";
               }}
