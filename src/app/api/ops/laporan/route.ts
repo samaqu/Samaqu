@@ -4,6 +4,7 @@ import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
 import { BIZ_OFFSET_MS } from "@/lib/ops-followup";
 import { SALE_STATUSES, ORDER_SOURCE_LABEL, orderRevenue, orderSourceKey } from "@/lib/transaksi";
 import { paymentChannelLabel } from "@/lib/payment-channel";
+import { loadMayarFees } from "@/lib/mayar-fees";
 
 /**
  * Laporan keuangan owner.
@@ -218,7 +219,7 @@ async function loadPeriod(
   const [ordersRes, returnsCreatedRes, refundsRes, exchangesRes] = await Promise.all([
     admin
       .from("orders")
-      .select("id, order_number, customer_name, customer_whatsapp, created_at, total, shipping_cost, status, source, payment_method, payment_provider, payment_channel")
+      .select("id, order_number, customer_name, customer_whatsapp, created_at, total, shipping_cost, status, source, payment_method, payment_provider, payment_channel, payment_ref, paid_at")
       .gte("created_at", startIso)
       .lt("created_at", endIso)
       .order("created_at", { ascending: false })
@@ -615,6 +616,45 @@ export async function GET(req: NextRequest) {
       items: current.itemsByOrder[String(order.id)] || [],
       hpp: current.orderHpp.get(String(order.id)) || 0,
     }));
+
+    /*
+     * ── Biaya transaksi Mayar ──
+     * Hanya pesanan online (Mayar) yang punya biaya. Dicocokkan lewat `payment_ref`
+     * (id invoice Mayar) ke daftar transaksi, karena `orders` tidak menyimpan id transaksi.
+     *
+     * Dua daftar dipisah supaya jelas mana yang angkanya SUDAH final:
+     *  - `mayarSettled`  → dana cair, `fee` & `net` dari Mayar (angka pasti)
+     *  - `mayarPending`  → sudah dibayar tapi belum cair; biaya BELUM ada, tidak ditebak
+     */
+    const mayarFees = await loadMayarFees();
+    const mayarOrders = salesRows.filter((row) => {
+      const provider = String((row as { payment_provider?: string | null }).payment_provider || "").toLowerCase();
+      return provider === "mayar";
+    });
+
+    const mayarSettled: Array<Record<string, unknown>> = [];
+    const mayarPending: Array<Record<string, unknown>> = [];
+
+    for (const row of mayarOrders) {
+      const ref = String((row as { payment_ref?: string | null }).payment_ref || "").trim();
+      const detail = ref ? mayarFees.get(ref) : undefined;
+      const settled = detail?.status === "settled" && Number.isFinite(detail?.fee);
+
+      const base = {
+        order_number: row.order_number,
+        customer_name: row.customer_name,
+        created_at: row.created_at,
+        total: row.total,
+        channel: detail?.channel ?? null,
+      };
+
+      if (settled) {
+        mayarSettled.push({ ...base, fee: detail!.fee, net: detail!.net });
+      } else {
+        // Belum cair (atau belum ada transaksi di Mayar) → biaya TIDAK ditebak.
+        mayarPending.push({ ...base, mayar_status: detail?.status ?? null });
+      }
+    }
     const returnTable = current.returnRows
       .filter((row) => row.type === "return")
       .map((row) => ({ ...row, items: row.items || [] }));
@@ -675,6 +715,8 @@ export async function GET(req: NextRequest) {
       sources,
       tables: {
         sales: salesRows,
+        mayarSettled,
+        mayarPending,
         returns: returnTable,
         exchanges: exchangeTable,
       },

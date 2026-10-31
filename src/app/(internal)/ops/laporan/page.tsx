@@ -122,10 +122,14 @@ type ReportData = {
     sales: any[];
     returns: any[];
     exchanges: any[];
+    /** Biaya Mayar yang sudah cair — `fee`/`net` angka pasti dari Mayar. */
+    mayarSettled?: any[];
+    /** Pesanan Mayar yang belum cair — biaya belum tersedia (tidak ditebak). */
+    mayarPending?: any[];
   };
 };
 
-type Tab = "returns" | "exchanges" | "sales";
+type Tab = "returns" | "exchanges" | "sales" | "mayar-settled" | "mayar-pending";
 
 /* ───────────────────────── helpers ───────────────────────── */
 
@@ -769,6 +773,9 @@ export default function LaporanKeuanganPage() {
               { key: "returns", label: "Retur", count: data.tables.returns.length },
               { key: "exchanges", label: "Tukar Size", count: data.tables.exchanges.length },
               { key: "sales", label: "Penjualan", count: data.tables.sales.length },
+              /* Biaya Mayar dipisah: "Cair" = angka pasti, "Belum Cair" = biaya belum ada. */
+              { key: "mayar-settled", label: "Biaya Mayar · Cair", count: (data.tables.mayarSettled || []).length },
+              { key: "mayar-pending", label: "Biaya Mayar · Belum Cair", count: (data.tables.mayarPending || []).length },
             ].map((item) => (
               <button
                 key={item.key}
@@ -802,25 +809,38 @@ export default function LaporanKeuanganPage() {
               className="rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-semibold text-slate-700"
             >
               <option value="all">Semua status</option>
-              {tab === "sales"
-                ? ["diproses", "dikirim", "selesai", "pending", "dibatalkan"].map((value) => (
-                    <option key={value} value={value}>{statusLabel(value)}</option>
-                  ))
-                : tab === "exchanges"
-                  ? [
-                      <option key="settled" value="settled">Selesai</option>,
-                      <option key="unpaid" value="unpaid">Belum</option>,
-                    ]
-                  : Object.entries(RETURN_STATUS).map(([value, meta]) => (
-                      <option key={value} value={value}>{meta.label}</option>
-                    ))}
+              {tab === "mayar-settled" || tab === "mayar-pending"
+                ? /* Tabel biaya Mayar tidak punya status pesanan — filternya tidak relevan. */
+                  null
+                : tab === "sales"
+                  ? ["diproses", "dikirim", "selesai", "pending", "dibatalkan"].map((value) => (
+                      <option key={value} value={value}>{statusLabel(value)}</option>
+                    ))
+                  : tab === "exchanges"
+                    ? [
+                        <option key="settled" value="settled">Selesai</option>,
+                        <option key="unpaid" value="unpaid">Belum</option>,
+                      ]
+                    : Object.entries(RETURN_STATUS).map(([value, meta]) => (
+                        <option key={value} value={value}>{meta.label}</option>
+                      ))}
             </select>
           </div>
         </div>
 
         <TableBody
           tab={tab}
-          rows={tab === "returns" ? data.tables.returns : tab === "exchanges" ? data.tables.exchanges : data.tables.sales}
+          rows={
+            tab === "returns"
+              ? data.tables.returns
+              : tab === "exchanges"
+                ? data.tables.exchanges
+                : tab === "mayar-settled"
+                  ? data.tables.mayarSettled || []
+                  : tab === "mayar-pending"
+                    ? data.tables.mayarPending || []
+                    : data.tables.sales
+          }
           search={search}
           statusFilter={statusFilter}
           sort={sort}
@@ -833,9 +853,13 @@ export default function LaporanKeuanganPage() {
         <p className="mt-3 text-[11px] font-medium text-slate-400">
           {tab === "sales"
             ? "Tabel menampilkan semua pesanan di periode. Angka penjualan hanya menghitung status diproses/dikirim/selesai — bukan status pembayaran."
-            : tab === "returns"
-              ? "Termasuk retur yang dibuat di periode dan retur lama yang refund-nya selesai di periode ini."
-              : "Selisih positif = customer bayar; negatif = refund. Pending tidak mengurangi Penjualan Setelah Retur."}
+            : tab === "mayar-settled"
+              ? "Biaya & dana bersih dari Mayar untuk transaksi yang sudah CAIR. Angka ini pasti, bukan perkiraan."
+              : tab === "mayar-pending"
+                ? "Pesanan sudah dibayar tetapi dana belum cair (biasanya ±3 hari). Biaya belum tersedia karena Mayar baru memotong saat dana cair — sengaja tidak ditaksir."
+                : tab === "returns"
+                  ? "Termasuk retur yang dibuat di periode dan retur lama yang refund-nya selesai di periode ini."
+                  : "Selisih positif = customer bayar; negatif = refund. Pending tidak mengurangi Penjualan Setelah Retur."}
         </p>
       </section>
 
@@ -940,14 +964,18 @@ function TableBody({
     return rows
       .filter((row) => {
         const status = tab === "exchanges" ? String(row.price_difference_status || "") : String(row.status || "");
-        if (statusFilter !== "all" && status !== statusFilter) return false;
+        // Tabel biaya Mayar tidak punya status pesanan → filter status dilewati.
+        const isMayarTab = tab === "mayar-settled" || tab === "mayar-pending";
+        if (!isMayarTab && statusFilter !== "all" && status !== statusFilter) return false;
         if (!needle) return true;
         const haystack =
-          tab === "sales"
-            ? [row.order_number, row.customer_name, row.customer_whatsapp, row.source]
-            : tab === "returns"
-              ? [row.return_number, row.order_number, row.customer_name, row.customer_whatsapp]
-              : [
+          isMayarTab
+            ? [row.order_number, row.customer_name, row.channel]
+            : tab === "sales"
+              ? [row.order_number, row.customer_name, row.customer_whatsapp, row.source]
+              : tab === "returns"
+                ? [row.return_number, row.order_number, row.customer_name, row.customer_whatsapp]
+                : [
                   row.return_number,
                   row.order_number,
                   row.customer_name,
@@ -1002,8 +1030,18 @@ function TableBody({
                   {header("customer_name", "Pelanggan", "hidden md:table-cell")}
                   {header("created_at", "Tanggal", "hidden sm:table-cell")}
                   {header("total", "Penjualan", "text-right")}
-                  {header("status", "Status")}
-                  {header("source", "Sumber", "hidden lg:table-cell")}
+                  {header("channel", "Metode Mayar", "hidden md:table-cell")}
+                  {header("fee", "Biaya", "text-right")}
+                  {header("net", "Diterima Bersih", "text-right")}
+                </>
+              ) : tab === "mayar-pending" ? (
+                <>
+                  {header("order_number", "No. Pesanan")}
+                  {header("customer_name", "Pelanggan", "hidden md:table-cell")}
+                  {header("created_at", "Tanggal", "hidden sm:table-cell")}
+                  {header("total", "Dibayar", "text-right")}
+                  {header("channel", "Metode Mayar", "hidden md:table-cell")}
+                  {header("mayar_status", "Status Mayar")}
                 </>
               ) : tab === "returns" ? (
                 <>
@@ -1039,12 +1077,22 @@ function TableBody({
                     <td className="hidden px-3 py-3 text-xs font-semibold text-slate-600 md:table-cell">{row.customer_name || "-"}</td>
                     <td className="hidden px-3 py-3 text-xs text-slate-500 sm:table-cell">{dateOnly(row.created_at)}</td>
                     <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-800">{rp(row.total)}</td>
+                    <td className="hidden px-3 py-3 text-xs text-slate-500 md:table-cell">{row.channel || "-"}</td>
+                    <td className="px-3 py-3 text-right font-bold tabular-nums text-red-600">{rp(row.fee)}</td>
+                    <td className="px-3 py-3 text-right font-black tabular-nums text-slate-900">{rp(row.net)}</td>
+                  </>
+                ) : tab === "mayar-pending" ? (
+                  <>
+                    <td className="px-3 py-3 font-mono text-xs font-bold text-slate-800">{row.order_number}</td>
+                    <td className="hidden px-3 py-3 text-xs font-semibold text-slate-600 md:table-cell">{row.customer_name || "-"}</td>
+                    <td className="hidden px-3 py-3 text-xs text-slate-500 sm:table-cell">{dateOnly(row.created_at)}</td>
+                    <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-800">{rp(row.total)}</td>
+                    <td className="hidden px-3 py-3 text-xs text-slate-500 md:table-cell">{row.channel || "-"}</td>
                     <td className="px-3 py-3">
-                      <Badge tone={row.status === "dibatalkan" ? "red" : row.status === "pending" ? "amber" : "green"}>
-                        {statusLabel(row.status)}
+                      <Badge tone={row.mayar_status === "paid" ? "amber" : "gray"}>
+                        {row.mayar_status === "paid" ? "Dibayar · belum cair" : row.mayar_status === "unpaid" ? "Belum dibayar" : "Belum tercatat"}
                       </Badge>
                     </td>
-                    <td className="hidden px-3 py-3 text-xs text-slate-500 lg:table-cell">{orderSourceLabel(row)}</td>
                   </>
                 ) : tab === "returns" ? (
                   <>
@@ -1132,9 +1180,13 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Detail</p>
-            <h2 className="mt-1 text-lg font-black text-slate-900">
-              {selected.kind === "sales" ? row.order_number : row.return_number}
-            </h2>
+            <p className="mt-1 text-lg font-black text-slate-900">
+              {selected.kind === "mayar-settled" || selected.kind === "mayar-pending"
+                ? row.order_number
+                : selected.kind === "sales"
+                  ? row.order_number
+                  : row.return_number}
+            </p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg border border-[#E5E7EB] p-1.5 text-slate-500 hover:bg-slate-50" aria-label="Tutup">
             <X size={16} />
@@ -1151,8 +1203,21 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
           {selected.kind === "sales" ? (
             <div className="rounded-2xl border border-[#E5E7EB] p-3.5">
               <div className="flex justify-between"><span className="text-slate-500">Penjualan</span><span className="font-black tabular-nums">{rp(row.total)}</span></div>
-              <div className="mt-1 flex justify-between"><span className="text-slate-500">Status</span><Badge tone={row.status === "dibatalkan" ? "red" : row.status === "pending" ? "amber" : "green"}>{statusLabel(row.status)}</Badge></div>
+              <div className="mt-1 flex justify-between"><span className="text-slate-500">Metode Mayar</span><span className="text-xs font-semibold">{row.channel || "-"}</span></div>
+              <div className="mt-1 flex justify-between"><span className="text-slate-500">Biaya Mayar</span><span className="font-bold tabular-nums text-red-600">{rp(row.fee)}</span></div>
+              <div className="mt-1 flex justify-between"><span className="text-slate-500">Diterima bersih</span><span className="font-black tabular-nums">{rp(row.net)}</span></div>
               <div className="mt-1 flex justify-between"><span className="text-slate-500">Tanggal</span><span className="text-xs font-semibold">{dateTime(row.created_at)}</span></div>
+            </div>
+          ) : selected.kind === "mayar-pending" ? (
+            <div className="rounded-2xl border border-[#E5E7EB] p-3.5">
+              <div className="flex justify-between"><span className="text-slate-500">Dibayar</span><span className="font-black tabular-nums">{rp(row.total)}</span></div>
+              <div className="mt-1 flex justify-between"><span className="text-slate-500">Metode Mayar</span><span className="text-xs font-semibold">{row.channel || "-"}</span></div>
+              <div className="mt-1 flex justify-between"><span className="text-slate-500">Status</span><Badge tone={row.mayar_status === "paid" ? "amber" : "gray"}>{row.mayar_status === "paid" ? "Dibayar · belum cair" : row.mayar_status === "unpaid" ? "Belum dibayar" : "Belum tercatat"}</Badge></div>
+              <div className="mt-1 flex justify-between"><span className="text-slate-500">Biaya Mayar</span><span className="text-xs font-semibold text-slate-500">Belum tersedia</span></div>
+              <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                Dana belum cair, jadi biaya belum dipotong Mayar. Angkanya muncul di tab
+                “Biaya Mayar · Cair” setelah dana masuk (±3 hari).
+              </p>
             </div>
           ) : (
             <div className="rounded-2xl border border-[#E5E7EB] p-3.5">
