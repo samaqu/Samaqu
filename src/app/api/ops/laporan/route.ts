@@ -729,6 +729,10 @@ export async function GET(req: NextRequest) {
         hppNote: current.hppNote,
         hppCoverage: current.hppCoverage,
         biayaAvailable: current.biayaAvailable,
+        /* Rincian biaya — WAJIB ikut dikirim; tanpa ini kartu "Biaya Mayar" selalu Rp 0. */
+        mayarFee: current.mayarFee,
+        mayarPendingCount: current.mayarPendingCount,
+        biayaOperasional: current.biayaOperasional,
         profitStatus: current.profitStatus,
         profitNote: current.profitNote,
         transactions: current.transactions,
