@@ -18,14 +18,18 @@ export const FREE_COVER_HANGER_CSS = `
 .fch-cq{container-type:inline-size;container-name:fch;width:100%}
 .fch-wrap{max-width:1240px;margin:0 auto;padding:0 28px;box-sizing:border-box}
 .fch-disp{font-family:'Big Shoulders Display',Impact,sans-serif;text-transform:uppercase;letter-spacing:0.005em;line-height:0.88;margin:0}
-.fch-hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr);gap:48px;align-items:center}
+.fch-hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,0.85fr);gap:56px;align-items:center}
 .fch-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:64px;align-items:center}
 .fch-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
 .fch-coll{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);grid-template-rows:auto auto;gap:20px}
 .fch-coll-big{grid-row:span 2}
 .fch-coll-big-box{min-height:560px}
-.fch-h-hero{font-size:118px}
-.fch-h-sec{font-size:76px}
+/* Judul hero & judul bagian memakai clamp(), bukan ukuran tetap.
+   118px sebelumnya membuat headline meledak di desktop dan memakan layar.
+   Batas bawah tetap tegas; batas atas 86/64px terbaca sebagai display tanpa
+   mendominasi. Nilai di breakpoint mobile/tablet TIDAK berubah. */
+.fch-h-hero{font-size:clamp(68px, 6.2vw, 86px)}
+.fch-h-sec{font-size:clamp(44px, 4.4vw, 64px)}
 .fch-sec{padding-top:120px;padding-bottom:120px}
 .fch-only-m{display:none}
 .fch-sticky-cta{display:none}
@@ -81,8 +85,10 @@ export const FREE_COVER_HANGER_CSS = `
 @container fch (max-width:900px){
 .fch-hero,.fch-two{grid-template-columns:minmax(0,1fr) !important;gap:40px !important}
 .fch-steps{grid-template-columns:minmax(0,1fr) !important}
-.fch-h-hero{font-size:84px}
-.fch-h-sec{font-size:58px}
+/* Tangga ukuran 640 → 60px, 900 → 68px, desktop clamp (68–86px) tetap mulus.
+   Sebelumnya 900px melompat ke 84px lalu turun tajam ke 60px di 640px. */
+.fch-h-hero{font-size:68px}
+.fch-h-sec{font-size:52px}
 .fch-sec{padding-top:88px;padding-bottom:88px}
 .fch-hide-m{display:none !important}
 .fch-wrap{padding-left:32px;padding-right:32px}
