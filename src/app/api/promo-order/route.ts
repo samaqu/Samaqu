@@ -17,6 +17,7 @@ import {
   sumWeightGramsBySize,
   productWeightMapFromRows,
   variantWeightMapFromRows,
+  FALLBACK_ITEM_WEIGHT_GRAMS,
 } from "@/lib/shipping-weight";
 import { verifyJntShipping } from "@/lib/shipping-verify";
 import { markLeadBoughtForOrder } from "@/lib/ops-lead-sync";
@@ -315,7 +316,7 @@ export async function POST(request: NextRequest) {
       productWeights,
       variantWeights,
     );
-    const itemsWeight = grams + missingQty * 1200;
+    const itemsWeight = grams + missingQty * FALLBACK_ITEM_WEIGHT_GRAMS;
     const totalWeight = Math.max(300, itemsWeight + (giveBonus ? addonWeight : 0));
 
     // ── Ongkir: diverifikasi server lewat API J&T (fungsi yang sama dengan Open Order) ──

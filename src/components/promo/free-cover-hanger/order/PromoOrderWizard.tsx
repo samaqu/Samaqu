@@ -25,7 +25,7 @@ import {
   OPEN_ORDER_PERIOD,
   resolveAddonWeightFromCatalog,
 } from "@/lib/open-order-config";
-import { sumWeightGramsBySize, variantWeightMapFromRows } from "@/lib/shipping-weight";
+import { sumWeightGramsBySize, variantWeightMapFromRows, FALLBACK_ITEM_WEIGHT_GRAMS } from "@/lib/shipping-weight";
 import {
   buildOpenOrderProducts,
   findOpenOrderProduct,
@@ -382,7 +382,7 @@ export default function PromoOrderWizard({
       };
     });
     const { grams, missingQty } = sumWeightGramsBySize(weightLines, productWeights, variantWeights);
-    return grams + missingQty * 1200;
+    return grams + missingQty * FALLBACK_ITEM_WEIGHT_GRAMS;
   }, [lines, products, productWeights, variantWeights]);
 
   // Berat bonus Cover Hanger (gram). Diambil dari katalog; kalau katalog masih kosong,

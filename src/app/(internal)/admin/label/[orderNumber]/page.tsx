@@ -5,7 +5,12 @@ import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { maskPhoneLast4 } from "@/lib/mask-phone";
 import { fetchPaymentMethodById, isPaymentMethodId, legacyPaymentType, normalizeMethodType } from "@/lib/payment-methods";
-import { sumWeightGramsBySize, productWeightMapFromRows, variantWeightMapFromRows } from "@/lib/shipping-weight";
+import {
+  sumWeightGramsBySize,
+  productWeightMapFromRows,
+  variantWeightMapFromRows,
+  FALLBACK_ITEM_WEIGHT_GRAMS,
+} from "@/lib/shipping-weight";
 import { jntServiceCodeFromShippingMethod } from "@/lib/jnt/layanan";
 import { labelItemName } from "@/lib/item-label";
 
@@ -169,7 +174,7 @@ export default function LabelPage() {
             productWeightMapFromRows(pRes.data),
             variantWeightMapFromRows(vRes.data)
           );
-          data.weight = Math.max(300, grams + missingQty * 1200);
+          data.weight = Math.max(300, grams + missingQty * FALLBACK_ITEM_WEIGHT_GRAMS);
         }
       }
 

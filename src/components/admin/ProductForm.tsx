@@ -126,6 +126,20 @@ interface SeriesBlock {
 type SizeRow = { size: string; stock: number; priceOverride: string; sku: string; weight?: string; /** ID baris `product_variants` lama (dipakai mode Edit supaya ID tidak putus). */ id?: string };
 
 /**
+ * Potongan kolom `weight` untuk simpan varian.
+ *
+ * Kosong → `undefined` (kolom TIDAK dikirim) supaya `upsert`/`update` mempertahankan berat
+ * yang sudah tersimpan. Mengirim `null` dulu menghapus berat asli saat admin mengosongkan
+ * satu field. Angka valid → berat asli yang dikirim apa adanya.
+ */
+function weightPatch(raw?: string): { weight?: number } {
+  const text = String(raw ?? "").trim();
+  if (text === "") return {};
+  const grams = parseInt(text, 10);
+  return Number.isInteger(grams) && grams > 0 ? { weight: grams } : {};
+}
+
+/**
  * Tabel ukuran yang dipakai dua tempat (blok series Thobe & varian biasa).
  * Di layar sempit tiap ukuran jadi satu kartu berlabel (tidak ada tabel yang
  * melebar keluar layar), di sm+ kembali jadi satu baris rapi berkolom tetap.
@@ -738,9 +752,9 @@ export default function TambahProdukPage({
             const colorGroups: Record<string, Variant> = {};
             let baseProductId = "";
             let baseSize = "";
-            (sibVariants || []).forEach((v: { color: string; hex: string | null; size: string; stock: number; weight: number | null; price_override: number | null; sku: string | null; base_product_id: string | null; base_size: string | null }) => {
+            (sibVariants || []).forEach((v: { id: string; color: string; hex: string | null; size: string; stock: number; weight: number | null; price_override: number | null; sku: string | null; base_product_id: string | null; base_size: string | null }) => {
               if (!colorGroups[v.color]) colorGroups[v.color] = { color: v.color, hex: v.hex || "#141414", sizes: [] };
-              colorGroups[v.color].sizes.push({ size: v.size, stock: v.stock, weight: v.weight ? String(v.weight) : "", priceOverride: v.price_override ? String(v.price_override) : "", sku: v.sku || "" });
+              colorGroups[v.color].sizes.push({ id: v.id, size: v.size, stock: v.stock, weight: v.weight ? String(v.weight) : "", priceOverride: v.price_override ? String(v.price_override) : "", sku: v.sku || "" });
               if (v.base_product_id && !baseProductId) { baseProductId = v.base_product_id; baseSize = v.base_size || ""; }
             });
             const { data: sibImages } = await supabase.from("product_images").select("*").eq("product_id", sib.id).order("display_order");
@@ -806,9 +820,10 @@ export default function TambahProdukPage({
           setPaketMediaColor(rowsPaket[0]?.color || "");
         } else if (dbVariants && dbVariants.length > 0) {
           const colorGroups: Record<string, Variant> = {};
-          dbVariants.forEach((v: { color: string; hex: string | null; size: string; stock: number; weight: number | null; price_override: number | null; sku: string | null }) => {
+          dbVariants.forEach((v: { id: string; color: string; hex: string | null; size: string; stock: number; weight: number | null; price_override: number | null; sku: string | null }) => {
             if (!colorGroups[v.color]) colorGroups[v.color] = { color: v.color, hex: v.hex || colorMap[v.color] || "#141414", sizes: [] };
-            colorGroups[v.color].sizes.push({ size: v.size, stock: v.stock, weight: v.weight ? String(v.weight) : "", priceOverride: v.price_override ? String(v.price_override) : "", sku: v.sku || "" });
+            // `id` dibawa supaya simpan berikutnya memperbarui baris ini, bukan membuat ulang.
+            colorGroups[v.color].sizes.push({ id: v.id, size: v.size, stock: v.stock, weight: v.weight ? String(v.weight) : "", priceOverride: v.price_override ? String(v.price_override) : "", sku: v.sku || "" });
           });
           const varList = Object.values(colorGroups);
           setVariants(varList);
@@ -1537,16 +1552,24 @@ export default function TambahProdukPage({
             : await supabase.from("products").upsert(productRow, { onConflict: "id" });
           if (productError) throw productError;
 
-          // Insert variants
+          // Varian baris series ini.
+          //
+          // Berat: field kosong BUKAN berarti "hapus berat". Dulu `s.weight` kosong dikirim
+          // sebagai null, dan karena baris varian lama dihapus lalu dibuat ulang, berat yang
+          // sudah diisi admin hilang tanpa jejak. Sekarang field kosong = `undefined` →
+          // `upsert` tidak menyentuh kolom `weight`, jadi nilai lama (berat asli) tetap ada.
           const isDerived = !!block.baseProductId;
           const variantRows = block.variants.flatMap((v, vi) =>
             v.sizes.map((s, si) => ({
+              // ID baris lama ikut dikirim supaya diperbarui, bukan dibuat ulang — referensi
+              // transaksi ke varian tetap nyambung dan baris tidak pernah "hilang".
+              ...(s.id ? { id: s.id } : {}),
               product_id: seriesSlug,
               color: v.color,
               hex: v.hex || null,
               size: s.size,
               stock: isDerived ? 0 : s.stock,  // Derived series: stock lives in base product
-              weight: s.weight !== undefined && String(s.weight).trim() !== "" ? parseInt(String(s.weight)) : null,
+              ...(weightPatch(s.weight) as { weight?: number }),
               price_override: s.priceOverride ? parseInt(s.priceOverride) : null,
               sku:
                 s.sku.trim() ||
@@ -1564,13 +1587,35 @@ export default function TambahProdukPage({
               base_size: isDerived ? s.size : null,  // 1:1 mapping: each size maps to same size in base
             }))
           );
-          // Mode edit: tulis ulang varian & media baris ini (bukan menumpuk).
+          // Mode edit: hapus HANYA varian yang benar-benar dibuang di form (mis. ukuran yang
+          // dicabut), bukan seluruh baris series. Media tetap ditulis ulang karena daftarnya
+          // dikelola penuh di form.
           if (isEdit) {
-            await supabase.from("product_variants").delete().eq("product_id", seriesSlug);
+            const { data: existing } = await supabase
+              .from("product_variants")
+              .select("id, color, size")
+              .eq("product_id", seriesSlug);
+            const keptIds = new Set(variantRows.map((row) => (row as { id?: string }).id).filter(Boolean));
+            const keptKeys = new Set(variantRows.map((row) => `${row.color}|${row.size}`.trim().toLowerCase()));
+            const removedIds = (existing || [])
+              .filter(
+                (row: { id: string; color: string | null; size: string | null }) =>
+                  !keptIds.has(row.id) && !keptKeys.has(`${row.color ?? ""}|${row.size ?? ""}`.trim().toLowerCase()),
+              )
+              .map((row: { id: string }) => row.id);
+            if (removedIds.length > 0) await supabase.from("product_variants").delete().in("id", removedIds);
             await supabase.from("product_images").delete().eq("product_id", seriesSlug);
           }
           if (variantRows.length > 0) {
-            await supabase.from("product_variants").upsert(variantRows, { onConflict: "product_id,color,size" });
+            const withId = variantRows.filter((row) => (row as { id?: string }).id);
+            const withoutId = variantRows.filter((row) => !(row as { id?: string }).id);
+            for (const row of withId) {
+              const { id, ...patch } = row as { id: string } & Record<string, unknown>;
+              await supabase.from("product_variants").update(patch).eq("id", id);
+            }
+            if (withoutId.length > 0) {
+              await supabase.from("product_variants").upsert(withoutId, { onConflict: "product_id,color,size" });
+            }
           }
 
           // Insert images
@@ -1649,7 +1694,8 @@ export default function TambahProdukPage({
             hex: v.hex || null,
             size: s.size,
             stock: s.stock,
-            weight: s.weight !== undefined && String(s.weight).trim() !== "" ? parseInt(String(s.weight)) : null,
+            // Kosong = pertahankan berat lama (lihat `weightPatch`), bukan menulis null.
+            ...(weightPatch(s.weight) as { weight?: number }),
             price_override: s.priceOverride ? parseInt(s.priceOverride) : null,
             sku:
               s.sku.trim() ||
@@ -1673,7 +1719,22 @@ export default function TambahProdukPage({
             const idHapus = paketIdsLamaRef.current.filter((id) => !idDisimpan.has(id));
             if (idHapus.length > 0) await supabase.from("product_variants").delete().in("id", idHapus);
           } else {
-            await supabase.from("product_variants").delete().eq("product_id", slug);
+            // Varian biasa: hapus HANYA baris yang benar-benar dicabut dari form (mis. ukuran
+            // atau warna yang dihapus admin). Baris yang masih ada diperbarui in-place lewat
+            // `id`, jadi ID tidak putus dan berat yang tidak diubah tidak hilang.
+            const { data: existing } = await supabase
+              .from("product_variants")
+              .select("id, color, size")
+              .eq("product_id", slug);
+            const keptIds = new Set(variantRows.map((row) => row.id).filter((id): id is string => Boolean(id)));
+            const keptKeys = new Set(variantRows.map((row) => `${row.color}|${row.size}`.trim().toLowerCase()));
+            const idHapus = (existing || [])
+              .filter(
+                (row: { id: string; color: string | null; size: string | null }) =>
+                  !keptIds.has(row.id) && !keptKeys.has(`${row.color ?? ""}|${row.size ?? ""}`.trim().toLowerCase()),
+              )
+              .map((row: { id: string }) => row.id);
+            if (idHapus.length > 0) await supabase.from("product_variants").delete().in("id", idHapus);
           }
           await supabase.from("product_images").delete().eq("product_id", slug);
         }
@@ -1687,7 +1748,17 @@ export default function TambahProdukPage({
             const rowsBaru = variantRows.filter((row) => !row.id);
             if (rowsBaru.length > 0) await supabase.from("product_variants").insert(rowsBaru);
           } else {
-            await supabase.from("product_variants").upsert(variantRows, { onConflict: "product_id,color,size" });
+            // Baris lama diperbarui lewat `id`; baris baru (tanpa id) di-upsert agar varian
+            // yang sudah ada dengan kunci sama tidak dobel.
+            const withId = variantRows.filter((row) => row.id);
+            const withoutId = variantRows.filter((row) => !row.id);
+            for (const row of withId) {
+              const { id, ...patch } = row;
+              await supabase.from("product_variants").update(patch).eq("id", id);
+            }
+            if (withoutId.length > 0) {
+              await supabase.from("product_variants").upsert(withoutId, { onConflict: "product_id,color,size" });
+            }
           }
         }
 

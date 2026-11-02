@@ -14,6 +14,18 @@
 
 export type WeightMap = Record<string, number>;
 
+/**
+ * Berat cadangan (gram) untuk satu unit yang beratnya TIDAK ada di database —
+ * baik berat varian maupun berat produknya kosong.
+ *
+ * Satu angka, satu tempat: dipakai wizard Open Order, wizard promo, pembuatan pesanan
+ * promo (`/api/promo-order`), dan cetak label. Mengubahnya di sini berlaku ke semuanya.
+ *
+ * Ini BUKAN berat default yang boleh menimpa data: begitu berat asli diisi di katalog
+ * (per ukuran atau per produk), berat itulah yang dipakai dan angka ini tidak disentuh.
+ */
+export const FALLBACK_ITEM_WEIGHT_GRAMS = 1100;
+
 export interface WeightLine {
   /** id produk (slug baris `products`, mis. "thobe-navy-karim"). */
   productId?: string | null;
