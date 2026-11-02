@@ -20,6 +20,7 @@ import {
 import { ShieldCheckIcon } from "@phosphor-icons/react/dist/csr/ShieldCheck";
 import HouseIcon from "@/components/icons/HouseIcon";
 import menu from "@/components/MobileMenu.module.css";
+import DrawerMenu from "@/components/drawer/DrawerMenu";
 import ProfileDropdown from "@/components/ProfileDropdown";
 import { CartBadge } from "@/components/CartBadge";
 import CartDrawer from "@/components/CartDrawer";
@@ -366,6 +367,7 @@ export default function Navbar() {
           onClose={() => setMenuOpen(false)}
           homeHref={homeHref}
           locale={locale}
+          open={menuOpen}
           t={t}
           switchLocale={switchLocale}
         />
@@ -382,163 +384,32 @@ function DrawerNavContent({
   onClose,
   homeHref,
   locale,
+  open,
   t,
   switchLocale,
 }: {
   onClose: () => void;
   homeHref: string;
   locale: Locale;
+  open: boolean;
   t: (key: string) => string;
   switchLocale: (locale: Locale) => void;
 }) {
   const pathname = usePathname();
   const currentPath = (pathname || "").replace(/\/$/, "");
-  const createYourPriceHref = `/${locale}/create-your-price`;
 
-  const mainLinks = [
-    { label: t("nav.home"), href: homeHref },
-    { label: t("nav.katalog"), href: `/${locale}/katalog` },
-    { label: t("nav.testimoni"), href: `/${locale}/testimoni` },
-    { label: t("nav.sama_quran"), href: `/${locale}/sama-quran` },
-    { label: t("nav.tentang"), href: `/${locale}/tentang-kami` },
-  ];
-
-  const helpLinks: { label: string; href: string; Icon: React.ComponentType<MenuIconProps> }[] = [
-    { label: t("nav.panduan"), href: `/${locale}/panduan-ukuran`, Icon: Ruler },
-    { label: t("nav.cara_pesan"), href: `/${locale}/cara-pesan`, Icon: Bag },
-    { label: t("nav.faq"), href: `/${locale}/faq`, Icon: Question },
-    { label: t("nav.cek_resi"), href: `/${locale}/cek-resi`, Icon: TruckIcon },
-    { label: t("nav.garansi_retur"), href: `/${locale}/garansi-retur`, Icon: ShieldCheckIcon },
-  ];
-
-  const isActive = (href: string) =>
-    currentPath === href ||
-    (href !== `/${locale}` && currentPath.startsWith(`${href}/`));
-
+  // Isi menu dipecah ke komponen kecil di `src/components/drawer/*`.
   return (
-    <nav className={menu.nav} aria-label="Menu utama">
-      <a
-        href={createYourPriceHref}
-        className={menu.createCard}
-        onClick={onClose}
-        aria-current={currentPath === createYourPriceHref ? "page" : undefined}
-      >
-        <span className={menu.createCopy}>
-          <span className={menu.createLabel}>{t("nav.program")}</span>
-          <span className={menu.createTitle}>
-            {t("nav.cyp_lead")}{" "}
-            <span className={menu.priceWord}>{t("nav.cyp_accent")}</span>
-          </span>
-        </span>
-        <span className={menu.createArrow} aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M7 17 17 7M9 7h8v8" />
-          </svg>
-        </span>
-      </a>
-
-      <ul className={menu.mainList}>
-        {mainLinks.map((item) => (
-          <li key={item.href} className={menu.mainItem}>
-            <a
-              href={item.href}
-              className={menu.mainLink}
-              onClick={onClose}
-              aria-current={isActive(item.href) ? "page" : undefined}
-            >
-              <span className={menu.mainTextMask}>
-                <span className={menu.mainText}>{item.label}</span>
-              </span>
-            </a>
-          </li>
-        ))}
-      </ul>
-
-      <div className={menu.helpSection}>
-        <p className={menu.helpLabel}>{t("nav.bantuan")}</p>
-        <div className={menu.helpGrid}>
-          {helpLinks.map((item, index) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className={`${menu.helpLink} ${index === helpLinks.length - 1 ? menu.helpLinkWide : ""}`}
-              onClick={onClose}
-            >
-              <item.Icon size={16} className={menu.helpIcon} aria-hidden="true" />
-              <span>{item.label}</span>
-            </a>
-          ))}
-        </div>
-
-        <a
-          href="https://affiliate.samaqu.id/"
-          target="_blank"
-          rel="noopener"
-          className={menu.affiliateBox}
-          onClick={onClose}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            width="18"
-            height="18"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={menu.affiliateIcon}
-            aria-hidden="true"
-          >
-            <circle cx="9" cy="7" r="3" />
-            <path d="M3 20c0-4 2.8-7 6-7 2.2 0 4.2 1.2 5.3 3" />
-            <path d="M18 8v6M15 11h6" />
-          </svg>
-          <span>{t("nav.affiliate_program")}</span>
-          <span className={menu.affiliateArrow} aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M7 17 17 7M9 7h8v8" />
-            </svg>
-          </span>
-        </a>
-      </div>
-
-      <div className={menu.bottom}>
-        <div className={menu.bottomRow}>
-          <div className={menu.langSwitch} role="group" aria-label="Bahasa">
-            {locales.map((loc) => (
-              <button
-                key={loc}
-                type="button"
-                className={menu.langButton}
-                aria-pressed={locale === loc}
-                onClick={() => {
-                  onClose();
-                  switchLocale(loc);
-                }}
-              >
-                {loc.toUpperCase()}
-              </button>
-            ))}
-          </div>
-
-          <a href={`/${locale}/akun`} className={menu.accountLink} onClick={onClose}>
-            <User size={16} className={menu.accountIcon} aria-hidden="true" />
-            <span>{t("nav.account")}</span>
-          </a>
-        </div>
-
-        <a
-          href={getWhatsAppLink("Halo Admin SAMAQU, saya tertarik dengan koleksi Anda dan ingin bertanya soal pemesanan.")}
-          target="_blank"
-          rel="noopener"
-          className={menu.chatButton}
-          onClick={onClose}
-        >
-          <MessageCircle size={18} className={menu.chatIcon} aria-hidden="true" />
-          <span>{t("nav.chat_admin")}</span>
-        </a>
-      </div>
-    </nav>
+    <DrawerMenu
+      locale={locale}
+      homeHref={homeHref}
+      currentPath={currentPath}
+      open={open}
+      locales={locales}
+      switchLocale={switchLocale}
+      onNavigate={onClose}
+      t={t}
+    />
   );
 }
 

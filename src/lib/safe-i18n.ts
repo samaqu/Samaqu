@@ -24,6 +24,10 @@ const DEFAULT_MESSAGES: Record<string, Record<string, string>> = {
     bantuan: "Bantuan", panduan: "Panduan Ukuran", cara_pesan: "Cara Pesan", faq: "FAQ",
     garansi_retur: "Garansi & Retur", cyp: "Create Your Price", sama_quran: "Sama Quran",
     free_cover_hanger: "Gratis Cover Hanger",
+    cyp_eyebrow: "Bayar sesuai kemampuan", fch_eyebrow: "Promo berjalan · Order pertama",
+    fch_title_pre: "Cover Hanger", fch_title_accent: "Gratis", fch_note: "Thobe, Kandora, Koko",
+    fch_price_before: "Rp35rb", fch_price_free: "Rp0", fch_cta: "Ambil Bonus", fch_quota_left: "Tinggal %s/%s bonus",
+    affiliate_short: "Affiliate", bantuan_label: "Bantuan", chat_admin_cta: "Chat Admin",
     account: "Account", chat_admin: "Chat Admin", bantuan_title: "Butuh bantuan? Hubungi kami.",
   },
   // Panel admin berada DI LUAR provider next-intl, jadi tanpa cadangan ini label pelacakan
@@ -57,9 +61,15 @@ export function useSafeTranslations(namespace?: string) {
   } catch {
     const ns = namespace || "nav";
     const fallback = DEFAULT_MESSAGES[ns] || {};
-    const translate = (key: string) => {
+    const translate = (key: string, values?: Record<string, string | number>) => {
       const fullKey = key.includes(".") ? key.split(".").pop()! : key;
-      return fallback[fullKey] || key;
+      const text = fallback[fullKey] || key;
+      // Dukung interpolasi sederhana `{nama}` seperti next-intl, supaya teks berparameter
+      // (mis. "Tinggal {left}/{total} bonus") tetap benar tanpa provider.
+      if (!values) return text;
+      return text.replace(/\{(\w+)\}/g, (match, name) =>
+        name in values ? String(values[name]) : match,
+      );
     };
     // Mirror the parts of the translator API the app uses so message lookups
     // keep working when NextIntlClientProvider isn't mounted.

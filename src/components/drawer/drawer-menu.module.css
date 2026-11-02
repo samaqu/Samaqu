@@ -1,0 +1,576 @@
+/* Drawer menu mobile — gaya mengikuti referensi "sidebar mobile".
+   Semua ukuran/warna/radius diambil dari desain; hanya penyesuaian tinggi layar
+   pendek yang ditambahkan supaya isi tetap muat satu layar. */
+
+.wrap {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.wrap::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Grup PROGRAM ── */
+.programSection {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionLabel {
+  margin: 0;
+  color: #595959;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+/* ── Kartu Create Your Price ── */
+.cypCard {
+  display: flex;
+  height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 10px 0 14px;
+  border-radius: 14px;
+  background: #111111;
+  color: #ffffff;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.cypCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cypEyebrow {
+  color: #bdbdbd;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.cypTitle {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.cypAccent {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111111;
+}
+
+.cypArrow {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #111111;
+}
+
+.cypArrow svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
+
+/* ── Kartu Gratis Cover Hanger ── */
+.fchCard {
+  --fch-accent: #1f6b45;
+  --fch-bg: #f5efe5;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1.5px solid var(--fch-accent);
+  border-radius: 16px;
+  background: var(--fch-bg);
+  box-shadow: 0 6px 18px rgba(31, 107, 69, 0.16);
+  color: #111111;
+  text-decoration: none;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.fchShine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 70px;
+  height: 100%;
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.75) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  pointer-events: none;
+}
+
+.fchHead {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fchIcon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--fch-accent);
+  color: #ffffff;
+}
+
+.fchHanger {
+  display: block;
+  width: 28px;
+  height: 28px;
+  transform-origin: 50% 20%;
+}
+
+.fchCopy {
+  display: flex;
+  min-width: 0;
+  flex-grow: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fchEyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fch-accent);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.fchDot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--fch-accent);
+}
+
+.fchTitle {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  line-height: 1.15;
+}
+
+.fchAccent {
+  color: var(--fch-accent);
+}
+
+.fchNote {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: #4a4a4a;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.fchStrike {
+  color: #6b6b6b;
+  text-decoration: line-through;
+}
+
+.fchFree {
+  color: var(--fch-accent);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.fchFoot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fchQuota {
+  display: flex;
+  min-width: 0;
+  flex-grow: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fchBar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: #e3d8c6;
+  overflow: hidden;
+}
+
+.fchBarFill {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--fch-accent);
+}
+
+.fchQuotaText {
+  color: #8a3b12;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.fchCta {
+  display: flex;
+  height: 38px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border-radius: 19px;
+  background: #111111;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Tanpa kuota → tombol mengisi lebar baris. */
+.fchCta[data-grow="1"] {
+  flex-grow: 1;
+}
+
+.fchNudge {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
+
+/* ── Menu utama ── */
+.navList {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+}
+
+.navLink {
+  display: flex;
+  height: 38px;
+  align-items: center;
+  border-bottom: 1px solid #efefef;
+  color: #1a1a1a;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.navLink[aria-current="page"] {
+  color: #111111;
+}
+
+/* ── Grid Bantuan ── */
+.helpSection {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.helpGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.helpLink {
+  display: flex;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border-radius: 10px;
+  background: #f4f4f4;
+  color: #111111;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  text-decoration: none;
+}
+
+/* ── Baris bawah ── */
+.menuFooter {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.langSwitch {
+  display: flex;
+  flex: none;
+  padding: 3px;
+  border: 1px solid #e5e5e5;
+  border-radius: 22px;
+}
+
+.langButton {
+  height: 34px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 17px;
+  background: transparent;
+  color: #4a4a4a;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.langButton[aria-pressed="true"] {
+  background: #111111;
+  color: #ffffff;
+}
+
+.accountBtn {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  place-items: center;
+  border: 1px solid #e5e5e5;
+  border-radius: 50%;
+  color: #111111;
+  text-decoration: none;
+}
+
+.chatButton {
+  display: flex;
+  height: 44px;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 22px;
+  background: #111111;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* ── Animasi kartu Free Cover Hanger (hanya saat drawer terbuka) ── */
+@keyframes fchShine {
+  0% {
+    transform: translateX(-120px);
+  }
+  55% {
+    transform: translateX(420px);
+  }
+  100% {
+    transform: translateX(420px);
+  }
+}
+
+@keyframes fchPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(31, 107, 69, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(31, 107, 69, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(31, 107, 69, 0);
+  }
+}
+
+@keyframes fchSwing {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  20% {
+    transform: rotate(-9deg);
+  }
+  40% {
+    transform: rotate(7deg);
+  }
+  60% {
+    transform: rotate(-4deg);
+  }
+  80% {
+    transform: rotate(0);
+  }
+}
+
+@keyframes fchNudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(4px);
+  }
+}
+
+.fchCard[data-anim] .fchShine {
+  animation: fchShine 3.2s ease-in-out infinite;
+}
+
+.fchCard[data-anim] .fchDot {
+  animation: fchPulse 1.8s ease-out infinite;
+}
+
+.fchCard[data-anim] .fchHanger {
+  animation: fchSwing 3.2s ease-in-out infinite;
+}
+
+.fchCard[data-anim] .fchNudge {
+  animation: fchNudge 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fchShine,
+  .fchDot,
+  .fchHanger,
+  .fchNudge {
+    animation: none !important;
+  }
+
+  .langButton {
+    transition: none;
+  }
+}
+
+/* ── Layar pendek: seluruh bagian dirapatkan supaya tetap muat satu layar ── */
+@media (max-height: 699px) {
+  .wrap {
+    gap: 10px;
+  }
+
+  .cypCard {
+    height: 50px;
+  }
+
+  .cypTitle {
+    font-size: 15px;
+  }
+
+  .fchCard {
+    gap: 8px;
+    padding: 10px;
+    border-radius: 14px;
+  }
+
+  .fchIcon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+  }
+
+  .fchHanger {
+    width: 24px;
+    height: 24px;
+  }
+
+  .fchTitle {
+    font-size: 15px;
+  }
+
+  .navLink {
+    height: 32px;
+    font-size: 15px;
+  }
+
+  .helpLink {
+    height: 32px;
+  }
+
+  .menuFooter {
+    padding-top: 8px;
+  }
+
+  .chatButton {
+    height: 40px;
+  }
+
+  .accountBtn {
+    width: 38px;
+    height: 38px;
+  }
+
+  .langButton {
+    height: 30px;
+  }
+}
+
+@media (max-height: 599px) {
+  .wrap {
+    gap: 8px;
+  }
+
+  .fchCard {
+    gap: 6px;
+  }
+
+  .fchEyebrow {
+    font-size: 8px;
+  }
+
+  .fchNote {
+    font-size: 10px;
+  }
+
+  .navLink {
+    height: 30px;
+    font-size: 14px;
+  }
+
+  .helpLink {
+    height: 30px;
+    font-size: 10px;
+  }
+}
