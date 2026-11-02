@@ -879,8 +879,10 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     const product = resolveProduct(row);
     const paket = isPaketEntry(product);
     const groupIsPaket = paketOptions(groupOf(row)).length > 0;
-    // Baris add-on dikenali lewat id produknya (format lama & baru) — sama dengan server.
-    const isAddonRow = isOpenOrderAddonLine({ product_id: product?.product_id });
+    // Baris add-on HANYA untuk pesanan Open Order / Promo FCH (baris itu memang dikunci di
+    // sana). Di transaksi manual, produk `cover-hanger` adalah produk BIASA: bebas diubah,
+    // dihapus, dan beratnya ikut dihitung seperti baris lain.
+    const isAddonRow = isOpenOrderEdit && isOpenOrderAddonLine({ product_id: product?.product_id });
     const options = sizeOptions(product);
     const chosen = paket ? options[0] || null : options.find((entry) => entry.value === row.variant) || null;
     const quantity = Number(row.quantity) || 0;
@@ -2801,25 +2803,23 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                 Rp {formatRupiah(info.subtotal)}
                                 {row.priceManual ? ` · harga manual Rp ${formatRupiah(info.unitPrice)}/pcs` : ""}
                                 {!info.isAddon ? (
-                                  <>
-                                    {` · stok ${info.chosen.stock}`}
-                                    {info.chosen.linkedTo ? ` · stok mengikuti ${info.chosen.linkedTo}` : ""}
-                                    {" · "}
-                                    {/* Berat per produk — ditampilkan di list supaya admin tahu tanpa buka detail. */}
-                                    <span
-                                      className={
-                                        weightMissing || info.unitWeight.source === "product"
-                                          ? "font-bold text-amber-600 dark:text-amber-400"
-                                          : "font-semibold text-slate-600 dark:text-slate-300"
-                                      }
-                                    >
-                                      Berat {weightMissing ? "belum diisi" : formatWeightExact(info.unitWeight.grams)}
-                                      {info.unitWeight.source === "product" ? " (fallback)" : ""}
-                                    </span>
-                                  </>
+                                  <>{` · stok ${info.chosen.stock}`}{info.chosen.linkedTo ? ` · stok mengikuti ${info.chosen.linkedTo}` : ""}</>
                                 ) : (
                                   <span className="font-bold text-slate-500 dark:text-slate-400"> · add-on tetap</span>
                                 )}
+                                {" · "}
+                                {/* Berat SELALU dirender — termasuk baris add-on. Berat ikut dihitung
+                                    ke total & ongkir, jadi admin harus bisa melihat angkanya. */}
+                                <span
+                                  className={
+                                    weightMissing || info.unitWeight.source === "product"
+                                      ? "font-bold text-amber-600 dark:text-amber-400"
+                                      : "font-semibold text-slate-600 dark:text-slate-300"
+                                  }
+                                >
+                                  Berat {weightMissing ? "belum diisi" : formatWeightExact(info.unitWeight.grams)}
+                                  {info.unitWeight.source === "product" ? " (fallback)" : ""}
+                                </span>
                               </p>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">

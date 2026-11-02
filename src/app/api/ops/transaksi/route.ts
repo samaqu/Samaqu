@@ -303,9 +303,11 @@ async function buildEditSnapshot(
 
   if (cleaned.length === 0) return { error: "Minimal satu produk harus diisi" };
   for (const row of cleaned) {
-    // Baris add-on Open Order dikenali lewat helper bersama (format lama & baru) — hanya di
-    // pesanan Open Order, supaya Cover Hanger yang dibeli biasa tetap baris produk normal.
-    const openOrderAddon = group === "open_order" && isOpenOrderAddonLine(row);
+    // Baris add-on/bonus Cover & Hanger hanya dikenali di pesanan Open Order & Promo FCH.
+    // Transaksi manual memakai produk `cover-hanger` sebagai produk BIASA (ukuran wajib,
+    // bisa diubah/dihapus), jadi tidak ikut aturan add-on di sini.
+    const openOrderAddon =
+      (group === "open_order" || group === "promo_fch") && isOpenOrderAddonLine(row);
     if (!openOrderAddon && !row.size) return { error: "Ukuran produk harus dipilih" };
     if (row.quantity < 1 || row.quantity > 99) return { error: "Jumlah produk harus antara 1 dan 99" };
   }
@@ -313,7 +315,7 @@ async function buildEditSnapshot(
   const productIds = [
     ...new Set(
       cleaned
-        .filter((row) => !(group === "open_order" && isOpenOrderAddonLine(row)))
+        .filter((row) => !((group === "open_order" || group === "promo_fch") && isOpenOrderAddonLine(row)))
         .map((row) => row.product_id),
     ),
   ];
@@ -346,7 +348,7 @@ async function buildEditSnapshot(
 
   const items: Snapshot[] = [];
   for (const row of cleaned) {
-    if (group === "open_order" && isOpenOrderAddonLine(row)) {
+    if ((group === "open_order" || group === "promo_fch") && isOpenOrderAddonLine(row)) {
       // Cari baris lama yang bersangkutan: format lama (tanpa warna/ukuran) atau format baru
       // (varian katalog add-on). Bentuk barisnya DIPERTAHANKAN apa adanya — format baru tetap
       // membawa color/size-nya supaya stoknya cocok saat edit, format lama tetap tanpa varian.
