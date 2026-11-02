@@ -40,7 +40,11 @@ export function MobileDrawer({ children, title = "SAMAQU" }: MobileDrawerProps) 
       <DialogPositioner className={s.positioner}>
         <DialogContent className={s.content}>
           <div className={s.header}>
-            <DialogTitle className={s.title}>{title}</DialogTitle>
+            {/* Logo asli SAMAQU (aset publik yang sama dengan Navbar/Footer). Tetap memakai
+                <DialogTitle> supaya dialog punya nama yang terbaca screen reader. */}
+            <DialogTitle className={s.title}>
+              <img src="/logo.svg" alt={title} className={s.logo} />
+            </DialogTitle>
             <DialogCloseTrigger className={s.close} aria-label="Tutup menu" autoFocus>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
                 <path d="M18 6 6 18M6 6l12 12" />

@@ -105,7 +105,7 @@
 /* ── Kartu Gratis Cover Hanger ── */
 .fchCard {
   --fch-accent: #1f6b45;
-  --fch-bg: #f5efe5;
+  --fch-bg: #ffffff;
 
   position: relative;
   display: flex;

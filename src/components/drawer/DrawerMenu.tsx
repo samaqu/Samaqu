@@ -83,10 +83,8 @@ export default function DrawerMenu({
 
   return (
     <div className={s.wrap}>
-      {/* 1. Grup PROGRAM */}
+      {/* 1. Grup PROGRAM — kartu langsung tampil, tanpa label judul. */}
       <section className={s.programSection}>
-        <span className={s.sectionLabel}>{t("nav.program")}</span>
-
         <CypCard
           href={cypHref}
           eyebrow={t("nav.cyp_eyebrow")}
