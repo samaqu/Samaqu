@@ -85,13 +85,22 @@ function TruckIcon({ size = 16, className, "aria-hidden": ariaHidden }: MenuIcon
 }
 type NavItem = { label: string; href: string; hasDropdown?: false; Icon?: IconComponent } | { label: string; hasDropdown: true; Icon?: IconComponent };
 
+/**
+ * Menu navbar DESKTOP saja (dipakai `<nav className="hidden lg:flex">`).
+ * Drawer mobile memakai `drawer-nav.ts`, jadi tidak terpengaruh perubahan di sini.
+ *
+ * Urutan: Home → Katalog → Open Order → Sama Quran → Free Cover Hanger.
+ * Testimoni & Bantuan dikeluarkan dari navbar desktop sesuai permintaan pemilik;
+ * keduanya masih terjangkau dari drawer mobile dan footer.
+ */
 function getNavItems(t: (key: string) => string): NavItem[] {
   return [
     { label: t("nav.home"), href: "/", Icon: HouseIcon },
     { label: t("nav.katalog"), href: "/katalog", Icon: Storefront },
-    { label: t("nav.testimoni"), href: "/testimoni", Icon: MessageCircle },
+    { label: t("nav.open_order"), href: "/open-order", Icon: Bag },
     { label: t("nav.sama_quran"), href: "/sama-quran", Icon: BookOpen },
-    { label: t("nav.bantuan"), hasDropdown: true, Icon: Question },
+    // Diskon/garansi cocok mewakili promo; ikonnya sudah dipakai di navbar ini.
+    { label: t("nav.free_cover_hanger_nav"), href: "/promo/free-cover-hanger", Icon: ShieldCheckIcon },
   ];
 }
 
