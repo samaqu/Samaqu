@@ -13,7 +13,13 @@ import PromoOrderWizard from "@/components/promo/free-cover-hanger/order/PromoOr
  * yang merupakan salinan wizard Open Order, jadi `src/components/open-order/*` tidak
  * tersentuh.
  */
-export const revalidate = 60;
+/**
+ * 180 detik (dulu 60). Halaman ini memang membaca data server (status promo, kuota,
+ * periode), jadi tidak bisa dibiarkan basi lama — tapi 60 detik membuang 3× lebih banyak
+ * penulisan cache tanpa manfaat: katalog & ongkir di wizard tetap diambil di browser.
+ * Perubahan dari admin tetap instan untuk produk/katalog lewat /api/revalidate.
+ */
+export const revalidate = 180;
 
 export default async function PromoOrderPage() {
   const promo = await readPromoFchSettings();

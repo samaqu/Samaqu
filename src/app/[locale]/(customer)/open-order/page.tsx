@@ -8,8 +8,11 @@ import {
   resolveOpenOrderState,
 } from "@/lib/open-order-window";
 
-// Jendela Open Order global; cache sebentar supaya status buka/tutup tetap akurat.
-export const revalidate = 60;
+/**
+ * Jendela Open Order global. 180 detik (dulu 60): hemat penulisan cache, sementara
+ * status buka/tutup masih terbaca baru dalam hitungan menit.
+ */
+export const revalidate = 180;
 
 /**
  * Open Order Samaqu — alur 6 langkah (daftar produk → detail → keranjang → data pemesan →

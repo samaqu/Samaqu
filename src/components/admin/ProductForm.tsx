@@ -16,6 +16,7 @@ import { PAKET_SIZE, isCoverHangerKategori, isKabakKategori, isPaketKategori, is
 import { uploadToCloudinary, validateMediaFile } from "@/lib/cloudinary";
 import { useStoreSettings } from "@/lib/store-settings";
 import { usePageUrl } from "@/lib/ops-router";
+import { requestRevalidate } from "@/lib/admin-revalidate";
 import { duplicateSkus, generateBaseSku, generateVariantSku, resolveColorName, seriesCode } from "@/lib/sku";
 
 const CATEGORIES = ["Thobe", "Kandora", "Koko", "Vest", "Kabak", "Cover & Hanger"] as const;
@@ -1777,6 +1778,16 @@ export default function TambahProdukPage({
         if (imageRows.length > 0) {
           await supabase.from("product_images").insert(imageRows);
         }
+      }
+
+      // Segarkan cache halaman publik SEBELUM pindah halaman, supaya katalog & detail
+      // produk langsung menampilkan perubahan. Detail produk disegarkan per produk yang
+      // benar-benar disimpan (bukan seluruh katalog) supaya hemat penulisan cache.
+      // Best-effort: gagal revalidate tidak boleh menggagalkan penyimpanan.
+      try {
+        await requestRevalidate(isEdit ? editProductId : undefined);
+      } catch {
+        /* diabaikan — data sudah tersimpan */
       }
 
       // Hard navigation: daftar produk di /admin memuat stok lewat useEffect di client.

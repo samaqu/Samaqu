@@ -9,8 +9,11 @@ import {
   resolveOpenOrderState,
 } from "@/lib/open-order-window";
 
-// Konten Bio + status Open Order global; cache 1 menit supaya banner tetap akurat.
-export const revalidate = 60;
+/**
+ * Konten Bio + status Open Order global. 180 detik (dulu 60): konten Biolink diatur admin
+ * dan jarang berubah, sementara banner status tetap akurat dalam hitungan menit.
+ */
+export const revalidate = 180;
 
 export default async function Page() {
   const content = await fetchBioPageContent();

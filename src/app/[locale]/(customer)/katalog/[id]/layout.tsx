@@ -3,8 +3,12 @@ import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, localeAlternates } from "@/lib/site-config";
 
-// Shell + metadata produk di-cache; admin memanggil revalidatePath saat produk disimpan.
-export const revalidate = 300;
+/**
+ * Shell + metadata produk di-cache. 600 detik (dulu 300): harga & stok yang dibeli tetap
+ * dibaca di browser, dan admin yang menyimpan produk sudah menyegarkan halaman ini lewat
+ * `/api/revalidate` (per produk, bukan seluruh katalog).
+ */
+export const revalidate = 600;
 
 /** Semua produk terbit diprerender saat build; produk baru dibuat on-demand lalu di-cache. */
 export async function generateStaticParams() {

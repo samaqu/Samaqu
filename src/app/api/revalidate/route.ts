@@ -16,25 +16,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const productId = typeof body.productId === "string" ? body.productId : null;
+  const productId = typeof body.productId === "string" ? body.productId.trim() : "";
 
-  // Home + katalog: tanpa prefix bahasa (route lama, sebagian halaman masih diakses begini)…
+  /*
+   * Sengaja SEMPIT: setiap `revalidatePath` = satu penulisan cache (ISR write), dan pola
+   * dinamis seperti `/[locale]/katalog/[id]` membuang cache SEMUA produk (111 × 2 bahasa)
+   * hanya karena satu produk disimpan. Pemakaian ISR write paket Hobby ada batasnya
+   * (200K/bulan), jadi di sini hanya yang benar-benar berubah yang disegarkan.
+   *
+   * - Home: menampilkan produk unggulan/terbaru → tetap disegarkan.
+   * - Daftar katalog: menampilkan status stok/harga → tetap disegarkan.
+   * - Detail produk: HANYA produk yang disebut. Tanpa `productId`, halaman detail tidak
+   *   disentuh sama sekali dan mengandalkan `revalidate` berkala milik layout-nya.
+   */
   revalidatePath("/");
-  revalidatePath("/katalog");
-  // …dan pola route dinamis (localePrefix default = "always") untuk Home, katalog, & detail produk.
   revalidatePath("/[locale]", "page");
+  revalidatePath("/katalog");
   revalidatePath("/[locale]/katalog", "page");
-  revalidatePath("/[locale]/katalog/[id]", "page");
 
-  // Bila komponen pemanggil menyebut id produk tertentu, segarkan halamannya langsung
-  // (lebih pasti daripada hanya mengandalkan pola route dinamis).
   if (productId) {
     for (const locale of LOCALES) {
-      revalidatePath(`/${locale}`);
-      revalidatePath(`/${locale}/katalog`);
       revalidatePath(`/${locale}/katalog/${productId}`);
     }
+    // Pola dinamis TIDAK dipakai lagi — itu yang membuang cache seluruh katalog.
   }
 
-  return NextResponse.json({ revalidated: true, timestamp: Date.now() });
+  return NextResponse.json({ revalidated: true, productId: productId || null, timestamp: Date.now() });
 }
