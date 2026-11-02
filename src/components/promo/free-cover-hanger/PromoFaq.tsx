@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ADMIN_WA_LINK, PROMO_FAQ } from "@/lib/promo/free-cover-hanger";
+import { PROMO_FAQ, PROMO_WA_MESSAGE } from "@/lib/promo/free-cover-hanger";
+import { getWhatsAppLink } from "@/lib/store-settings";
 
 /** FAQ accordion — satu item terbuka pada satu waktu. */
 export function PromoFaq() {
@@ -18,7 +19,7 @@ export function PromoFaq() {
             {PROMO_FAQ.description}
           </p>
           <a
-            href={ADMIN_WA_LINK}
+            href={getWhatsAppLink(PROMO_WA_MESSAGE)}
             data-wa-number=""
             data-fch-placement="faq"
             className="fch-btn-line"

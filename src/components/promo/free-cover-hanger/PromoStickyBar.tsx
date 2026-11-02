@@ -1,10 +1,12 @@
+"use client";
+
 import {
-  ADMIN_WA_LINK,
-  ADMIN_WA_NUMBER,
   PROMO_FLAGS,
   PROMO_STICKY,
+  PROMO_WA_MESSAGE,
   katalogHref,
 } from "@/lib/promo/free-cover-hanger";
+import { getWhatsAppLink, getWhatsAppNumber } from "@/lib/store-settings";
 import { QuotaBar } from "./QuotaBar";
 
 /**
@@ -48,8 +50,8 @@ export function PromoStickyBar({ locale }: { locale: string }) {
         {PROMO_STICKY.ctaLabel}
       </a>
       <a
-        href={ADMIN_WA_LINK}
-        data-wa-number={ADMIN_WA_NUMBER}
+        href={getWhatsAppLink(PROMO_WA_MESSAGE)}
+        data-wa-number={getWhatsAppNumber()}
         data-fch-placement="sticky"
         className="fch-tap"
         aria-label={PROMO_STICKY.waLabel}

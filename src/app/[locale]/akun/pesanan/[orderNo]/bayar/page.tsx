@@ -25,8 +25,7 @@ import { useAkunCustomer } from "@/components/akun/AkunContext";
 import { useSafeLocale } from "@/lib/safe-i18n";
 import { useResolvedPaymentMethod } from "@/lib/use-payment-methods";
 import { rupiah, tglID } from "@/lib/akun-format";
-import { waLink } from "@/lib/whatsapp";
-import { ADMIN_WA_NUMBER } from "@/lib/promo/free-cover-hanger";
+import { getWhatsAppLink } from "@/lib/store-settings";
 import { isAwaitingPayment } from "@/components/akun/PayNowButton";
 
 type CustomerOrder = Record<string, any>;
@@ -134,7 +133,7 @@ export default function BayarPesananPage() {
     `No. Pesanan: ${order.order_number}\n` +
     `Nama: ${order.customer_name || customer?.name || "-"}\n` +
     `Nominal: ${rupiah(amount)}`;
-  const confirmHref = waLink(ADMIN_WA_NUMBER, confirmMessage);
+  const confirmHref = getWhatsAppLink(confirmMessage);
 
   return (
     <div className="-mx-4 -mt-4 min-h-screen bg-[#F7F5F0] px-4 py-6 md:mx-0 md:mt-0 md:px-0">

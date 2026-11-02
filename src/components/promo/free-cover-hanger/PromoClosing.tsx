@@ -1,4 +1,7 @@
-import { ADMIN_WA_LINK, PROMO_CLOSING, katalogHref } from "@/lib/promo/free-cover-hanger";
+"use client";
+
+import { PROMO_CLOSING, PROMO_WA_MESSAGE, katalogHref } from "@/lib/promo/free-cover-hanger";
+import { getWhatsAppLink } from "@/lib/store-settings";
 
 const ctaBase: React.CSSProperties = {
   textDecoration: "none",
@@ -54,7 +57,7 @@ export function PromoClosing({ locale }: { locale: string }) {
             {PROMO_CLOSING.primaryCta}
           </a>
           <a
-            href={ADMIN_WA_LINK}
+            href={getWhatsAppLink(PROMO_WA_MESSAGE)}
             data-wa-number=""
             data-fch-placement="closing"
             className="fch-btn-line"

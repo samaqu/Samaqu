@@ -6,11 +6,6 @@
  * database dan tidak ada logic promo apa pun.
  */
 
-import { waNumber, waLink } from "@/lib/whatsapp";
-
-/** Nomor admin SAMAQU — sumbernya dari store settings di `bio-page-content`. */
-const ADMIN_WHATSAPP_RAW = "62895635965400";
-
 /** Aset promo (sudah ada di `public/promo`). */
 export const PROMO_ASSETS = {
   video: "/promo/free-cover-hanger.mp4",
@@ -251,10 +246,15 @@ export const PROMO_STICKY = {
   waLabel: "Chat WhatsApp SAMAQU",
 } as const;
 
-/** Tautan WhatsApp admin (pesan siap kirim). */
-export const ADMIN_WA_LINK = waLink(ADMIN_WHATSAPP_RAW, "Halo Samaqu, saya mau tanya program Free Cover Hanger");
-
-export const ADMIN_WA_NUMBER = waNumber(ADMIN_WHATSAPP_RAW);
+/**
+ * Pesan siap kirim untuk tombol WhatsApp admin di halaman promo.
+ *
+ * Nomornya TIDAK ditulis di sini: satu sumbernya `store_settings.whatsapp`, dibaca lewat
+ * `getWhatsAppLink()` / `getWhatsAppNumber()` di `lib/store-settings` — helper yang sama
+ * dengan Navbar, Hero, dan Footer. Dulu nomornya di-hardcode di modul ini, sehingga
+ * mengganti nomor di pengaturan tidak ikut mengubah halaman promo.
+ */
+export const PROMO_WA_MESSAGE = "Halo Samaqu, saya mau tanya program Free Cover Hanger";
 
 /** Path halaman pesan promo (wizard katalog → keranjang → data). */
 export const PROMO_ORDER_PATH = "/promo/free-cover-hanger/pesan";

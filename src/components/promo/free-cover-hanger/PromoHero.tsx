@@ -1,9 +1,12 @@
+"use client";
+
 import {
-  ADMIN_WA_LINK,
   PROMO_FLAGS,
   PROMO_HERO,
+  PROMO_WA_MESSAGE,
   katalogHref,
 } from "@/lib/promo/free-cover-hanger";
+import { getWhatsAppLink } from "@/lib/store-settings";
 import { HeroStageSvg } from "./illustrations";
 import { QuotaBar } from "./QuotaBar";
 
@@ -56,7 +59,7 @@ export function PromoHero({ locale }: { locale: string }) {
             {PROMO_HERO.primaryCta}
           </a>
           <a
-            href={ADMIN_WA_LINK}
+            href={getWhatsAppLink(PROMO_WA_MESSAGE)}
             data-fch-placement="hero"
             className="fch-btn-line"
             style={{
