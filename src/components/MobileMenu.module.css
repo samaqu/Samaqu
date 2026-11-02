@@ -7,8 +7,25 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  justify-content: space-between;
-  overflow: hidden;
+  /* Dulu `space-between`: begitu grup Program dibuka, bagian bawah terdorong keluar dari
+     body drawer (`overflow: hidden`) sehingga bar bahasa/Chat Admin terpotong.
+     Sekarang blok bawah ditempel ke dasar lewat `margin-top: auto` di `.bottom`.
+     `overflow-y: auto` adalah PENGAMAN: di layar sangat pendek + grup Program terbuka,
+     isi boleh bergulir halus alih-alih terpotong (scrollbar disembunyikan). */
+  justify-content: flex-start;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.nav::-webkit-scrollbar {
+  display: none;
+}
+
+/* Dorongan ke bawah hanya kalau masih ada ruang sisa. */
+.bottom {
+  margin-top: auto;
 }
 
 /* ── Kartu Create Your Price ── */
@@ -74,6 +91,79 @@
   display: block;
   width: 16px;
   height: 16px;
+}
+
+/* ── Grup program (kartu hitam + daftar yang bisa dibuka-tutup) ── */
+.programGroup {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+}
+
+.programChevron {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  background: #262626;
+  color: #ffffff;
+  transition: transform 0.25s ease;
+}
+
+.programChevron[data-open] {
+  transform: rotate(180deg);
+}
+
+.programChevron svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+.programList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0 0;
+  padding: 6px;
+  border-radius: 14px;
+  background: #f2f2f2;
+  list-style: none;
+}
+
+.programLink {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: #111111;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.programLink[aria-current="page"] {
+  background: #111111;
+  color: #ffffff;
+}
+
+.programExternal {
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  opacity: 0.55;
+}
+
+.programExternal svg {
+  display: block;
+  width: 11px;
+  height: 11px;
 }
 
 /* ── Menu utama ── */
@@ -407,6 +497,62 @@
     height: 44px;
     min-height: 44px;
   }
+
+  /* Grup Program: dipadatkan supaya isinya (4 baris) tetap masuk satu layar
+     bersama menu utama + Bantuan + bar bawah saat dibuka. */
+  .programChevron {
+    width: 26px;
+    height: 26px;
+  }
+
+  .programChevron svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .programList {
+    margin-top: 4px;
+    padding: 4px;
+    border-radius: 12px;
+    gap: 0;
+  }
+
+  .programLink {
+    min-height: 28px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .mainList {
+    margin-top: 4px;
+  }
+
+  .helpSection {
+    margin-top: 8px;
+    gap: 4px;
+  }
+
+  .helpLabel {
+    margin-bottom: 4px;
+  }
+
+  .bottom {
+    gap: 6px;
+    padding-top: 6px;
+  }
+
+  .chatButton {
+    height: 38px;
+    min-height: 38px;
+  }
+
+  .langButton {
+    height: 30px;
+  }
+
+  .accountLink {
+    min-height: 30px;
+  }
 }
 
 /* ── HP kecil (tinggi < 600px, mis. 360×640): dipadatkan lagi ±25% ── */
@@ -463,6 +609,57 @@
     font-size: 13px;
   }
 
+  /* Grup Program ikut dipadatkan supaya drawer (dengan grup terbuka) tetap muat
+     satu layar tanpa scroll di HP pendek. */
+  .programChevron {
+    width: 26px;
+    height: 26px;
+  }
+
+  .programChevron svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .programList {
+    margin-top: 4px;
+    padding: 4px;
+    border-radius: 12px;
+    gap: 1px;
+  }
+
+  .programLink {
+    min-height: 26px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .programList {
+    gap: 0;
+    padding: 3px;
+  }
+
+  /* Menu utama & jarak antar-bagian dirapatkan juga — dengan grup Program terbuka,
+     isi drawer harus tetap berada di dalam satu layar (body drawer `overflow: hidden`). */
+  .mainList {
+    margin-top: 4px;
+  }
+
+  .mainLink {
+    height: 32px;
+    font-size: 17px;
+  }
+
+  .helpSection {
+    margin-top: 8px;
+    gap: 4px;
+  }
+
+  .helpLink {
+    height: 32px;
+    min-height: 32px;
+  }
+
   .bottom {
     gap: 7px;
     padding-top: 8px;
@@ -498,7 +695,9 @@
   .mainLink,
   .helpLink,
   .langButton,
-  .chatButton {
+  .chatButton,
+  .programChevron,
+  .programLink {
     transition: none;
   }
 
