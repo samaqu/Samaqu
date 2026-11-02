@@ -123,8 +123,8 @@ export function PromoHero({ locale }: { locale: string }) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 className="fchh-abs fchh-set"
-                src="/promo/hero/cover-hanger-kosong.webp"
-                alt="Cover dan hanger kayu SAMAQU"
+                src="/promo/hero/cover-hanger-baru.webp"
+                alt="Tiga cover hanger SAMAQU berlapis dengan hanger kayu"
                 style={{ left: 40, top: 8, width: 278, height: 347, objectFit: "contain" }}
               />
             </div>
