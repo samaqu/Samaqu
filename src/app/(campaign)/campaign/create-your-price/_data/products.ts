@@ -1,0 +1,155 @@
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import {
+  buildOpenOrderProducts,
+  openOrderEffectivePrice,
+  type OpenOrderCatalogRow,
+  type OpenOrderProduct,
+  type OpenOrderStockRow,
+} from "@/lib/open-order-offering";
+import { openOrderProductImage } from "@/lib/open-order-catalog";
+import { CYP_MAX_PRODUCTS } from "@/lib/campaign/create-your-price-content";
+
+/** Satu kartu di section "Produk pilihan periode ini". */
+export interface CampaignProduct {
+  /** id baris katalog acuan — dipakai untuk link ke halaman detail produk. */
+  id: string;
+  name: string;
+  /** Keterangan "kain · series" di bawah nama (kosong kalau tidak ada datanya). */
+  sub: string;
+  image: string;
+  /** Harga minimum yang tampil setelah kata "Mulai". */
+  minimumPrice: number;
+}
+
+/** URL media yang benar-benar gambar (bukan video) — `<img>` tidak bisa merender video. */
+function isImageUrl(url: string): boolean {
+  if (!url) return false;
+  return !/\.(mp4|m4v|webm|mov)(\?|$)/i.test(url.trim());
+}
+
+/** Host media utama katalog (R2). Dipakai sebagai cadangan kalau URL utama gagal dimuat. */
+const PRIMARY_MEDIA_HOST = "samaqu-media.samaqu.workers.dev";
+
+/**
+ * Cek satu URL gambar benar-benar bisa dibuka (HEAD). Dipakai hanya untuk KANDIDAT CADANGAN,
+ * jadi jumlah request-nya kecil (maksimal beberapa per halaman).
+ */
+async function isReachableImage(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { method: "HEAD", cache: "no-store" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Foto kartu untuk satu produk Open Order.
+ *
+ * `openOrderProductImage()` mengutamakan media varian, TAPI media baris katalog sering
+ * dimulai dengan video (`00_semua_video.mp4`) sementara gambarnya ada di media berikutnya.
+ * Jadi: ambil kandidat gambar pertama dari seluruh varian grup (urutan media katalog).
+ *
+ * Kandidat cadangan: beberapa baris katalog menyimpan `images[]` di bucket `media-backup`
+ * yang sudah mati (HTTP 400), sementara salinan R2-nya masih hidup. Kalau kandidat utama
+ * ternyata tidak bisa dibuka, pakai URL R2 dengan path yang sama. Ini murni mengatasi data
+ * katalog yang rusak — tidak mengubah data apa pun di database.
+ */
+async function cardImageOf(product: OpenOrderProduct): Promise<string> {
+  let candidate = "";
+
+  for (const variant of product.variants) {
+    const image = variant.media.find((item) => item.type === "image" && isImageUrl(item.src));
+    if (image) {
+      candidate = image.src;
+      break;
+    }
+  }
+  if (!candidate) {
+    const fallback = openOrderProductImage(product);
+    candidate = isImageUrl(fallback) ? fallback : "";
+  }
+  if (!candidate) return "";
+
+  // URL utama hidup → langsung pakai (tanpa request tambahan).
+  if (candidate.includes(PRIMARY_MEDIA_HOST)) return candidate;
+
+  // Bukan host utama: jangan percaya blind, coba dulu.
+  if (await isReachableImage(candidate)) return candidate;
+
+  // Cadangan: path yang sama di R2.
+  const pathStart = candidate.indexOf("/katalog/");
+  if (pathStart >= 0) {
+    const r2 = `https://${PRIMARY_MEDIA_HOST}${candidate.slice(pathStart)}`;
+    if (await isReachableImage(r2)) return r2;
+  }
+
+  return "";
+}
+
+/**
+ * Ambil maksimal 4 produk yang Create Your Price-nya AKTIF.
+ *
+ * Sumber kebenaran aturan CYP adalah `buildOpenOrderProducts()` — fungsi yang sama yang
+ * dipakai halaman Open Order dan `/api/open-order` — jadi kartu di sini tidak mungkin
+ * berbeda dari yang benar-benar bisa dipesan. Yang difilter tinggal `cypEnabled`.
+ *
+ * Filter "sedang aktif di Open Order" dilakukan dua lapis, sama seperti halaman Open Order:
+ *  - `open_order_enabled !== false` → ditangani `buildOpenOrderProducts`
+ *  - harga efektif `openOrderEffectivePrice()` ada (bukan 0/null)
+ * Serta `is_published = true` supaya produk yang disembunyikan dari katalog tidak tampil.
+ *
+ * Mengembalikan `[]` bila tidak ada produk CYP aktif — pemanggil menyembunyikan section.
+ */
+export async function loadCampaignProducts(): Promise<CampaignProduct[]> {
+  try {
+    const supabase = getSupabaseAdmin();
+
+    const { data: catalogRows, error } = await supabase
+      .from("products")
+      .select("*, jenis_kain(*)")
+      .eq("is_published", true)
+      .order("created_at", { ascending: true });
+
+    if (error || !catalogRows?.length) return [];
+
+    const { data: stockRows } = await supabase
+      .from("product_variants")
+      .select("product_id, color, size, stock, weight");
+
+    const products = buildOpenOrderProducts(
+      catalogRows as unknown as OpenOrderCatalogRow[],
+      (stockRows ?? []) as OpenOrderStockRow[]
+    );
+
+    const active = products.filter((product) => {
+      // Wajib CYP aktif dan harga efektifnya ada.
+      if (!product.cypEnabled) return false;
+      const row = (catalogRows as unknown as OpenOrderCatalogRow[]).find((item) => item.id === product.id);
+      if (row && !openOrderEffectivePrice(row)) return false;
+      return product.minimumPrice > 0;
+    });
+
+    const selected = active.slice(0, CYP_MAX_PRODUCTS);
+
+    // Paralel: maksimal 4 produk, jadi paling banyak beberapa request HEAD (hanya untuk
+    // kandidat cadangan — URL host utama tidak dicek).
+    return Promise.all(
+      selected.map(async (product) => ({
+        id: product.id,
+        name: product.name,
+        sub: [product.kain, product.series.map((option) => option.name).filter(Boolean).join(", ")]
+          .filter(Boolean)
+          .join(" · "),
+        // Foto kartu: gambar pertama dari media katalog (bukan video). Kosong = render tanpa foto.
+        image: await cardImageOf(product),
+        minimumPrice: product.minimumPrice,
+      }))
+    );
+  } catch (error) {
+    // Section ini hanya pelengkap: kalau query gagal, sembunyikan saja jangan sampai
+    // halaman kampanye ikut error.
+    console.error("[CYP-CAMPAIGN] Gagal memuat produk Create Your Price:", error);
+    return [];
+  }
+}

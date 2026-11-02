@@ -1,0 +1,259 @@
+/**
+ * Style kampanye Create Your Price.
+ *
+ * SEMUA aturan di-scope ke `.cyp` (elemen pembungkus halaman) supaya tidak menyentuh
+ * halaman lain, bukan bagian dari `globals.css`, dan tidak mengubah Tailwind config
+ * maupun tema toko. Nilai (warna, ukuran, spacing, radius, breakpoint) disalin apa
+ * adanya dari mockup `Main.dc.html`.
+ *
+ * Warna palet (dari mockup):
+ *   #0B0B0B hitam pekat   #F4F1EA krem utama   #E6E1D6 krem info bar
+ *   #BDB8AE teks redup    #8F8A80 teks redup 2 #595959 teks sekunder
+ *   #4A4A4A teks body     #E2DDD2 garis kartu  #ECE8DF kartu jaminan
+ *   #DDD7CB garis lembut  #FFFFFF kartu putih
+ */
+
+.cyp {
+  --cyp-black: #0b0b0b;
+  --cyp-cream: #f4f1ea;
+  --cyp-cream-2: #e6e1d6;
+  --cyp-cream-3: #ece8df;
+  --cyp-faint: #bdb8ae;
+  --cyp-faint-2: #8f8a80;
+  --cyp-muted: #595959;
+  --cyp-body: #4a4a4a;
+  --cyp-line: #e2ddd2;
+  --cyp-line-soft: #ddd7cb;
+
+  --cyp-serif: var(--font-campaign-serif), "Cormorant Garamond", Georgia, serif;
+  --cyp-sans: var(--font-campaign-sans), "DM Sans", system-ui, sans-serif;
+
+  font-family: var(--cyp-sans);
+  color: var(--cyp-black);
+  background: var(--cyp-cream);
+  width: 100%;
+  position: relative;
+}
+
+.cyp a {
+  color: var(--cyp-black);
+}
+.cyp a:hover {
+  color: #4a4a4a;
+}
+
+.cyp h1,
+.cyp h2,
+.cyp h3 {
+  text-wrap: balance;
+}
+.cyp p {
+  text-wrap: pretty;
+}
+
+/* ── animasi ── */
+@keyframes cyp-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+@keyframes cyp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes cyp-floaty {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.cyp .glow {
+  animation: cyp-glow 6s ease-in-out infinite;
+}
+.cyp .r1 {
+  animation: cyp-rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.cyp .r2 {
+  animation: cyp-rise 0.9s 0.15s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.cyp .r3 {
+  animation: cyp-rise 0.9s 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.cyp .r4 {
+  animation: cyp-rise 0.9s 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.cyp .floaty {
+  animation: cyp-floaty 6s ease-in-out infinite;
+}
+.cyp .pill {
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+/* ── tipografi dasar ── */
+.cyp .heroTitle {
+  font-size: clamp(40px, 5vw, 74px);
+}
+.cyp .tEyebrow {
+  font-size: 12px;
+  letter-spacing: 3px;
+  font-weight: 700;
+}
+.cyp .tH2 {
+  font-family: var(--cyp-serif);
+  font-weight: 500;
+  font-size: clamp(34px, 4.4vw, 56px);
+  line-height: 1.08;
+  letter-spacing: -0.4px;
+}
+.cyp .tBody {
+  max-width: 62ch;
+}
+
+/* Angka tegak (lining) & tabular untuk semua nominal harga. */
+.cyp .num {
+  font-family: var(--cyp-sans);
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: -0.5px;
+}
+
+/* ── grid ── */
+.cyp .prodRow {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.cyp .trustGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.cyp .steps {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* ── breakpoint (sama dengan mockup) ── */
+@media (max-width: 1071px) {
+  .cyp .heroTitle {
+    font-size: clamp(40px, 10vw, 76px);
+  }
+}
+
+@media (max-width: 640px) {
+  .cyp .sec {
+    padding: 64px 20px !important;
+  }
+  .cyp .sec0 {
+    padding-top: 0 !important;
+  }
+  .cyp .tH2 {
+    font-size: 32px !important;
+    line-height: 1.14 !important;
+    letter-spacing: -0.3px;
+  }
+  .cyp .tLead {
+    font-size: 22px !important;
+    line-height: 1.45 !important;
+  }
+  .cyp .tBody {
+    font-size: 16px !important;
+    line-height: 1.65 !important;
+  }
+  .cyp .tEyebrow {
+    font-size: 11px !important;
+    letter-spacing: 2.5px !important;
+  }
+  .cyp .btnRow {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    width: 100%;
+  }
+  .cyp .btnRow a {
+    justify-content: center;
+    min-height: 54px;
+    box-sizing: border-box;
+  }
+
+  /* Produk → carousel geser */
+  .cyp .prodRow {
+    display: flex !important;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 12px !important;
+    margin: 0 -20px;
+    padding: 0 20px 6px;
+    scrollbar-width: none;
+  }
+  .cyp .prodRow::-webkit-scrollbar {
+    display: none;
+  }
+  .cyp .prodRow > a,
+  .cyp .prodRow > div {
+    flex: 0 0 62%;
+    scroll-snap-align: start;
+  }
+
+  .cyp .trustGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .cyp .steps {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  .cyp .step {
+    flex-direction: row !important;
+    align-items: center !important;
+    padding: 18px !important;
+  }
+  .cyp .hideSm {
+    display: none !important;
+  }
+  .cyp .heroCopy {
+    text-align: left;
+  }
+  .cyp .ctaMedia {
+    min-height: 280px !important;
+    order: -1;
+  }
+  .cyp .ctaCard {
+    border-radius: 22px !important;
+  }
+  .cyp .stickyPrice {
+    display: none !important;
+  }
+  .cyp .priceCard {
+    padding: 18px !important;
+    gap: 14px !important;
+    border-radius: 22px !important;
+  }
+  .cyp .cardPhoto {
+    aspect-ratio: 4 / 5 !important;
+  }
+}
+
+/* Hormati preferensi pengunjung yang mematikan animasi. */
+@media (prefers-reduced-motion: reduce) {
+  .cyp .glow,
+  .cyp .r1,
+  .cyp .r2,
+  .cyp .r3,
+  .cyp .r4,
+  .cyp .floaty {
+    animation: none !important;
+  }
+}
