@@ -7,51 +7,6 @@
  * animasi dimatikan oleh CSS, jadi SVG tetap menampilkan kondisi akhir.
  */
 
-/** Animasi utama hero: thobe bergoyang, Cover Hanger turun menutup, resleting tertutup, stempel muncul. */
-export function HeroStageSvg() {
-  return (
-    <svg
-      viewBox="0 0 400 520"
-      style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-      role="img"
-      aria-label="Animasi Cover Hanger SAMAQU menutup thobe, lalu stempel gratis muncul"
-    >
-      <g className="fch-sway">
-        <path d="M200 46 q0 -16 14 -16 q14 0 14 14 q0 11 -14 16 L200 82" fill="none" stroke="#000000" strokeWidth="5" strokeLinecap="round" />
-        <path d="M118 122 L200 80 L282 122" fill="none" stroke="#000000" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M150 114 L250 114 L312 172 L292 198 L272 184 L282 482 L118 482 L128 184 L108 198 L88 172 Z" fill="#FFFFFF" stroke="#000000" strokeWidth="4" strokeLinejoin="round" />
-        <path d="M178 114 Q200 146 222 114" fill="none" stroke="#000000" strokeWidth="4" strokeLinecap="round" />
-        <path d="M200 134 L200 240" stroke="#000000" strokeWidth="3" />
-        <circle cx="208" cy="156" r="3" fill="#000000" />
-        <circle cx="208" cy="184" r="3" fill="#000000" />
-        <circle cx="208" cy="212" r="3" fill="#000000" />
-        <g className="fch-dust">
-          <circle cx="96" cy="250" r="3" fill="#8A8A85" />
-          <circle cx="312" cy="300" r="2.5" fill="#8A8A85" />
-          <circle cx="150" cy="340" r="2.5" fill="#8A8A85" />
-          <circle cx="262" cy="230" r="3" fill="#8A8A85" />
-          <circle cx="300" cy="420" r="3" fill="#8A8A85" />
-          <circle cx="84" cy="400" r="2.5" fill="#8A8A85" />
-        </g>
-      </g>
-      <g className="fch-cover">
-        <rect x="76" y="98" width="248" height="398" rx="22" fill="#000000" />
-        <path d="M200 102 L200 492" className="fch-zip" stroke="#FFFFFF" strokeWidth="3" strokeDasharray="392" strokeLinecap="round" />
-        <rect x="194" y="104" width="12" height="18" rx="3" fill="#FFFFFF" />
-        <text x="200" y="330" textAnchor="middle" fontFamily="'Big Shoulders Display', Impact, sans-serif" fontWeight="900" fontSize="38" letterSpacing="6" fill="#FFFFFF">SAMAQU</text>
-        <text x="200" y="356" textAnchor="middle" fontFamily="'Instrument Sans', sans-serif" fontWeight="500" fontSize="13" letterSpacing="2" fill="#BDBDB8">COVER HANGER</text>
-      </g>
-      <path d="M200 46 q0 -16 14 -16 q14 0 14 14 q0 11 -14 16 L200 82" fill="none" stroke="#000000" strokeWidth="5" strokeLinecap="round" />
-      <g className="fch-stamp">
-        <circle cx="318" cy="172" r="56" fill="#FFFFFF" stroke="#000000" strokeWidth="3" />
-        <circle cx="318" cy="172" r="48" fill="none" stroke="#000000" strokeWidth="1.5" strokeDasharray="3 4" />
-        <text x="318" y="170" textAnchor="middle" fontFamily="'Big Shoulders Display', Impact, sans-serif" fontWeight="900" fontSize="30" fill="#000000">GRATIS</text>
-        <text x="318" y="192" textAnchor="middle" fontFamily="'Instrument Sans', sans-serif" fontWeight="700" fontSize="14" fill="#000000">Rp35.000</text>
-      </g>
-    </svg>
-  );
-}
-
 /** Ilustrasi "sesudah": thobe tersimpan di dalam Cover Hanger. */
 export function AfterIllustrationSvg() {
   return (

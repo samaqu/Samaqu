@@ -20,3 +20,14 @@ export const instrumentSans = localFont({
   variable: "--font-instrument-sans",
   display: "swap",
 });
+
+/**
+ * Anton — judul hero mengikuti mockup hero terbaru. Satu bobot (400) karena Anton hanya
+ * punya satu ketebalan; "lebih tebal" di mockup dicapai lewat ukuran, bukan `font-weight`.
+ * Disajikan dari `public/fonts` supaya tidak ada permintaan ke Google saat build.
+ */
+export const anton = localFont({
+  src: [{ path: "../../../public/fonts/anton-latin.woff2", weight: "400", style: "normal" }],
+  variable: "--font-anton",
+  display: "swap",
+});
