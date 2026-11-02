@@ -135,8 +135,13 @@ export const FREE_COVER_HANGER_CSS = `
 .fchh-sub{margin:0;font-size:14px;line-height:1.55;color:#3D3D3D;max-width:560px}
 .fchh-ctas{display:flex;flex-direction:column;gap:8px}
 .fchh-btn{height:50px;border-radius:25px;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 28px;box-sizing:border-box;white-space:nowrap}
-.fchh-btn--ink{background:#111111;color:#FFFFFF}
-.fchh-btn--line{border:1.5px solid #111111;color:#111111;height:48px}
+/* Warna teks WAJIB ditulis di kelas, bukan hanya style inline: aturan .fch-root a
+   (hitam) lebih kuat daripada atribut style, sehingga tombol hitam sempat menulis
+   hitam di atas hitam. Selector .fch-root .fchh-btn--ink juga menang atas aturan itu. */
+.fch-root .fchh-btn{text-decoration:none;color:#111111}
+.fch-root .fchh-btn--ink{background:#111111;color:#FFFFFF}
+.fch-root .fchh-btn--line{background:#FFFFFF;border:1.5px solid #111111;color:#111111;height:48px}
+.fch-root .fchh-btn--ink:hover{color:#FFFFFF}
 .fchh-text{display:contents}
 .fchh-title{order:1}
 .fchh-visual{order:2}
