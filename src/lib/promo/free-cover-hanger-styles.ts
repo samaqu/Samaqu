@@ -83,6 +83,9 @@ export const FREE_COVER_HANGER_CSS = `
 .fch-steps{grid-template-columns:minmax(0,1fr) !important}
 .fch-h-sec{font-size:52px}
 .fch-sec{padding-top:88px;padding-bottom:88px}
+/* Tablet: grid 2 kolom masih dipakai, tapi nama koleksi 52px terlalu besar untuk
+   kolom kiri yang cuma ~45% lebar layar — judulnya pecah jadi 3 baris. */
+.fch-tile-name{font-size:clamp(30px,5vw,40px) !important}
 .fch-hide-m{display:none !important}
 .fch-wrap{padding-left:32px;padding-right:32px}
 }
@@ -112,11 +115,20 @@ export const FREE_COVER_HANGER_CSS = `
 .fch-step-t{font-size:19px !important}
 .fch-coll{display:flex !important;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-left:24px;gap:14px !important;margin:0 -24px;padding:0 24px 6px;scrollbar-width:none}
 .fch-coll::-webkit-scrollbar{display:none}
-.fch-coll>a{flex:0 0 80%;scroll-snap-align:start}
+/* Kartu carousel: satu kartu = 86% layar supaya tepi kartu berikutnya tetap terlihat
+   (tanda bisa digeser), dan isi kartu diskalakan mengikuti lebar itu. Sebelumnya
+   teks tetap ukuran desktop (38px + deskripsi 15px) sehingga nama & deskripsi
+   memakan hampir seluruh tinggi kartu dan fotonya terasa sempit. */
+.fch-coll>a{flex:0 0 86%;scroll-snap-align:start}
 .fch-coll-big-box{min-height:0 !important;aspect-ratio:4 / 5}
 .fch-tile-box{aspect-ratio:4 / 5 !important}
-.fch-tile-name{font-size:38px !important}
+.fch-tile-name{font-size:clamp(26px,8vw,34px) !important;line-height:.95 !important}
 .fch-tile-pill{display:none !important}
+/* Foto: fokus ke bagian atas (dada & wajah model), bukan terpotong di tengah. */
+.fch-tile-img img{object-position:center top !important}
+/* Baris judul + deskripsi di bawah foto: rapat, tidak mendorong kartu jadi tinggi. */
+.fch-coll>a>div:last-child{margin-top:-4px !important}
+.fch-coll .fch-tile-name + div{font-size:13.5px !important;line-height:1.45 !important}
 .fch-tag{transform:none !important}
 .fch-faq-q{font-size:16px !important;padding:20px 0 !important}
 .fch-faq-a{padding:0 0 22px 0 !important;font-size:15px !important}

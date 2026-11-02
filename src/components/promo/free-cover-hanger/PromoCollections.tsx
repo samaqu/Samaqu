@@ -11,7 +11,7 @@ function TilePhoto({ item, name }: { item: PromoCollection; name: string }) {
             src={item.image}
             alt={`Foto ${name}`}
             fill
-            sizes="(max-width: 640px) 80vw, 620px"
+            sizes="(max-width: 640px) 86vw, (max-width: 900px) 45vw, 620px"
             style={{ objectFit: "cover", objectPosition: "center top" }}
           />
         </div>
