@@ -221,6 +221,20 @@ export async function validateMediaFile(file: File): Promise<void> {
 }
 
 /**
+ * Token sesi Supabase yang sedang login di browser (admin).
+ * Diambil lazy supaya modul ini tetap bisa dipakai di tempat tanpa sesi (mis. chat pengunjung).
+ */
+async function currentSessionToken(): Promise<string | undefined> {
+  try {
+    const { supabase } = await import("./supabase");
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Upload file ke Cloudinary memakai signed upload (server menandatangani
  * parameter lewat /api/cloudinary/sign). Dengan cara ini server bisa memaksa
  * incoming transformation, sehingga storage tidak menyimpan file resolusi
@@ -240,17 +254,25 @@ export async function uploadToCloudinary(
   // 1) Minta signature + parameter transformation dari server. `scope` menentukan akun
   //    Cloudinary: "product" (utama), "chat", atau "review" (akun terpisah bila env diisi).
   //    Scope review wajib membawa token customer.
+  //    Scope product wajib token ADMIN — route sign menolak tanpa itu (401). Kebanyakan
+  //    pemanggil (form produk, konten website, biolink, dll) tidak mengoper token, jadi
+  //    token sesi Supabase diambil di sini sekali untuk semua.
+  const token = opts.token || (scope === "product" ? await currentSessionToken() : undefined);
   const signRes = await fetch("/api/cloudinary/sign", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ resourceType, scope }),
   });
   if (!signRes.ok) {
-    console.error("[uploadToCloudinary] Gagal minta signature:", signRes.status);
-    throw new Error("Upload gagal");
+    const detail = await signRes.json().catch(() => null);
+    console.error("[uploadToCloudinary] Gagal minta signature:", signRes.status, detail);
+    if (signRes.status === 401) {
+      throw new Error("Sesi admin tidak terbaca. Muat ulang halaman lalu login lagi, kemudian coba upload.");
+    }
+    throw new Error(detail?.error || "Upload gagal");
   }
   const sign = (await signRes.json()) as CloudinarySignature;
 
