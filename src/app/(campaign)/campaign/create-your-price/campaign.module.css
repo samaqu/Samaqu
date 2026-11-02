@@ -189,23 +189,20 @@
     box-sizing: border-box;
   }
 
-  /* Produk → carousel geser */
+  /* Produk → grid 2×2 (bukan carousel): keempat produk langsung terlihat
+     tanpa perlu digeser. Mockup aslinya carousel; ini permintaan pemilik. */
   .cyp .prodRow {
-    display: flex !important;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 12px !important;
-    margin: 0 -20px;
-    padding: 0 20px 6px;
-    scrollbar-width: none;
-  }
-  .cyp .prodRow::-webkit-scrollbar {
-    display: none;
+    overflow: visible;
+    margin: 0;
+    padding: 0;
   }
   .cyp .prodRow > a,
   .cyp .prodRow > div {
-    flex: 0 0 62%;
-    scroll-snap-align: start;
+    flex: none;
+    min-width: 0;
   }
 
   .cyp .trustGrid {
