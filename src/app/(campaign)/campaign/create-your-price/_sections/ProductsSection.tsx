@@ -75,6 +75,7 @@ export default function ProductsSection({ products }: { products: CampaignProduc
                   // tidak terdaftar di `next.config.ts` (mis. R2 `samaqu-media.samaqu.workers.dev`)
                   // dan sebagian berupa `.mp4`. Menambah host ke config global di luar lingkup
                   // halaman ini, jadi di sini dipakai tag gambar biasa yang selalu aman.
+                  // `object-contain` + padding → foto tampil UTUH, sama seperti kartu Open Order.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={product.image}
@@ -86,8 +87,12 @@ export default function ProductsSection({ products }: { products: CampaignProduc
                       inset: 0,
                       width: "100%",
                       height: "100%",
-                      objectFit: "cover",
+                      objectFit: "contain",
+                      padding: "4px",
+                      boxSizing: "border-box",
                       display: "block",
+                      // Produk habis digelapkan sedikit, sama seperti kartu Open Order.
+                      filter: product.available ? undefined : "grayscale(35%) brightness(.85)",
                     }}
                   />
                 ) : (
@@ -105,6 +110,8 @@ export default function ProductsSection({ products }: { products: CampaignProduc
                     [FOTO PRODUK]
                   </div>
                 )}
+
+                {/* Badge sumber promo — tetap ada seperti sebelumnya. */}
                 <span
                   style={{
                     position: "absolute",
@@ -121,6 +128,62 @@ export default function ProductsSection({ products }: { products: CampaignProduc
                 >
                   CREATE YOUR PRICE
                 </span>
+
+                {/* Status stok — ekuivalen badge "Sold Out" di kartu Open Order. */}
+                {!product.available ? (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: "10px",
+                      right: "10px",
+                      background: "var(--cyp-black)",
+                      color: "var(--cyp-cream)",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      letterSpacing: "0.5px",
+                      padding: "5px 9px",
+                      borderRadius: "999px",
+                    }}
+                  >
+                    Sold Out
+                  </span>
+                ) : null}
+
+                {/* Belum bisa dipesan → foto digelapkan + pill di tengah, sama seperti Open Order
+                    saat event belum dibuka. */}
+                {!product.available ? (
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "rgba(0,0,0,0.25)",
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        background: "#FFFFFF",
+                        color: "var(--cyp-black)",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        padding: "6px 12px",
+                        borderRadius: "999px",
+                        boxShadow: "0 2px 8px rgba(0,0,0,.15)",
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                        <rect x="4" y="10" width="16" height="11" rx="2" />
+                        <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                      </svg>
+                      Stok habis
+                    </span>
+                  </div>
+                ) : null}
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
@@ -134,6 +197,37 @@ export default function ProductsSection({ products }: { products: CampaignProduc
                     {money(product.minimumPrice)}
                   </span>
                 </div>
+
+                {/* Tombol status — meniru "Lihat Detail" di kartu Open Order. Produk habis tetap
+                    bisa diklik ke halaman detail, tapi tombolnya tampil nonaktif. */}
+                <span
+                  style={{
+                    marginTop: "10px",
+                    display: "flex",
+                    width: "100%",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "4px",
+                    padding: "9px 12px",
+                    borderRadius: "12px",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    ...(product.available
+                      ? { background: "var(--cyp-black)", color: "var(--cyp-cream)" }
+                      : {
+                          background: "#FFFFFF",
+                          color: "var(--cyp-muted)",
+                          border: "1px solid rgba(11,11,11,0.15)",
+                        }),
+                  }}
+                >
+                  {product.available ? "Lihat Detail" : "Stok habis"}
+                  {product.available ? (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <path d="M9 6l6 6-6 6" />
+                    </svg>
+                  ) : null}
+                </span>
               </div>
             </a>
           ))}

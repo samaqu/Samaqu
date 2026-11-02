@@ -25,6 +25,13 @@ export interface CampaignProduct {
   image: string;
   /** Harga minimum yang tampil setelah kata "Mulai". */
   minimumPrice: number;
+  /** Total stok semua varian grup — sama dengan `OpenOrderProduct.totalStock`. */
+  totalStock: number;
+  /**
+   * true = ada stok, jadi bisa dipesan sekarang.
+   * false = stok habis (tampil badge "Sold Out", sama seperti kartu Open Order).
+   */
+  available: boolean;
 }
 
 /** URL media yang benar-benar gambar (bukan video) — `<img>` tidak bisa merender video. */
@@ -171,6 +178,8 @@ export async function loadCampaignProducts(): Promise<CampaignProduct[]> {
         // Foto kartu: gambar pertama dari media katalog (bukan video). Kosong = render tanpa foto.
         image: await cardImageOf(product),
         minimumPrice: product.minimumPrice,
+        totalStock: product.totalStock,
+        available: product.totalStock > 0,
       }))
     );
   } catch (error) {
