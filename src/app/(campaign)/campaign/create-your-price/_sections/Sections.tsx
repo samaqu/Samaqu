@@ -2,7 +2,6 @@ import Image from "next/image";
 import {
   CYP_ASSETS,
   GUARANTEES,
-  HERO_FROM_PRICE,
   INFO_BAR,
   REASONS,
   STEPS,
@@ -541,7 +540,7 @@ export function ClosingCtaSection({ waHref, orderHref }: { waHref: string | null
 }
 
 /* ── Footer ringkas + sticky CTA bawah ── */
-export function CampaignFooter({ waHref, orderHref }: { waHref: string | null; orderHref: string }) {
+export function CampaignFooter({ waHref, orderHref, fromPrice }: { waHref: string | null; orderHref: string; fromPrice: string }) {
   return (
     <>
       <footer style={{ borderTop: "1px solid var(--cyp-line-soft)", padding: "28px 20px 120px" }}>
@@ -588,7 +587,7 @@ export function CampaignFooter({ waHref, orderHref }: { waHref: string | null; o
           >
             <span style={{ fontSize: "11px", letterSpacing: "1px", color: "var(--cyp-faint-2)" }}>MULAI DARI</span>
             <span className={s.num} style={{ fontSize: "20px", fontWeight: 700, lineHeight: 1 }}>
-              {HERO_FROM_PRICE}
+              {fromPrice}
             </span>
           </div>
 

@@ -1,16 +1,12 @@
 import Image from "next/image";
-import Link from "next/link";
-import {
-  CYP_ASSETS,
-  HERO_FROM_PRICE,
-  VIDEO_ANCHOR,
-} from "@/lib/campaign/create-your-price-content";
+import { CYP_ASSETS, VIDEO_ANCHOR } from "@/lib/campaign/create-your-price-content";
 import s from "../campaign.module.css";
 import HeroPriceCard from "./HeroPriceCard";
+import type { HeroData } from "../_data/products";
 import CampaignOrderCta from "./CampaignOrderCta";
 
 /** Section 1 — hero gelap + kartu demo harga interaktif. */
-export default function HeroSection({ orderHref }: { orderHref: string }) {
+export default function HeroSection({ orderHref, hero }: { orderHref: string; hero: HeroData }) {
   return (
     <section
       style={{
@@ -130,7 +126,7 @@ export default function HeroSection({ orderHref }: { orderHref: string }) {
                 MULAI DARI
               </span>
               <span className={s.num} style={{ fontSize: "44px", fontWeight: 700, lineHeight: 1 }}>
-                {HERO_FROM_PRICE}
+                {hero.fromPrice}
               </span>
             </div>
 
@@ -162,7 +158,7 @@ export default function HeroSection({ orderHref }: { orderHref: string }) {
         </div>
 
         <div style={{ display: "flex", justifyContent: "center" }}>
-          <HeroPriceCard />
+          <HeroPriceCard data={hero} />
         </div>
       </div>
     </section>

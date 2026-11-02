@@ -20,10 +20,18 @@ export const CYP_ASSETS = {
   stitchPoster: `${BASE}/c7dd4e958da8308499967e55cf90b893.jpg`,
 } as const;
 
-/** Kartu demo harga di hero (client component). */
+/**
+ * Data STATIS kartu demo harga di hero.
+ *
+ * Dipakai hanya sebagai FALLBACK: kalau tidak ada produk Create Your Price yang aktif,
+ * hero tetap tampil dengan angka ini supaya tidak pernah kosong.
+ * Kalau ada produk aktif, kartu & harga diturunkan dari produk aslinya
+ * (lihat `heroFromProducts()` di `_data/products.ts`).
+ */
 export const HERO_PRODUCT = {
   name: "Thobe Superblack",
   photoAlt: "Model memakai Thobe Superblack",
+  minimumPrice: 300000,
   /** Pilihan harga yang bisa diklik; `short` dipakai di tombol, `price` di baris "Kamu bayar". */
   options: [
     { label: "MINIMUM", price: "Rp300.000", short: "Rp300rb" },
@@ -32,7 +40,10 @@ export const HERO_PRODUCT = {
   ],
 } as const;
 
-/** Harga pembuka yang tampil sebagai "MULAI DARI" di hero & sticky bar. */
+/** Selisih pilihan harga ke-2 dan ke-3 terhadap harga minimum produk. */
+export const HERO_PRICE_STEPS = [0, 20000, 50000] as const;
+
+/** Harga pembuka FALLBACK ("MULAI DARI") bila tidak ada produk aktif. */
 export const HERO_FROM_PRICE = "Rp300rb";
 
 export const INFO_BAR = [

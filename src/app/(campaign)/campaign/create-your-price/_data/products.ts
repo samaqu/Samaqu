@@ -7,7 +7,13 @@ import {
   type OpenOrderStockRow,
 } from "@/lib/open-order-offering";
 import { openOrderProductImage } from "@/lib/open-order-catalog";
-import { CYP_MAX_PRODUCTS } from "@/lib/campaign/create-your-price-content";
+import {
+  CYP_ASSETS,
+  CYP_MAX_PRODUCTS,
+  HERO_FROM_PRICE,
+  HERO_PRICE_STEPS,
+  HERO_PRODUCT,
+} from "@/lib/campaign/create-your-price-content";
 
 /** Satu kartu di section "Produk pilihan periode ini". */
 export interface CampaignProduct {
@@ -25,6 +31,27 @@ export interface CampaignProduct {
 function isImageUrl(url: string): boolean {
   if (!url) return false;
   return !/\.(mp4|m4v|webm|mov)(\?|$)/i.test(url.trim());
+}
+
+/**
+ * Format harga ringkas ala mockup: 309000 → "Rp309rb", 1050000 → "Rp1jt".
+ * Sama gambarannya dengan angka statis lama ("Rp300rb"/"Rp320rb"/"Rp350rb").
+ */
+export function shortPrice(value: number): string {
+  const amount = Math.max(0, Math.round(Number(value) || 0));
+  if (amount >= 1_000_000) {
+    const millions = amount / 1_000_000;
+    const text = Number.isInteger(millions) ? String(millions) : millions.toFixed(1).replace(/\.0$/, "");
+    return `Rp${text.replace(".", ",")}jt`;
+  }
+  const thousands = amount / 1000;
+  const text = Number.isInteger(thousands) ? String(thousands) : thousands.toFixed(1).replace(/\.0$/, "");
+  return `Rp${text.replace(".", ",")}rb`;
+}
+
+/** "309000" → "Rp309.000" (pemisah ribuan gaya Indonesia). */
+export function fullPrice(value: number): string {
+  return `Rp${Math.max(0, Math.round(Number(value) || 0)).toLocaleString("id-ID")}`;
 }
 
 /** Host media utama katalog (R2). Dipakai sebagai cadangan kalau URL utama gagal dimuat. */
@@ -153,3 +180,77 @@ export async function loadCampaignProducts(): Promise<CampaignProduct[]> {
     return [];
   }
 }
+
+/** Satu pilihan harga di kartu demo hero. */
+export interface HeroPriceOption {
+  label: string;
+  /** Nominal penuh untuk baris "Kamu bayar", mis. "Rp309.000". */
+  price: string;
+  /** Format ringkas di tombol, mis. "Rp309rb". */
+  short: string;
+}
+
+/** Isi kartu demo harga di hero + harga "MULAI DARI". */
+export interface HeroData {
+  name: string;
+  photoAlt: string;
+  image: string;
+  /** Harga minimum produk (nominal penuh), untuk baris "Minimum Rp…". */
+  minimumLabel: string;
+  options: HeroPriceOption[];
+  /** "MULAI DARI" — harga minimum TERENDAH dari semua produk aktif, format ringkas. */
+  fromPrice: string;
+}
+
+/**
+ * Kartu demo harga hero diturunkan dari PRODUK CYP AKTIF PERTAMA, dengan tiga pilihan:
+ * minimum, minimum + Rp20.000, minimum + Rp50.000.
+ *
+ * Kalau tidak ada produk aktif → fallback ke data statis (`HERO_PRODUCT`), jadi hero
+ * tidak pernah kosong.
+ */
+export function heroFromProducts(products: CampaignProduct[]): HeroData {
+  const first = products[0];
+
+  if (!first) {
+    return {
+      name: HERO_PRODUCT.name,
+      photoAlt: HERO_PRODUCT.photoAlt,
+      image: CYP_ASSETS.heroPhoto,
+      minimumLabel: `Minimum ${fullPrice(HERO_PRODUCT.minimumPrice)}`,
+      options: HERO_PRODUCT.options.map((option) => ({
+        label: option.label,
+        price: option.price,
+        short: option.short,
+      })),
+      fromPrice: HERO_FROM_PRICE,
+    };
+  }
+
+  const minimum = first.minimumPrice;
+  const lowest = lowestMinimumPrice(products);
+
+  return {
+    name: first.name,
+    photoAlt: first.name,
+    image: first.image || CYP_ASSETS.heroPhoto,
+    minimumLabel: `Minimum ${fullPrice(minimum)}`,
+    options: HERO_PRICE_STEPS.map((step, index) => ({
+      label: index === 0 ? "MINIMUM" : "PILIHAN",
+      price: fullPrice(minimum + step),
+      short: shortPrice(minimum + step),
+    })),
+    fromPrice: shortPrice(lowest),
+  };
+}
+
+/**
+ * Harga minimum TERENDAH di antara produk CYP aktif.
+ *
+ * `undefined` bila tidak ada produk aktif (supaya pemanggil memakai fallback statis).
+ */
+export function lowestMinimumPrice(products: CampaignProduct[]): number {
+  if (products.length === 0) return 0;
+  return Math.min(...products.map((product) => product.minimumPrice));
+}
+

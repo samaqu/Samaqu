@@ -1,20 +1,19 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
-import { CYP_ASSETS, HERO_PRODUCT } from "@/lib/campaign/create-your-price-content";
+import type { HeroData } from "../_data/products";
 import s from "../campaign.module.css";
 
 /**
  * Kartu demo harga interaktif di hero.
  *
- * Hanya contoh tampilan — tidak memilih produk sungguhan dan tidak menyentuh keranjang.
- * Pilihan awal = opsi pertama (harga MINIMUM), sama seperti mockup (`picked: 1`
- * di sana karena daftarnya 0-based dimulai dari Rp300rb; di sini 0-based eksplisit).
+ * Isinya datang dari produk CYP aktif pertama (`heroFromProducts()`), atau data statis
+ * kalau tidak ada produk aktif. Hanya contoh tampilan — tidak memilih produk sungguhan
+ * dan tidak menyentuh keranjang.
  */
-export default function HeroPriceCard() {
+export default function HeroPriceCard({ data }: { data: HeroData }) {
   const [picked, setPicked] = useState(0);
-  const selected = HERO_PRODUCT.options[picked] ?? HERO_PRODUCT.options[0];
+  const selected = data.options[picked] ?? data.options[0];
 
   return (
     <div className={s.floaty} style={{ position: "relative", width: "min(400px, 100%)" }}>
@@ -66,27 +65,36 @@ export default function HeroPriceCard() {
             position: "relative",
           }}
         >
-          <Image
-            src={CYP_ASSETS.heroPhoto}
-            alt={HERO_PRODUCT.photoAlt}
-            fill
-            sizes="(max-width: 640px) 90vw, 400px"
-            style={{ objectFit: "cover", objectPosition: "center top" }}
-            priority
+          {/* Sengaja `<img>`, bukan `next/image`: foto produk aktif bisa berasal dari host
+              yang tidak terdaftar di `next.config.ts` (mis. R2 samaqu-media.samaqu.workers.dev).
+              Sama seperti kartu di section produk. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={data.image}
+            alt={data.photoAlt}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center top",
+              display: "block",
+            }}
           />
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: "12px" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: 0 }}>
-            <div style={{ fontSize: "17px", fontWeight: 700 }}>{HERO_PRODUCT.name}</div>
-            <div style={{ fontSize: "13px", color: "var(--cyp-muted)" }}>Minimum Rp300.000</div>
+            <div style={{ fontSize: "17px", fontWeight: 700 }}>{data.name}</div>
+            <div style={{ fontSize: "13px", color: "var(--cyp-muted)" }}>{data.minimumLabel}</div>
           </div>
         </div>
 
         <div style={{ fontSize: "13px", fontWeight: 700 }}>Pilih hargamu</div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" }}>
-          {HERO_PRODUCT.options.map((option, index) => {
+          {data.options.map((option, index) => {
             const on = picked === index;
             return (
               <button

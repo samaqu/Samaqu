@@ -14,7 +14,7 @@ import {
   ClosingCtaSection,
   CampaignFooter,
 } from "./_sections/Sections";
-import { loadCampaignProducts } from "./_data/products";
+import { loadCampaignProducts, heroFromProducts } from "./_data/products";
 import { loadCsWhatsappLink } from "./_data/whatsapp";
 import { openOrderHref } from "./_data/order-href";
 
@@ -64,10 +64,14 @@ export default async function CreateYourPriceCampaignPage({
 
   const [products, waHref] = await Promise.all([loadCampaignProducts(), loadCsWhatsappLink()]);
 
+  // Hero & sticky bar ikut produk CYP aktif. `heroFromProducts` sudah menangani fallback
+  // (Thobe Superblack, Rp300rb/320rb/350rb) kalau daftar produknya kosong.
+  const hero = heroFromProducts(products);
+
   return (
     <main className={s.cyp}>
       {/* 1. Hero + kartu harga interaktif */}
-      <HeroSection orderHref={orderHref} />
+      <HeroSection orderHref={orderHref} hero={hero} />
 
       {/* 2. Info bar */}
       <InfoBarSection />
@@ -97,7 +101,7 @@ export default async function CreateYourPriceCampaignPage({
       <ClosingCtaSection waHref={waHref} orderHref={orderHref} />
 
       {/* Footer ringkas + 11. Sticky CTA bawah */}
-      <CampaignFooter waHref={waHref} orderHref={orderHref} />
+      <CampaignFooter waHref={waHref} orderHref={orderHref} fromPrice={hero.fromPrice} />
     </main>
   );
 }
