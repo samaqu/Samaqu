@@ -84,7 +84,7 @@ export default async function CreateYourPriceCampaignPage({
       <VideoSection />
 
       {/* 4. Produk pilihan periode ini — section ini disembunyikan (return null) bila kosong */}
-      <ProductsSection products={products} window={window} />
+      <ProductsSection products={products} window={window} searchParams={params} />
 
       {/* 5. Cara kerja */}
       <StepsSection />

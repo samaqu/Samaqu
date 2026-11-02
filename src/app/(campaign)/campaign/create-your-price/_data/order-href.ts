@@ -43,3 +43,19 @@ export function openOrderHref(searchParams: Record<string, string | string[] | u
   const query = forwardedQuery(searchParams);
   return query ? `${OPEN_ORDER_PATH}?${query}` : OPEN_ORDER_PATH;
 }
+
+/**
+ * Href ke DETAIL produk di alur Open Order (langkah 2), bukan halaman katalog.
+ *
+ * Wizard mengenali `?product=<id>` lalu langsung membuka detail produk tersebut
+ * (lihat `focusProductId` di `OpenOrderWizard`). Atribusi kampanye tetap dibawa.
+ */
+export function openOrderProductHref(
+  productId: string,
+  searchParams: Record<string, string | string[] | undefined> = {},
+): string {
+  const [base, query = ""] = [OPEN_ORDER_PATH, forwardedQuery(searchParams)];
+  const params = new URLSearchParams(query);
+  params.set("product", productId);
+  return `${base}?${params.toString()}`;
+}

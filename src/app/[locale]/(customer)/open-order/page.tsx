@@ -20,8 +20,15 @@ export const revalidate = 60;
  * hydration, jadi kalau countdown & status buka/tutup dihitung dari situ, numbers-nya akan
  * nongkar belakangan (pop-in) dan halaman sempat menampilkan tombol yang seharusnya terkunci.
  */
-export default async function OpenOrderPage() {
+export default async function OpenOrderPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const window = await readOpenOrderWindow();
+  const params = await searchParams;
+  const focusParam = params.product;
+  const focusProductId = Array.isArray(focusParam) ? focusParam[0] : focusParam;
 
   return (
     <OpenOrderWizard
@@ -31,6 +38,7 @@ export default async function OpenOrderPage() {
       period={formatOpenOrderPeriod(window, OPEN_ORDER_PERIOD)}
       startDate={window.open_order_start_date}
       endDate={window.open_order_end_date}
+      focusProductId={focusProductId}
     />
   );
 }

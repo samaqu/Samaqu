@@ -138,6 +138,7 @@ export default function OpenOrderWizard({
   period: periodProp,
   startDate: startDateProp,
   endDate: endDateProp,
+  focusProductId,
 }: {
   /** Status jendela Open Order — dibaca di server (route halaman) supaya tidak pop-in. */
   initialState: OpenOrderState;
@@ -151,6 +152,11 @@ export default function OpenOrderWizard({
   startDate?: string | null;
   /** Tanggal tutup (YYYY-MM-DD) — untuk label "Berakhir …", dikirim dari server. */
   endDate?: string | null;
+  /**
+   * id produk Open Order yang langsung dibuka detailnya (langkah 2), dipakai tautan dari
+   * halaman lain (`/open-order?product=<id>`). Kosong = mulai dari katalog seperti biasa.
+   */
+  focusProductId?: string | null;
 }) {
   const [step, setStep] = useState<Step>(1);
   const [catalog, setCatalog] = useState<Product[]>([]);
@@ -275,6 +281,28 @@ export default function OpenOrderWizard({
 
   const subtotal = lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
   const total = subtotal + (extraCover ? OPEN_ORDER_ADDON.price : 0) + (shipping?.cost ?? 0);
+
+  /**
+   * Tautan dari halaman lain (`/open-order?product=<id>`) langsung membuka DETAIL produk itu
+   * (langkah 2), bukan katalog. Dijalankan sekali setelah katalog + varian termuat; efek
+   * `step` di atas lalu menggulir ke atas dengan `behavior: "smooth"`, jadi perpindahan dari
+   * halaman campaign terasa mulus (tidak ada lompatan ke katalog dulu).
+   * Kalau produknya tidak ditemukan, wizard tetap di katalog seperti biasa.
+   */
+  const openedFocusRef = useRef(false);
+  useEffect(() => {
+    if (!focusProductId || products.length === 0) return;
+    if (openedFocusRef.current) return;
+    const product = findOpenOrderProduct(products, focusProductId);
+    if (!product) return;
+    openedFocusRef.current = true;
+    const initialColor =
+      product.variants.find((variant) => variant.stock > 0)?.color ?? product.colors[0] ?? "";
+    const next = defaultDraft(products, product.id, initialColor);
+    if (!next) return;
+    setDraft(next);
+    setStep(2);
+  }, [focusProductId, products]);
 
   // ── Add-on Extra Cover & Hanger = produk katalog `cover-hanger` ──
   // Stok & berat add-on dibaca dari varian katalog yang sama dengan yang dipakai server

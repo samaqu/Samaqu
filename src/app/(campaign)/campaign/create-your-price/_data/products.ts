@@ -22,7 +22,7 @@ export interface CampaignProduct {
   /** id baris katalog acuan — dipakai untuk link ke halaman detail produk. */
   id: string;
   name: string;
-  /** Keterangan "kain · series" di bawah nama (kosong kalau tidak ada datanya). */
+  /** Keterangan di bawah nama — format sama dengan kartu /open-order: "Kain B-01 · 6 series tersedia". */
   sub: string;
   image: string;
   /** Harga minimum yang tampil setelah kata "Mulai". */
@@ -197,18 +197,23 @@ export async function loadCampaignProducts(): Promise<CampaignProduct[]> {
     // Paralel: maksimal 4 produk, jadi paling banyak beberapa request HEAD (hanya untuk
     // kandidat cadangan — URL host utama tidak dicek).
     return Promise.all(
-      selected.map(async (product) => ({
-        id: product.id,
-        name: product.name,
-        sub: [product.kain, product.series.map((option) => option.name).filter(Boolean).join(", ")]
-          .filter(Boolean)
-          .join(" · "),
-        // Foto kartu: gambar pertama dari media katalog (bukan video). Kosong = render tanpa foto.
-        image: await cardImageOf(product),
-        minimumPrice: product.minimumPrice,
-        totalStock: product.totalStock,
-        available: product.totalStock > 0,
-      }))
+      selected.map(async (product) => {
+        // Keterangan kartu dibuat SAMA dengan kartu /open-order:
+        //   "Kain B-01 · 6 series tersedia"  (series hanya disebut kalau lebih dari satu)
+        const kainLabel = product.kain ? `Kain ${product.kain}` : product.category;
+        const seriesCount = product.series.length;
+
+        return {
+          id: product.id,
+          name: product.name,
+          sub: seriesCount > 1 ? `${kainLabel} · ${seriesCount} series tersedia` : kainLabel,
+          // Foto kartu: gambar pertama dari media katalog (bukan video). Kosong = render tanpa foto.
+          image: await cardImageOf(product),
+          minimumPrice: product.minimumPrice,
+          totalStock: product.totalStock,
+          available: product.totalStock > 0,
+        };
+      })
     );
   } catch (error) {
     // Section ini hanya pelengkap: kalau query gagal, sembunyikan saja jangan sampai

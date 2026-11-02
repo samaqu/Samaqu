@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { money } from "@/lib/open-order-catalog";
 import type { CampaignProduct, CampaignWindowState } from "../_data/products";
-import { OPEN_ORDER_PATH } from "../_data/order-href";
+import { OPEN_ORDER_PATH, openOrderProductHref } from "../_data/order-href";
 import s from "../campaign.module.css";
 
 /**
@@ -20,9 +20,12 @@ import s from "../campaign.module.css";
 export default function ProductsSection({
   products,
   window: openOrderWindow,
+  searchParams = {},
 }: {
   products: CampaignProduct[];
   window: CampaignWindowState;
+  /** Query kampanye (utm_*) yang ikut diteruskan ke tautan detail Open Order. */
+  searchParams?: Record<string, string | string[] | undefined>;
 }) {
   if (products.length === 0) return null;
 
@@ -64,7 +67,7 @@ export default function ProductsSection({
           {products.map((product) => (
             <a
               key={product.id}
-              href={`/id/katalog/${product.id}`}
+              href={openOrderProductHref(product.id, searchParams)}
               style={{
                 textDecoration: "none",
                 color: "var(--cyp-black)",
@@ -123,24 +126,6 @@ export default function ProductsSection({
                     [FOTO PRODUK]
                   </div>
                 )}
-
-                {/* Badge sumber promo — tetap ada seperti sebelumnya. */}
-                <span
-                  style={{
-                    position: "absolute",
-                    top: "10px",
-                    left: "10px",
-                    background: "var(--cyp-black)",
-                    color: "var(--cyp-cream)",
-                    fontSize: "10px",
-                    fontWeight: 700,
-                    letterSpacing: "1px",
-                    padding: "5px 9px",
-                    borderRadius: "999px",
-                  }}
-                >
-                  CREATE YOUR PRICE
-                </span>
 
                 {/* Kunci — jendela Open Order BELUM dibuka / sudah berakhir: foto digelapkan +
                     pill putih berikon gembok di tengah, PERSIS seperti kartu /open-order. */}
