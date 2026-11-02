@@ -682,9 +682,23 @@ a { text-decoration: none; }
 /* Overlay kunci di atas foto produk. */
 .oo-lock-overlay { transition: opacity .4s ease; }
 
-/* Aksesibilitas: kalau penggunaaskurangi animasi, semua dekorasi Open Order dimatikan dan
-   konten langsung terlihat (tanpa ini elemen ber-`oo-fade-up` bisa tertahan opacity 0). */
+/* Judul hero Open Order ("Create Your Price").
+   Muncul SEKALI saat halaman dibuka: naik halus + sedikit membesar, tanpa library animasi
+   dan tanpa interval — jadi tidak menambah beban setelah selesai. */
+.oo-title-in {
+  opacity: 0;
+  animation: oo-title-in .85s cubic-bezier(.2,.8,.2,1) forwards;
+  will-change: opacity, transform;
+}
+@keyframes oo-title-in {
+  from { opacity: 0; transform: translateY(18px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Aksesibilitas: kalau pengguna meminta kurangi animasi, semua dekorasi Open Order dimatikan
+   dan konten langsung terlihat (tanpa ini elemen ber-`oo-fade-up` bisa tertahan opacity 0). */
 @media (prefers-reduced-motion: reduce) {
   .oo-fade-up { opacity: 1; transform: none; animation: none; }
+  .oo-title-in { opacity: 1; transform: none; animation: none; }
   .oo-roll span, .oo-tick span, .oo-shimmer, .oo-ping { animation: none !important; }
 }

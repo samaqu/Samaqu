@@ -80,20 +80,39 @@ export default function StepCatalog({
 
   return (
     <div>
-      {/* Hero */}
-      <section className="oo-fade-up pb-10 pt-6 text-center">
-        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[.3em] text-neutral-600">
-          Create Your Price
-        </p>
+      {/* Hero.
+          Judulnya "Create Your Price" (bukan lagi "Open Order Samaqu"), dibuat menonjol
+          dengan huruf serif besar + animasi sekali-jalan (`oo-title-in`). Baris periode
+          sengaja tidak ditampilkan di sini — tanggal tetap terbaca di kartu timer bawah.
+          Ukuran memakai clamp() supaya tidak meledak di layar lebar dan tidak sempit di HP. */}
+      <section className="pb-10 pt-6 text-center">
         <h1
-          className="text-4xl sm:text-6xl"
-          style={{ fontFamily: "var(--font-cormorant), Georgia, serif", fontWeight: 500 }}
+          className="oo-title-in mx-auto"
+          style={{
+            fontFamily: "var(--font-cormorant), Georgia, serif",
+            fontWeight: 600,
+            fontSize: "clamp(2rem, 7.5vw, 4.25rem)",
+            lineHeight: 1.05,
+            letterSpacing: "0.01em",
+            textTransform: "uppercase",
+            maxWidth: "16ch",
+          }}
         >
-          Open Order Samaqu
+          Create Your Price
         </h1>
-        <p className="mt-3 text-neutral-500">Periode {period}</p>
-        <p className="mx-auto mt-4 max-w-xl text-neutral-600">
-          Pilih produk, atur ukuran dan harga, lalu kirim pesanan kamu. Admin akan mengonfirmasi lewat WhatsApp.
+
+        <p
+          className="oo-fade-up mx-auto mt-5 max-w-xl px-1 text-[15px] font-medium text-neutral-900 sm:text-[17px]"
+          style={{ animationDelay: ".15s" }}
+        >
+          Produk Pilihan, Hadir Bergantian.
+        </p>
+        <p
+          className="oo-fade-up mx-auto mt-2.5 max-w-xl px-1 text-[13.5px] leading-relaxed text-neutral-600 sm:text-[15px]"
+          style={{ animationDelay: ".25s" }}
+        >
+          Temukan produk pilihan Samaqu yang hadir bergantian di halaman Open Order. Nikmati
+          kesempatan mendapatkannya dengan harga minimum.
         </p>
       </section>
 
