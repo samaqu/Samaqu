@@ -7,6 +7,8 @@ import {
   type OpenOrderStockRow,
 } from "@/lib/open-order-offering";
 import { openOrderProductImage } from "@/lib/open-order-catalog";
+import { readOpenOrderWindow } from "@/lib/open-order-settings";
+import { resolveOpenOrderState, type OpenOrderState } from "@/lib/open-order-window";
 import {
   CYP_ASSETS,
   CYP_MAX_PRODUCTS,
@@ -32,6 +34,32 @@ export interface CampaignProduct {
    * false = stok habis (tampil badge "Sold Out", sama seperti kartu Open Order).
    */
   available: boolean;
+}
+
+/** Status jendela Open Order untuk kartu campaign — sumber yang sama dengan /open-order. */
+export interface CampaignWindowState {
+  /** "open" | "before" | "closed". */
+  state: OpenOrderState;
+  /** Tombol/kartu bisa dipakai: jendela terbuka DAN stoknya ada. */
+  locked: boolean;
+}
+
+/**
+ * Baca status jendela Open Order (`store_settings`) dengan fungsi yang SAMA yang dipakai
+ * halaman /open-order, jadi kartu di campaign tidak mungkin beda status dari sana.
+ *
+ * Kalau pembacaan gagal, anggap "open" supaya halaman campaign tidak ikut mengunci
+ * semua kartu hanya karena masalah sesaat.
+ */
+export async function loadCampaignWindowState(): Promise<CampaignWindowState> {
+  try {
+    const window = await readOpenOrderWindow();
+    const state = resolveOpenOrderState(window);
+    return { state, locked: state !== "open" };
+  } catch (error) {
+    console.error("[CYP-CAMPAIGN] Gagal membaca jendela Open Order:", error);
+    return { state: "open", locked: false };
+  }
 }
 
 /** URL media yang benar-benar gambar (bukan video) — `<img>` tidak bisa merender video. */

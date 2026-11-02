@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { money } from "@/lib/open-order-catalog";
-import type { CampaignProduct } from "../_data/products";
+import type { CampaignProduct, CampaignWindowState } from "../_data/products";
 import { OPEN_ORDER_PATH } from "../_data/order-href";
 import s from "../campaign.module.css";
 
@@ -11,10 +11,23 @@ import s from "../campaign.module.css";
  * aktif di Open Order, maksimal 4. Kalau daftarnya kosong, section ini TIDAK dirender
  * sama sekali oleh `page.tsx` — bukan placeholder kosong.
  *
- * Di mobile `.prodRow` berubah jadi carousel scroll-snap (lihat `campaign.module.css`).
+ * Tampilan kartu sengaja MENIRU kartu katalog /open-order, termasuk overlay kunci
+ * "Sudah ditutup" / "Segera dibuka" ketika jendela Open Order belum/sudah lewat
+ * (`loadCampaignWindowState()`, sumber status yang sama).
+ *
+ * Di mobile `.prodRow` jadi grid 2×2 (lihat `campaign.module.css`).
  */
-export default function ProductsSection({ products }: { products: CampaignProduct[] }) {
+export default function ProductsSection({
+  products,
+  window: openOrderWindow,
+}: {
+  products: CampaignProduct[];
+  window: CampaignWindowState;
+}) {
   if (products.length === 0) return null;
+
+  const locked = openOrderWindow.locked;
+  const lockLabel = openOrderWindow.state === "closed" ? "Sudah ditutup" : "Segera dibuka";
 
   return (
     <section className={s.sec} style={{ padding: "96px 20px" }}>
@@ -91,8 +104,8 @@ export default function ProductsSection({ products }: { products: CampaignProduc
                       padding: "4px",
                       boxSizing: "border-box",
                       display: "block",
-                      // Produk habis digelapkan sedikit, sama seperti kartu Open Order.
-                      filter: product.available ? undefined : "grayscale(35%) brightness(.85)",
+                      // Produk habis / jendela ditutup digelapkan sedikit, sama seperti kartu Open Order.
+                      filter: locked || !product.available ? "grayscale(35%) brightness(.85)" : undefined,
                     }}
                   />
                 ) : (
@@ -129,29 +142,9 @@ export default function ProductsSection({ products }: { products: CampaignProduc
                   CREATE YOUR PRICE
                 </span>
 
-                {/* Status stok — ekuivalen badge "Sold Out" di kartu Open Order. */}
-                {!product.available ? (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "10px",
-                      right: "10px",
-                      background: "var(--cyp-black)",
-                      color: "var(--cyp-cream)",
-                      fontSize: "10px",
-                      fontWeight: 700,
-                      letterSpacing: "0.5px",
-                      padding: "5px 9px",
-                      borderRadius: "999px",
-                    }}
-                  >
-                    Sold Out
-                  </span>
-                ) : null}
-
-                {/* Belum bisa dipesan → foto digelapkan + pill di tengah, sama seperti Open Order
-                    saat event belum dibuka. */}
-                {!product.available ? (
+                {/* Kunci — jendela Open Order BELUM dibuka / sudah berakhir: foto digelapkan +
+                    pill putih berikon gembok di tengah, PERSIS seperti kartu /open-order. */}
+                {locked ? (
                   <div
                     style={{
                       position: "absolute",
@@ -180,7 +173,7 @@ export default function ProductsSection({ products }: { products: CampaignProduc
                         <rect x="4" y="10" width="16" height="11" rx="2" />
                         <path d="M8 10V7a4 4 0 0 1 8 0v3" />
                       </svg>
-                      Stok habis
+                      {lockLabel}
                     </span>
                   </div>
                 ) : null}
@@ -198,8 +191,7 @@ export default function ProductsSection({ products }: { products: CampaignProduc
                   </span>
                 </div>
 
-                {/* Tombol status — meniru "Lihat Detail" di kartu Open Order. Produk habis tetap
-                    bisa diklik ke halaman detail, tapi tombolnya tampil nonaktif. */}
+                {/* Tombol — gaya kartu /open-order: terkunci = garis abu-abu, aktif = hitam. */}
                 <span
                   style={{
                     marginTop: "10px",
@@ -212,21 +204,21 @@ export default function ProductsSection({ products }: { products: CampaignProduc
                     borderRadius: "12px",
                     fontSize: "12px",
                     fontWeight: 700,
-                    ...(product.available
-                      ? { background: "var(--cyp-black)", color: "var(--cyp-cream)" }
-                      : {
+                    ...(locked
+                      ? {
                           background: "#FFFFFF",
                           color: "var(--cyp-muted)",
                           border: "1px solid rgba(11,11,11,0.15)",
-                        }),
+                        }
+                      : { background: "var(--cyp-black)", color: "var(--cyp-cream)" }),
                   }}
                 >
-                  {product.available ? "Lihat Detail" : "Stok habis"}
-                  {product.available ? (
+                  Lihat Detail
+                  {locked ? null : (
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                       <path d="M9 6l6 6-6 6" />
                     </svg>
-                  ) : null}
+                  )}
                 </span>
               </div>
             </a>

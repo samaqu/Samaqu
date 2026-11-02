@@ -14,7 +14,7 @@ import {
   ClosingCtaSection,
   CampaignFooter,
 } from "./_sections/Sections";
-import { loadCampaignProducts, heroFromProducts } from "./_data/products";
+import { loadCampaignProducts, heroFromProducts, loadCampaignWindowState } from "./_data/products";
 import { loadCsWhatsappLink } from "./_data/whatsapp";
 import { openOrderHref } from "./_data/order-href";
 
@@ -62,7 +62,11 @@ export default async function CreateYourPriceCampaignPage({
   const params = await searchParams;
   const orderHref = openOrderHref(params);
 
-  const [products, waHref] = await Promise.all([loadCampaignProducts(), loadCsWhatsappLink()]);
+  const [products, waHref, window] = await Promise.all([
+    loadCampaignProducts(),
+    loadCsWhatsappLink(),
+    loadCampaignWindowState(),
+  ]);
 
   // Hero & sticky bar ikut produk CYP aktif. `heroFromProducts` sudah menangani fallback
   // (Thobe Superblack, Rp300rb/320rb/350rb) kalau daftar produknya kosong.
@@ -80,7 +84,7 @@ export default async function CreateYourPriceCampaignPage({
       <VideoSection />
 
       {/* 4. Produk pilihan periode ini — section ini disembunyikan (return null) bila kosong */}
-      <ProductsSection products={products} />
+      <ProductsSection products={products} window={window} />
 
       {/* 5. Cara kerja */}
       <StepsSection />
