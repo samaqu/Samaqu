@@ -322,12 +322,16 @@
   gap: 6px;
 }
 
+/* Tombol Bantuan: ikon di atas, label di bawah. Tinggi dinaikkan dari 36px karena
+   sekarang dua baris; rasio 3 kolom tetap sama supaya grid tidak berubah bentuk. */
 .helpLink {
   display: flex;
-  height: 36px;
+  min-height: 52px;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 0 8px;
+  gap: 4px;
+  padding: 7px 8px;
   border-radius: 10px;
   background: #f4f4f4;
   color: #111111;
@@ -336,6 +340,16 @@
   line-height: 1.15;
   text-align: center;
   text-decoration: none;
+}
+
+/* Warna ikon sengaja sama dengan label (bukan lebih pudar) supaya kontrasnya setara. */
+.helpIcon {
+  flex: none;
+  color: #111111;
+}
+
+.helpLabel {
+  display: block;
 }
 
 /* ── Baris bawah ── */
@@ -525,8 +539,10 @@
     font-size: 15px;
   }
 
+  /* Dua baris (ikon + label) → pakai min-height, bukan height tetap. */
   .helpLink {
-    height: 32px;
+    min-height: 48px;
+    padding: 6px 8px;
   }
 
   .menuFooter {
@@ -570,7 +586,8 @@
   }
 
   .helpLink {
-    height: 30px;
+    min-height: 46px;
+    padding: 5px 6px;
     font-size: 10px;
   }
 }

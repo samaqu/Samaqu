@@ -53,18 +53,25 @@ export function HelpGrid({
     <div className={s.helpSection}>
       <span className={s.sectionLabel}>{t("nav.bantuan_label")}</span>
       <div className={s.helpGrid}>
-        {DRAWER_HELP.map((item) => (
-          <a
-            key={item.labelKey}
-            href={item.external ? item.path : `/${locale}${item.path}`}
-            className={s.helpLink}
-            onClick={onNavigate}
-            {...(item.external ? { target: "_blank", rel: "noopener" } : {})}
-          >
-            {t(item.labelKey)}
-            {item.external ? <span aria-hidden="true"> ↗</span> : null}
-          </a>
-        ))}
+        {DRAWER_HELP.map((item) => {
+          const Icon = item.icon;
+          return (
+            <a
+              key={item.labelKey}
+              href={item.external ? item.path : `/${locale}${item.path}`}
+              className={s.helpLink}
+              onClick={onNavigate}
+              {...(item.external ? { target: "_blank", rel: "noopener" } : {})}
+            >
+              {/* Ikon di atas label. `aria-hidden` karena nama tombolnya sudah ada di teks. */}
+              <Icon size={16} strokeWidth={1.9} aria-hidden="true" className={s.helpIcon} />
+              <span className={s.helpLabel}>
+                {t(item.labelKey)}
+                {item.external ? <span aria-hidden="true"> ↗</span> : null}
+              </span>
+            </a>
+          );
+        })}
       </div>
     </div>
   );
