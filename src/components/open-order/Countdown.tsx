@@ -18,10 +18,39 @@
  */
 
 import { useEffect, useState } from "react";
-import { Bell, Clock, Lock } from "lucide-react";
+import { ArrowUpRight, Bell, Clock, Lock } from "lucide-react";
 import { splitCountdown } from "@/lib/open-order-window";
 
 export type OpenOrderPhase = "upcoming" | "live" | "ended";
+
+/** Akun Instagram toko, dipakai tombol ajakan saat periode selesai. */
+const INSTAGRAM_URL = "https://instagram.com/samaqu.id";
+
+/**
+ * Ikon Instagram.
+ *
+ * Digambar inline karena `lucide-react` versi proyek ini tidak mengekspor `Instagram`
+ * (sudah dicek lewat `tsc`). Bentuknya ikon resmi: kotak membulat, lensa, dan titik lampu.
+ */
+function InstagramGlyph({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" />
+      <circle cx="12" cy="12" r="4.2" />
+      <circle cx="17.4" cy="6.6" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
 
 const pad = (value: number) => (value < 10 ? `0${value}` : String(value));
 
@@ -30,18 +59,6 @@ export function phaseLabel(phase: OpenOrderPhase): string {
   if (phase === "upcoming") return "Segera dibuka";
   if (phase === "live") return "Buruan, sisa waktu";
   return "Follow kami, tunggu batch berikutnya";
-}
-
-/**
- * Label untuk KARTU BESAR di langkah 1 (varian `card`).
- *
- * Fase `ended` memakai kalimat ajakan Follow Instagram. Kalimatnya panjang, jadi tidak
- * dipakai di varian `pill` (10px, satu baris di samping angka) — di sana tetap
- * `phaseLabel()` yang pendek supaya tata letaknya tidak pecah.
- */
-export function cardPhaseLabel(phase: OpenOrderPhase): string {
-  if (phase === "ended") return "Follow Instagram @samaqu.id untuk mengetahui produk apa yang akan hadir berikutnya.";
-  return phaseLabel(phase);
 }
 
 /** Sisa waktu (ms) + pecahannya, dihitung tiap detik. */
@@ -200,12 +217,71 @@ export default function Countdown({
     );
   }
 
-  // ── Varian card: kartu timer besar di langkah 1 ──
+  // ── Varian card, fase SELESAI: ajakan Follow Instagram ──
+  //
+  // Tampilan sendiri, bukan kartu putih timer. Alasannya: di fase ini tidak ada angka
+  // yang perlu dihitung, jadi bentuk kartu timer justru menyisakan ruang kosong (ikon jam
+  // + garis) sementara kalimatnya panjang dan sempit di HP.
+  //
+  // Prinsip desain: latar transparan (menyatu dengan latar halaman), struktur lewat garis
+  // tipis atas–bawah, ikon Instagram sebagai penanda, dan kalimat dipecah dua tingkat
+  // (ajakan + keterangan) supaya enak dibaca di layar sempit.
+  if (phase === "ended") {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <div className="oo-fade-up border-y border-black/12 py-5 sm:py-6">
+          <a
+            href={INSTAGRAM_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-start gap-3.5 sm:items-center sm:gap-4"
+          >
+            {/* Ikon Instagram: kotak membulat dengan garis hitam, bukan lingkaran ikon jam. */}
+            <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-black/15 text-neutral-900 transition-colors group-hover:border-black/40 sm:mt-0">
+              <InstagramGlyph size={18} />
+            </span>
+
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold leading-snug text-neutral-900 sm:text-[16px]">
+                Follow Instagram{" "}
+                <span className="whitespace-nowrap underline decoration-black/25 underline-offset-4 group-hover:decoration-black/60">
+                  @samaqu.id
+                </span>
+              </span>
+              <span className="mt-1 block text-[13px] leading-relaxed text-neutral-600 sm:text-[13.5px]">
+                Produk yang hadir berikutnya diumumkan di sana lebih dulu.
+              </span>
+            </span>
+
+            <ArrowUpRight size={16} strokeWidth={2} className="mt-1 shrink-0 text-neutral-400 transition-colors group-hover:text-neutral-900 sm:mt-0" />
+          </a>
+
+          {/* Ucapan terima kasih + pengingat periode berikutnya.
+              Di HP keduanya menumpuk (teks dulu, tombol selebar isi), di layar lebar sejajar. */}
+          {onRemind && (
+            <div className="mt-4 flex flex-col items-center gap-3 text-center sm:mt-5 sm:flex-row sm:justify-between sm:text-left">
+              <span className="text-[12.5px] leading-relaxed text-neutral-500">
+                Terima kasih untuk semua pesanan periode ini.
+              </span>
+              <button
+                type="button"
+                onClick={onRemind}
+                className="inline-flex shrink-0 items-center gap-2 rounded-full bg-black px-4 py-2 text-xs font-semibold text-white transition hover:opacity-80"
+              >
+                <Bell size={13} strokeWidth={2} />
+                {remindLabel || "Kabari Periode Berikutnya"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Varian card: kartu timer besar di langkah 1 (fase belum dibuka / sedang jalan) ──
   return (
     <div className="mx-auto max-w-2xl">
       <div className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-black/[.06] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,.04),0_12px_32px_-18px_rgba(0,0,0,.25)] sm:flex-row sm:px-6">
-        {/* `min-w-0` + `shrink` wajib: kalimat fase `ended` panjang dan harus membungkus,
-            bukan mendorong isi kartu keluar layar. */}
         <div className="flex w-full min-w-0 items-start gap-3 sm:w-auto sm:flex-1">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/15">
             <Clock size={16} strokeWidth={2} />
@@ -213,37 +289,25 @@ export default function Countdown({
           <span className="flex min-w-0 items-start gap-2">
             <span
               className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                phase === "live" ? "bg-emerald-500 oo-ping" : phase === "upcoming" ? "bg-amber-400" : "bg-neutral-500"
+                phase === "live" ? "bg-emerald-500 oo-ping" : "bg-amber-400"
               }`}
             />
-            {/* Kartu besar: kalimat fase `ended` lebih panjang, jadi tidak di-uppercase dan
-                spasi hurufnya dilonggarkan agar tetap terbaca rapi. */}
-            <span
-              className={`min-w-0 ${
-                phase === "ended"
-                  ? "text-[12.5px] font-medium normal-case leading-snug tracking-[.01em] text-neutral-800"
-                  : "text-[12px] font-semibold uppercase tracking-[.22em]"
-              }`}
-            >
-              {cardPhaseLabel(phase)}
+            <span className="min-w-0 text-[12px] font-semibold uppercase tracking-[.22em]">
+              {phaseLabel(phase)}
             </span>
           </span>
         </div>
 
-        {/* Fase `ended`: tanggal penutupan sengaja TIDAK ditampilkan lagi — kalimat Follow
-            Instagram sudah jadi satu-satunya pesan di kartu, jadi lebih rapi. Kartu lalu
-            tidak perlu lagi dipecah dua sisi. */}
-        {phase !== "ended" && (
-          <div className="flex items-start gap-1.5">
-            <CardDigit value={pad(days)} unit="Hari" />
-            <Colon />
-            <CardDigit value={pad(hours)} unit="Jam" />
-            <Colon />
-            <CardDigit value={pad(minutes)} unit="Menit" />
-            <Colon />
-            <CardDigit value={pad(seconds)} unit="Detik" />
-          </div>
-        )}
+        {/* Fase `ended` sudah keluar lebih awal di atas, jadi di sini selalu ada angka. */}
+        <div className="flex items-start gap-1.5">
+          <CardDigit value={pad(days)} unit="Hari" />
+          <Colon />
+          <CardDigit value={pad(hours)} unit="Jam" />
+          <Colon />
+          <CardDigit value={pad(minutes)} unit="Menit" />
+          <Colon />
+          <CardDigit value={pad(seconds)} unit="Detik" />
+        </div>
       </div>
 
       {phase === "upcoming" && (startInfo || onRemind) && (
@@ -274,19 +338,6 @@ export default function Countdown({
         </div>
       )}
 
-      {phase === "ended" && onRemind && (
-        <div className="mt-4 flex flex-col items-center justify-center gap-3 text-sm sm:flex-row">
-          <span className="text-neutral-500">Terima kasih untuk semua pesanan periode ini.</span>
-          <button
-            type="button"
-            onClick={onRemind}
-            className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-xs font-semibold text-white transition hover:opacity-80"
-          >
-            <Bell size={13} strokeWidth={2} />
-            {remindLabel || "Kabari Periode Berikutnya"}
-          </button>
-        </div>
-      )}
     </div>
   );
 }
