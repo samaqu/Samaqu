@@ -268,6 +268,16 @@ export const PROMO_ORDER_PATH = "/promo/free-cover-hanger/pesan";
 export const PROMO_FCH_SOURCE = "Promo Free Cover Hanger";
 
 /**
+ * Awalan nomor pesanan promo (`FCH-YYYYMMDD-NNN`).
+ *
+ * Satu sumber untuk pembuat nomor (`/api/promo-order`) dan cron pembayaran
+ * (`/api/cron/auto-cancel`). Tanpa didaftarkan di cron, pesanan promo tidak pernah
+ * diingatkan dan tidak pernah dibatalkan otomatis setelah 24 jam — stok tertahan
+ * di pesanan `pending` selamanya.
+ */
+export const PROMO_ORDER_PREFIX = "FCH-";
+
+/**
  * Tautan CTA utama landing promo.
  *
  * Semua tombol "Pilih Baju & Ambil Bonus" / "Ambil Bonus" / kartu koleksi mengarah ke

@@ -33,7 +33,7 @@ import {
   sendMetaPurchaseEvent,
 } from "@/lib/meta-capi";
 import { metaCatalogContents } from "@/lib/meta-catalog";
-import { PROMO_FCH_SOURCE } from "@/lib/promo/free-cover-hanger";
+import { PROMO_FCH_SOURCE, PROMO_ORDER_PREFIX } from "@/lib/promo/free-cover-hanger";
 
 /**
  * POST /api/promo-order — pesanan dari landing "Free Cover Hanger".
@@ -83,7 +83,7 @@ function generateOrderNumber(): string {
   const wib = new Date(Date.now() + 7 * 60 * 60 * 1000);
   const ymd = wib.toISOString().slice(0, 10).replace(/-/g, "");
   const rand = String(Math.floor(Math.random() * 900) + 100);
-  return `FCH-${ymd}-${rand}`;
+  return `${PROMO_ORDER_PREFIX}${ymd}-${rand}`;
 }
 
 export async function POST(request: NextRequest) {

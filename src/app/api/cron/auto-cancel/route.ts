@@ -6,6 +6,7 @@ import { claimOrderNotification } from "@/lib/order-notify";
 import { fetchOrderPaymentMethodRow } from "@/lib/payment-methods";
 import { validMayarPaymentUrl } from "@/lib/mayar";
 import { RESELLER_ORDER_PREFIX, LEGACY_RESELLER_ORDER_PREFIX } from "@/lib/reseller/order-number";
+import { PROMO_ORDER_PREFIX } from "@/lib/promo/free-cover-hanger";
 
 /**
  * Cron pembayaran: **reminder** lalu **auto-cancel**.
@@ -31,6 +32,25 @@ import { RESELLER_ORDER_PREFIX, LEGACY_RESELLER_ORDER_PREFIX } from "@/lib/resel
 const REMINDER_LIMIT = 30;
 /** Batas pembatalan per eksekusi — mencegah backlog besar memicu loop stok + WA tanpa akhir. */
 const AUTO_CANCEL_LIMIT = 100;
+
+/**
+ * Awalan nomor pesanan yang ikut diingatkan & dibatalkan otomatis.
+ *
+ * SATU daftar untuk kedua query di bawah supaya tidak pernah berbeda lagi: dulu daftarnya
+ * ditulis dua kali dan `FCH-` (promo Free Cover Hanger) terlewat di keduanya, sehingga pesanan
+ * promo berstatus `pending` menggantung selamanya — stok & kuota bonus tertahan, customer tidak
+ * pernah diingatkan. Nomor `OPS-…` (transaksi manual) SENGAJA tidak ada di sini: itu urusan admin.
+ */
+const AUTO_CANCEL_PREFIXES = [
+  "SMQ-", // checkout website
+  "CYO-", // Open Order
+  PROMO_ORDER_PREFIX, // Promo Free Cover Hanger
+  RESELLER_ORDER_PREFIX, // reseller baru (Exclusive Partner)
+  LEGACY_RESELLER_ORDER_PREFIX, // reseller lama
+];
+
+/** Filter PostgREST `.or(...)` untuk semua awalan di atas. */
+const PREFIX_FILTER = AUTO_CANCEL_PREFIXES.map((prefix) => `order_number.like.${prefix}%`).join(",");
 
 export async function GET(request: NextRequest) {
   // Verify cron secret (penjadwal mengirim header Authorization: Bearer $CRON_SECRET)
@@ -58,10 +78,11 @@ export async function GET(request: NextRequest) {
     )
     .eq("status", "pending")
     .is("paid_at", null)
-    // Hanya pesanan website (`SMQ-`) & Open Order (`CYO-`). Transaksi manual dari ops/admin
-    // bernomor `OPS-…` dan boleh berstatus pending ("Belum Lunas") — itu urusan admin, jangan
-    // pernah diingatkan atau dibatalkan otomatis oleh cron.
-    .or("order_number.like.SMQ-%,order_number.like.CYO-%")
+    // Hanya pesanan yang nomornya berawalan di `AUTO_CANCEL_PREFIXES` (website, Open Order,
+    // promo Free Cover Hanger, reseller). Transaksi manual dari ops/admin bernomor `OPS-…`
+    // dan boleh berstatus pending ("Belum Lunas") — itu urusan admin, jangan pernah
+    // diingatkan atau dibatalkan otomatis oleh cron.
+    .or(PREFIX_FILTER)
     .is("reminded_at", null)
     .gt("created_at", windowStart)
     .lt("created_at", windowEnd)
@@ -129,9 +150,7 @@ export async function GET(request: NextRequest) {
     // Sama seperti reminder: transaksi manual `OPS-…` ("Belum Lunas") tidak ikut dibatalkan.
     // Pesanan reseller (`EP-…` baru / `RSL-…` lama) yang masih pending = kekurangan belum
     // dibayar; ikut dibatalkan setelah 24 jam lewat jalur resmi (saldo & stok kembali).
-    .or(
-      `order_number.like.SMQ-%,order_number.like.CYO-%,order_number.like.${RESELLER_ORDER_PREFIX}%,order_number.like.${LEGACY_RESELLER_ORDER_PREFIX}%`
-    )
+    .or(PREFIX_FILTER)
     .lt("created_at", cutoff)
     .limit(AUTO_CANCEL_LIMIT);
 
