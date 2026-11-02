@@ -1,34 +1,79 @@
 "use client";
 
 import { useStoreSettings, getWhatsAppLink } from "@/lib/store-settings";
-import { useSafeTranslations } from "@/lib/safe-i18n";
+import { useSafeLocale, useSafeTranslations } from "@/lib/safe-i18n";
 import s from "./Footer.module.css";
 
-function getNavLinks(t: (key: string) => string) {
-  return [
-    { href: "/katalog", label: t("nav.katalog") },
-    { href: "/testimoni", label: t("nav.testimoni") },
-    { href: "/tentang-kami", label: t("nav.tentang") },
-    { href: "/faq", label: t("nav.faq") },
-  ];
+/** Satu baris link di kolom footer. */
+interface FooterLink {
+  /** Path internal TANPA prefix bahasa (mis. "/katalog"), atau URL absolut untuk tautan luar. */
+  path: string;
+  /** Key terjemahan namespace `nav`. */
+  labelKey: string;
+  /** true = buka di tab baru (tautan luar seperti portal affiliate). */
+  external?: boolean;
 }
 
-function getHelpLinks(t: (key: string) => string) {
-  return [
-    { href: "/cek-resi", label: t("nav.cek_resi") },
-    { href: "/cara-pesan", label: t("nav.cara_pesan") },
-    { href: "/faq", label: t("nav.faq") },
-    { href: "/panduan-ukuran", label: t("nav.panduan") },
-    { href: "/create-your-price", label: t("nav.cyp") },
-  ];
+interface FooterColumn {
+  /** Key terjemahan judul kolom, namespace `footer`. */
+  headingKey: string;
+  /** aria-label kolom. */
+  ariaKey: string;
+  links: FooterLink[];
+}
+
+/**
+ * SUSUNAN LINK FOOTER — satu sumber data.
+ *
+ * Untuk menambah link: cukup tambah satu entri di kolom yang dituju, lalu tambahkan
+ * key terjemahannya di `src/i18n/messages/{id,en}.json` (namespace `nav`). Komponen
+ * tidak perlu disentuh.
+ *
+ * Urutan kolom = urutan render (kiri → kanan di desktop).
+ */
+const FOOTER_COLUMNS: FooterColumn[] = [
+  {
+    headingKey: "footer.nav",
+    ariaKey: "Navigasi footer",
+    links: [
+      // FAQ sengaja tidak di sini — sudah ada di kolom Bantuan.
+      { path: "/katalog", labelKey: "nav.katalog" },
+      { path: "/testimoni", labelKey: "nav.testimoni" },
+      { path: "/tentang-kami", labelKey: "nav.tentang" },
+    ],
+  },
+  {
+    headingKey: "nav.program",
+    ariaKey: "Program footer",
+    links: [
+      { path: "/create-your-price", labelKey: "nav.cyp" },
+      { path: "/promo/free-cover-hanger", labelKey: "nav.free_cover_hanger" },
+      { path: "/sama-quran", labelKey: "nav.sama_quran" },
+      { path: "https://affiliate.samaqu.id/", labelKey: "nav.affiliate_program", external: true },
+    ],
+  },
+  {
+    headingKey: "footer.help",
+    ariaKey: "Bantuan footer",
+    links: [
+      { path: "/cek-resi", labelKey: "nav.cek_resi" },
+      { path: "/cara-pesan", labelKey: "nav.cara_pesan" },
+      { path: "/faq", labelKey: "nav.faq" },
+      { path: "/panduan-ukuran", labelKey: "nav.panduan" },
+    ],
+  },
+];
+
+/** Path internal → ikut prefix bahasa yang sedang aktif, sama seperti link footer sebelumnya. */
+function localizeHref(locale: string, path: string): string {
+  return `/${locale}${path}`;
 }
 
 export default function Footer() {
   const t = useSafeTranslations();
+  const locale = useSafeLocale();
   const settings = useStoreSettings();
   const instagramUrl = settings.instagram_url || "";
-  const navLinks = getNavLinks(t);
-  const helpLinks = getHelpLinks(t);
 
   return (
     <footer className={s.footer}>
@@ -73,31 +118,24 @@ export default function Footer() {
           </div>
 
           <div className={s.linkColumns}>
-            <nav aria-label="Navigasi footer" className={s.linkColumn}>
-              <p className={s.heading}>{t("footer.nav")}</p>
-              <ul className={s.links}>
-                {navLinks.map((link) => (
-                  <li key={link.href}>
-                    <a href={link.href} className={s.link}>
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-
-            <nav aria-label="Bantuan footer" className={s.linkColumn}>
-              <p className={s.heading}>{t("footer.help")}</p>
-              <ul className={s.links}>
-                {helpLinks.map((link) => (
-                  <li key={link.href}>
-                    <a href={link.href} className={s.link}>
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </nav>
+            {FOOTER_COLUMNS.map((column) => (
+              <nav key={column.headingKey} aria-label={column.ariaKey} className={s.linkColumn}>
+                <p className={s.heading}>{t(column.headingKey)}</p>
+                <ul className={s.links}>
+                  {column.links.map((link) => (
+                    <li key={link.path}>
+                      <a
+                        href={link.external ? link.path : localizeHref(locale, link.path)}
+                        className={s.link}
+                        {...(link.external ? { target: "_blank", rel: "noopener" } : {})}
+                      >
+                        {t(link.labelKey)}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            ))}
           </div>
         </div>
 

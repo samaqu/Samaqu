@@ -23,6 +23,7 @@ const DEFAULT_MESSAGES: Record<string, Record<string, string>> = {
     home: "Home", katalog: "Katalog", testimoni: "Testimoni", tentang: "Tentang Kami",
     bantuan: "Bantuan", panduan: "Panduan Ukuran", cara_pesan: "Cara Pesan", faq: "FAQ",
     garansi_retur: "Garansi & Retur", cyp: "Create Your Price", sama_quran: "Sama Quran",
+    free_cover_hanger: "Gratis Cover Hanger",
     account: "Account", chat_admin: "Chat Admin", bantuan_title: "Butuh bantuan? Hubungi kami.",
   },
   // Panel admin berada DI LUAR provider next-intl, jadi tanpa cadangan ini label pelacakan
