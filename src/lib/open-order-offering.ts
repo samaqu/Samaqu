@@ -13,6 +13,27 @@
  * dengan id baris katalog yang sebenarnya.
  */
 
+/**
+ * Urutan ukuran baku untuk tampilan (kecil → besar).
+ *
+ * Daftar ini BUKAN pembatas: produk boleh punya ukuran lain (mis. "ALL SIZE" untuk paket),
+ * dan ukuran yang tidak ada di sini diletakkan di belakang dengan urutan abjad. Tujuannya
+ * hanya memastikan S–M–L tampil berurutan, bukan mengikuti urutan baris database.
+ */
+const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "ALL SIZE"];
+
+/** Urutkan daftar ukuran menurut `SIZE_ORDER`, sisanya di belakang (abjad). */
+function sortSizes(sizes: string[]): string[] {
+  const rank = (size: string) => {
+    const index = SIZE_ORDER.indexOf(size.toUpperCase());
+    return index === -1 ? SIZE_ORDER.length : index;
+  };
+  return [...sizes].sort((a, b) => {
+    const diff = rank(a) - rank(b);
+    return diff !== 0 ? diff : a.localeCompare(b);
+  });
+}
+
 /** Satu pilihan series + harga minimumnya. Kosong untuk produk tanpa series. */
 export interface OpenOrderSeriesOption {
   name: string;
@@ -281,7 +302,8 @@ export function buildOpenOrderProducts(
         label: colorLabelOf(row, color),
         series: series || null,
         productId: row.id,
-        sizes: sizesByRow.get(row.id)?.get(color) ?? [],
+        // Diurutkan S–M–L, bukan mengikuti urutan baris `product_variants` di database.
+        sizes: sortSizes(sizesByRow.get(row.id)?.get(color) ?? []),
         stock,
         media,
       });

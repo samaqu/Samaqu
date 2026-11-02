@@ -357,13 +357,9 @@ export default function StepProduct({
                       className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full shrink-0"
                       style={{ background: colorMap[color] || "#ccc", border: "1px solid rgba(0,0,0,.1)" }}
                     />
+                    {/* Angka stok & label "Habis" sengaja tidak ditampilkan. Status habis masih
+                        terbaca dari chip yang meredup + tidak bisa diklik, dan dari `title`. */}
                     {openOrderColorLabel(product, color)}
-                    <span
-                      className="ml-0.5 text-[10px] font-semibold tabular-nums"
-                      style={{ color: habis ? "#b91c1c" : color === draft.color ? "rgba(255,255,255,.8)" : "#6b8a5e" }}
-                    >
-                      {habis ? "Habis" : stock}
-                    </span>
                   </button>
                 );
               })}
