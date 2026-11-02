@@ -119,7 +119,14 @@ export default function Countdown({
   startInfo?: string;
   /** Versi bulan singkat ("21 Okt 2026 · 10.00 WIB") — dipakai di layar sempit. */
   startInfoShort?: string;
-  /** "22 Okt 2026 · 23.59 WIB" — baris info saat event sudah berakhir. */
+  /**
+   * "22 Okt 2026 · 23.59 WIB" — tanggal penutupan.
+   *
+   * Dulu ditampilkan di kartu & pill saat fase `ended`. Sekarang sengaja TIDAK dirender
+   * (pemilik menilai tanggalnya mengganggu); fase `ended` hanya menampilkan kalimat ajakan
+   * Follow Instagram. Prop tetap diterima supaya pemanggil lain (wizard promo) tidak perlu
+   * diubah — sekaligus gampang kalau nanti tanggalnya mau dimunculkan lagi.
+   */
   endInfo?: string;
   /** Label tombol pengingat (default mengikuti fase). */
   remindLabel?: string;
@@ -162,13 +169,23 @@ export default function Countdown({
                   phase === "live" ? "bg-emerald-500 oo-ping" : phase === "upcoming" ? "bg-amber-500" : "bg-neutral-400"
                 }`}
               />
-              <span className="text-[10px] font-semibold uppercase tracking-[.2em]">{phaseLabel(phase)}</span>
+              {/* Pill: fase `ended` pakai kalimat ajakan, tanpa huruf besar semua agar
+                  kalimatnya enak dibaca di ukuran kecil. */}
+              <span
+                className={
+                  phase === "ended"
+                    ? "text-[10.5px] font-medium normal-case leading-snug tracking-[.01em] text-neutral-700"
+                    : "text-[10px] font-semibold uppercase tracking-[.2em]"
+                }
+              >
+                {phase === "ended" ? "Follow Instagram kami untuk info selanjutnya" : phaseLabel(phase)}
+              </span>
             </span>
           </span>
         </span>
-        {phase === "ended" ? (
-          <span className="text-[11px] font-semibold">{endInfo}</span>
-        ) : (
+        {/* Fase `ended`: tanggal penutupan tidak lagi ditampilkan di pill (dianggap
+            mengganggu), dan labelnya memakai kalimat ajakan Follow Instagram. */}
+        {phase !== "ended" && (
           <b className="flex items-start gap-1">
             <PillDigit value={pad(days)} unit="hari" />
             <Colon small />
