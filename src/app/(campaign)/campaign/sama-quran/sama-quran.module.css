@@ -1,0 +1,300 @@
+/**
+ * Style kampanye Sama Quran — SEMUA aturan di-scope ke `.sq`.
+ *
+ * Nilai (warna, ukuran, spacing, radius, breakpoint) disalin dari mockup
+ * `SamaQuran.dc.html`. Tidak ada aturan global yang disentuh.
+ *
+ * Palet:
+ *   #0B0B0B / #0E0E0E hitam   #F4F1EA krem   #CFCAC0 garis   #ECE8DF kartu krem
+ *   #BDB8AE teks redup        #8F8A80 redup 2 #595959 sekunder #4A4A4A body
+ */
+
+.sq {
+  --sq-black: #0b0b0b;
+  --sq-ink: #0e0e0e;
+  --sq-cream: #f4f1ea;
+  --sq-card: #ece8df;
+  --sq-line: #cfcac0;
+  --sq-faint: #bdb8ae;
+  --sq-faint-2: #8f8a80;
+  --sq-muted: #595959;
+  --sq-body: #4a4a4a;
+
+  --sq-serif: var(--font-campaign-serif), "Cormorant Garamond", Georgia, serif;
+  --sq-sans: var(--font-campaign-sans), "DM Sans", system-ui, sans-serif;
+
+  font-family: var(--sq-sans);
+  color: var(--sq-ink);
+  background: var(--sq-cream);
+  width: 100%;
+  position: relative;
+}
+
+.sq a {
+  color: var(--sq-ink);
+}
+.sq a:hover {
+  color: #4a4a4a;
+}
+
+.sq h1,
+.sq h2,
+.sq h3 {
+  text-wrap: balance;
+}
+.sq p {
+  text-wrap: pretty;
+}
+
+/* ── Animasi ── */
+@keyframes sqFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+@keyframes sqGlow {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+@keyframes sqRise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sqScrolly {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(18px);
+    opacity: 0;
+  }
+}
+
+.sq .glow {
+  animation: sqGlow 6s ease-in-out infinite;
+}
+.sq .r1 {
+  animation: sqRise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.sq .r2 {
+  animation: sqRise 0.9s 0.15s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.sq .r3 {
+  animation: sqRise 0.9s 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.sq .r4 {
+  animation: sqRise 0.9s 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.sq .dot {
+  animation: sqScrolly 1.8s ease-in-out infinite;
+}
+
+/* ── Teks pembungkus dari mockup ── */
+.sq .mk {
+  background: var(--sq-ink);
+  color: var(--sq-cream);
+  padding: 0 10px;
+  font-style: italic;
+}
+.sq .mkL {
+  background: var(--sq-cream);
+  color: var(--sq-ink);
+  padding: 0 10px;
+  font-style: italic;
+}
+.sq .stitch {
+  border-bottom: 3px dashed var(--sq-ink);
+  font-style: italic;
+  padding-bottom: 2px;
+}
+.sq .logoInv {
+  filter: invert(1);
+}
+
+/* ── Tipografi dasar ── */
+.sq .heroTitle {
+  font-size: clamp(38px, 5vw, 72px);
+}
+.sq .tH2 {
+  letter-spacing: -0.4px;
+}
+.sq .tBody {
+  max-width: 62ch;
+}
+
+/* ── Grid ── */
+.sq .prodGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.sq .harapanGrid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.sq .nilaiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.sq .journey {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* ── Breakpoint ── */
+@media (max-width: 1071px) {
+  .sq .heroTitle {
+    font-size: clamp(38px, 10vw, 76px);
+  }
+}
+
+@media (max-width: 760px) {
+  .sq .heroGrid {
+    text-align: center;
+  }
+  .sq .heroGrid .ctas {
+    justify-content: center;
+  }
+  .sq .heroGrid .eyebrow {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .sq .sec {
+    padding: 64px 20px !important;
+  }
+  .sq .sec0 {
+    padding-top: 0 !important;
+  }
+  .sq .tH2 {
+    font-size: 32px !important;
+    line-height: 1.14 !important;
+    letter-spacing: -0.3px;
+  }
+  .sq .tLead {
+    font-size: 22px !important;
+    line-height: 1.45 !important;
+  }
+  .sq .tBody {
+    font-size: 16px !important;
+    line-height: 1.65 !important;
+  }
+  .sq .tEyebrow {
+    font-size: 11px !important;
+    letter-spacing: 2.5px !important;
+  }
+  .sq .mLeft {
+    text-align: left !important;
+    align-items: flex-start !important;
+  }
+  .sq .btnRow {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100%;
+  }
+  .sq .btnRow a {
+    justify-content: center;
+    text-align: center;
+    min-height: 52px;
+    box-sizing: border-box;
+  }
+  .sq .bgNum {
+    font-size: 200px !important;
+    right: -20px !important;
+    top: 0 !important;
+    opacity: 0.7;
+  }
+
+  /* Perjalanan → carousel geser */
+  .sq .journey {
+    display: flex !important;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 12px !important;
+    margin: 0 -20px !important;
+    padding: 0 20px 6px;
+    scrollbar-width: none;
+  }
+  .sq .journey::-webkit-scrollbar {
+    display: none;
+  }
+  .sq .journey > div {
+    flex: 0 0 74%;
+    scroll-snap-align: start;
+  }
+
+  .sq .journeyCap {
+    font-size: 20px !important;
+  }
+  .sq .heroTitle {
+    line-height: 1.08 !important;
+  }
+  .sq .ctaMedia {
+    min-height: 300px !important;
+    order: -1;
+  }
+  .sq .ctaBtns {
+    grid-template-columns: 1fr !important;
+    max-width: none !important;
+  }
+  .sq .ctaCard {
+    border-radius: 22px !important;
+  }
+
+  .sq .prodGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .sq .harapanGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .sq .nilaiCard {
+    padding: 14px 8px !important;
+    gap: 8px !important;
+    align-items: center;
+    text-align: center;
+    border-radius: 12px !important;
+  }
+  .sq .nilaiTitle {
+    font-size: 15px !important;
+  }
+  .sq .nilaiDesc {
+    display: none;
+  }
+  .sq .hideSm {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sq .glow,
+  .sq .r1,
+  .sq .r2,
+  .sq .r3,
+  .sq .r4,
+  .sq .dot {
+    animation: none !important;
+  }
+}
