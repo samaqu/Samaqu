@@ -1348,7 +1348,10 @@ export default function TambahProdukPage({
         }
         if (!isOps && (!block.price || parseInt(block.price) <= 0)) e[`series_${sn}_price`] = `Harga ${sn} wajib diisi`;
         if (block.cypEnabled && (!block.minimumPrice || parseInt(block.minimumPrice) <= 0)) e[`series_${sn}_min`] = `Harga Minimum ${sn} wajib diisi`;
-        if (!isOps) {
+        // Foto hanya diwajibkan saat MEMBUAT produk dari form admin — produk dari ops memang
+        // lahir tanpa foto (`is_published = false`), jadi mengeditnya tidak boleh dipaksa
+        // mengunggah foto. Ini yang dulu bikin produk ops mentok di validasi media.
+        if (!isOps && !isEdit) {
           const uploadedMedia = block.media.filter((m) => m.url && !m.uploading);
           if (uploadedMedia.length === 0) e[`series_${sn}_media`] = `Media ${sn} wajib diisi (min 1)`;
         }
@@ -1394,7 +1397,8 @@ export default function TambahProdukPage({
           }
         }
       }
-      if (!isOps) {
+      // Sama seperti di cabang Thobe: foto wajib hanya untuk produk BARU dari form admin.
+      if (!isOps && !isEdit) {
         const uploadedMedia = media.filter((m) => m.url && !m.uploading);
         if (uploadedMedia.length === 0) e.media = "Minimal 1 media (gambar/video)";
       }
