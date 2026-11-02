@@ -12,7 +12,8 @@
  */
 
 import { useMemo, useState } from "react";
-import { ChevronRight, Lock } from "lucide-react";
+import { ArrowUpRight, ChevronRight, Lock } from "lucide-react";
+import { InstagramGlyph } from "./icons";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import { openOrderProductImage } from "@/lib/open-order-catalog";
 import { openOrderProductPrice, type OpenOrderProduct } from "@/lib/open-order-offering";
@@ -75,40 +76,71 @@ export default function StepCatalog({
 
   return (
     <div>
-      {/* Hero.
-          Judulnya "Create Your Price" (bukan lagi "Open Order Samaqu"), dibuat menonjol
-          dengan huruf serif besar + animasi sekali-jalan (`oo-title-in`). Baris periode
-          sengaja tidak ditampilkan di sini — tanggal tetap terbaca di kartu timer bawah.
-          Ukuran memakai clamp() supaya tidak meledak di layar lebar dan tidak sempit di HP. */}
-      <section className="pb-10 pt-6 text-center">
+      {/* Hero — mengikuti mockup pemilik.
+          Judul dua baris: "Create Your" lalu "Price" yang latarnya menyapu hitam dari kiri
+          lalu teksnya jadi putih (`oo-title-sweep`). Huruf memakai Inter Tight (display
+          mockup), ukuran clamp() supaya aman dari HP sampai desktop.
+          Dipakai di SEMUA fase (buka maupun tutup). */}
+      <section className="pb-10 pt-8 text-center sm:pt-14">
         <h1
-          className="oo-title-in mx-auto"
+          className="oo-title-in mx-auto font-extrabold leading-[.92] tracking-[-.045em] text-neutral-950"
           style={{
-            fontFamily: "var(--font-cormorant), Georgia, serif",
-            fontWeight: 600,
-            fontSize: "clamp(2rem, 7.5vw, 4.25rem)",
-            lineHeight: 1.05,
-            letterSpacing: "0.01em",
-            textTransform: "uppercase",
-            maxWidth: "16ch",
+            fontFamily: "var(--font-inter-tight), var(--font-inter), system-ui, sans-serif",
+            fontSize: "clamp(2.6rem, 12vw, 6.5rem)",
+            maxWidth: "12ch",
           }}
         >
-          Create Your Price
+          <span className="block">Create Your</span>
+          <span className="relative mt-2 inline-block px-3 pb-1 sm:px-4" style={{ animationDelay: ".1s" }}>
+            {/* Kotak hitam: menyapu dari kiri (scaleX) — sekali jalan, bukan berulang. */}
+            <span className="oo-title-sweep absolute inset-0 rounded-xl bg-neutral-950 sm:rounded-2xl" />
+            <span className="relative" style={{ color: "#fff" }}>
+              Price
+            </span>
+          </span>
         </h1>
 
         <p
-          className="oo-fade-up mx-auto mt-5 max-w-xl px-1 text-[15px] font-medium text-neutral-900 sm:text-[17px]"
+          className="oo-fade-up mx-auto mt-5 max-w-xl px-1 text-[15px] font-semibold text-neutral-900 sm:mt-6 sm:text-lg"
           style={{ animationDelay: ".15s" }}
         >
           Produk Pilihan, Hadir Bergantian.
         </p>
         <p
-          className="oo-fade-up mx-auto mt-2.5 max-w-xl px-1 text-[13.5px] leading-relaxed text-neutral-600 sm:text-[15px]"
+          className="oo-fade-up mx-auto mt-3 max-w-[22rem] px-1 text-sm leading-relaxed text-neutral-600 sm:max-w-md sm:text-base"
           style={{ animationDelay: ".25s" }}
         >
           Temukan produk pilihan Samaqu yang hadir bergantian di halaman Open Order. Nikmati
           kesempatan mendapatkannya dengan harga minimum.
         </p>
+
+        {/* Kartu Follow Instagram (versi mockup). Tampil di SEMUA fase. */}
+        <a
+          href="https://instagram.com/samaqu.id"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="oo-fade-up group mx-auto mt-7 flex max-w-xl items-center gap-3 rounded-[20px] border border-black/[.06] bg-white p-3 text-left shadow-[0_8px_30px_rgba(0,0,0,.06)] transition-shadow hover:shadow-[0_10px_36px_rgba(0,0,0,.1)] sm:mt-8 sm:gap-4 sm:p-4"
+          style={{ animationDelay: ".35s" }}
+        >
+          <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-neutral-950 text-white">
+            <InstagramGlyph size={20} />
+            <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-neutral-950 bg-white" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block whitespace-nowrap text-[11px] font-semibold tracking-[.18em] text-neutral-500">
+              INFO BATCH BARU
+            </span>
+            <span className="mt-0.5 block text-sm font-semibold text-neutral-950 sm:text-[15px]">
+              Follow Instagram @samaqu.id
+            </span>
+            <span className="block text-xs text-neutral-600 sm:text-sm">
+              untuk mengetahui produk apa yang akan hadir berikutnya.
+            </span>
+          </span>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/15 transition group-hover:bg-neutral-950 group-hover:text-white">
+            <ArrowUpRight size={14} strokeWidth={2.2} />
+          </span>
+        </a>
       </section>
 
       {/* Timer */}

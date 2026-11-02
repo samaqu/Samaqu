@@ -18,39 +18,10 @@
  */
 
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Bell, Clock, Lock } from "lucide-react";
+import { Bell, Clock, Lock } from "lucide-react";
 import { splitCountdown } from "@/lib/open-order-window";
 
 export type OpenOrderPhase = "upcoming" | "live" | "ended";
-
-/** Akun Instagram toko, dipakai tombol ajakan saat periode selesai. */
-const INSTAGRAM_URL = "https://instagram.com/samaqu.id";
-
-/**
- * Ikon Instagram.
- *
- * Digambar inline karena `lucide-react` versi proyek ini tidak mengekspor `Instagram`
- * (sudah dicek lewat `tsc`). Bentuknya ikon resmi: kotak membulat, lensa, dan titik lampu.
- */
-function InstagramGlyph({ size = 18 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" />
-      <circle cx="12" cy="12" r="4.2" />
-      <circle cx="17.4" cy="6.6" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
 
 const pad = (value: number) => (value < 10 ? `0${value}` : String(value));
 
@@ -217,62 +188,62 @@ export default function Countdown({
     );
   }
 
-  // ── Varian card, fase SELESAI: ajakan Follow Instagram ──
+  // ── Varian card, fase SELESAI: blok "periode ditutup" versi mockup ──
   //
-  // Tampilan sendiri, bukan kartu putih timer. Alasannya: di fase ini tidak ada angka
-  // yang perlu dihitung, jadi bentuk kartu timer justru menyisakan ruang kosong (ikon jam
-  // + garis) sementara kalimatnya panjang dan sempit di HP.
-  //
-  // Prinsip desain: latar transparan (menyatu dengan latar halaman), struktur lewat garis
-  // tipis atas–bawah, ikon Instagram sebagai penanda, dan kalimat dipecah dua tingkat
-  // (ajakan + keterangan) supaya enak dibaca di layar sempit.
+  // Kartu hitam besar dengan garis grid halus, badge berdenyut, judul "Coming Soon"
+  // ber-shine, dan satu tombol Follow. Tidak ada angka & tidak ada tanggal: di fase ini
+  // memang tidak ada yang bisa dihitung.
   if (phase === "ended") {
     return (
       <div className="mx-auto max-w-2xl">
-        <div className="oo-fade-up border-y border-black/12 py-5 sm:py-6">
-          <a
-            href={INSTAGRAM_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex items-start gap-3.5 sm:items-center sm:gap-4"
-          >
-            {/* Ikon Instagram: kotak membulat dengan garis hitam, bukan lingkaran ikon jam. */}
-            <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-black/15 text-neutral-900 transition-colors group-hover:border-black/40 sm:mt-0">
-              <InstagramGlyph size={18} />
-            </span>
+        <div className="oo-fade-up relative overflow-hidden rounded-[24px] bg-neutral-950 px-5 py-12 text-center text-white sm:rounded-[28px] sm:px-6 sm:py-20">
+          {/* Garis grid halus, memudar ke tepi. */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            aria-hidden="true"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)",
+              backgroundSize: "44px 44px",
+              maskImage: "radial-gradient(ellipse at center,#000 30%,transparent 75%)",
+              WebkitMaskImage: "radial-gradient(ellipse at center,#000 30%,transparent 75%)",
+            }}
+          />
 
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold leading-snug text-neutral-900 sm:text-[16px]">
-                Follow Instagram{" "}
-                <span className="whitespace-nowrap underline decoration-black/25 underline-offset-4 group-hover:decoration-black/60">
-                  @samaqu.id
-                </span>
-              </span>
-              <span className="mt-1 block text-[13px] leading-relaxed text-neutral-600 sm:text-[13.5px]">
-                Produk yang hadir berikutnya diumumkan di sana lebih dulu.
-              </span>
-            </span>
+          <div className="relative">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-[11px] font-semibold tracking-[.2em]">
+              <span className="oo-ping-light h-1.5 w-1.5 rounded-full bg-white" aria-hidden="true" />
+              PERIODE DITUTUP
+            </div>
 
-            <ArrowUpRight size={16} strokeWidth={2} className="mt-1 shrink-0 text-neutral-400 transition-colors group-hover:text-neutral-900 sm:mt-0" />
-          </a>
+            {/* "Coming Soon" dengan kilau gradien yang bergerak pelan. */}
+            <h2
+              className="mt-5 font-extrabold leading-[1] sm:mt-6"
+              style={{
+                fontFamily: "var(--font-inter-tight), var(--font-inter), system-ui, sans-serif",
+                fontSize: "clamp(2.2rem, 11vw, 4.5rem)",
+                letterSpacing: "-.045em",
+              }}
+            >
+              <span className="oo-shine-text">Coming Soon</span>
+            </h2>
 
-          {/* Ucapan terima kasih + pengingat periode berikutnya.
-              Di HP keduanya menumpuk (teks dulu, tombol selebar isi), di layar lebar sejajar. */}
-          {onRemind && (
-            <div className="mt-4 flex flex-col items-center gap-3 text-center sm:mt-5 sm:flex-row sm:justify-between sm:text-left">
-              <span className="text-[12.5px] leading-relaxed text-neutral-500">
-                Terima kasih untuk semua pesanan periode ini.
-              </span>
+            <p className="mt-4 text-base text-white/70 sm:text-lg">Nantikan batch berikutnya.</p>
+            <p className="mx-auto mt-2 max-w-sm text-sm text-white/45">
+              Produk pilihan berikutnya sedang kami siapkan. Pantau Instagram untuk pengumumannya.
+            </p>
+
+            {onRemind && (
               <button
                 type="button"
                 onClick={onRemind}
-                className="inline-flex shrink-0 items-center gap-2 rounded-full bg-black px-4 py-2 text-xs font-semibold text-white transition hover:opacity-80"
+                className="mt-7 inline-flex h-14 w-full items-center justify-center gap-2 rounded-full bg-white px-7 font-semibold text-neutral-950 transition hover:opacity-90 sm:mt-8 sm:w-auto"
               >
-                <Bell size={13} strokeWidth={2} />
+                <Bell size={16} strokeWidth={2} />
                 {remindLabel || "Kabari Periode Berikutnya"}
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     );

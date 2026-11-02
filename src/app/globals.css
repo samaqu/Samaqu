@@ -676,6 +676,13 @@ a { text-decoration: none; }
   70%  { box-shadow: 0 0 0 7px rgba(16,185,129,0); }
   100% { box-shadow: none; }
 }
+/* Varian untuk latar gelap (badge "PERIODE DITUTUP"): denyut putih, bukan hijau. */
+.oo-ping-light { animation: oo-ping-light 2s infinite; }
+@keyframes oo-ping-light {
+  0%   { box-shadow: 0 0 0 0 rgba(255,255,255,.5); }
+  70%  { box-shadow: 0 0 0 10px rgba(255,255,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+}
 /* Muncul naik pelan (hero + kartu produk). */
 .oo-fade-up { opacity: 0; transform: translateY(16px); animation: oo-fu .7s ease forwards; }
 @keyframes oo-fu { to { opacity: 1; transform: none; } }
@@ -695,10 +702,38 @@ a { text-decoration: none; }
   to   { opacity: 1; transform: none; }
 }
 
+/* Kotak hitam di belakang kata "Price": menyapu dari kiri lalu berhenti.
+   Satu kali jalan (bukan berulang) supaya tidak mengganggu saat membaca. */
+.oo-title-sweep {
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: oo-title-sweep .8s cubic-bezier(.7,0,.2,1) .35s forwards;
+}
+@keyframes oo-title-sweep {
+  to { transform: scaleX(1); }
+}
+
+/* Teks "Coming Soon": kilau gradien berjalan pelan (versi mockup). Dihilangkan saat
+   pengunjung meminta kurangi animasi — di mode itu teksnya tetap putih solid. */
+.oo-shine-text {
+  background: linear-gradient(110deg, #fff 40%, #8a8a8a 50%, #fff 60%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: oo-shine-text 5s linear infinite;
+}
+@keyframes oo-shine-text {
+  from { background-position: 100% 0; }
+  to   { background-position: -150% 0; }
+}
+
 /* Aksesibilitas: kalau pengguna meminta kurangi animasi, semua dekorasi Open Order dimatikan
    dan konten langsung terlihat (tanpa ini elemen ber-`oo-fade-up` bisa tertahan opacity 0). */
 @media (prefers-reduced-motion: reduce) {
   .oo-fade-up { opacity: 1; transform: none; animation: none; }
   .oo-title-in { opacity: 1; transform: none; animation: none; }
-  .oo-roll span, .oo-tick span, .oo-shimmer, .oo-ping { animation: none !important; }
+  .oo-title-sweep { transform: none; animation: none; }
+  .oo-shine-text { background: none; color: #fff; -webkit-text-fill-color: #fff; animation: none !important; }
+  .oo-roll span, .oo-tick span, .oo-shimmer, .oo-ping, .oo-ping-light { animation: none !important; }
 }

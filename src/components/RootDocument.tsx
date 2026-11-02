@@ -21,6 +21,17 @@ const inter = localFont({
   display: "swap",
 });
 
+/**
+ * Inter Tight — khusus judul besar Open Order (mengikuti mockup pemilik). Disajikan dari
+ * `public/fonts` seperti font lain, bukan Google Fonts, supaya build tidak bergantung
+ * jaringan. Satu bobot (800) karena hanya dipakai di judul.
+ */
+const interTight = localFont({
+  src: [{ path: "../../public/fonts/intertight-extrabold.woff2", weight: "800", style: "normal" }],
+  variable: "--font-inter-tight",
+  display: "swap",
+});
+
 const cormorant = localFont({
   src: [
     { path: "../../public/fonts/cormorantgaramond-wght--light.woff2", weight: "300", style: "normal" },
@@ -80,7 +91,7 @@ export const ROOT_METADATA = {
  */
 export function RootDocument({ lang, children }: { lang: string; children: React.ReactNode }) {
   return (
-    <html lang={lang} className={`${inter.variable} ${cormorant.variable}`}>
+    <html lang={lang} className={`${inter.variable} ${cormorant.variable} ${interTight.variable}`}>
       <head>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
           "@context": "https://schema.org",
