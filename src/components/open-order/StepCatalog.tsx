@@ -15,11 +15,7 @@ import { useMemo, useState } from "react";
 import { ChevronRight, Lock } from "lucide-react";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import { openOrderProductImage } from "@/lib/open-order-catalog";
-import {
-  lowestOpenOrderPrice,
-  openOrderProductPrice,
-  type OpenOrderProduct,
-} from "@/lib/open-order-offering";
+import { openOrderProductPrice, type OpenOrderProduct } from "@/lib/open-order-offering";
 import Countdown, { type OpenOrderPhase } from "./Countdown";
 
 const ALL = "semua";
@@ -68,7 +64,6 @@ export default function StepCatalog({
   // Satu kartu per PRODUK (bukan per warna/varian). Pengelompokan sudah dilakukan
   // `buildOpenOrderProducts` dengan kunci yang sama seperti halaman Katalog
   // (kategori + nama), jadi Kabak (Kabak 01/02/04/12) tampil sebagai satu kartu.
-  const lowestPrice = useMemo(() => lowestOpenOrderPrice(products), [products]);
   const shown = useMemo(
     () => (category === ALL ? products : products.filter((product) => product.category === category)),
     [products, category],
@@ -262,12 +257,20 @@ export default function StepCatalog({
         <p className="py-10 text-center text-sm text-neutral-500">Belum ada produk untuk kategori ini.</p>
       )}
 
-      {/* Catatan harga */}
-      {lowestPrice !== null && (
-        <p className="mx-auto mt-10 max-w-2xl text-sm text-neutral-500">
-          Harga di atas adalah harga Open Order periode ini. Kamu bisa menentukan harga sendiri (Create Your Price) di
-          langkah berikutnya, mulai dari {rupiah(lowestPrice)}.
-        </p>
+      {/* Penjelasan Create Your Price.
+          Muncul selama ada produk yang tampil — sama seperti catatan harga sebelumnya, tapi
+          tanpa menyebut angka. Alasan: harga terendah berbeda per kategori/series, jadi satu
+          angka di bawah katalog justru menyesatkan. */}
+      {products.length > 0 && (
+        <div className="mx-auto mt-10 max-w-2xl text-center">
+          <h2 className="text-[15px] font-semibold text-neutral-900 sm:text-base">
+            Bagaimana Create Your Price Bekerja?
+          </h2>
+          <p className="mx-auto mt-2 max-w-xl text-[13.5px] leading-relaxed text-neutral-600 sm:text-sm">
+            Harga yang tertera merupakan batas minimum setiap produk. Kamu bisa menentukan harga sendiri pada langkah
+            pemesanan berikutnya, sesuai kemampuan dan ketentuan yang berlaku.
+          </p>
+        </div>
       )}
 
       {cartCount > 0 && (
