@@ -95,8 +95,10 @@ export default function PromoStepReview({
           label={shipping ? `Ongkir (J&T — ${shipping.service})` : "Ongkir"}
           value={loadingOngkir ? "Menghitung…" : shipping ? money(ongkir) : "—"}
         />
+        {/* Total berat sudah termasuk Cover Hanger bonus — disebut di label supaya tidak
+            dikira berat barangnya saja. */}
         <SummaryRow
-          label="Total berat"
+          label="Total berat (termasuk Cover Hanger)"
           value={`${totalWeight.toLocaleString("id-ID")} g (${(totalWeight / 1000).toLocaleString("id-ID", { maximumFractionDigits: 3 })} kg)`}
         />
         {ongkirError && (

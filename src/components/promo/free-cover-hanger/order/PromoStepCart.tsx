@@ -188,9 +188,17 @@ export default function PromoStepCart({
           <SummaryRow label="Total" value={money(total)} strong />
         </div>
         <div className="mt-3 space-y-2.5 pt-3" style={{ borderTop: `1px solid ${LINE}` }}>
-          {/* `itemsWeight` SUDAH termasuk berat Cover Hanger (berat varian katalognya),
-              jadi baris "Berat produk" memakai sisa setelah bonus — tidak dihitung dua kali. */}
-          <SummaryRow label="Berat produk" value={formatWeightExact(Math.max(0, itemsWeight - addonWeight))} />
+          {/*
+            Berat dipecah per barang supaya jelas mana berat baju dan mana berat bonus:
+            "Berat produk (2 item)" = jumlah berat semua baris, BUKAN berat satu baju.
+            Tanpa label jumlah item, angka 1.100 g mudah terbaca sebagai berat total baju.
+            `itemsWeight` SUDAH termasuk berat Cover Hanger (berat varian katalognya), jadi
+            baris "Berat produk" memakai sisa setelah bonus — tidak dihitung dua kali.
+          */}
+          <SummaryRow
+            label={`Berat produk (${totalQty} item)`}
+            value={formatWeightExact(Math.max(0, itemsWeight - addonWeight))}
+          />
           <SummaryRow label="Cover Hanger (bonus)" value={`+${formatWeightExact(addonWeight)}`} />
           <SummaryRow label="Total berat" value={formatWeightExact(totalWeight)} strong />
         </div>

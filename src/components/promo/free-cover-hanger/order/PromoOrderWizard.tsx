@@ -823,7 +823,6 @@ export default function PromoOrderWizard({
                 products={products}
                 phase={phase}
                 countdownTarget={phase === "ended" ? null : phase === "upcoming" ? promoStartDeadline : promoEndDeadline}
-                endInfo={formatOpenOrderMoment(promoEndDate, null, true)}
                 onChange={(patch) => setDraft((prev) => (prev ? { ...prev, ...patch } : prev))}
                 onAdd={addDraftToCart}
               />

@@ -62,7 +62,6 @@ export default function PromoStepProduct({
   products,
   phase,
   countdownTarget,
-  endInfo,
   onChange,
   onAdd,
 }: {
@@ -72,8 +71,6 @@ export default function PromoStepProduct({
   phase: OpenOrderPhase;
   /** Batas hitung mundur (epoch ms) — dipakai di dalam tombol terkunci. */
   countdownTarget: number | null;
-  /** "22 Okt 2026 · 23.59 WIB" — dipakai di pil timer saat event sudah berakhir. */
-  endInfo?: string;
   onChange: (patch: Partial<ProductDraft>) => void;
   onAdd: (line: ProductDraft) => void;
 }) {
@@ -321,14 +318,6 @@ export default function PromoStepProduct({
           <span style={{ color: "var(--gold)" }}>{product.category}</span>
           <span>{product.weight ? ` · ${product.weight >= 1000 ? (product.weight / 1000).toFixed(1) + " kg" : product.weight + " g"}` : " · ready stock"}</span>
         </p>
-
-        {/* Pil timer (ala mockup) — disembunyikan saat event belum dibuka, karena saat itu
-            timernya sudah ada di dalam tombol "Tambah ke Pesanan". */}
-        {phase !== "upcoming" && (
-          <div className="mb-6">
-            <Countdown target={countdownTarget} phase={phase} variant="pill" endInfo={endInfo} />
-          </div>
-        )}
 
         {/* Series — hanya produk yang punya series (mis. Thobe) */}
         {product.series.length > 0 && (
