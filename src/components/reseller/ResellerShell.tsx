@@ -98,27 +98,57 @@ export default function ResellerShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [me, setMe] = useState<MeResponse | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "unauth">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "unauth" | "error">("loading");
   const loadedRef = useRef(false);
 
   const isLogin = pathname === "/reseller/login";
 
+  /**
+   * Ambil sesi reseller. Dipakai saat shell dimuat dan saat `refreshMe`.
+   *
+   * CATATAN PENTING (bug "OTP kelihatan crash, harus refresh dulu"):
+   * setelah OTP diverifikasi, `router.replace("/reseller")` menjalankan shell ini SELAGI
+   * token baru saja ditulis. Satu kegagalan sesaat di titik itu (request balapan, jaringan,
+   * atau sesi belum kebaca) DULU langsung disimpulkan "unauth" → halaman dilempar balik ke
+   * /reseller/login, jadi terasa crash; refresh barunya normal karena percobaan berikutnya
+   * berhasil. Sekarang: 401 pun dicoba ulang beberapa kali sebelum menyerah, dan kalau masih
+   * gagal bukan karena 401 (gangguan sementara) shell TIDAK meng-unauth-kan sesi.
+   */
   const load = useCallback(async () => {
-    if (!getResellerToken()) {
+    const token = getResellerToken();
+    if (!token) {
       setState("unauth");
       return;
     }
-    try {
-      const payload = await resellerApi.me();
-      setMe(payload);
-      setState("ready");
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        clearResellerToken();
-        setState("unauth");
-      } else {
-        // Gangguan sementara: tetap tampilkan shell dengan data terakhir.
-        setState(me ? "ready" : "unauth");
+
+    // Beberapa percobaan singkat: cukup untuk menutup jeda pasca-login tanpa bikin
+    // pengunjung yang memang belum login menunggu lama.
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const payload = await resellerApi.me();
+        setMe(payload);
+        setState("ready");
+        return;
+      } catch (error) {
+        const unauthorized = error instanceof ApiError && error.status === 401;
+
+        // Token masih ada → anggap gangguan sementara, coba lagi sebentar.
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => window.setTimeout(resolve, 250 * attempt));
+          continue;
+        }
+
+        if (unauthorized) {
+          // 401 setelah beberapa percobaan = sesi benar-benar tidak sah.
+          clearResellerToken();
+          setState("unauth");
+        } else {
+          // Gangguan sementara (jaringan / 5xx): JANGAN buang sesi dan JANGAN lempar ke
+          // login — cukup tampilkan keadaan "gagal sementara" agar pengunjung bisa coba lagi.
+          setState(me ? "ready" : "error");
+        }
+        return;
       }
     }
   }, [me]);
@@ -133,11 +163,14 @@ export default function ResellerShell({ children }: { children: ReactNode }) {
         .catch(() => clearResellerToken());
       return;
     }
+    // Muat sekali per kunjungan halaman reseller (bukan per render).
     if (loadedRef.current) return;
     loadedRef.current = true;
     load();
   }, [isLogin, load, router]);
 
+  // Halaman login TIDAK boleh punya efek ini: jangan pernah redirect dari /reseller/login
+  // ke /reseller/login (itu yang membuat tampilan seperti "crash"/berkedip).
   useEffect(() => {
     if (isLogin || state !== "unauth") return;
     router.replace("/reseller/login");
@@ -147,22 +180,53 @@ export default function ResellerShell({ children }: { children: ReactNode }) {
     await load();
   }, [load]);
 
+  // Selama "unauth" jangan render spinner: halaman sedang dialihkan ke /reseller/login oleh
+  // effect di atas. Spinner tanpa keterangan itulah yang dulu terlihat seperti "crash".
   if (isLogin) return <>{children}</>;
+
+  if (state === "unauth") return null;
+
+  // Gagal sementara (bukan 401): sesi dipertahankan, tampilkan tombol coba lagi.
+  if (state === "error" && !me) {
+    return (
+      <div className="rs-root" style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 20 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, textAlign: "center" }}>
+          <span style={{ fontSize: 14, color: "#6f6f6d" }}>
+            Koneksi ke portal reseller sedang terganggu.
+          </span>
+          <button
+            type="button"
+            className="btn blk"
+            onClick={() => {
+              loadedRef.current = true;
+              setState("loading");
+              void load();
+            }}
+          >
+            Coba lagi
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (state !== "ready" || !me) {
     return (
       <div className="rs-root" style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
-        <span
-          aria-label="Memuat"
-          style={{
-            width: 20,
-            height: 20,
-            border: "2px solid #e4e4e0",
-            borderTopColor: "#111",
-            borderRadius: "50%",
-            animation: "rsSpin .7s linear infinite",
-          }}
-        />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+          <span
+            aria-label="Memuat"
+            style={{
+              width: 20,
+              height: 20,
+              border: "2px solid #e4e4e0",
+              borderTopColor: "#111",
+              borderRadius: "50%",
+              animation: "rsSpin .7s linear infinite",
+            }}
+          />
+          <span style={{ fontSize: 13, color: "#6f6f6d" }}>Memuat portal reseller…</span>
+        </div>
         <style>{`@keyframes rsSpin{to{transform:rotate(360deg)}}`}</style>
       </div>
     );

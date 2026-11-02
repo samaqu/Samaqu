@@ -79,15 +79,30 @@ export default function LoginForm() {
     setBusy(true);
     try {
       const res = await resellerApi.verifyOtp(whatsapp, code);
+
+      // Simpan token DULU (sinkron, localStorage) sebelum pindah halaman. Tanpa ini shell
+      // /reseller sempat jalan sebelum token terbaca → `me()` gagal → dulu terlempar balik
+      // ke halaman login sehingga terlihat seperti crash; refresh barulah normal.
       setResellerToken(res.token);
+
+      // Verifikasi sesi baru SEBELUM navigasi: kalau server sudah mengakui tokennya, shell
+      // tujuan tidak perlu menebak dan perpindahannya halus.
+      try {
+        await resellerApi.me();
+      } catch {
+        /* tetap lanjut — shell punya retry sendiri */
+      }
+
+      // Biarkan animasi tombol berhenti; `busy` sengaja TIDAK di-reset di sini supaya
+      // tombol tetap nonaktif selama perpindahan halaman (mencegah submit ganda).
       router.replace("/reseller");
+      return;
     } catch (e) {
       setError(
         e instanceof ApiError
           ? e.message
           : "Nomor ini belum terdaftar sebagai reseller aktif. Hubungi admin SAMAQU."
       );
-    } finally {
       setBusy(false);
     }
   };
