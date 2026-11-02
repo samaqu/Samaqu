@@ -32,6 +32,18 @@ export function phaseLabel(phase: OpenOrderPhase): string {
   return "Follow kami, tunggu batch berikutnya";
 }
 
+/**
+ * Label untuk KARTU BESAR di langkah 1 (varian `card`).
+ *
+ * Fase `ended` memakai kalimat ajakan Follow Instagram. Kalimatnya panjang, jadi tidak
+ * dipakai di varian `pill` (10px, satu baris di samping angka) — di sana tetap
+ * `phaseLabel()` yang pendek supaya tata letaknya tidak pecah.
+ */
+export function cardPhaseLabel(phase: OpenOrderPhase): string {
+  if (phase === "ended") return "Follow Instagram @samaqu.id untuk mengetahui produk apa yang akan hadir berikutnya.";
+  return phaseLabel(phase);
+}
+
 /** Sisa waktu (ms) + pecahannya, dihitung tiap detik. */
 function useCountdown(target: number | null) {
   const [remaining, setRemaining] = useState<number | null>(null);
@@ -175,22 +187,34 @@ export default function Countdown({
   return (
     <div className="mx-auto max-w-2xl">
       <div className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-black/[.06] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,.04),0_12px_32px_-18px_rgba(0,0,0,.25)] sm:flex-row sm:px-6">
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-black/15">
+        {/* `min-w-0` + `shrink` wajib: kalimat fase `ended` panjang, dan tanpa ini teks
+            mendorong tanggal "Berakhir …" keluar kartu di layar sempit. */}
+        <div className="flex w-full min-w-0 items-start gap-3 sm:w-auto sm:flex-1">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/15">
             <Clock size={16} strokeWidth={2} />
           </span>
-          <span className="flex items-center gap-2">
+          <span className="flex min-w-0 items-start gap-2">
             <span
-              className={`h-2 w-2 rounded-full ${
+              className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
                 phase === "live" ? "bg-emerald-500 oo-ping" : phase === "upcoming" ? "bg-amber-400" : "bg-neutral-500"
               }`}
             />
-            <span className="text-[12px] font-semibold uppercase tracking-[.22em]">{phaseLabel(phase)}</span>
+            {/* Kartu besar: kalimat fase `ended` lebih panjang, jadi tidak di-uppercase dan
+                spasi hurufnya dilonggarkan agar tetap terbaca rapi. */}
+            <span
+              className={`min-w-0 ${
+                phase === "ended"
+                  ? "text-[12.5px] font-medium normal-case leading-snug tracking-[.01em] text-neutral-800"
+                  : "text-[12px] font-semibold uppercase tracking-[.22em]"
+              }`}
+            >
+              {cardPhaseLabel(phase)}
+            </span>
           </span>
         </div>
 
         {phase === "ended" ? (
-          <div className="text-sm text-neutral-500">
+          <div className="shrink-0 text-sm text-neutral-500">
             Berakhir <b className="font-semibold text-neutral-900">{endInfo}</b>
           </div>
         ) : (
