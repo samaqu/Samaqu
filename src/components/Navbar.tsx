@@ -394,20 +394,12 @@ function DrawerNavContent({
   const pathname = usePathname();
   const currentPath = (pathname || "").replace(/\/$/, "");
   const createYourPriceHref = `/${locale}/create-your-price`;
-  const freeCoverHangerHref = `/${locale}/promo/free-cover-hanger`;
 
-  /** Grup PROGRAM: satu kartu, isinya dibuka-tutup. */
-  const programLinks = [
-    { label: t("nav.cyp"), href: createYourPriceHref, accent: true },
-    { label: t("nav.free_cover_hanger"), href: freeCoverHangerHref },
-    { label: t("nav.sama_quran"), href: `/${locale}/sama-quran` },
-  ];
-
-  // "Sama Quran" tidak lagi di menu utama — sudah pindah ke grup Program di atas.
   const mainLinks = [
     { label: t("nav.home"), href: homeHref },
     { label: t("nav.katalog"), href: `/${locale}/katalog` },
     { label: t("nav.testimoni"), href: `/${locale}/testimoni` },
+    { label: t("nav.sama_quran"), href: `/${locale}/sama-quran` },
     { label: t("nav.tentang"), href: `/${locale}/tentang-kami` },
   ];
 
@@ -423,74 +415,27 @@ function DrawerNavContent({
     currentPath === href ||
     (href !== `/${locale}` && currentPath.startsWith(`${href}/`));
 
-  /** Grup Program dibuka-tutup; otomatis terbuka kalau halaman aktif ada di dalamnya. */
-  const [programOpen, setProgramOpen] = useState(() =>
-    [...programLinks, { href: "https://affiliate.samaqu.id/" }].some(
-      (item) => currentPath === item.href.replace(/\/$/, ""),
-    ),
-  );
-
   return (
     <nav className={menu.nav} aria-label="Menu utama">
-      {/* ── Grup PROGRAM: satu kartu, isinya dibuka-tutup supaya drawer tetap compact ── */}
-      <div className={menu.programGroup}>
-        <button
-          type="button"
-          className={menu.createCard}
-          onClick={() => setProgramOpen((open) => !open)}
-          aria-expanded={programOpen}
-          aria-controls="drawer-program-list"
-        >
-          <span className={menu.createCopy}>
-            <span className={menu.createLabel}>{t("nav.program")}</span>
-            <span className={menu.createTitle}>
-              {t("nav.cyp_lead")} <span className={menu.priceWord}>{t("nav.cyp_accent")}</span>
-            </span>
+      <a
+        href={createYourPriceHref}
+        className={menu.createCard}
+        onClick={onClose}
+        aria-current={currentPath === createYourPriceHref ? "page" : undefined}
+      >
+        <span className={menu.createCopy}>
+          <span className={menu.createLabel}>{t("nav.program")}</span>
+          <span className={menu.createTitle}>
+            {t("nav.cyp_lead")}{" "}
+            <span className={menu.priceWord}>{t("nav.cyp_accent")}</span>
           </span>
-          <span
-            className={menu.programChevron}
-            data-open={programOpen || undefined}
-            aria-hidden="true"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </span>
-        </button>
-
-        {programOpen ? (
-          <ul id="drawer-program-list" className={menu.programList}>
-            {programLinks.map((item) => (
-              <li key={item.href}>
-                <a
-                  href={item.href}
-                  className={menu.programLink}
-                  onClick={onClose}
-                  aria-current={currentPath === item.href ? "page" : undefined}
-                >
-                  {item.label}
-                </a>
-              </li>
-            ))}
-            <li>
-              <a
-                href="https://affiliate.samaqu.id/"
-                target="_blank"
-                rel="noopener"
-                className={menu.programLink}
-                onClick={onClose}
-              >
-                {t("nav.affiliate_program")}
-                <span className={menu.programExternal} aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M7 17 17 7M9 7h8v8" />
-                  </svg>
-                </span>
-              </a>
-            </li>
-          </ul>
-        ) : null}
-      </div>
+        </span>
+        <span className={menu.createArrow} aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7 17 17 7M9 7h8v8" />
+          </svg>
+        </span>
+      </a>
 
       <ul className={menu.mainList}>
         {mainLinks.map((item) => (
@@ -524,6 +469,37 @@ function DrawerNavContent({
             </a>
           ))}
         </div>
+
+        <a
+          href="https://affiliate.samaqu.id/"
+          target="_blank"
+          rel="noopener"
+          className={menu.affiliateBox}
+          onClick={onClose}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={menu.affiliateIcon}
+            aria-hidden="true"
+          >
+            <circle cx="9" cy="7" r="3" />
+            <path d="M3 20c0-4 2.8-7 6-7 2.2 0 4.2 1.2 5.3 3" />
+            <path d="M18 8v6M15 11h6" />
+          </svg>
+          <span>{t("nav.affiliate_program")}</span>
+          <span className={menu.affiliateArrow} aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17 17 7M9 7h8v8" />
+            </svg>
+          </span>
+        </a>
       </div>
 
       <div className={menu.bottom}>
