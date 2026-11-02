@@ -54,7 +54,6 @@ export default function HeroPriceCard() {
           >
             CREATE YOUR PRICE
           </span>
-          <span style={{ fontSize: "12px", color: "var(--cyp-muted)" }}>Contoh</span>
         </div>
 
         <div
