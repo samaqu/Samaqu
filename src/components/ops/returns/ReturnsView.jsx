@@ -34,7 +34,7 @@ import {
   trackingSummary,
 } from "@/lib/jnt/track-status";
 import { formatRupiah, formatTanggalJamID, formatTanggalSingkatID } from "@/components/ops/transaksi/transaksi-format";
-import { PanelDetailFooter, PanelDetailShell } from "@/components/ops/transaksi/PanelDetailPesanan";
+import { PanelDetailFooter, PanelDetailShell, PanelLacakModal } from "@/components/ops/transaksi/PanelDetailPesanan";
 
 /**
  * Format nomor pesanan SAMAQU (SMQ-… website, CYO-… Open Order, OPS-… transaksi manual).
@@ -2485,6 +2485,8 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
   const [trackInfo, setTrackInfo] = useState(null);
   /** Panel riwayat dibuka setelah tombol Lacak ditekan (pola sama dengan detail transaksi). */
   const [trackOpened, setTrackOpened] = useState(false);
+  /** Pop-up "Lacak Pengiriman" — komponen bersama `PanelLacakModal`, sama dengan transaksi. */
+  const [trackModal, setTrackModal] = useState(false);
 
   /**
    * Baris riwayat memakai helper BERSAMA `src/lib/jnt/track-status.ts` — bukan format sendiri.
@@ -2578,6 +2580,7 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
   const trackReturn = async () => {
     setBusy("track");
     setTrackOpened(true);
+    setTrackModal(true);
     try {
       // Lewat shim `base44` supaya header Authorization ikut terkirim (kalau tidak: 401).
       const result = await base44.entities.Return.action(record.return_number, "track");
@@ -2702,7 +2705,7 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
   };
 
   return (
-    <PanelDetailShell open onClose={onClose} tema="warna">
+    <PanelDetailShell open onClose={onClose} tema={isPanel ? "warna" : "mono"}>
       <div className="dp-wrap">
         {/* 1. Header gradasi — sama dengan Detail Pesanan. */}
         <div className="dp-header">
@@ -2795,7 +2798,7 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
               <span className="dp-baris-aksi">
                 <button
                   type="button"
-                  className={`dp-mini${trackOpened ? " aktif" : ""}`}
+                  className="dp-mini"
                   onClick={trackReturn}
                   disabled={!record.shipping_out_awb || busy === "track"}
                 >
@@ -3172,6 +3175,24 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
               busy === a.key ? { ...a, label: `${a.label}…` } : a,
             );
           })()}
+        />
+        {/* Pop-up Lacak — komponen bersama `PanelLacakModal`, sama persis dengan Transaksi. */}
+        <PanelLacakModal
+          open={trackModal}
+          onClose={() => setTrackModal(false)}
+          resi={record.shipping_out_awb || ""}
+          loading={busy === "track"}
+          error={trackInfo?.error || ""}
+          riwayat={trackRows.map((row, index) => ({
+            key: `${row.dateTime}-${index}`,
+            status: row.status,
+            meta: [row.location, formatTrackingTime(row.dateTime)].filter(Boolean).join(" · "),
+            note: row.note,
+            receiver: row.receiver,
+            receivedByThirdParty: row.receivedByThirdParty,
+            handoverNote: row.handoverNote,
+            terbaru: index === 0,
+          }))}
         />
       </div>
     </PanelDetailShell>
