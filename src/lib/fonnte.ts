@@ -875,6 +875,123 @@ export async function notifyCustomerOrderCancelled(
   );
 }
 
+/* ── Retur: tagihan tukar series + pengganti diterima ── */
+
+export interface ReturnBillingNotification {
+  returnNumber: string;
+  customerName?: string | null;
+  customerWhatsapp?: string | null;
+  orderNumber?: string | null;
+  originalItem: string;
+  replacementItem: string;
+  /** Selisih harga produk (bisa negatif = refund). */
+  priceDifference: number;
+  /** Ongkir pengiriman pengganti yang ditagihkan. */
+  shippingCost: number;
+  /** priceDifference + shippingCost. Positif = customer kurang, negatif = refund. */
+  total: number;
+}
+
+export interface ReplacementDeliveredNotification {
+  returnNumber: string;
+  customerName?: string | null;
+  customerWhatsapp?: string | null;
+  itemLabel?: string | null;
+}
+
+/**
+ * Tagihan/refund tukar (series maupun ukuran). Dikirim **manual** oleh admin dari detail retur,
+ * bukan otomatis — supaya admin bisa memastikan angka dan ongkirnya dulu.
+ */
+export async function notifyCustomerReturnBilling(
+  data: ReturnBillingNotification
+): Promise<boolean> {
+  const total = Number(data.total) || 0;
+  const body =
+    total < 0
+      ? [
+          `Halo Ka ${greetingName(data.customerName)},`,
+          "",
+          "Tukar series-mu sudah kami setujui ya.",
+          "",
+          `Pesanan: ${data.orderNumber || "-"}`,
+          `Barang awal: ${data.originalItem}`,
+          `Barang pengganti: ${data.replacementItem}`,
+          "",
+          `Kelebihan bayar kamu: ${rupiah(Math.abs(total))}`,
+          "",
+          "Dana ini kami kembalikan ke rekening kamu ya Ka.",
+          "Mohon balas chat ini dengan nama bank, nomor rekening, dan nama pemilik rekening.",
+          "",
+          "Terima kasih,",
+          "SAMAQU",
+        ].join("\n")
+      : [
+          `Halo Ka ${greetingName(data.customerName)},`,
+          "",
+          "Tukar series-mu sudah kami setujui ya.",
+          "",
+          `Pesanan: ${data.orderNumber || "-"}`,
+          `Barang awal: ${data.originalItem}`,
+          `Barang pengganti: ${data.replacementItem}`,
+          "",
+          "Rincian biaya:",
+          `- Selisih harga series: ${rupiah(Number(data.priceDifference) || 0)}`,
+          `- Ongkir pengiriman pengganti: ${rupiah(Number(data.shippingCost) || 0)}`,
+          `Total kekurangan: ${rupiah(total)}`,
+          "",
+          "Kekurangan ini bisa ditransfer ya Ka, biar paket penggantinya bisa langsung kami kirim",
+          "begitu barang awal sampai di gudang.",
+          "",
+          "Kalau sudah transfer, tinggal balas chat ini dengan buktinya.",
+          "",
+          "Terima kasih,",
+          "SAMAQU",
+        ].join("\n");
+
+  return sendToCustomer(
+    data.customerWhatsapp,
+    await buildNotifikasi("retur-tagihan", body, {
+      nama: greetingName(data.customerName),
+      nomor_retur: data.returnNumber,
+      nomor: String(data.orderNumber || "-"),
+      barang_awal: data.originalItem,
+      barang_pengganti: data.replacementItem,
+      selisih: rupiah(Number(data.priceDifference) || 0),
+      ongkir: rupiah(Number(data.shippingCost) || 0),
+      total: rupiah(Math.abs(total)),
+    }),
+  );
+}
+
+/** Dikirim otomatis saat tracking J&T menyatakan paket pengganti diterima. */
+export async function notifyCustomerReplacementDelivered(
+  data: ReplacementDeliveredNotification
+): Promise<boolean> {
+  const body = [
+    `Halo Ka ${greetingName(data.customerName)},`,
+    "",
+    "Kabar baik! Barang pengganti untuk tukar-mu sudah sampai.",
+    "",
+    `Nomor Retur: ${data.returnNumber}`,
+    ...(data.itemLabel ? [`Produk: ${data.itemLabel}`] : []),
+    "",
+    "Semoga pas dan cocok ya. Kalau ada kendala, balas chat ini aja, kami bantu.",
+    "",
+    "Terima kasih,",
+    "SAMAQU",
+  ].join("\n");
+
+  return sendToCustomer(
+    data.customerWhatsapp,
+    await buildNotifikasi("retur-pengganti-tiba", body, {
+      nama: greetingName(data.customerName),
+      nomor_retur: data.returnNumber,
+      produk: String(data.itemLabel || "-"),
+    }),
+  );
+}
+
 /* ── Invoice transaksi manual ("Belum Lunas") ── */
 
 /** Batas waktu pembayaran yang disebut di invoice. */

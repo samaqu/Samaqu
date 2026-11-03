@@ -100,6 +100,231 @@ const inputClass =
   "w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/20 dark:focus:ring-white/20";
 const labelClass = "block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1";
 
+/**
+ * Picker pengganti untuk mode "Ganti series": pilih PRODUK → WARNA → UKURAN.
+ *
+ * Sengaja dipisah dari picker ukuran lama: mode ukuran tetap memakai kotak ukuran yang sudah
+ * ada (tidak diubah sama sekali), sedangkan mode series memakai daftar bertingkat ini.
+ *
+ * `value` berisi: replacement_variant_id (`product_id||color`), replacement_product_id,
+ * replacement_color, replacement_size.
+ */
+function SeriesReplacementPicker({ value, groups, onChange, qty, originalProductId, originalSize }) {
+  const [search, setSearch] = useState("");
+  const [openProductId, setOpenProductId] = useState("");
+
+  const selected = String(value.replacement_variant_id || "");
+  const [selectedProductId, selectedColor] = selected.split("||");
+
+  const filtered = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    const sorted = [...groups].sort((a, b) => {
+      // Produk asal tetap di urutan biasa; sisa ditaruh apa adanya (sudah urut nama).
+      return a.name.localeCompare(b.name);
+    });
+    if (!needle) return sorted;
+    return sorted.filter((group) =>
+      [group.name, group.series, group.kain, group.category, ...group.colors.map((c) => c.color)]
+        .filter(Boolean)
+        .some((text) => String(text).toLowerCase().includes(needle)),
+    );
+  }, [groups, search]);
+
+  /** Produk terpilih dicari dari SEMUA grup (bukan hasil filter) agar kartunya tidak hilang saat mencari. */
+  const activeGroup = selectedProductId
+    ? groups.find((group) => group.product_id === selectedProductId) || null
+    : null;
+  const activeVariant =
+    activeGroup?.colors.find((variant) => (variant.color || "default") === (selectedColor || "default")) || null;
+  const stockMap = activeVariant?.stock_efektif || activeVariant?.stock || {};
+  const sizes = Object.keys(stockMap).sort();
+
+  const chooseProduct = (group) => {
+    if (group.product_id === originalProductId) {
+      // Produk asal: biarkan admin pindah ke mode "ukuran" — di sini tidak ditawarkan,
+      // karena kalau produknya sama, alur yang dipakai adalah picker ukuran.
+      return;
+    }
+    const first = group.colors[0];
+    onChange({
+      replacement_variant_id: `${group.product_id}||${first?.color || "default"}`,
+      replacement_product_id: group.product_id,
+      replacement_color: first?.color || "default",
+      replacement_size: "",
+      replacement_price: "",
+    });
+    setOpenProductId("");
+    setSearch("");
+  };
+
+  const chooseColor = (variant) => {
+    onChange({
+      replacement_variant_id: `${variant.product_id}||${variant.color || "default"}`,
+      replacement_product_id: variant.product_id,
+      replacement_color: variant.color || "default",
+      replacement_size: "",
+      replacement_price: "",
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <p className={labelClass}>Produk / series pengganti</p>
+
+      {selectedProductId && activeGroup ? (
+        <div className="rounded-xl border-2 border-slate-900 p-2.5 dark:border-white">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{activeGroup.name}</p>
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                {[activeGroup.series, activeGroup.kain, activeGroup.category].filter(Boolean).join(" · ")}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                onChange({
+                  replacement_variant_id: "",
+                  replacement_product_id: "",
+                  replacement_color: "",
+                  replacement_size: "",
+                  replacement_price: "",
+                })
+              }
+              className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              Ganti
+            </button>
+          </div>
+
+          {activeGroup.colors.length > 1 ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {activeGroup.colors.map((variant) => {
+                const active = (variant.color || "default") === (selectedColor || "default");
+                return (
+                  <button
+                    key={variant.id || variant.color}
+                    type="button"
+                    onClick={() => chooseColor(variant)}
+                    className={`rounded-lg border px-2 py-1 text-[11px] font-bold ${
+                      active
+                        ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    {variant.color === "default" ? "Default" : variant.color}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          <div className="mt-2">
+            <label className={labelClass}>Ukuran pengganti</label>
+            <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
+              {sizes.map((size) => {
+                const sisa = Number(stockMap[size]) || 0;
+                const active = value.replacement_size === size;
+                const insufficient = sisa < Number(qty || 1);
+                return (
+                  <button
+                    key={size}
+                    type="button"
+                    disabled={insufficient}
+                    onClick={() => onChange({ replacement_size: size, replacement_price: "" })}
+                    className={`rounded-lg border-2 px-2 py-1.5 text-center text-xs font-bold ${
+                      active
+                        ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900"
+                        : insufficient
+                          ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-900"
+                          : "border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    <span className="block">{size}</span>
+                    <span className="block text-[10px] font-semibold opacity-70">
+                      {insufficient ? "habis" : sisa}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1 text-[10.5px] font-semibold text-slate-500 dark:text-slate-400">
+              Asal {originalSize} → {value.replacement_size || "—"}
+              {value.replacement_size ? `: sisa ${Number(stockMap[value.replacement_size] || 0)}` : ""}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Cari produk / series…"
+            className={inputClass}
+          />
+          <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700">
+            {filtered.length === 0 ? (
+              <p className="p-3 text-[11px] font-semibold text-slate-400">Produk tidak ditemukan.</p>
+            ) : (
+              filtered.map((group) => {
+                const isOriginal = group.product_id === originalProductId;
+                const expanded = openProductId === group.product_id;
+                return (
+                  <div key={group.product_id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                    <button
+                      type="button"
+                      disabled={isOriginal}
+                      onClick={() => setOpenProductId(expanded ? "" : group.product_id)}
+                      className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left ${
+                        isOriginal ? "cursor-not-allowed opacity-50" : "hover:bg-slate-50 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-bold text-slate-900 dark:text-white">
+                          {group.name}
+                        </span>
+                        <span className="block text-[10.5px] font-semibold text-slate-500 dark:text-slate-400">
+                          {[group.series, group.kain].filter(Boolean).join(" · ")}
+                          {isOriginal ? " · produk asal" : ""}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-[10px] font-bold text-slate-400">{group.stockTotal}</span>
+                    </button>
+                    {expanded && !isOriginal ? (
+                      <div className="space-y-1 px-3 pb-2">
+                        {group.colors.map((variant) => {
+                          const stok = variant.stock_efektif || variant.stock || {};
+                          const total = Object.values(stok).reduce((sum, v) => sum + (Number(v) || 0), 0);
+                          return (
+                            <button
+                              key={variant.id || variant.color}
+                              type="button"
+                              disabled={total <= 0}
+                              onClick={() => chooseProduct({ ...group, colors: [variant] })}
+                              className={`flex w-full items-center justify-between rounded-lg border px-2 py-1.5 text-[11px] font-bold ${
+                                total <= 0
+                                  ? "cursor-not-allowed border-slate-200 text-slate-400 dark:border-slate-700"
+                                  : "border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                              }`}
+                            >
+                              <span>{variant.color === "default" ? "Default" : variant.color}</span>
+                              <span className="font-mono">{total <= 0 ? "habis" : `${total} pcs`}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SummaryCard({ icon: Icon, label, value, caption, soft }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-[#1a1d28]">
@@ -526,6 +751,49 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
 
   const sizesOf = (variant) => Object.keys(variant?.stock_efektif || variant?.stock || {}).sort();
 
+  /**
+   * Picker produk pengganti (tukar series). Memakai sumber data yang SAMA dengan picker
+   * produk asal (`variants` dari /api/ops/product-variants), jadi tidak ada query kedua.
+   * `replacement_variant_id` disimpan sebagai `product_id||color` agar konsisten dengan
+   * cara picker manual menyimpan `variant_id`.
+   */
+  const replacementVariantOf = (replacementKey) => {
+    const [productId, color] = String(replacementKey || "").split("||");
+    if (!productId) return null;
+    return (
+      (variants || []).find(
+        (variant) => variant.product_id === productId && (variant.color || "default") === (color || "default"),
+      ) || null
+    );
+  };
+
+  /** Apakah hasil tukar ini mengganti produk (bukan hanya ukuran pada produk yang sama). */
+  const isSeriesSwap = (value) => Boolean(value?.replacement_product_id);
+
+  /**
+   * Mode tukar: "size" (perilaku lama) atau "series" (produk/series diganti).
+   * Default "size" supaya tampilan & alur yang sudah biasa dipakai tidak berubah.
+   */
+  const [swapMode, setSwapMode] = useState("size");
+
+  /**
+   * Ongkir J&T untuk pengganti. `status` menjelaskan kondisi hitungan supaya admin tidak
+   * menerima angka 0 tanpa keterangan ketika alamat/kecamatan belum lengkap.
+   */
+  const [ongkirState, setOngkirState] = useState({ status: "idle", message: "", grams: 0 });
+
+  /** Stok efektif untuk satu baris variant (produk + warna tertentu). */
+  const replacementStockMap = (replacementKey) => {
+    const entry = replacementVariantOf(replacementKey);
+    return entry?.stock_efektif || entry?.stock || {};
+  };
+
+  /** Harga katalog ukuran tertentu dari baris variant pengganti. */
+  const replacementPriceOf = (replacementKey, size) => {
+    const entry = replacementVariantOf(replacementKey);
+    return Number(entry?.prices?.[size]) || Number(entry?.price) || 0;
+  };
+
   const productGroups = useMemo(() => {
     const groups = new Map();
     for (const variant of variants || []) {
@@ -585,8 +853,11 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
     qty: 1,
     condition: "sellable",
     replacement_size: "",
-    price: "",
     replacement_price: "",
+    replacement_variant_id: "",
+    replacement_product_id: "",
+    replacement_color: "",
+    price: "",
   });
 
   const updateManualItem = (key, patch) => {
@@ -676,6 +947,9 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
         qty: Number(item.quantity) || 1,
         replacement_size: "",
         replacement_price: "",
+        replacement_variant_id: "",
+        replacement_product_id: "",
+        replacement_color: "",
         condition: "sellable",
       };
     }
@@ -735,6 +1009,10 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
 
   const selectedItems = (order?.order_items || []).filter((item) => selected[item.id]?.checked);
 
+  /** Stok pengganti untuk satu baris: dari produk pengganti kalau tukar series, kalau tidak produk asal. */
+  const replacementStockFor = (value, productId, color) =>
+    isSeriesSwap(value) ? replacementStockMap(value.replacement_variant_id) : stockMapOf(productId, color);
+
   const manualReady =
     manual &&
     Boolean(manualCustomer.trim()) &&
@@ -743,8 +1021,9 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
       const variant = variantOf(item.variant_id);
       if (!variant || !item.size) return false;
       if (!isExchange) return true;
-      const stock = Number((variant.stock_efektif || {})[item.replacement_size]) || 0;
-      return Boolean(item.replacement_size) && item.replacement_size !== item.size && stock >= Number(item.qty);
+      const stock = Number((isSeriesSwap(item) ? replacementStockMap(item.replacement_variant_id) : variant.stock_efektif || {})[item.replacement_size]) || 0;
+      const different = isSeriesSwap(item) ? Boolean(item.replacement_variant_id) : item.replacement_size !== item.size;
+      return Boolean(item.replacement_size) && different && stock >= Number(item.qty);
     });
 
   const canSubmit = manual
@@ -755,17 +1034,26 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
         const value = selected[item.id];
         if (!value) return false;
         if (isExchange) {
-          const stock = Number(stockMapOf(item.product_id, item.color)[value.replacement_size]) || 0;
-          return Boolean(value.replacement_size) && stock >= Number(value.qty);
+          const stock = Number(replacementStockFor(value, item.product_id, item.color)[value.replacement_size]) || 0;
+          const different = isSeriesSwap(value)
+            ? Boolean(value.replacement_variant_id)
+            : value.replacement_size !== item.size;
+          return Boolean(value.replacement_size) && different && stock >= Number(value.qty);
         }
         return true;
       });
+
+  /** Harga katalog pengganti: dari produk pengganti kalau tukar series, kalau tidak produk asal. */
+  const catalogReplacementFor = (value, productId, color, size) =>
+    isSeriesSwap(value)
+      ? replacementPriceOf(value.replacement_variant_id, size)
+      : priceOf(productId, color, size);
 
   const orderDifference = selectedItems.reduce((sum, item) => {
     const value = selected[item.id];
     if (!value?.replacement_size) return sum;
     const original = Number(item.price) || 0;
-    const catalogReplacement = priceOf(item.product_id, item.color, value.replacement_size);
+    const catalogReplacement = catalogReplacementFor(value, item.product_id, item.color, value.replacement_size);
     const manualReplacement = Number(String(value.replacement_price || "").replace(/\D/g, "")) || 0;
     const replacement = manualReplacement > 0 ? manualReplacement : catalogReplacement;
     return sum + (replacement - original) * (Number(value.qty) || 1);
@@ -777,13 +1065,95 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
     const manualOriginal = Number(String(item.price || "").replace(/\D/g, "")) || 0;
     const manualReplacement = Number(String(item.replacement_price || "").replace(/\D/g, "")) || 0;
     const catalogOriginal = Number(variant.prices?.[item.size]) || Number(variant.price) || 0;
-    const catalogReplacement = Number(variant.prices?.[item.replacement_size]) || Number(variant.price) || 0;
+    const catalogReplacement = isSeriesSwap(item)
+      ? replacementPriceOf(item.replacement_variant_id, item.replacement_size)
+      : Number(variant.prices?.[item.replacement_size]) || Number(variant.price) || 0;
     const original = manualOriginal > 0 ? manualOriginal : catalogOriginal;
     const replacement = manualReplacement > 0 ? manualReplacement : catalogReplacement;
     return sum + (replacement - original) * (Number(item.qty) || 1);
   }, 0);
 
   const differenceTotal = manual ? manualDifference : orderDifference;
+
+  /** Ongkir pengganti yang diketik admin (dipakai juga untuk total tagihan di ringkasan). */
+  const shippingOutValue = Number(String(shippingOut || "").replace(/\D/g, "")) || 0;
+  const totalTagihan = differenceTotal + shippingOutValue;
+
+  /**
+   * Hitung ongkir pengganti ke J&T (endpoint yang sama dengan drawer Transaksi).
+   * Berat dihitung server dari VARIAN PENGGANTI. Alamat diambil dari pesanan asal.
+   * Hasilnya hanya MENGISI kolom ongkir; admin tetap bisa mengubah manual.
+   */
+  const hitungOngkir = async () => {
+    const destination = order
+      ? { city: order.shipping_city, kecamatan: order.shipping_kecamatan }
+      : { city: manualCity, kecamatan: manualKecamatan };
+    if (!destination.city || !destination.kecamatan) {
+      setOngkirState({ status: "error", message: "Kota & kecamatan belum lengkap — isi alamat dulu.", grams: 0 });
+      return;
+    }
+
+    const itemsForWeight = manual
+      ? manualItems
+          .map((item) => {
+            const [replacementProductId, replacementColor] = String(item.replacement_variant_id || "").split("||");
+            const productId = replacementProductId || String(item.variant_id || "").split("||")[0];
+            return {
+              product_id: productId,
+              color: replacementProductId ? replacementColor || "default" : String(item.variant_id || "").split("||")[1] || "default",
+              size: item.replacement_size,
+              quantity: Number(item.qty) || 1,
+            };
+          })
+          .filter((item) => item.product_id && item.size)
+      : selectedItems
+          .filter((item) => selected[item.id]?.replacement_size)
+          .map((item) => {
+            const value = selected[item.id];
+            return {
+              product_id: isSeriesSwap(value) ? value.replacement_product_id : item.product_id,
+              color: isSeriesSwap(value) ? value.replacement_color || "default" : item.color || "default",
+              size: value.replacement_size,
+              quantity: Number(value.qty) || 1,
+            };
+          });
+
+    if (itemsForWeight.length === 0) {
+      setOngkirState({ status: "error", message: "Pilih ukuran pengganti dulu.", grams: 0 });
+      return;
+    }
+
+    setOngkirState({ status: "loading", message: "", grams: 0 });
+    try {
+      const response = await fetch("/api/ops/ongkir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ city: destination.city, kecamatan: destination.kecamatan, items: itemsForWeight }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setOngkirState({ status: "error", message: json?.error || "Gagal cek ongkir.", grams: 0 });
+        return;
+      }
+      const options = Array.isArray(json?.data) ? json.data : [];
+      if (options.length === 0) {
+        setOngkirState({ status: "error", message: "Tarif J&T tidak tersedia untuk tujuan ini.", grams: json?.weight_grams || 0 });
+        return;
+      }
+      // Pilih termurah — sama dengan kebiasaan admin saat memilih layanan.
+      const cheapest = options.reduce((best, option) =>
+        Number(option.cost) < Number(best.cost) ? option : best,
+      );
+      setShippingOut(String(Math.round(Number(cheapest.cost) || 0)));
+      setOngkirState({
+        status: "ok",
+        message: `${cheapest.service || cheapest.description || "J&T"} · Rp ${formatRupiah(Number(cheapest.cost) || 0)} (dari J&T, bisa diubah manual)`,
+        grams: Number(json?.weight_grams) || 0,
+      });
+    } catch {
+      setOngkirState({ status: "error", message: "Gagal cek ongkir. Coba lagi.", grams: 0 });
+    }
+  };
 
   const submit = async () => {
     if (!canSubmit || saving) return;
@@ -811,6 +1181,7 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
               refund_method: type === "return" ? refundMethod.trim() : null,
               items: manualItems.map((item) => {
                 const [productId, color] = String(item.variant_id).split("||");
+                const [replacementProductId, replacementColor] = String(item.replacement_variant_id || "").split("||");
                 return {
                   product_id: productId,
                   color: color || "default",
@@ -818,6 +1189,8 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
                   qty: Number(item.qty) || 1,
                   condition: item.condition === "damaged" ? "damaged" : "sellable",
                   replacement_size: isExchange ? item.replacement_size : null,
+                  replacement_product_id: isExchange && replacementProductId ? replacementProductId : null,
+                  replacement_color: isExchange && replacementProductId ? replacementColor || "default" : null,
                   price: Number(String(item.price || "").replace(/\D/g, "")) || 0,
                   replacement_price: Number(String(item.replacement_price || "").replace(/\D/g, "")) || 0,
                 };
@@ -833,15 +1206,22 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
               shipping_payment_status: shippingPaid,
               refund_amount: type === "return" ? Number(String(refundAmount).replace(/\D/g, "")) || 0 : 0,
               refund_method: type === "return" ? refundMethod.trim() : null,
-              items: selectedItems.map((item) => ({
-                order_item_id: item.id,
-                qty: Number(selected[item.id]?.qty) || 1,
-                condition: selected[item.id]?.condition === "damaged" ? "damaged" : "sellable",
-                replacement_size: isExchange ? selected[item.id]?.replacement_size : null,
-                replacement_price: isExchange
-                  ? Number(String(selected[item.id]?.replacement_price || "").replace(/\D/g, "")) || 0
-                  : 0,
-              })),
+              items: selectedItems.map((item) => {
+                const value = selected[item.id] || {};
+                return {
+                  order_item_id: item.id,
+                  qty: Number(value.qty) || 1,
+                  condition: value.condition === "damaged" ? "damaged" : "sellable",
+                  replacement_size: isExchange ? value.replacement_size : null,
+                  replacement_product_id:
+                    isExchange && isSeriesSwap(value) ? value.replacement_product_id : null,
+                  replacement_color:
+                    isExchange && isSeriesSwap(value) ? value.replacement_color || "default" : null,
+                  replacement_price: isExchange
+                    ? Number(String(value.replacement_price || "").replace(/\D/g, "")) || 0
+                    : 0,
+                };
+              }),
             },
       );
       onCreated(created);
@@ -1358,7 +1738,7 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
                               <div className="space-y-1">
                                 <div className="flex items-center justify-between gap-2">
                                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                    Ukuran pengganti
+                                    Pengganti
                                   </p>
                                   {!item.size ? (
                                     <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
@@ -1366,7 +1746,48 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
                                     </span>
                                   ) : null}
                                 </div>
-                                {item.size ? (
+
+                                <div className="mb-1 inline-flex rounded-xl border border-slate-200 p-0.5 dark:border-slate-700">
+                                  {[
+                                    { key: "size", label: "Tukar ukuran" },
+                                    { key: "series", label: "Ganti series" },
+                                  ].map((option) => (
+                                    <button
+                                      key={option.key}
+                                      type="button"
+                                      onClick={() => {
+                                        setSwapMode(option.key);
+                                        if (option.key === "size") {
+                                          updateManualItem(item.key, {
+                                            replacement_variant_id: "",
+                                            replacement_product_id: "",
+                                            replacement_color: "",
+                                            replacement_size: "",
+                                            replacement_price: "",
+                                          });
+                                        }
+                                      }}
+                                      className={`rounded-lg px-3 py-1 text-[11px] font-bold transition-colors ${
+                                        swapMode === option.key
+                                          ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                                          : "text-slate-500 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                                      }`}
+                                    >
+                                      {option.label}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                {swapMode === "series" ? (
+                                  <SeriesReplacementPicker
+                                    value={item}
+                                    groups={productGroups}
+                                    qty={item.qty}
+                                    originalProductId={item.product_id}
+                                    originalSize={item.size}
+                                    onChange={(patch) => updateManualItem(item.key, patch)}
+                                  />
+                                ) : item.size ? (
                                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                                     {sizes
                                       .filter((size) => size !== item.size)
@@ -1425,8 +1846,10 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
 
                             {isExchange && item.size && item.replacement_size ? (() => {
                               const catalogOriginal = Number(variant.prices?.[item.size]) || Number(variant.price) || 0;
-                              const catalogReplacement =
-                                Number(variant.prices?.[item.replacement_size]) || Number(variant.price) || 0;
+                              // Produk pengganti -> harga dari produk pengganti; ukuran -> produk asal.
+                              const catalogReplacement = isSeriesSwap(item)
+                                ? replacementPriceOf(item.replacement_variant_id, item.replacement_size)
+                                : Number(variant.prices?.[item.replacement_size]) || Number(variant.price) || 0;
                               const manualOriginal = Number(String(item.price || "").replace(/\D/g, "")) || 0;
                               const manualReplacement =
                                 Number(String(item.replacement_price || "").replace(/\D/g, "")) || 0;
@@ -1586,72 +2009,168 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
                         </div>
                         {isExchange ? (
                           <div className="col-span-2">
-                            <label className={labelClass}>Ukuran pengganti</label>
-                            <select
-                              value={value.replacement_size}
-                              onChange={(event) =>
-                                updateItem(item.id, { replacement_size: event.target.value, replacement_price: "" })
-                              }
-                              className={inputClass}
-                            >
-                              <option value="">Pilih ukuran…</option>
-                              {sizes.map(([size, valueStock]) => (
-                                <option key={size} value={size} disabled={Number(valueStock) < Number(value.qty)}>
-                                  {size} — sisa {Number(valueStock) || 0}
-                                </option>
-                              ))}
-                            </select>
-                            <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                              Stok asal {item.size}: {Number(stock[item.size] || 0)}
-                              {value.replacement_size
-                                ? ` → ${value.replacement_size}: ${Number(stock[value.replacement_size] || 0)}`
-                                : ""}
-                            </p>
-                            {value.replacement_size ? (() => {
-                              const original = Number(item.price) || 0;
-                              const catalogReplacement = priceOf(item.product_id, item.color, value.replacement_size);
-                              const manualReplacement =
-                                Number(String(value.replacement_price || "").replace(/\D/g, "")) || 0;
-                              const replacement = manualReplacement > 0 ? manualReplacement : catalogReplacement;
-                              const diff = (replacement - original) * (Number(value.qty) || 1);
-                              return (
-                                <div className="mt-2 space-y-1">
-                                  <label className={labelClass}>Harga pengganti</label>
-                                  <input
-                                    value={value.replacement_price}
-                                    onChange={(event) =>
+                            <div className="mb-2 inline-flex rounded-xl border border-slate-200 p-0.5 dark:border-slate-700">
+                              {[
+                                { key: "size", label: "Tukar ukuran" },
+                                { key: "series", label: "Ganti series" },
+                              ].map((option) => (
+                                <button
+                                  key={option.key}
+                                  type="button"
+                                  onClick={() => {
+                                    setSwapMode(option.key);
+                                    if (option.key === "size") {
                                       updateItem(item.id, {
-                                        replacement_price: String(event.target.value).replace(/\D/g, ""),
-                                      })
+                                        replacement_variant_id: "",
+                                        replacement_product_id: "",
+                                        replacement_color: "",
+                                        replacement_size: "",
+                                        replacement_price: "",
+                                      });
                                     }
-                                    inputMode="numeric"
-                                    placeholder={`Katalog: Rp ${formatRupiah(catalogReplacement)}`}
-                                    className={inputClass}
-                                  />
-                                  <p className="text-[10.5px] font-semibold text-slate-500 dark:text-slate-400">
-                                    Kosongkan untuk harga katalog. Isi manual kalau harga CYP/custom berbeda.
-                                  </p>
-                                  <p
-                                    className={`text-[11px] font-bold ${
-                                      diff > 0
-                                        ? "text-amber-600 dark:text-amber-400"
-                                        : diff < 0
-                                          ? "text-blue-600 dark:text-blue-400"
-                                          : "text-slate-500 dark:text-slate-400"
-                                    }`}
-                                  >
-                                    Harga {item.size} Rp {formatRupiah(original)} → {value.replacement_size} Rp{" "}
-                                    {formatRupiah(replacement)}
-                                    {" · "}
-                                    {diff === 0
-                                      ? "harga sama"
-                                      : diff > 0
-                                        ? `customer bayar +Rp ${formatRupiah(diff)}`
-                                        : `refund -Rp ${formatRupiah(Math.abs(diff))}`}
-                                  </p>
-                                </div>
-                              );
-                            })() : null}
+                                  }}
+                                  className={`rounded-lg px-3 py-1 text-[11px] font-bold transition-colors ${
+                                    swapMode === option.key
+                                      ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                                      : "text-slate-500 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                                  }`}
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+
+                            {swapMode === "series" ? (
+                              <>
+                                <SeriesReplacementPicker
+                                  value={value}
+                                  groups={productGroups}
+                                  qty={value.qty}
+                                  originalProductId={item.product_id}
+                                  originalSize={item.size}
+                                  onChange={(patch) => updateItem(item.id, patch)}
+                                />
+                                {isSeriesSwap(value) && value.replacement_size ? (() => {
+                                  const original = Number(item.price) || 0;
+                                  const catalogReplacement = replacementPriceOf(
+                                    value.replacement_variant_id,
+                                    value.replacement_size,
+                                  );
+                                  const manualReplacement =
+                                    Number(String(value.replacement_price || "").replace(/\D/g, "")) || 0;
+                                  const replacement = manualReplacement > 0 ? manualReplacement : catalogReplacement;
+                                  const diff = (replacement - original) * (Number(value.qty) || 1);
+                                  return (
+                                    <div className="mt-2 space-y-1">
+                                      <label className={labelClass}>Harga pengganti</label>
+                                      <input
+                                        value={value.replacement_price}
+                                        onChange={(event) =>
+                                          updateItem(item.id, {
+                                            replacement_price: String(event.target.value).replace(/\D/g, ""),
+                                          })
+                                        }
+                                        inputMode="numeric"
+                                        placeholder={`Katalog: Rp ${formatRupiah(catalogReplacement)}`}
+                                        className={inputClass}
+                                      />
+                                      <p className="text-[10.5px] font-semibold text-slate-500 dark:text-slate-400">
+                                        Kosongkan untuk harga katalog. Isi manual kalau harganya berbeda.
+                                      </p>
+                                      <p
+                                        className={`text-[11px] font-bold ${
+                                          diff > 0
+                                            ? "text-amber-600 dark:text-amber-400"
+                                            : diff < 0
+                                              ? "text-blue-600 dark:text-blue-400"
+                                              : "text-slate-500 dark:text-slate-400"
+                                        }`}
+                                      >
+                                        Rp {formatRupiah(original)} → Rp {formatRupiah(replacement)}
+                                        {" · "}
+                                        {diff === 0
+                                          ? "harga sama"
+                                          : diff > 0
+                                            ? `customer bayar +Rp ${formatRupiah(diff)}`
+                                            : `refund -Rp ${formatRupiah(Math.abs(diff))}`}
+                                      </p>
+                                    </div>
+                                  );
+                                })() : null}
+                              </>
+                            ) : (
+                              <>
+                                <label className={labelClass}>Ukuran pengganti</label>
+                                <select
+                                  value={value.replacement_size}
+                                  onChange={(event) =>
+                                    updateItem(item.id, {
+                                      replacement_size: event.target.value,
+                                      replacement_price: "",
+                                    })
+                                  }
+                                  className={inputClass}
+                                >
+                                  <option value="">Pilih ukuran…</option>
+                                  {sizes.map(([size, valueStock]) => (
+                                    <option key={size} value={size} disabled={Number(valueStock) < Number(value.qty)}>
+                                      {size} — sisa {Number(valueStock) || 0}
+                                    </option>
+                                  ))}
+                                </select>
+                                <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                                  Stok asal {item.size}: {Number(stock[item.size] || 0)}
+                                  {value.replacement_size
+                                    ? ` → ${value.replacement_size}: ${Number(stock[value.replacement_size] || 0)}`
+                                    : ""}
+                                </p>
+                                {value.replacement_size ? (() => {
+                                  const original = Number(item.price) || 0;
+                                  const catalogReplacement = priceOf(item.product_id, item.color, value.replacement_size);
+                                  const manualReplacement =
+                                    Number(String(value.replacement_price || "").replace(/\D/g, "")) || 0;
+                                  const replacement = manualReplacement > 0 ? manualReplacement : catalogReplacement;
+                                  const diff = (replacement - original) * (Number(value.qty) || 1);
+                                  return (
+                                    <div className="mt-2 space-y-1">
+                                      <label className={labelClass}>Harga pengganti</label>
+                                      <input
+                                        value={value.replacement_price}
+                                        onChange={(event) =>
+                                          updateItem(item.id, {
+                                            replacement_price: String(event.target.value).replace(/\D/g, ""),
+                                          })
+                                        }
+                                        inputMode="numeric"
+                                        placeholder={`Katalog: Rp ${formatRupiah(catalogReplacement)}`}
+                                        className={inputClass}
+                                      />
+                                      <p className="text-[10.5px] font-semibold text-slate-500 dark:text-slate-400">
+                                        Kosongkan untuk harga katalog. Isi manual kalau harga CYP/custom berbeda.
+                                      </p>
+                                      <p
+                                        className={`text-[11px] font-bold ${
+                                          diff > 0
+                                            ? "text-amber-600 dark:text-amber-400"
+                                            : diff < 0
+                                              ? "text-blue-600 dark:text-blue-400"
+                                              : "text-slate-500 dark:text-slate-400"
+                                        }`}
+                                      >
+                                        Harga {item.size} Rp {formatRupiah(original)} → {value.replacement_size} Rp{" "}
+                                        {formatRupiah(replacement)}
+                                        {" · "}
+                                        {diff === 0
+                                          ? "harga sama"
+                                          : diff > 0
+                                            ? `customer bayar +Rp ${formatRupiah(diff)}`
+                                            : `refund -Rp ${formatRupiah(Math.abs(diff))}`}
+                                      </p>
+                                    </div>
+                                  );
+                                })() : null}
+                              </>
+                            )}
                           </div>
                         ) : null}
                       </div>
@@ -1674,6 +2193,32 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
                 <div>
                   <label className={labelClass}>Ongkir pengganti</label>
                   <input value={shippingOut} onChange={(event) => setShippingOut(event.target.value)} inputMode="numeric" placeholder="0" className={inputClass} />
+                  {isExchange ? (
+                    <div className="mt-1 flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={ongkirState.status === "loading"}
+                        onClick={hitungOngkir}
+                        className="rounded-lg border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                      >
+                        {ongkirState.status === "loading" ? "Menghitung…" : "Hitung ongkir J&T"}
+                      </button>
+                      {ongkirState.grams ? (
+                        <span className="text-[10px] font-semibold text-slate-400">{ongkirState.grams} g</span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {ongkirState.message ? (
+                    <p
+                      className={`mt-1 text-[10.5px] font-semibold ${
+                        ongkirState.status === "error"
+                          ? "text-red-600 dark:text-red-400"
+                          : "text-slate-500 dark:text-slate-400"
+                      }`}
+                    >
+                      {ongkirState.message}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="col-span-2">
                   <label className={labelClass}>Ongkir dibayar customer?</label>
@@ -1758,6 +2303,32 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
                     : `-Rp ${formatRupiah(Math.abs(differenceTotal))} (refund ke customer)`}
                 </p>
               ) : null}
+
+              {/*
+                Ringkasan tagihan ke customer: selisih produk + ongkir pengganti.
+                Ongkir balik sengaja TIDAK dihitung (customer bayar sendiri di konter).
+              */}
+              {isExchange && totalTagihan !== 0 ? (
+                <div className="mt-2 space-y-1 border-t border-slate-200 pt-2 dark:border-slate-700">
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    Selisih produk: {differenceTotal >= 0 ? "" : "-"}Rp {formatRupiah(Math.abs(differenceTotal))}
+                    {" · "}Ongkir pengganti: Rp {formatRupiah(shippingOutValue)}
+                  </p>
+                  <p
+                    className={`text-sm font-black ${
+                      isPanel
+                        ? "text-[#c2255c]"
+                        : totalTagihan > 0
+                          ? "text-amber-700 dark:text-amber-300"
+                          : "text-blue-700 dark:text-blue-300"
+                    }`}
+                  >
+                    {totalTagihan > 0
+                      ? `Kekurangan ditagih ke customer: Rp ${formatRupiah(totalTagihan)}`
+                      : `Perlu refund ke customer: Rp ${formatRupiah(Math.abs(totalTagihan))}`}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </>
         ) : null}
@@ -1798,6 +2369,8 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
   const [city, setCity] = useState(record.shipping_city || "");
   const [kec, setKec] = useState(record.shipping_kecamatan || "");
   const [postal, setPostal] = useState(record.shipping_postal_code || "");
+  /** Hasil lacak J&T; null = belum ditekan. `history` diisi setelah tombol Lacak. */
+  const [trackInfo, setTrackInfo] = useState(null);
 
   const isExchange = record.type === "tukar_size";
   const final = ["selesai", "ditolak", "dibatalkan"].includes(record.status);
@@ -1825,6 +2398,85 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
       onChanged(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal menyimpan selisih harga");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  /** Tandai tagihan (selisih + ongkir pengganti) lunas. */
+  const settleBilling = async () => {
+    setBusy("settle_billing");
+    setError("");
+    try {
+      const updated = await base44.entities.Return.update(record.return_number, "settle_billing");
+      onChanged(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal menyimpan status tagihan");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  /** Buka lagi tagihan yang sudah ditandai lunas (salah tekan). */
+  const reopenBilling = async () => {
+    setBusy("reopen_billing");
+    setError("");
+    try {
+      const updated = await base44.entities.Return.update(record.return_number, "reopen_billing");
+      onChanged(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal membuka status tagihan");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  /**
+   * Lacak resi pengganti langsung ke J&T (baca-saja). Sama seperti tombol Lacak di drawer
+   * transaksi: tidak menulis apa pun ke database.
+   */
+  const trackReturn = async () => {
+    setBusy("track");
+    try {
+      const response = await fetch("/api/ops/returns/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ return_number: record.return_number, action: "track" }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setTrackInfo({ error: json?.error || "Gagal melacak resi." });
+      } else {
+        setTrackInfo({ detail: json?.detail || null, history: json?.history || [] });
+      }
+    } catch {
+      setTrackInfo({ error: "Gagal melacak resi." });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  /**
+   * Aksi retur yang tidak mengubah record lewat PATCH biasa (kirim WA, lacak J&T).
+   * Tanpa `onDone`, hasilnya hanya memuat ulang data dari server.
+   */
+  const returnAction = async (action, onDone) => {
+    setBusy(action);
+    setError("");
+    try {
+      const response = await fetch("/api/ops/returns/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ return_number: record.return_number, action }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(json?.error || "Aksi gagal");
+      if (typeof onDone === "function") onDone(json);
+      // Muat ulang record supaya badge/tombol mengikuti status terbaru.
+      const fresh = await base44.entities.Return.get(record.return_number).catch(() => null);
+      if (fresh) onChanged(fresh);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Aksi gagal");
     } finally {
       setBusy("");
     }
@@ -2103,6 +2755,83 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
           </section>
         ) : null}
 
+        {/* Tagihan ke customer = selisih produk + ongkir pengganti. Ongkir balik tidak ikut. */}
+        {record.type === "tukar_size" && Number(record.total_tagihan) !== 0 ? (
+          <section className="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Tagihan ke Customer
+              </p>
+              <span
+                className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                  record.billing_status === "lunas"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-300"
+                    : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-300"
+                }`}
+              >
+                {record.billing_status === "lunas" ? "Lunas" : "Belum lunas"}
+              </span>
+            </div>
+
+            <p
+              className={`mt-1 text-lg font-black ${
+                Number(record.total_tagihan) > 0
+                  ? "text-amber-700 dark:text-amber-300"
+                  : "text-blue-700 dark:text-blue-300"
+              }`}
+            >
+              {Number(record.total_tagihan) > 0
+                ? `Rp ${formatRupiah(record.total_tagihan)}`
+                : `-Rp ${formatRupiah(Math.abs(Number(record.total_tagihan)))}`}
+            </p>
+            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              {Number(record.total_tagihan) > 0 ? "Customer kurang bayar" : "Perlu refund ke customer"}
+              {` · selisih Rp ${formatRupiah(Math.abs(Number(record.price_difference_total) || 0))} + ongkir Rp ${formatRupiah(
+                Number(record.shipping_out_cost) || 0,
+              )}`}
+            </p>
+
+            {record.billing_status !== "lunas" ? (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => returnAction("send_billing")}
+                  disabled={Boolean(busy)}
+                  className="rounded-xl border-2 border-slate-200 px-3 py-2 text-[12px] font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  {busy === "send_billing" ? "Mengirim…" : "Kirim Tagihan WA"}
+                </button>
+                <button
+                  type="button"
+                  onClick={settleBilling}
+                  disabled={Boolean(busy)}
+                  className={`rounded-xl px-3 py-2 text-[12px] font-bold disabled:opacity-50 ${accent}`}
+                >
+                  {busy === "settle_billing"
+                    ? "Menyimpan…"
+                    : Number(record.total_tagihan) > 0
+                      ? "Sudah Dibayar"
+                      : "Sudah Direfund"}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={reopenBilling}
+                disabled={Boolean(busy)}
+                className="mt-3 text-[11px] font-bold text-slate-500 underline disabled:opacity-50 dark:text-slate-400"
+              >
+                Buka lagi / batalkan status lunas
+              </button>
+            )}
+            {record.billing_settled_at ? (
+              <p className="mt-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                Dilunasi {formatTanggalJamID(record.billing_settled_at)}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+
         <section className="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Pengiriman & Refund</p>
@@ -2236,11 +2965,69 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
         </section>
 
         <section className="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Lacak Pengganti
+            </p>
+            {record.shipping_out_awb ? (
+              <button
+                type="button"
+                onClick={trackReturn}
+                disabled={Boolean(busy)}
+                className={`text-[11px] font-bold disabled:opacity-50 ${isPanel ? "text-[#c2255c]" : "text-slate-700 underline dark:text-slate-200"}`}
+              >
+                {busy === "track" ? "Memuat…" : "Lacak"}
+              </button>
+            ) : null}
+          </div>
+
+          {!record.shipping_out_awb ? (
+            <p className="mt-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+              Resi pengganti belum dibuat.
+            </p>
+          ) : (
+            <>
+              <p className="mt-1 font-mono text-xs font-bold text-slate-700 dark:text-slate-200">
+                {record.shipping_out_awb}
+              </p>
+              {trackInfo?.detail ? (
+                <p className="mt-1 text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                  {trackInfo.detail.status || "-"}
+                  {trackInfo.detail.receiver?.name ? ` · diterima ${trackInfo.detail.receiver.name}` : ""}
+                </p>
+              ) : null}
+              {trackInfo?.error ? (
+                <p className="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">{trackInfo.error}</p>
+              ) : null}
+              {trackInfo?.history?.length ? (
+                <div className="mt-2 max-h-52 space-y-1.5 overflow-y-auto">
+                  {trackInfo.history.map((event, index) => (
+                    <div key={`${event.date_time}-${index}`} className="border-l-2 border-slate-200 pl-2 dark:border-slate-700">
+                      <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{event.status}</p>
+                      <p className="text-[10.5px] font-semibold text-slate-500 dark:text-slate-400">
+                        {[event.city_name, event.date_time].filter(Boolean).join(" · ")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : trackInfo && !trackInfo.error ? (
+                <p className="mt-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+                  Belum ada pemindaian J&T.
+                </p>
+              ) : null}
+            </>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Riwayat</p>
           <div className="mt-2 space-y-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
             <p>Diajukan: {formatTanggalJamID(record.created_at)}</p>
             {record.approved_at ? <p>Disetujui: {formatTanggalJamID(record.approved_at)}</p> : null}
             {record.received_at ? <p>Barang diterima: {formatTanggalJamID(record.received_at)}</p> : null}
+            {record.replacement_delivered_at ? (
+              <p>Pengganti diterima: {formatTanggalJamID(record.replacement_delivered_at)}</p>
+            ) : null}
             {record.completed_at ? <p>Selesai: {formatTanggalJamID(record.completed_at)}</p> : null}
             {record.cancelled_at ? <p>Dibatalkan: {formatTanggalJamID(record.cancelled_at)}</p> : null}
             <p>Pergerakan stok: {record.stock_applied_at ? "sudah diterapkan" : "belum"}</p>

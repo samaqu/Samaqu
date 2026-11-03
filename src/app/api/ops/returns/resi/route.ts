@@ -78,13 +78,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const jntItems = items.map((item: any) => ({
-      product_id: item.product_id,
-      product_name: item.product_name,
-      color: item.color || "default",
-      size: item.replacement_size,
-      quantity: Number(item.qty) || 1,
-    }));
+    /**
+     * Resi yang dicetak/discan adalah barang PENGGANTI. Kalau tukar series, produknya
+     * berbeda dari produk asal — memakai `item.product_id` akan mencetak produk yang salah
+     * di label. Kosong = tukar ukuran (perilaku lama, produk sama).
+     */
+    const replacementProductIds = [
+      ...new Set(
+        items
+          .map((item: any) => String(item.replacement_product_id || "").trim())
+          .filter(Boolean),
+      ),
+    ];
+    const replacementProductNames = new Map<string, string>();
+    if (replacementProductIds.length > 0) {
+      const { data: productRows } = await admin
+        .from("products")
+        .select("id, name")
+        .in("id", replacementProductIds);
+      for (const row of productRows || []) {
+        replacementProductNames.set(String(row.id), String(row.name || ""));
+      }
+    }
+
+    const jntItems = items.map((item: any) => {
+      const replacementProductId = String(item.replacement_product_id || "").trim();
+      return {
+        product_id: replacementProductId || item.product_id,
+        product_name:
+          (replacementProductId ? replacementProductNames.get(replacementProductId) : null) ||
+          item.product_name,
+        color: (replacementProductId ? item.replacement_color : item.color) || "default",
+        size: item.replacement_size,
+        quantity: Number(item.qty) || 1,
+      };
+    });
     if (jntItems.some((item) => !item.size)) {
       return NextResponse.json({ error: "Ukuran pengganti belum lengkap" }, { status: 400 });
     }

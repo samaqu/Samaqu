@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { trackShipment } from "@/lib/jnt/track";
 import { applyTrackingToOrder } from "@/lib/jnt/tracking-sync";
+import { applyTrackingToReturn } from "@/lib/jnt/return-tracking";
 
 /**
  * Sinkronkan status pengiriman & pesanan dengan tracking J&T.
@@ -66,5 +67,59 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ checked, shipped, completed, eventsStored, errors });
+  /**
+   * Retur tukar: resi PENGGANTI (SAMAQU → customer) punya AWB sendiri di `returns`,
+   * bukan di `orders`. Tanpa blok ini status retur tidak pernah selesai sendiri.
+   * Hanya `pengganti_dikirim` yang diperiksa; transisi & notifikasi ada di
+   * `src/lib/jnt/return-tracking.ts` (maju-saja, idempoten).
+   */
+  let returnsChecked = 0;
+  let returnsCompleted = 0;
+  let returnErrors = 0;
+
+  try {
+    const { data: returns, error: returnFetchError } = await supabase
+      .from("returns")
+      .select(
+        "id, return_number, status, shipping_out_awb, customer_name, customer_whatsapp, replacement_delivered_at, replacement_delivered_notified_at",
+      )
+      .eq("type", "tukar_size")
+      .eq("status", "pengganti_dikirim")
+      .not("shipping_out_awb", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (returnFetchError) {
+      console.error("[SYNC-TRACKING] Fetch retur error:", returnFetchError.message);
+    } else {
+      for (const record of returns || []) {
+        if (!record.shipping_out_awb) continue;
+        returnsChecked++;
+        try {
+          const track = await trackShipment(record.shipping_out_awb);
+          const result = await applyTrackingToReturn(supabase, record, track);
+          if (result.completed) {
+            returnsCompleted++;
+            console.log("[SYNC-TRACKING] Pengganti diterima → retur selesai:", record.return_number);
+          }
+        } catch (e) {
+          console.error("[SYNC-TRACKING] Retur error:", record.return_number, e);
+          returnErrors++;
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[SYNC-TRACKING] Blok retur gagal:", e);
+  }
+
+  return NextResponse.json({
+    checked,
+    shipped,
+    completed,
+    eventsStored,
+    errors,
+    returnsChecked,
+    returnsCompleted,
+    returnErrors,
+  });
 }
