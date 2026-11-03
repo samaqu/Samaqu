@@ -46,7 +46,6 @@ const PRIVATE_PATHS = [
   "/checkout",
   "/cart",
   "/akun",
-  "/open-order",
   "/reseller",
   "/affiliate",
 ];

@@ -8,12 +8,18 @@ const PROMO_PATH = "/promo/free-cover-hanger";
 // Sitemap di-cache 1 jam supaya produk baru ikut terdaftar tanpa redeploy.
 export const revalidate = 3600;
 
-type Freq = "weekly" | "monthly";
+type Freq = "daily" | "weekly" | "monthly";
 
-/** Halaman publik yang layak diindeks (urutan = prioritas). */
+/**
+ * Halaman publik yang layak diindeks (urutan = prioritas).
+ *
+ * `/open-order` memakai frekuensi "daily": jendela buka/tutupnya berubah dan isinya
+ * (produk yang ikut program) bergerak selama periode Open Order berjalan.
+ */
 const STATIC_PAGES: { path: string; priority: number; changeFrequency: Freq }[] = [
   { path: "/", priority: 1, changeFrequency: "weekly" },
   { path: "/katalog", priority: 0.9, changeFrequency: "weekly" },
+  { path: "/open-order", priority: 0.9, changeFrequency: "daily" },
   { path: "/testimoni", priority: 0.7, changeFrequency: "weekly" },
   { path: "/tentang-kami", priority: 0.6, changeFrequency: "monthly" },
   { path: "/faq", priority: 0.6, changeFrequency: "monthly" },
