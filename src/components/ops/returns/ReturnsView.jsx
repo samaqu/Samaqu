@@ -34,7 +34,7 @@ import {
   trackingSummary,
 } from "@/lib/jnt/track-status";
 import { formatRupiah, formatTanggalJamID, formatTanggalSingkatID } from "@/components/ops/transaksi/transaksi-format";
-import { PanelDetailShell } from "@/components/ops/transaksi/PanelDetailPesanan";
+import { PanelDetailFooter, PanelDetailShell } from "@/components/ops/transaksi/PanelDetailPesanan";
 
 /**
  * Format nomor pesanan SAMAQU (SMQ-… website, CYO-… Open Order, OPS-… transaksi manual).
@@ -3084,24 +3084,62 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
           {error ? <p className="dp-catatan" style={{ color: "#a3355f" }}>{error}</p> : null}
         </div>
 
-        {/* Footer aksi — pola sama dengan Detail Pesanan. */}
-        <div className="dp-footer">
-          {(() => {
+        {/*
+          Footer memakai `PanelDetailFooter` (komponen yang sama dengan Detail Pesanan):
+          aksi sekunder dalam satu baris, aksi utama full-width di bawahnya. Sebelumnya
+          lima tombol dijejalkan dalam satu baris sehingga label terpotong.
+        */}
+        <PanelDetailFooter
+          aksi={(() => {
             const aksi = [];
             if (record.status === "diajukan") {
-              aksi.push({ key: "approve", label: "Setujui", jenis: "utama", onClick: () => run("approve", "menyetujui") });
-              aksi.push({ key: "reject", label: "Tolak", jenis: "sekunder", onClick: () => run("reject", "menolak") });
+              aksi.push({
+                key: "approve",
+                label: "Setujui",
+                jenis: "utama",
+                onClick: () => run("approve", "menyetujui"),
+                disabled: Boolean(busy),
+              });
+              aksi.push({
+                key: "reject",
+                label: "Tolak",
+                jenis: "sekunder",
+                onClick: () => run("reject", "menolak"),
+                disabled: Boolean(busy),
+              });
             }
             if (record.status === "disetujui") {
-              aksi.push({ key: "receive", label: "Barang Diterima", jenis: "utama", onClick: () => run("receive", "menerapkan stok") });
+              aksi.push({
+                key: "receive",
+                label: "Barang Diterima",
+                jenis: "utama",
+                onClick: () => run("receive", "menerapkan stok"),
+                disabled: Boolean(busy),
+              });
             }
             if (record.status === "barang_diterima" && isExchange && !record.shipping_out_awb) {
-              aksi.push({ key: "resi", label: "Buat Resi Pengganti", jenis: "utama", onClick: createResi });
+              aksi.push({
+                key: "resi",
+                label: "Buat Resi Pengganti",
+                jenis: "utama",
+                onClick: createResi,
+                disabled: Boolean(busy),
+              });
+            }
+            if (["barang_diterima", "pengganti_dikirim"].includes(record.status)) {
+              aksi.push({
+                key: "complete",
+                label: "Selesaikan",
+                jenis: "utama",
+                onClick: () => run("complete", "menyelesaikan"),
+                disabled: Boolean(busy) || (isExchange && !record.shipping_out_awb),
+                hint: isExchange && !record.shipping_out_awb ? "Buat resi pengganti dulu" : undefined,
+              });
             }
             if (isExchange && record.shipping_out_awb) {
               aksi.push({
                 key: "cetak",
-                label: "Cetak Resi Pengganti",
+                label: "Cetak Resi",
                 jenis: "sekunder",
                 onClick: () =>
                   window.open(
@@ -3109,35 +3147,32 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
                     "_blank",
                     "noopener,noreferrer",
                   ),
+                disabled: Boolean(busy),
               });
             }
-            if (["barang_diterima", "pengganti_dikirim"].includes(record.status)) {
-              aksi.push({ key: "complete", label: "Selesaikan", jenis: "utama", onClick: () => run("complete", "menyelesaikan") });
-            }
             if (!final) {
-              aksi.push({ key: "cancel", label: "Batalkan Retur", jenis: "sekunder", onClick: cancelReturn });
+              aksi.push({
+                key: "cancel",
+                label: "Batalkan",
+                jenis: "sekunder",
+                onClick: cancelReturn,
+                disabled: Boolean(busy),
+              });
             }
             if (!record.delete_locked) {
-              aksi.push({ key: "hapus", label: "Hapus Data", jenis: "bahaya", onClick: deleteReturn });
+              aksi.push({
+                key: "hapus",
+                label: "Hapus",
+                jenis: "bahaya",
+                onClick: deleteReturn,
+                disabled: Boolean(busy),
+              });
             }
-            return (
-              <div className="dp-footer-baris">
-                {aksi.map((tombol) => (
-                  <button
-                    key={tombol.key}
-                    type="button"
-                    className={`dp-mini${tombol.jenis === "utama" ? " aktif" : ""}`}
-                    style={{ flex: 1, height: 34, justifyContent: "center" }}
-                    onClick={tombol.onClick}
-                    disabled={Boolean(busy)}
-                  >
-                    {busy === tombol.key ? "Memproses…" : tombol.label}
-                  </button>
-                ))}
-              </div>
+            return aksi.map((a) =>
+              busy === a.key ? { ...a, label: `${a.label}…` } : a,
             );
           })()}
-        </div>
+        />
       </div>
     </PanelDetailShell>
   );
