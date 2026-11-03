@@ -357,12 +357,12 @@ export default function Leads() {
                     </td>
                     <td className="px-3 py-3">
                       {lead.status === 'closing' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300">
-                          <CheckCircle2 size={12} /> Closing
+                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300">
+                          <CheckCircle2 size={12} className="shrink-0" /> Closing
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
-                          <Clock size={12} /> Belum Closing
+                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+                          <Clock size={12} className="shrink-0" /> Belum Closing
                         </span>
                       )}
                     </td>
@@ -412,7 +412,7 @@ export default function Leads() {
                       {lead.kontak}
                     </p>
                   </div>
-                  <span className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-bold ${SUMBER_STYLES[lead.sumber] || "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
+                  <span className={`shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-bold ${SUMBER_STYLES[lead.sumber] || "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
                     {lead.sumber}
                   </span>
                 </div>
