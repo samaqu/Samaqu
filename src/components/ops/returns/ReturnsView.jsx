@@ -103,12 +103,13 @@ const labelClass = "block text-[10px] font-bold uppercase tracking-wider text-sl
 /**
  * Picker pengganti untuk mode "Ganti series".
  *
- * Mengikuti pemilih produk di form Transaksi (bukan mengarang pola sendiri):
- *   cari produk (+chip kategori)  →  klik produk  →  chip SERIES  →  ukuran
+ * Polanya SAMA dengan pemilih produk di form Transaksi (`TransaksiFormModal`):
+ *   cari produk (+chip kategori) → klik PRODUK → chip SERIES → ukuran
  *
- * Kenapa dikelompokkan per produk: satu nama produk dipakai banyak series
- * (Thobe Ash Grey Jiharkah / Imron / Bayati / …). Menampilkan semua series sebagai
- * daftar rata membuat pilihannya tidak jelas produk mana.
+ * Grup produk = `kategori | kain | nama produk` (lihat `productGroups` di form Transaksi).
+ * Ini WAJIB: di DB satu nama produk punya 7 baris produk berbeda (satu per series) —
+ * `thobe-ash-grey-jiharkah`, `-imron`, `-bayati`, dst. Tanpa pengelompokan, daftarnya
+ * menampilkan "Thobe Ash Grey" berulang 6–7 kali.
  *
  * `value` berisi: replacement_variant_id (`product_id||color`), replacement_product_id,
  * replacement_color, replacement_size.
@@ -116,76 +117,73 @@ const labelClass = "block text-[10px] font-bold uppercase tracking-wider text-sl
 function SeriesReplacementPicker({ value, groups, onChange, qty, originalProductId, originalSize }) {
   const [search, setSearch] = useState("");
   const [catChip, setCatChip] = useState("all");
-  /** Produk yang sedang dibuka (diisi otomatis dari pilihan yang sudah ada). */
-  const [openProductId, setOpenProductId] = useState("");
+  const [openKey, setOpenKey] = useState("");
 
   const selected = String(value.replacement_variant_id || "");
   const [selectedProductId, selectedColor] = selected.split("||");
 
-  /** Produk asal tidak ditawarkan: kalau produknya sama, jalurnya "Tukar ukuran". */
-  const options = useMemo(
-    () => groups.filter((group) => group.product_id !== originalProductId),
-    [groups, originalProductId],
-  );
+  /** Grup produk: semua series dari produk yang sama digabung dalam satu entri. */
+  const productGroups = useMemo(() => {
+    const map = new Map();
+    for (const group of groups) {
+      const key = `${group.category || ""}|${group.kain || ""}|${group.name || ""}`;
+      let entry = map.get(key);
+      if (!entry) {
+        entry = { key, name: group.name, category: group.category, kain: group.kain, variants: [] };
+        map.set(key, entry);
+      }
+      for (const variant of group.colors) {
+        entry.variants.push({ ...variant, group });
+      }
+    }
+    return [...map.values()].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  }, [groups]);
 
   const categories = useMemo(() => {
-    const set = new Set(options.map((group) => group.category).filter(Boolean));
+    const set = new Set(productGroups.map((group) => group.category).filter(Boolean));
     return [...set].sort();
-  }, [options]);
+  }, [productGroups]);
+
+  const stockOf = (variant) => {
+    const map = variant.stock_efektif || variant.stock || {};
+    return Object.values(map).reduce((sum, n) => sum + (Number(n) || 0), 0);
+  };
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    return options
+    return productGroups
       .filter((group) => catChip === "all" || group.category === catChip)
       .filter((group) => {
         if (!needle) return true;
-        return [group.name, group.kain, group.category, group.series]
+        return [group.name, group.kain, group.category, ...group.variants.map((v) => v.series_name)]
           .filter(Boolean)
           .some((text) => String(text).toLowerCase().includes(needle));
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [options, search, catChip]);
+      });
+  }, [productGroups, search, catChip]);
 
-  const stockTotal = (group) =>
-    group.colors.reduce((sum, variant) => {
-      const map = variant.stock_efektif || variant.stock || {};
-      return sum + Object.values(map).reduce((s, n) => s + (Number(n) || 0), 0);
-    }, 0);
-
-  /**
-   * Chip series = satu baris varian (produk + warna). Harga & stok mengikuti baris itu,
-   * persis seperti `seriesChoices()` di form Transaksi.
-   */
-  const seriesOf = (group) =>
-    group.colors.map((variant) => {
-      const map = variant.stock_efektif || variant.stock || {};
-      const stock = Object.values(map).reduce((sum, n) => sum + (Number(n) || 0), 0);
-      return {
-        variant,
-        series: variant.series_name || group.series || "",
-        color: variant.color || "default",
-        price: Object.values(variant.prices || {}).find((p) => Number(p) > 0) || Number(variant.price) || 0,
-        stock,
-      };
-    });
-
-  const activeGroup = selectedProductId
-    ? options.find((group) => group.product_id === selectedProductId) || null
+  const activeVariant = selectedProductId
+    ? groups
+        .flatMap((group) => group.colors)
+        .find(
+          (variant) =>
+            variant.product_id === selectedProductId &&
+            (variant.color || "default") === (selectedColor || "default"),
+        ) || null
     : null;
-  const activeVariant =
-    activeGroup?.colors.find((variant) => (variant.color || "default") === (selectedColor || "default")) || null;
+  const activeGroup = activeVariant
+    ? groups.find((group) => group.product_id === activeVariant.product_id) || null
+    : null;
   const stockMap = activeVariant?.stock_efektif || activeVariant?.stock || {};
   const sizes = Object.keys(stockMap).sort();
 
-  const chooseVariant = (group, variant) => {
+  const chooseVariant = (variant) => {
     onChange({
-      replacement_variant_id: `${group.product_id}||${variant.color || "default"}`,
-      replacement_product_id: group.product_id,
+      replacement_variant_id: `${variant.product_id}||${variant.color || "default"}`,
+      replacement_product_id: variant.product_id,
       replacement_color: variant.color || "default",
       replacement_size: "",
       replacement_price: "",
     });
-    setOpenProductId(group.product_id);
     setSearch("");
   };
 
@@ -197,11 +195,11 @@ function SeriesReplacementPicker({ value, groups, onChange, qty, originalProduct
       replacement_size: "",
       replacement_price: "",
     });
-    setOpenProductId("");
+    setOpenKey("");
   };
 
-  /* ── Sudah ada series terpilih: ringkasan + ukuran ── */
-  if (selectedProductId && activeGroup && activeVariant) {
+  /* ── Series sudah terpilih: ringkasan + ukuran ── */
+  if (activeVariant && activeGroup) {
     return (
       <div className="space-y-2">
         <div className="rounded-xl border-2 border-slate-900 p-2.5 dark:border-white">
@@ -212,7 +210,9 @@ function SeriesReplacementPicker({ value, groups, onChange, qty, originalProduct
                 {activeGroup.series ? ` · ${activeGroup.series}` : ""}
               </p>
               <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                {[activeGroup.kain, activeGroup.category].filter(Boolean).join(" · ")}
+                {[activeGroup.kain ? `Kain ${activeGroup.kain}` : null, activeGroup.category]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
             </div>
             <button
@@ -223,36 +223,6 @@ function SeriesReplacementPicker({ value, groups, onChange, qty, originalProduct
               Ganti
             </button>
           </div>
-
-          {activeGroup.colors.length > 1 ? (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {activeGroup.colors.map((variant) => {
-                const active = (variant.color || "default") === (selectedColor || "default");
-                return (
-                  <button
-                    key={variant.id || variant.color}
-                    type="button"
-                    onClick={() =>
-                      onChange({
-                        replacement_variant_id: `${activeGroup.product_id}||${variant.color || "default"}`,
-                        replacement_product_id: activeGroup.product_id,
-                        replacement_color: variant.color || "default",
-                        replacement_size: "",
-                        replacement_price: "",
-                      })
-                    }
-                    className={`rounded-lg border px-2 py-1 text-[11px] font-bold ${
-                      active
-                        ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                    }`}
-                  >
-                    {variant.color === "default" ? "Default" : variant.color}
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
 
           <div className="mt-2">
             <label className={labelClass}>Ukuran pengganti</label>
@@ -293,7 +263,7 @@ function SeriesReplacementPicker({ value, groups, onChange, qty, originalProduct
     );
   }
 
-  /* ── Daftar produk (dikelompokkan) → chip series ── */
+  /* ── Daftar PRODUK (dikelompokkan) → chip series ── */
   return (
     <div className="space-y-1.5">
       <input
@@ -327,14 +297,17 @@ function SeriesReplacementPicker({ value, groups, onChange, qty, originalProduct
           <p className="p-3 text-[11px] font-semibold text-slate-400">Produk tidak ditemukan.</p>
         ) : (
           filtered.map((group) => {
-            const expanded = openProductId === group.product_id;
-            const sisa = stockTotal(group);
-            const series = seriesOf(group);
+            const expanded = openKey === group.key;
+            // Produk asal tidak ditawarkan (jalurnya "Tukar ukuran"), tapi series lain tetap.
+            const seriesList = group.variants.filter(
+              (variant) => variant.product_id !== originalProductId,
+            );
+            const sisa = seriesList.reduce((sum, variant) => sum + stockOf(variant), 0);
             return (
-              <div key={group.product_id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+              <div key={group.key} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setOpenProductId(expanded ? "" : group.product_id)}
+                  onClick={() => setOpenKey(expanded ? "" : group.key)}
                   className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   <span className="min-w-0">
@@ -342,7 +315,11 @@ function SeriesReplacementPicker({ value, groups, onChange, qty, originalProduct
                       {group.name}
                     </span>
                     <span className="block truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                      {[group.kain ? `Kain ${group.kain}` : null, group.category, `${series.length} series`]
+                      {[
+                        group.kain ? `Kain ${group.kain}` : null,
+                        group.category,
+                        `${seriesList.length} series`,
+                      ]
                         .filter(Boolean)
                         .join(" · ")}
                     </span>
@@ -362,14 +339,19 @@ function SeriesReplacementPicker({ value, groups, onChange, qty, originalProduct
                       Series
                     </p>
                     <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                      {series.map((option) => {
-                        const habis = option.stock <= 0;
+                      {seriesList.map((variant) => {
+                        const stok = stockOf(variant);
+                        const habis = stok <= 0;
+                        const harga =
+                          Object.values(variant.prices || {}).find((p) => Number(p) > 0) ||
+                          Number(variant.price) ||
+                          0;
                         return (
                           <button
-                            key={`${option.color}-${option.series}`}
+                            key={`${variant.product_id}-${variant.color}`}
                             type="button"
                             disabled={habis}
-                            onClick={() => chooseVariant(group, option.variant)}
+                            onClick={() => chooseVariant(variant)}
                             className={`rounded-xl border-2 px-2.5 py-1.5 text-left transition-colors ${
                               habis
                                 ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-60 dark:border-slate-700 dark:bg-slate-900"
@@ -381,17 +363,17 @@ function SeriesReplacementPicker({ value, groups, onChange, qty, originalProduct
                                 habis ? "text-slate-400 dark:text-slate-500" : "text-slate-900 dark:text-white"
                               }`}
                             >
-                              {option.series || "Tanpa series"}
+                              {variant.series_name || "Tanpa series"}
                             </span>
                             <span className="block text-[10.5px] font-semibold text-slate-500 dark:text-slate-400">
-                              Rp {formatRupiah(option.price)}
+                              Rp {formatRupiah(harga)}
                             </span>
                             <span
                               className={`block text-[10.5px] font-bold ${
                                 habis ? "text-slate-400 dark:text-slate-500" : "text-emerald-600 dark:text-emerald-400"
                               }`}
                             >
-                              {habis ? "habis" : `sisa ${option.stock}`}
+                              {habis ? "habis" : `sisa ${stok}`}
                             </span>
                           </button>
                         );
