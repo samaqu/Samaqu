@@ -111,26 +111,30 @@ const labelClass = "block text-[10px] font-bold uppercase tracking-wider text-sl
  */
 function SeriesReplacementPicker({ value, groups, onChange, qty, originalProductId, originalSize }) {
   const [search, setSearch] = useState("");
-  const [openProductId, setOpenProductId] = useState("");
 
   const selected = String(value.replacement_variant_id || "");
   const [selectedProductId, selectedColor] = selected.split("||");
 
+  /**
+   * Urutan: SERIES dulu (bukan produk), karena satu nama produk dipakai banyak series
+   * (Thobe Latte Jiharkah / Imron / Bayati / Nahawand). Mengelompokkan per produk membuat
+   * daftar panjang dan admin harus mengklik dua kali untuk hal yang sama.
+   */
+  const seriesOptions = useMemo(
+    () => groups.filter((group) => group.product_id !== originalProductId),
+    [groups, originalProductId],
+  );
+
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    const sorted = [...groups].sort((a, b) => {
-      // Produk asal tetap di urutan biasa; sisa ditaruh apa adanya (sudah urut nama).
-      return a.name.localeCompare(b.name);
-    });
-    if (!needle) return sorted;
-    return sorted.filter((group) =>
+    if (!needle) return seriesOptions;
+    return seriesOptions.filter((group) =>
       [group.name, group.series, group.kain, group.category, ...group.colors.map((c) => c.color)]
         .filter(Boolean)
         .some((text) => String(text).toLowerCase().includes(needle)),
     );
-  }, [groups, search]);
+  }, [seriesOptions, search]);
 
-  /** Produk terpilih dicari dari SEMUA grup (bukan hasil filter) agar kartunya tidak hilang saat mencari. */
   const activeGroup = selectedProductId
     ? groups.find((group) => group.product_id === selectedProductId) || null
     : null;
@@ -139,12 +143,13 @@ function SeriesReplacementPicker({ value, groups, onChange, qty, originalProduct
   const stockMap = activeVariant?.stock_efektif || activeVariant?.stock || {};
   const sizes = Object.keys(stockMap).sort();
 
-  const chooseProduct = (group) => {
-    if (group.product_id === originalProductId) {
-      // Produk asal: biarkan admin pindah ke mode "ukuran" — di sini tidak ditawarkan,
-      // karena kalau produknya sama, alur yang dipakai adalah picker ukuran.
-      return;
-    }
+  const totalStock = (group) =>
+    group.colors.reduce((sum, variant) => {
+      const map = variant.stock_efektif || variant.stock || {};
+      return sum + Object.values(map).reduce((s, n) => s + (Number(n) || 0), 0);
+    }, 0);
+
+  const chooseSeries = (group) => {
     const first = group.colors[0];
     onChange({
       replacement_variant_id: `${group.product_id}||${first?.color || "default"}`,
@@ -153,7 +158,6 @@ function SeriesReplacementPicker({ value, groups, onChange, qty, originalProduct
       replacement_size: "",
       replacement_price: "",
     });
-    setOpenProductId("");
     setSearch("");
   };
 
@@ -167,30 +171,33 @@ function SeriesReplacementPicker({ value, groups, onChange, qty, originalProduct
     });
   };
 
-  return (
-    <div className="space-y-2">
-      <p className={labelClass}>Produk / series pengganti</p>
+  const reset = () =>
+    onChange({
+      replacement_variant_id: "",
+      replacement_product_id: "",
+      replacement_color: "",
+      replacement_size: "",
+      replacement_price: "",
+    });
 
-      {selectedProductId && activeGroup ? (
+  // Sudah ada series terpilih -> tampilkan ringkasannya + warna + ukuran.
+  if (selectedProductId && activeGroup) {
+    return (
+      <div className="space-y-2">
         <div className="rounded-xl border-2 border-slate-900 p-2.5 dark:border-white">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{activeGroup.name}</p>
+              <p className="truncate text-sm font-bold text-slate-900 dark:text-white">
+                {activeGroup.name}
+                {activeGroup.series ? ` · ${activeGroup.series}` : ""}
+              </p>
               <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                {[activeGroup.series, activeGroup.kain, activeGroup.category].filter(Boolean).join(" · ")}
+                {[activeGroup.kain, activeGroup.category].filter(Boolean).join(" · ")}
               </p>
             </div>
             <button
               type="button"
-              onClick={() =>
-                onChange({
-                  replacement_variant_id: "",
-                  replacement_product_id: "",
-                  replacement_color: "",
-                  replacement_size: "",
-                  replacement_price: "",
-                })
-              }
+              onClick={reset}
               className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               Ganti
@@ -254,71 +261,60 @@ function SeriesReplacementPicker({ value, groups, onChange, qty, originalProduct
             </p>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // Belum ada pilihan -> chip series (sama seperti form Transaksi).
+  return (
+    <div className="space-y-1.5">
+      <input
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder="Cari produk / series…"
+        className={inputClass}
+      />
+      {filtered.length === 0 ? (
+        <p className="rounded-xl border border-slate-200 p-3 text-[11px] font-semibold text-slate-400 dark:border-slate-700">
+          Series tidak ditemukan.
+        </p>
       ) : (
-        <div className="space-y-1.5">
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Cari produk / series…"
-            className={inputClass}
-          />
-          <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700">
-            {filtered.length === 0 ? (
-              <p className="p-3 text-[11px] font-semibold text-slate-400">Produk tidak ditemukan.</p>
-            ) : (
-              filtered.map((group) => {
-                const isOriginal = group.product_id === originalProductId;
-                const expanded = openProductId === group.product_id;
-                return (
-                  <div key={group.product_id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
-                    <button
-                      type="button"
-                      disabled={isOriginal}
-                      onClick={() => setOpenProductId(expanded ? "" : group.product_id)}
-                      className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left ${
-                        isOriginal ? "cursor-not-allowed opacity-50" : "hover:bg-slate-50 dark:hover:bg-slate-800"
-                      }`}
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-xs font-bold text-slate-900 dark:text-white">
-                          {group.name}
-                        </span>
-                        <span className="block text-[10.5px] font-semibold text-slate-500 dark:text-slate-400">
-                          {[group.series, group.kain].filter(Boolean).join(" · ")}
-                          {isOriginal ? " · produk asal" : ""}
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-[10px] font-bold text-slate-400">{group.stockTotal}</span>
-                    </button>
-                    {expanded && !isOriginal ? (
-                      <div className="space-y-1 px-3 pb-2">
-                        {group.colors.map((variant) => {
-                          const stok = variant.stock_efektif || variant.stock || {};
-                          const total = Object.values(stok).reduce((sum, v) => sum + (Number(v) || 0), 0);
-                          return (
-                            <button
-                              key={variant.id || variant.color}
-                              type="button"
-                              disabled={total <= 0}
-                              onClick={() => chooseProduct({ ...group, colors: [variant] })}
-                              className={`flex w-full items-center justify-between rounded-lg border px-2 py-1.5 text-[11px] font-bold ${
-                                total <= 0
-                                  ? "cursor-not-allowed border-slate-200 text-slate-400 dark:border-slate-700"
-                                  : "border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                              }`}
-                            >
-                              <span>{variant.color === "default" ? "Default" : variant.color}</span>
-                              <span className="font-mono">{total <= 0 ? "habis" : `${total} pcs`}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })
-            )}
-          </div>
+        <div className="grid max-h-64 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
+          {filtered.map((group) => {
+            const sisa = totalStock(group);
+            const habis = sisa <= 0;
+            return (
+              <button
+                key={group.product_id}
+                type="button"
+                disabled={habis}
+                onClick={() => chooseSeries(group)}
+                className={`rounded-xl border-2 px-3 py-2 text-left transition-colors ${
+                  habis
+                    ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-60 dark:border-slate-700 dark:bg-slate-900"
+                    : "border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                }`}
+              >
+                <span
+                  className={`block truncate text-sm font-bold ${
+                    habis ? "text-slate-400 dark:text-slate-500" : "text-slate-900 dark:text-white"
+                  }`}
+                >
+                  {group.series || group.name}
+                </span>
+                <span className="block truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  {group.series ? group.name : group.kain || group.category || "-"}
+                </span>
+                <span
+                  className={`block text-[11px] font-bold ${
+                    habis ? "text-slate-400 dark:text-slate-500" : "text-emerald-600 dark:text-emerald-400"
+                  }`}
+                >
+                  {habis ? "stok habis" : `sisa ${sisa}`}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
