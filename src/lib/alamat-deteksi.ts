@@ -136,6 +136,13 @@ const AWALAN_ADMIN = new Set([
 ]);
 
 /**
+ * Awalan yang menandai segmen masih berupa keterangan wilayah ("Kec. Cibinong", "Kab. Bogor").
+ * Dipakai saat merapikan alamat lengkap — kelurahan/desa sengaja TIDAK termasuk karena masih
+ * dianggap bagian alamat yang perlu ditampilkan.
+ */
+const AWALAN_WILAYAH_SEGMEN = new Set(["kec", "kecamatan", "kota", "kab", "kabupaten", "prov", "provinsi"]);
+
+/**
  * Alias provinsi yang lazim dipakai orang. Nilainya = nama provinsi seperti yang muncul di
  * dropdown (hasil `prettifyProvince` di `src/lib/kota.ts` — dataset menulis DIY sebagai "DIY").
  */
@@ -246,7 +253,7 @@ function cariTempat(segmen: string[], daftar: string[], terpakai: Set<number> = 
 function potongSegmen(teks: string): string[] {
   return String(teks || "")
     .split(/[,;\n|·•]+/)
-    .map(rapikan)
+    .map((bagian) => buangAwalanLabel(rapikan(bagian)))
     .filter(Boolean);
 }
 
@@ -260,9 +267,17 @@ function hapusKemunculan(teks: string, potongan: string): string {
 
 /* ── Nomor HP ── */
 
-const POLA_HP = /(?:\+?62|0)(?:[\s.-]?\d){6,18}/g;
+const POLA_HP = /(?<!\d)(?:\+?62|0)(?:[\s.-]?\d){6,18}(?!\d)/g;
+/** Nomor HP yang menempel kode pos: "082294417599 36513" (bentuk yang lazim dari tempelan CRM). */
+const POLA_HP_KODE_POS = /(?<!\d)(?:\+?62|0)(?:[\s.-]?\d){6,12}[\s.-]+\d{5}(?!\d)/g;
 /** Nomor sheet TANPA 0 di depan: angka murni diawali 8, panjang 9–12 digit. */
 const POLA_HP_TANPA_NOL = /(?<!\d)8\d{8,11}(?!\d)/g;
+
+/**
+ * Nomor WA berlabel ("No. WA: 0822-9441-7599", "HP: 62812…"). Label didahulukan supaya nomor
+ * yang memang nomor kontak tidak tertukar dengan angka lain di teks.
+ */
+const POLA_LABEL_HP = /(?:no\.?\s*wa|nomor\s*wa|no\.?\s*hp|nomor\s*hp|whatsapp|\bwa\b|\bhp\b|telp\.?|telepon|tlp\.?)\s*[:.=]?\s*(\+?62[\s.-]?\d(?:[\s.-]?\d){7,14}|0\d(?:[\s.-]?\d){7,14})(?!\d)/i;
 
 function pisahHpDanKodePos(digit: string): { hp: string; sisa: string } {
   const bersih = digit.replace(/^62/, "0");
@@ -274,7 +289,23 @@ function pisahHpDanKodePos(digit: string): { hp: string; sisa: string } {
 }
 
 export function cariNomorHp(teks: string): { hp: string; mulai: number; selesai: number; ekor: string } | null {
-  const cocokan = [...String(teks || "").matchAll(POLA_HP)];
+  const sumber = String(teks || "");
+  const berlabel = sumber.match(POLA_LABEL_HP);
+  if (berlabel && berlabel.index !== undefined) {
+    const digit = berlabel[1].replace(/\D/g, "");
+    if (/^(0|62)?8/.test(digit.replace(/^62/, "0"))) {
+      const { hp, sisa } = pisahHpDanKodePos(digit);
+      if (hp.length >= 10 && hp.length <= 13) {
+        const mulai = berlabel.index + berlabel[0].indexOf(berlabel[1]);
+        return { hp, mulai, selesai: mulai + berlabel[1].length, ekor: sisa };
+      }
+    }
+  }
+
+  const denganKodePos = [...sumber.matchAll(POLA_HP_KODE_POS)];
+  const cocokan = [...denganKodePos, ...[...sumber.matchAll(POLA_HP)].filter((m) => !denganKodePos.some((d) => d.index === m.index))].sort(
+    (a, b) => (a.index ?? 0) - (b.index ?? 0),
+  );
   for (const m of cocokan) {
     const mentah = m[0];
     const digit = mentah.replace(/\D/g, "");
@@ -326,6 +357,17 @@ export function cariKodePos(teks: string): string {
 /** Segmen/teks yang memakai label wilayah eksplisit ("Kecamatan: …", "Kota: …"). */
 const POLA_LABEL = /(?:kecamatan|kec|kota|kabupaten|kab|provinsi)\s*:/i;
 
+/**
+ * Awalan label yang lazim di tempelan CRM/sheet ("Nama Lengkap:", "Alamat Lengkap:", "No. WA:").
+ * Dibuang dari tiap segmen supaya teks alamat tidak terkotori dan nama tidak ikut jadi alamat.
+ */
+const POLA_AWALAN_LABEL = /^\s*(?:nama\s+lengkap|nama\s+penerima|nama|alamat\s+lengkap|alamat|kecamatan|kec|kota(?:\s+atau\s+kabupaten)?|kabupaten|kab|provinsi|kelurahan|kode\s*pos|no\.?\s*wa|nomor\s*wa|whatsapp|no\.?\s*hp|nomor\s*hp|hp|telp|telepon)\s*[:=]\s*/i;
+
+/** Buang awalan label di depan segmen ("No. WA: 0822…" → "0822…"). */
+function buangAwalanLabel(isi: string): string {
+  return rapikan(isi.replace(POLA_AWALAN_LABEL, ""));
+}
+
 /** Ambil nilai setelah label eksplisit, mis. "Kecamatan:  manggala" → "manggala". */
 function nilaiLabel(teks: string, pola: RegExp): string {
   const m = String(teks || "").match(pola);
@@ -368,6 +410,26 @@ export function deteksiAlamat(teks: string, sumber: WilayahSource): HasilDeteksi
   let hp = "";
   let nama = "";
   let teksWilayah = "";
+  /** Tempelan berlabel ("Alamat Lengkap: …", "Kecamatan: …") → seluruh teks dinilai sebagai alamat. */
+  const adaLabelAlamat = /(?:alamat\s*lengkap|alamat|kecamatan|kec|kelurahan|kota|kabupaten|provinsi)\s*:/i.test(satuBaris);
+  /** Potongan per baris/sel (teks bebas dipecah juga per koma) — dipakai mengambil nama yang berdiri sendiri. */
+  const potonganBaris = rows
+    .flatMap((r) => r.map((sel) => rapikan(sel)))
+    .flatMap((sel) => (adaTab ? [sel] : sel.split(/[,;\n|·•]+/).map((bagian) => rapikan(bagian))))
+    .filter(Boolean);
+
+  /** Satu potongan dinilai "nama orang" (bukan label wilayah, bukan alamat, bukan angka). */
+  const tampakNamaOrang = (potongan: string): boolean => {
+    const isi = rapikan(potongan);
+    if (!isi || /\d/.test(isi)) return false;
+    const kata = normal(isi).split(" ").filter(Boolean);
+    if (kata.length < 2 || kata.length > 4) return false;
+    // Label wilayah ("Kec. Cibinong", "Kota Depok") bukan nama orang.
+    if (AWALAN_ADMIN.has(kata[0])) return false;
+    if (sumber.provinces.some((p) => skorCocok(isi, p) > 0)) return false;
+    if (/^(?:jl|jln|jalan|gg|gang|rt|rw|kel|desa|dusun|blok|kp|kampung|perum|komplek|apartemen|rusun)\b/i.test(isi)) return false;
+    return true;
+  };
   /** Sisa 5 digit di ekor nomor HP (HP menempel kode pos, mis. "0878… 16412") → kandidat kode pos. */
   let hpEkor = "";
   if (adaTab && baris.length >= 2) {
@@ -384,8 +446,22 @@ export function deteksiAlamat(teks: string, sumber: WilayahSource): HasilDeteksi
     hp = temuan?.hp || hpDariSel(satuBaris);
     hpEkor = temuan?.ekor || "";
     const sebelumHp = temuan ? satuBaris.slice(0, temuan.mulai) : "";
-    nama = rapikan(sebelumHp);
-    teksWilayah = temuan ? satuBaris.slice(temuan.selesai) : satuBaris;
+    // Tempelan berlabel ("Nama Lengkap: … Alamat Lengkap: …") → nama hanya dari label nama.
+    const labelNama = nilaiLabel(satuBaris, /(?:nama\s+lengkap|nama\s+penerima|nama)\s*:\s*([^\n,;|]+)/i);
+    // Nama yang berdiri di barisnya sendiri ("Siti Aminah\nJl. Melati…") → pakai baris itu, jangan
+    // digabung dengan seluruh teks sebelum nomor HP.
+    const barisNama = potonganBaris.find(tampakNamaOrang);
+    // Nama yang berdiri sendiri di potongan pertama (dipisah koma/baris): "Indra Ardiansyah, Jalan…".
+    const potonganPertama = potonganBaris[0] || "";
+    const namaPotonganPertama = tampakNamaOrang(potonganPertama) ? potonganPertama : "";
+    nama = rapikan(buangAwalanLabel(labelNama || namaPotonganPertama || barisNama || sebelumHp));
+    // Alamat dinilai dari SELURUH teks: label "Alamat Lengkap:" / "Kecamatan:" bisa berada
+    // SETELAH nomor WA pada tempelan CRM, dan nomor HP pun bisa berada di akhir baris — kalau hanya
+    // potongan sesudah HP yang dipakai, alamatnya bisa kosong sama sekali.
+    teksWilayah = buangAwalanLabel(satuBaris);
+    // Nomor HP yang sudah dipakai sebagai kontak dibuang dari teks alamat (bentuk bertanda baca
+    // "0822-9441-7599" tidak terhapus oleh pengganti nama/HP nanti).
+    if (hp) teksWilayah = rapikan(teksWilayah.replace(POLA_HP, " ").replace(/^[,;.\s-]+|[,;.\s-]+$/g, ""));
   }
   // Nama: buang tanda kutip, angka panjang (nomor HP yang kebetulan ikut di kolom nama), dan
   // pemisah di ujung. Huruf besar-kecil DIPERTAHANKAN seperti yang diketik.
@@ -582,13 +658,37 @@ export function deteksiAlamat(teks: string, sumber: WilayahSource): HasilDeteksi
     if (terpakai.has(i)) continue;
     // Segmen yang isinya cuma label ("Kecamatan: Pasar Minggu Jakarta") tidak dianggap alamat.
     if (POLA_LABEL.test(segmen[i])) continue;
-    let isi = segmen[i];
+    // Fragmen label CRM yang ikut terpecah koma ("Alamat Lengkap:Jalan Patunas gang45" → "alamat
+    // lengkap:..." → "…) tetap bermula dari label; kalau sisa labelnya tanpa isi, buang.
+    let isi = buangAwalanLabel(segmen[i]);
+    if (!isi || POLA_LABEL.test(isi)) continue;
     if (i === segmenKecamatanDibuang) isi = hapusKemunculan(isi, hasil.kecamatan);
-    for (const potongan of [hasil.city, hasil.province, hasil.name, hasil.whatsapp, kodePos]) {
+    // Nama kecamatan/kota/provinsi yang muncul sebagai SEGMEN UTUH ("…, TUNGKAL ILIR, JAMBI, ID,
+    // 36513") termasuk bagian wilayah, bukan alamat. Hanya skor 3 (persis) — skor 2 akan ikut
+    // membuang jalan yang kebetulan memuat nama kota ("Jl. Raya Bogor KM 20" ≠ Bogor).
+    if (hasil.kecamatan && skorCocok(isi, hasil.kecamatan) === 3) continue;
+    if (hasil.city && skorCocok(isi, hasil.city) === 3) continue;
+    if (hasil.province && skorCocok(isi, hasil.province) === 3) continue;
+    // Singkatan/alias provinsi yang berdiri sendiri ("DIY", "JABAR") juga bagian wilayah, bukan
+    // alamat. Dibandingkan lewat daftar alias karena `tanpaAwalan` sudah membuang akar "diy".
+    const aliasProvinsi = ALIAS_PROVINSI.find(({ provinsi }) => skorCocok(provinsi, hasil.province) > 0);
+    if (aliasProvinsi && aliasProvinsi.alias.some((alias) => normal(alias) === normal(isi))) continue;
+    // Segmen yang sudah diwakili segmen wilayah lain ("Kec. Cibinong", "Kab. Bogor") cukup dilewati.
+    // Kelurahan/desa TIDAK termasuk — "Kel. Sukapura" adalah bagian alamat yang tetap ditampilkan.
+    if (AWALAN_WILAYAH_SEGMEN.has(normal(isi).split(" ").filter(Boolean)[0] || "")) continue;
+    for (const potongan of [hasil.name, hasil.whatsapp, kodePos]) {
       if (potongan) isi = hapusKemunculan(isi, potongan);
     }
+    // Nomor HP yang tertulis dengan tanda hubung/spasi ("0822-9441-7599") tidak terhapus oleh
+    // `hapusKemunculan` (yang menghapus bentuk ternormalisasi) → sisir juga bentuk bertanda baca.
+    // Hanya dijalankan pada sisa teks yang memang masih memuat nomor (bukan setiap segmen) supaya
+    // nama jalan yang mengandung angka 5 digit ("Jl. Raya Bogor KM 20") tidak ikut terpotong.
+    isi = isi.replace(POLA_HP, " ");
     isi = rapikan(isi.replace(/^[\s,;.\-]+|[\s,;.\-]+$/g, ""));
     if (!isi) continue;
+    // Fragmen label yang tersisa tanpa isi ("kecamatan", "alamat lengkap") bukan bagian alamat.
+    if (/^(?:nama(?:\s+lengkap)?|alamat(?:\s+lengkap)?|kecamatan|kec|kota|kabupaten|kab|provinsi|kelurahan|kode\s*pos|no\.?\s*wa|nomor\s*wa|whatsapp|no\.?\s*hp|hp|telp|telepon)$/i.test(isi)) continue;
+    if (/^(?:id|indonesia|wni)$/i.test(isi)) continue;
     // Sisa yang isinya cuma potongan nama kota/provinsi (mis. baris "Jakarta 12520" setelah kode
     // pos dibuang) tidak dianggap bagian alamat.
     const kataSisa = normal(isi).split(" ").filter(Boolean);
