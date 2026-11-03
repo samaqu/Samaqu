@@ -340,6 +340,19 @@ export const base44 = {
           return_number: returnNumber,
         });
       },
+
+      /**
+       * Aksi tambahan retur (lacak J&T, kirim tagihan WA). WAJIB lewat `call()` supaya
+       * header Authorization ikut — tanpa itu endpoint ber-guard membalas 401 dan pesannya
+       * ("Tidak diizinkan") terbaca seolah penolakan dari J&T.
+       */
+      async action(returnNumber: string, action: string) {
+        return call<{ awb?: string; detail?: any; history?: any[]; sent?: boolean }>(
+          "POST",
+          `${RETURNS}/action`,
+          { return_number: returnNumber, action },
+        );
+      },
     },
 
     /** Pra-cek pembuatan resi (hanya membaca; tidak memanggil J&T dan tidak menulis apa pun). */

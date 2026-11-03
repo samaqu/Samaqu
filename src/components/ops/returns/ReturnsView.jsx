@@ -2434,45 +2434,34 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
   const trackReturn = async () => {
     setBusy("track");
     try {
-      const response = await fetch("/api/ops/returns/action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ return_number: record.return_number, action: "track" }),
-      });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setTrackInfo({ error: json?.error || "Gagal melacak resi." });
+      // Lewat shim `base44` supaya header Authorization ikut terkirim (kalau tidak: 401).
+      const result = await base44.entities.Return.action(record.return_number, "track");
+      if (result?.error) {
+        setTrackInfo({ error: result.error });
       } else {
-        setTrackInfo({ detail: json?.detail || null, history: json?.history || [] });
+        setTrackInfo({ detail: result?.detail || null, history: result?.history || [] });
       }
-    } catch {
-      setTrackInfo({ error: "Gagal melacak resi." });
+    } catch (err) {
+      setTrackInfo({ error: err instanceof Error ? err.message : "Gagal melacak resi." });
     } finally {
       setBusy("");
     }
   };
 
   /**
-   * Aksi retur yang tidak mengubah record lewat PATCH biasa (kirim WA, lacak J&T).
-   * Tanpa `onDone`, hasilnya hanya memuat ulang data dari server.
+   * Aksi retur yang tidak mengubah record lewat PATCH biasa (kirim WA tagihan).
+   * Lewat shim `base44` supaya header Authorization ikut — kalau tidak, endpoint ber-guard
+   * membalas 401 dan pesannya terbaca seolah kesalahan dari layanan lain.
    */
-  const returnAction = async (action, onDone) => {
-    setBusy(action);
+  const sendBilling = async () => {
+    setBusy("send_billing");
     setError("");
     try {
-      const response = await fetch("/api/ops/returns/action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ return_number: record.return_number, action }),
-      });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(json?.error || "Aksi gagal");
-      if (typeof onDone === "function") onDone(json);
-      // Muat ulang record supaya badge/tombol mengikuti status terbaru.
+      await base44.entities.Return.action(record.return_number, "send_billing");
       const fresh = await base44.entities.Return.get(record.return_number).catch(() => null);
       if (fresh) onChanged(fresh);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Aksi gagal");
+      setError(err instanceof Error ? err.message : "Gagal mengirim tagihan");
     } finally {
       setBusy("");
     }
@@ -2791,7 +2780,7 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => returnAction("send_billing")}
+                  onClick={sendBilling}
                   disabled={Boolean(busy)}
                   className="rounded-xl border-2 border-slate-200 px-3 py-2 text-[12px] font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
