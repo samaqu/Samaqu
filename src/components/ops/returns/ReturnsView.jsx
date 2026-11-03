@@ -34,6 +34,7 @@ import {
   trackingSummary,
 } from "@/lib/jnt/track-status";
 import { formatRupiah, formatTanggalJamID, formatTanggalSingkatID } from "@/components/ops/transaksi/transaksi-format";
+import { PanelDetailShell } from "@/components/ops/transaksi/PanelDetailPesanan";
 
 /**
  * Format nomor pesanan SAMAQU (SMQ-… website, CYO-… Open Order, OPS-… transaksi manual).
@@ -105,6 +106,34 @@ const STATUS = {
 const inputClass =
   "w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/20 dark:focus:ring-white/20";
 const labelClass = "block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1";
+
+/**
+ * Stepper & kartu status retur untuk panel detail.
+ *
+ * Memakai token warna yang SAMA dengan `PanelDetailPesanan` (Detail Pesanan) supaya kedua
+ * panel terlihat satu keluarga: biru #2774a8 (proses), hijau #1b7347 (selesai),
+ * kuning #8a5600 (menunggu), merah #a3355f (batal/ditolak).
+ */
+const RETUR_LANGKAH = ["Diajukan", "Disetujui", "Diterima", "Selesai"];
+
+const RETUR_RANK = { diajukan: 0, disetujui: 1, barang_diterima: 2, pengganti_dikirim: 2, selesai: 3 };
+
+const RETUR_STATUS_UI = {
+  diajukan: { judul: "Menunggu Persetujuan", catatan: "Retur baru diajukan, belum diproses.", nada: "kuning" },
+  disetujui: { judul: "Disetujui", catatan: "Menunggu barang lama diterima di gudang.", nada: "kuning" },
+  barang_diterima: { judul: "Barang Diterima", catatan: "Stok sudah diterapkan. Siap kirim pengganti.", nada: "biru" },
+  pengganti_dikirim: { judul: "Pengganti Dikirim", catatan: "Paket pengganti sedang dalam perjalanan.", nada: "biru" },
+  selesai: { judul: "Selesai", catatan: "Retur sudah diterima pembeli.", nada: "hijau" },
+  ditolak: { judul: "Ditolak", catatan: "Pengajuan retur ditolak.", nada: "merah" },
+  dibatalkan: { judul: "Dibatalkan", catatan: "Retur dibatalkan, stok dikembalikan.", nada: "merah" },
+};
+
+const RETUR_NADA_WARNA = {
+  biru: { bg: "#e8f3fb", warna: "#2774a8" },
+  hijau: { bg: "#e6f4ec", warna: "#1b7347" },
+  kuning: { bg: "#fff3d6", warna: "#8a5600" },
+  merah: { bg: "#fde8eb", warna: "#a3355f" },
+};
 
 /**
  * Picker pengganti untuk mode "Ganti series".
@@ -2468,6 +2497,15 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
   const isExchange = record.type === "tukar_size";
   const final = ["selesai", "ditolak", "dibatalkan"].includes(record.status);
 
+  /** Judul/nada/ikon kartu status — satu sumber, dipakai stepper & header. */
+  const returStatus = RETUR_STATUS_UI[record.status] || RETUR_STATUS_UI.diajukan;
+  const returNada = returStatus.nada;
+  const returIkon = RETUR_NADA_WARNA[returNada] || RETUR_NADA_WARNA.biru;
+  const returIkonBg = returIkon.bg;
+  const returIkonWarna = returIkon.warna;
+  const returLevel = RETUR_RANK[record.status] ?? 0;
+  const itemsQty = (record.items || []).reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+
   const run = async (action, label) => {
     setBusy(action);
     setError("");
@@ -2479,6 +2517,15 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
     } finally {
       setBusy("");
     }
+  };
+
+  /** Pembatalan menyebut bahwa stok dibalik & resi pengganti di-void lebih dulu (perilaku server). */
+  const cancelReturn = async () => {
+    const ok = window.confirm(
+      "Batalkan retur ini?\n\nStok yang sudah diterapkan akan dibalik, dan resi J&T pengganti (kalau ada) akan di-void lebih dulu.",
+    );
+    if (!ok) return;
+    await run("cancel", "membatalkan");
   };
 
   const settleDifference = async () => {
@@ -2655,592 +2702,444 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
   };
 
   return (
-    <DrawerShell
-      title={`Retur ${record.return_number}`}
-      subtitle={`${TYPE_LABEL[record.type]} · ${formatTanggalJamID(record.created_at)}`}
-      onClose={onClose}
-      isPanel={isPanel}
-    >
-      <div className="space-y-4">
-        {/* Ringkasan: status + asal retur, tanpa mengulang nomor retur (sudah di judul). */}
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-900/40">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge status={record.status} />
-            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-              {TYPE_LABEL[record.type]}
-            </span>
-            {!record.order_id ? (
-              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-                Tanpa pesanan asal
-              </span>
-            ) : null}
+    <PanelDetailShell open onClose={onClose} tema="warna">
+      <div className="dp-wrap">
+        {/* 1. Header gradasi — sama dengan Detail Pesanan. */}
+        <div className="dp-header">
+          <div className="dp-header-txt">
+            <span className="dp-sumber">{TYPE_LABEL[record.type]}</span>
+            <h1 className="dp-judul">Detail Retur</h1>
           </div>
-          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
-            <div className="min-w-0">
-              <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Pesanan Asal</dt>
-              <dd className="mt-0.5 truncate font-mono text-xs font-bold text-slate-800 dark:text-slate-100" title={record.order_number || undefined}>
-                {record.order_id ? (
-                  <a
-                    href={`${isPanel ? "/panel-admin" : "/ops"}/transaksi?order=${encodeURIComponent(record.order_number)}`}
-                    title="Buka pesanan asal di Transaksi"
-                    className={`underline decoration-dotted underline-offset-2 hover:no-underline ${isPanel ? "text-[#c2255c]" : "text-slate-900 dark:text-white"}`}
-                  >
-                    {record.order_number}
-                  </a>
-                ) : (
-                  record.order_number || "—"
-                )}
-              </dd>
-            </div>
-            <div className="min-w-0">
-              <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Resi</dt>
-              <dd className="mt-0.5 truncate font-mono text-xs font-bold text-slate-800 tabular-nums dark:text-slate-100" title={record.shipping_out_awb || record.shipping_in_awb || "—"}>
-                {record.shipping_out_awb || record.shipping_in_awb || "—"}
-              </dd>
-            </div>
-            <div className="min-w-0">
-              <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Diajukan</dt>
-              <dd className="mt-0.5 text-xs font-semibold text-slate-800 tabular-nums dark:text-slate-100">
-                {formatTanggalJamID(record.created_at)}
-              </dd>
-            </div>
-            <div className="min-w-0">
-              <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Jumlah item</dt>
-              <dd className="mt-0.5 text-xs font-semibold text-slate-800 tabular-nums dark:text-slate-100">
-                {(record.items || []).reduce((sum, item) => sum + (Number(item.qty) || 0), 0)} pcs
-              </dd>
-            </div>
-          </dl>
+          <button type="button" className="dp-tutup" onClick={onClose} aria-label="Tutup">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
         </div>
 
-        {error ? (
-          <p className="flex items-start gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 dark:border-red-900 dark:bg-red-900/20 dark:text-red-300">
-            <AlertCircle size={14} className="mt-px shrink-0" /> {error}
-          </p>
-        ) : null}
-
-        <section className="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Pelanggan</p>
-          <div className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-            <p className="min-w-0 truncate text-sm font-bold text-slate-900 dark:text-white">{record.customer_name}</p>
-            <p className="shrink-0 text-xs font-semibold text-slate-500 tabular-nums dark:text-slate-400">{record.customer_whatsapp || "-"}</p>
-          </div>
-          {record.shipping_address ? (
-            <p className="mt-1.5 text-xs font-semibold leading-relaxed text-slate-600 dark:text-slate-300">
-              {record.shipping_address}
-              {record.shipping_city ? `, ${record.shipping_city}` : ""}
-              {record.shipping_kecamatan ? `, ${record.shipping_kecamatan}` : ""}
-              {record.shipping_postal_code ? ` ${record.shipping_postal_code}` : ""}
-            </p>
-          ) : null}
-          {record.reason ? <p className="mt-2 text-xs font-semibold text-slate-600 dark:text-slate-300">Alasan: {record.reason}</p> : null}
-          {record.notes ? <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">{record.notes}</p> : null}
-        </section>
-
-        <section className="space-y-2">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Produk</p>
-          {(record.items || []).map((item) => (
-            <div key={item.id} className="rounded-xl border border-slate-200 px-3.5 py-3 dark:border-slate-800">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-slate-900 dark:text-white" title={item.product_name}>
-                    {item.product_name}
-                  </p>
-                  <p className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    {[item.color && item.color !== "default" ? item.color : null, item.size, item.condition === "damaged" ? "rusak" : "layak jual"]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
+        <div className="dp-isi">
+          {/* 2. Kartu status + stepper 4 langkah (diilhami stepper Detail Pesanan). */}
+          <section className={`dp-kartu dp-status-kartu nada-${returNada}`}>
+            <div className="dp-status">
+              <div className="dp-status-kiri">
+                <div className="dp-status-ikon" style={{ background: returIkonBg, color: returIkonWarna }}>
+                  <ArrowRightLeft size={16} strokeWidth={2.2} />
                 </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-sm font-bold text-slate-900 tabular-nums dark:text-white">×{item.qty}</p>
-                  {isExchange && item.replacement_size ? (
-                    <p className={`text-[11px] font-bold ${isPanel ? "text-[#c2255c]" : "text-slate-700 dark:text-slate-200"}`}>
-                      → {item.replacement_size}
-                    </p>
-                  ) : null}
+                <div className="dp-status-teks">
+                  <span className="dp-status-judul">{returStatus.judul}</span>
+                  <span className="dp-status-catatan">{returStatus.catatan}</span>
                 </div>
               </div>
+              {Number(record.total_tagihan) ? (
+                <span className="dp-hitung">
+                  {Number(record.total_tagihan) > 0 ? "+" : "-"}
+                  {formatRupiah(Math.abs(Number(record.total_tagihan)))}
+                </span>
+              ) : null}
             </div>
-          ))}
-        </section>
 
-        {isExchange && Number(record.price_difference_total || 0) !== 0 ? (
-          <section className="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Selisih Harga
-              </p>
-              <span
-                className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${
-                  record.price_difference_status === "settled"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-300"
-                    : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-300"
-                }`}
-              >
-                {record.price_difference_status === "settled" ? "Selesai" : "Belum selesai"}
+            {record.status !== "dibatalkan" && record.status !== "ditolak" ? (
+              <div className="dp-langkah">
+                <span className="dp-langkah-garis" aria-hidden="true">
+                  <span
+                    className="dp-langkah-garis-isi"
+                    style={{ width: `${Math.min(100, (returLevel / (RETUR_LANGKAH.length - 1)) * 100)}%` }}
+                  />
+                </span>
+                {RETUR_LANGKAH.map((label, index) => (
+                  <div
+                    key={label}
+                    className={`dp-langkah-item${index < returLevel ? " lewat" : ""}${index === returLevel ? " aktif" : ""}`}
+                  >
+                    <span className="dp-langkah-dot">
+                      {index < returLevel ? (
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M4 12.5l5 5L20 6.5" />
+                        </svg>
+                      ) : null}
+                    </span>
+                    <span className="dp-langkah-label">{label}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </section>
+
+          {/* 3. Informasi Pengiriman Pengganti + Lacak (modal bersama Detail Pesanan). */}
+          <section className="dp-kartu">
+            <div className="dp-kepala">
+              <div className="dp-kepala-kiri">
+                <span className="dp-kepala-ikon">
+                  <Truck size={14} strokeWidth={2} />
+                </span>
+                <span className="dp-kepala-judul">Informasi Pengiriman</span>
+              </div>
+              <div className="dp-lencana-grup">
+                <span className="dp-lencana kurir">J&amp;T Express</span>
+                {record.shipping_out_service ? (
+                  <span className="dp-lencana layanan">{record.shipping_out_service}</span>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="dp-baris">
+              <span className="dp-baris-ikon">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M4 7v10M8 7v10M12 7v10M16 7v10M20 7v10" />
+                </svg>
+              </span>
+              <span className="dp-baris-label">Nomor Resi</span>
+              <span className={`dp-baris-nilai${record.shipping_out_awb ? "" : " kosong"}`}>
+                {record.shipping_out_awb || "Belum dibuat"}
+              </span>
+              <span className="dp-baris-aksi">
+                <button
+                  type="button"
+                  className={`dp-mini${trackOpened ? " aktif" : ""}`}
+                  onClick={trackReturn}
+                  disabled={!record.shipping_out_awb || busy === "track"}
+                >
+                  Lacak
+                </button>
               </span>
             </div>
 
-            <p
-              className={`mt-1 text-lg font-black ${
-                Number(record.price_difference_total) > 0
-                  ? "text-amber-700 dark:text-amber-300"
-                  : "text-blue-700 dark:text-blue-300"
-              }`}
-            >
-              {Number(record.price_difference_total) > 0
-                ? `+Rp ${formatRupiah(record.price_difference_total)}`
-                : `-Rp ${formatRupiah(Math.abs(Number(record.price_difference_total)))}`}
-            </p>
-            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-              {Number(record.price_difference_total) > 0 ? "Customer bayar tambahan" : "Refund ke customer"}
-              {record.price_difference_method ? ` · ${record.price_difference_method}` : ""}
-            </p>
+            <div className="dp-baris">
+              <span className="dp-baris-ikon">
+                <Truck size={13} strokeWidth={2} />
+              </span>
+              <span className="dp-baris-label">Status Terbaru</span>
+              <span className={`dp-baris-nilai${trackSummary?.status ? "" : " kosong"}`}>
+                {trackSummary?.status || (trackOpened ? "Belum ada riwayat" : "Belum dilacak")}
+                {trackSummary?.updatedAt ? (
+                  <span className="dp-baris-sub">{formatTrackingTime(trackSummary.updatedAt)}</span>
+                ) : null}
+              </span>
+            </div>
 
-            <div className="mt-2 space-y-1">
+            <div className="dp-baris">
+              <span className="dp-baris-ikon">
+                <Wallet size={13} strokeWidth={2} />
+              </span>
+              <span className="dp-baris-label">Ongkir Pengganti</span>
+              <span className="dp-baris-nilai">Rp {formatRupiah(Number(record.shipping_out_cost) || 0)}</span>
+            </div>
+          </section>
+
+          {/* 4. Alamat Pengiriman — sama bentuknya dengan kartu Alamat pada Detail Pesanan. */}
+          <section className="dp-kartu">
+            <div className="dp-kepala">
+              <div className="dp-kepala-kiri">
+                <span className="dp-kepala-ikon pink">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" />
+                    <circle cx="12" cy="10" r="2.6" />
+                  </svg>
+                </span>
+                <span className="dp-kepala-judul">Alamat Pengiriman</span>
+              </div>
+              {record.customer_whatsapp ? (
+                <button
+                  type="button"
+                  className="dp-mini"
+                  onClick={() => {
+                    const nomor = String(record.customer_whatsapp).replace(/\D/g, "").replace(/^0/, "62");
+                    window.open(`https://wa.me/${nomor}`, "_blank", "noopener,noreferrer");
+                  }}
+                >
+                  WhatsApp
+                </button>
+              ) : null}
+            </div>
+            <p className="dp-catatan" style={{ color: "#24324a", fontWeight: 900 }}>
+              {record.customer_name || "-"}
+              {record.customer_whatsapp ? ` · ${record.customer_whatsapp}` : ""}
+            </p>
+            <p className="dp-catatan">
+              {[record.shipping_address, record.shipping_kecamatan, record.shipping_city, record.shipping_postal_code]
+                .filter(Boolean)
+                .join(", ") || "Alamat belum diisi."}
+            </p>
+            {record.reason ? <p className="dp-catatan">Alasan: {record.reason}</p> : null}
+          </section>
+
+          {/* 5. Informasi Produk — baris per item, pola sama dengan Detail Pesanan. */}
+          <section className="dp-kartu">
+            <div className="dp-kepala">
+              <div className="dp-kepala-kiri">
+                <span className="dp-kepala-ikon">
+                  <RotateCcw size={13} strokeWidth={2} />
+                </span>
+                <span className="dp-kepala-judul">Informasi Produk</span>
+              </div>
+            </div>
+            {(record.items || []).map((item) => (
+              <div key={item.id} className="dp-baris" style={{ alignItems: "flex-start" }}>
+                <span className="dp-baris-label" style={{ flexBasis: 0, width: "100%" }}>
+                  <span style={{ display: "block", color: "#24324a", fontWeight: 900 }}>
+                    {item.product_name}
+                    {item.replacement_product_name && item.replacement_product_id && item.replacement_product_id !== item.product_id
+                      ? ` → ${item.replacement_product_name}`
+                      : ""}
+                  </span>
+                  <span
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 5,
+                      marginTop: 4,
+                    }}
+                  >
+                    {item.replacement_series || item.replacement_kain ? (
+                      <span className="dp-lencana layanan">
+                        {[item.replacement_kain, item.replacement_series].filter(Boolean).join(" · ")}
+                      </span>
+                    ) : null}
+                    <span className="dp-lencana layanan">
+                      {item.size} → {item.replacement_size} · ×{item.qty}
+                    </span>
+                  </span>
+                  <span className="dp-baris-sub">
+                    {[
+                      item.condition === "damaged" ? "tidak layak jual" : "layak jual",
+                      Number(item.price_difference)
+                        ? `selisih ${Number(item.price_difference) > 0 ? "+" : "-"}Rp ${formatRupiah(Math.abs(Number(item.price_difference)))}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                </span>
+                <span className="dp-baris-nilai" style={{ flex: "0 0 auto", justifyContent: "flex-end" }}>
+                  Rp {formatRupiah(Number(item.price) || 0)}
+                </span>
+              </div>
+            ))}
+          </section>
+
+          {/* 6. Tagihan ke customer (hanya kalau ada). */}
+          {Number(record.total_tagihan) ? (
+            <section className="dp-kartu">
+              <div className="dp-kepala">
+                <div className="dp-kepala-kiri">
+                  <span className="dp-kepala-ikon">
+                    <Wallet size={13} strokeWidth={2} />
+                  </span>
+                  <span className="dp-kepala-judul">Tagihan ke Customer</span>
+                </div>
+                <span className="dp-lencana layanan">
+                  {record.billing_status === "lunas" ? "Lunas" : "Belum lunas"}
+                </span>
+              </div>
+              <div className="dp-baris">
+                <span className="dp-baris-label">Selisih Produk</span>
+                <span className="dp-baris-nilai">Rp {formatRupiah(Math.abs(Number(record.price_difference_total) || 0))}</span>
+              </div>
+              <div className="dp-baris">
+                <span className="dp-baris-label">Ongkir</span>
+                <span className="dp-baris-nilai">Rp {formatRupiah(Number(record.shipping_out_cost) || 0)}</span>
+              </div>
+              <div className="dp-baris">
+                <span className="dp-baris-label">
+                  {Number(record.total_tagihan) > 0 ? "Total Kekurangan" : "Perlu Refund"}
+                </span>
+                <span className="dp-baris-nilai">
+                  Rp {formatRupiah(Math.abs(Number(record.total_tagihan)))}
+                </span>
+              </div>
+              {record.billing_status !== "lunas" ? (
+                <div className="dp-footer-baris">
+                  <button
+                    type="button"
+                    className="dp-mini"
+                    style={{ flex: 1, height: 30, justifyContent: "center" }}
+                    onClick={sendBilling}
+                    disabled={Boolean(busy)}
+                  >
+                    {busy === "send_billing" ? "Mengirim…" : "Kirim Tagihan WA"}
+                  </button>
+                  <button
+                    type="button"
+                    className="dp-mini aktif"
+                    style={{ flex: 1, height: 30, justifyContent: "center" }}
+                    onClick={settleBilling}
+                    disabled={Boolean(busy)}
+                  >
+                    {busy === "settle_billing"
+                      ? "Menyimpan…"
+                      : Number(record.total_tagihan) > 0
+                        ? "Sudah Dibayar"
+                        : "Sudah Direfund"}
+                  </button>
+                </div>
+              ) : (
+                <p className="dp-catatan">
+                  Dilunasi {record.billing_settled_at ? formatTanggalJamID(record.billing_settled_at) : "-"}
+                </p>
+              )}
+            </section>
+          ) : null}
+
+          {/* 7. Selisih harga lama (tetap dipertahankan supaya data lama tidak hilang). */}
+          {isExchange && Number(record.price_difference_total) !== 0 ? (
+            <section className="dp-kartu">
+              <div className="dp-kepala">
+                <div className="dp-kepala-kiri">
+                  <span className="dp-kepala-ikon">
+                    <AlertCircle size={13} strokeWidth={2} />
+                  </span>
+                  <span className="dp-kepala-judul">Selisih Harga</span>
+                </div>
+                <span className="dp-lencana layanan">
+                  {record.price_difference_status === "settled" ? "Selesai" : "Belum selesai"}
+                </span>
+              </div>
               {(record.items || [])
                 .filter((item) => Number(item.price_difference) !== 0)
                 .map((item) => (
-                  <p key={item.id} className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                    {item.product_name} · {item.size} → {item.replacement_size}: Rp {formatRupiah(item.price)} → Rp{" "}
-                    {formatRupiah(item.replacement_price)} ·{" "}
-                    <span className={Number(item.price_difference) > 0 ? "text-amber-700 dark:text-amber-300" : "text-blue-700 dark:text-blue-300"}>
-                      {Number(item.price_difference) > 0
-                        ? `+Rp ${formatRupiah(item.price_difference)}`
-                        : `-Rp ${formatRupiah(Math.abs(Number(item.price_difference)))}`}
+                  <div key={item.id} className="dp-baris">
+                    <span className="dp-baris-label">
+                      {item.size} → {item.replacement_size}
                     </span>
-                  </p>
+                    <span className="dp-baris-nilai">
+                      Rp {formatRupiah(Number(item.price))} → Rp {formatRupiah(Number(item.replacement_price))}
+                    </span>
+                  </div>
                 ))}
-            </div>
-
-            {record.price_difference_status !== "settled" &&
-            record.status !== "dibatalkan" &&
-            record.status !== "ditolak" ? (
-              <button
-                type="button"
-                onClick={settleDifference}
-                disabled={Boolean(busy)}
-                className={`mt-3 w-full rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-50 ${accent}`}
-              >
-                {busy === "settle"
-                  ? "Menyimpan…"
-                  : Number(record.price_difference_total) > 0
-                    ? "Tandai Sudah Dibayar"
-                    : "Tandai Sudah Direfund"}
-              </button>
-            ) : null}
-            {record.price_difference_status === "settled" && record.price_difference_settled_at ? (
-              <p className="mt-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                Diselesaikan {formatTanggalJamID(record.price_difference_settled_at)}
-              </p>
-            ) : null}
-          </section>
-        ) : null}
-
-        {/* Tagihan ke customer = selisih produk + ongkir pengganti. Ongkir balik tidak ikut. */}
-        {record.type === "tukar_size" && Number(record.total_tagihan) !== 0 ? (
-          <section className="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Tagihan ke Customer
-              </p>
-              <span
-                className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${
-                  record.billing_status === "lunas"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-300"
-                    : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-300"
-                }`}
-              >
-                {record.billing_status === "lunas" ? "Lunas" : "Belum lunas"}
-              </span>
-            </div>
-
-            <p
-              className={`mt-1 text-lg font-black ${
-                Number(record.total_tagihan) > 0
-                  ? "text-amber-700 dark:text-amber-300"
-                  : "text-blue-700 dark:text-blue-300"
-              }`}
-            >
-              {Number(record.total_tagihan) > 0
-                ? `Rp ${formatRupiah(record.total_tagihan)}`
-                : `-Rp ${formatRupiah(Math.abs(Number(record.total_tagihan)))}`}
-            </p>
-            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-              {Number(record.total_tagihan) > 0 ? "Customer kurang bayar" : "Perlu refund ke customer"}
-              {` · selisih Rp ${formatRupiah(Math.abs(Number(record.price_difference_total) || 0))} + ongkir Rp ${formatRupiah(
-                Number(record.shipping_out_cost) || 0,
-              )}`}
-            </p>
-
-            {record.billing_status !== "lunas" ? (
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              {record.price_difference_status !== "settled" &&
+              record.status !== "dibatalkan" &&
+              record.status !== "ditolak" ? (
                 <button
                   type="button"
-                  onClick={sendBilling}
+                  className="dp-mini"
+                  style={{ height: 30, justifyContent: "center" }}
+                  onClick={settleDifference}
                   disabled={Boolean(busy)}
-                  className="rounded-xl border-2 border-slate-200 px-3 py-2 text-[12px] font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
-                  {busy === "send_billing" ? "Mengirim…" : "Kirim Tagihan WA"}
+                  {busy === "settle" ? "Menyimpan…" : "Tandai Sudah Dibayar"}
                 </button>
-                <button
-                  type="button"
-                  onClick={settleBilling}
-                  disabled={Boolean(busy)}
-                  className={`rounded-xl px-3 py-2 text-[12px] font-bold disabled:opacity-50 ${accent}`}
-                >
-                  {busy === "settle_billing"
-                    ? "Menyimpan…"
-                    : Number(record.total_tagihan) > 0
-                      ? "Sudah Dibayar"
-                      : "Sudah Direfund"}
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={reopenBilling}
-                disabled={Boolean(busy)}
-                className="mt-3 text-[11px] font-bold text-slate-500 underline disabled:opacity-50 dark:text-slate-400"
-              >
-                Buka lagi / batalkan status lunas
-              </button>
-            )}
-            {record.billing_settled_at ? (
-              <p className="mt-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                Dilunasi {formatTanggalJamID(record.billing_settled_at)}
-              </p>
-            ) : null}
-          </section>
-        ) : null}
-
-        <section className="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Pengiriman & Refund</p>
-            {!final ? (
-              <button type="button" onClick={() => setEditing((v) => !v)} className={`text-[11px] font-bold ${isPanel ? "text-[#c2255c]" : "text-slate-700 underline dark:text-slate-200"}`}>
-                {editing ? "Tutup" : "Ubah"}
-              </button>
-            ) : null}
-          </div>
-
-          {editing ? (
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <div>
-                <label className={labelClass}>Ongkir balik</label>
-                <input value={shippingIn} onChange={(event) => setShippingIn(event.target.value)} inputMode="numeric" className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Ongkir pengganti</label>
-                <input value={shippingOut} onChange={(event) => setShippingOut(event.target.value)} inputMode="numeric" className={inputClass} />
-              </div>
-              <div className="col-span-2">
-                <label className={labelClass}>Status bayar ongkir</label>
-                <select value={shippingPaid} onChange={(event) => setShippingPaid(event.target.value)} className={inputClass}>
-                  <option value="unpaid">Belum dibayar</option>
-                  <option value="paid">Sudah dibayar</option>
-                </select>
-              </div>
-              <div className="col-span-2">
-                <label className={labelClass}>AWB barang balik (dari customer)</label>
-                <input value={inAwb} onChange={(event) => setInAwb(event.target.value)} className={inputClass} />
-              </div>
-              {!record.order_id ? (
-                <>
-                  <div className="col-span-2">
-                    <label className={labelClass}>Alamat pengganti</label>
-                    <input value={addr} onChange={(event) => setAddr(event.target.value)} className={inputClass} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Kota</label>
-                    <input value={city} onChange={(event) => setCity(event.target.value)} className={inputClass} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Kecamatan</label>
-                    <input value={kec} onChange={(event) => setKec(event.target.value)} className={inputClass} />
-                  </div>
-                  <div className="col-span-2">
-                    <label className={labelClass}>Kode pos</label>
-                    <input value={postal} onChange={(event) => setPostal(event.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" className={inputClass} />
-                  </div>
-                </>
-              ) : null}
-              {record.type === "return" ? (
-                <>
-                  <div>
-                    <label className={labelClass}>Refund</label>
-                    <input value={refundAmount} onChange={(event) => setRefundAmount(event.target.value)} inputMode="numeric" className={inputClass} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Metode</label>
-                    <input value={refundMethod} onChange={(event) => setRefundMethod(event.target.value)} className={inputClass} />
-                  </div>
-                  <div className="col-span-2">
-                    <label className={labelClass}>Status refund</label>
-                    <input value={refundStatus} onChange={(event) => setRefundStatus(event.target.value)} placeholder="mis. diproses / selesai" className={inputClass} />
-                  </div>
-                </>
-              ) : null}
-              <button
-                type="button"
-                onClick={saveSettings}
-                disabled={busy === "update"}
-                className={`col-span-2 rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-50 ${accent}`}
-              >
-                {busy === "update" ? "Menyimpan…" : "Simpan"}
-              </button>
-            </div>
-          ) : (
-            <div className="mt-2 space-y-1.5 text-sm">
-              <Row label="Ongkir balik" value={`Rp ${formatRupiah(record.shipping_in_cost || 0)}`} />
-              <Row label="Ongkir pengganti" value={`Rp ${formatRupiah(record.shipping_out_cost || 0)}`} />
-              <Row label="Ongkir dibayar" value={record.shipping_payment_status === "paid" ? "Sudah" : "Belum"} />
-              <Row label="AWB balik" value={record.shipping_in_awb || "-"} />
-              {isExchange ? (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-slate-500 dark:text-slate-400">AWB pengganti</span>
-                  <span className="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-900 dark:text-white">
-                    {record.shipping_out_awb || "-"}
-                    {record.shipping_out_awb ? (
-                      <button type="button" onClick={() => copy(record.shipping_out_awb, "out")} className="rounded-md border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" aria-label="Salin resi">
-                        {copied === "out" ? <Check size={12} /> : <Clipboard size={12} />}
-                      </button>
-                    ) : null}
-                  </span>
-                </div>
-              ) : null}
-              {record.type === "return" ? (
-                <>
-                  <Row label="Refund" value={`Rp ${formatRupiah(record.refund_amount || 0)}`} />
-                  <Row label="Metode refund" value={record.refund_method || "-"} />
-                  <Row
-                    label="Status refund"
-                    value={record.refund_settled_at ? "Sudah dibayar" : "Belum ditandai selesai"}
-                  />
-                  {record.refund_settled_at ? (
-                    <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                      Refund selesai {formatTanggalJamID(record.refund_settled_at)}
-                    </p>
-                  ) : null}
-                  {!record.refund_settled_at &&
-                  Number(record.refund_amount) > 0 &&
-                  record.status !== "dibatalkan" &&
-                  record.status !== "ditolak" ? (
-                    <button
-                      type="button"
-                      onClick={settleRefund}
-                      disabled={Boolean(busy)}
-                      className={`mt-2 w-full rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-50 ${accent}`}
-                    >
-                      {busy === "refund" ? "Menyimpan…" : "Tandai Refund Selesai"}
-                    </button>
-                  ) : null}
-                </>
-              ) : null}
-              {!record.order_id && isExchange && !record.shipping_address ? (
-                <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                  Isi alamat lewat tombol Ubah agar resi pengganti bisa dibuat.
+              ) : record.price_difference_settled_at ? (
+                <p className="dp-catatan">
+                  Diselesaikan {formatTanggalJamID(record.price_difference_settled_at)}
                 </p>
               ) : null}
+            </section>
+          ) : null}
+
+          {/* 8. Riwayat status retur. */}
+          <section className="dp-kartu">
+            <div className="dp-kepala">
+              <div className="dp-kepala-kiri">
+                <span className="dp-kepala-ikon">
+                  <Clock size={13} strokeWidth={2} />
+                </span>
+                <span className="dp-kepala-judul">Riwayat Retur</span>
+              </div>
             </div>
-          )}
-        </section>
-
-        {/*
-          Lacak pengganti — markup & helper SAMA dengan "Lacak Resi" di detail transaksi
-          (`TransaksiDetailDrawer`): tombol lebar berikon truk, ringkasan penerima, daftar
-          riwayat ber-divider, footer jumlah riwayat. Memakai `trackingRow`,
-          `sortHistoryDesc`, dan `formatTrackingTime` dari `src/lib/jnt/track-status.ts`
-          supaya teks/label situs dan format waktunya identik, bukan versi kedua.
-        */}
-        {record.shipping_out_awb ? (
-          <section className="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Pengiriman Pengganti
-              </p>
-              <span className="font-mono text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                {record.shipping_out_awb}
-              </span>
+            <div className="dp-baris">
+              <span className="dp-baris-label">Diajukan</span>
+              <span className="dp-baris-nilai">{formatTanggalJamID(record.created_at)}</span>
             </div>
-
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={trackReturn}
-                disabled={Boolean(busy)}
-                className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-[13px] font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                <Truck size={15} /> {busy === "track" ? "Memuat…" : trackOpened ? "Muat ulang" : "Lacak Resi"}
-              </button>
-
-              {trackOpened ? (
-                <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
-                  {trackSummary?.receiver ? (
-                    <p className="border-b border-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:text-slate-200">
-                      Diterima oleh: {trackSummary.receiver}
-                    </p>
-                  ) : null}
-
-                  {busy === "track" ? (
-                    <p className="px-3 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                      Memuat riwayat dari J&T…
-                    </p>
-                  ) : trackInfo?.error ? (
-                    <p className="px-3 py-2.5 text-xs font-semibold text-red-600 dark:text-red-400">
-                      {trackInfo.error}
-                    </p>
-                  ) : trackRows.length === 0 ? (
-                    <p className="px-3 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                      Belum ada riwayat dari J&T.
-                    </p>
-                  ) : (
-                    <ul className="no-scrollbar max-h-[196px] divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
-                      {trackRows.map((row, index) => (
-                        <li key={`${row.dateTime}-${index}`} className="px-3 py-2">
-                          <p
-                            className={`text-xs font-bold ${
-                              row.warning
-                                ? "text-amber-600 dark:text-amber-400"
-                                : "text-slate-800 dark:text-slate-100"
-                            }`}
-                          >
-                            {row.status}
-                          </p>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                            {[row.location, formatTrackingTime(row.dateTime)].filter(Boolean).join(" • ")}
-                          </p>
-                          {row.note ? (
-                            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                              Catatan: {row.note}
-                            </p>
-                          ) : null}
-                          {row.driver ? (
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Kurir: {row.driver}</p>
-                          ) : null}
-                          {row.receiver ? (
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                              Diterima oleh: {row.receiver}
-                            </p>
-                          ) : null}
-                          {row.receivedByThirdParty ? (
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                              Diterima oleh: {row.receivedByThirdParty}
-                            </p>
-                          ) : null}
-                          {row.handoverNote ? (
-                            <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                              {row.handoverNote}
-                            </p>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  <div className="flex items-center justify-between gap-2 bg-slate-50 px-3 py-2 dark:bg-slate-900">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      {trackRows.length > 0 ? `${trackRows.length} riwayat` : "Riwayat J&T"}
-                    </span>
-                    {busy === "track" ? (
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                        Memuat…
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </section>
-        ) : null}
-
-        <section className="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Riwayat</p>
-          <div className="mt-2 space-y-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-            <p>Diajukan: {formatTanggalJamID(record.created_at)}</p>
-            {record.approved_at ? <p>Disetujui: {formatTanggalJamID(record.approved_at)}</p> : null}
-            {record.received_at ? <p>Barang diterima: {formatTanggalJamID(record.received_at)}</p> : null}
-            {record.replacement_delivered_at ? (
-              <p>Pengganti diterima: {formatTanggalJamID(record.replacement_delivered_at)}</p>
-            ) : null}
-            {record.completed_at ? <p>Selesai: {formatTanggalJamID(record.completed_at)}</p> : null}
-            {record.cancelled_at ? <p>Dibatalkan: {formatTanggalJamID(record.cancelled_at)}</p> : null}
-            <p>Pergerakan stok: {record.stock_applied_at ? "sudah diterapkan" : "belum"}</p>
-          </div>
-        </section>
-
-        {!final ? (
-          <div className="space-y-2">
-            {record.status === "diajukan" ? (
-              <div className="flex gap-2">
-                <button type="button" onClick={() => run("reject", "menolak")} disabled={Boolean(busy)} className="rounded-xl border-2 border-red-200 px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-900/50 dark:text-red-300 dark:hover:bg-red-900/20">
-                  Tolak
-                </button>
-                <button type="button" onClick={() => run("approve", "menyetujui")} disabled={Boolean(busy)} className={`ml-auto rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-50 ${accent}`}>
-                  {busy === "approve" ? "Menyetujui…" : "Setujui"}
-                </button>
+            {record.approved_at ? (
+              <div className="dp-baris">
+                <span className="dp-baris-label">Disetujui</span>
+                <span className="dp-baris-nilai">{formatTanggalJamID(record.approved_at)}</span>
               </div>
             ) : null}
-
-            {record.status === "disetujui" ? (
-              <button type="button" onClick={() => run("receive", "menerima barang")} disabled={Boolean(busy)} className={`w-full rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-50 ${accent}`}>
-                {busy === "receive" ? "Memproses stok…" : "Barang Diterima & Terapkan Stok"}
-              </button>
+            {record.received_at ? (
+              <div className="dp-baris">
+                <span className="dp-baris-label">Barang Diterima</span>
+                <span className="dp-baris-nilai">{formatTanggalJamID(record.received_at)}</span>
+              </div>
             ) : null}
-
-            {record.status === "barang_diterima" && isExchange && !record.shipping_out_awb ? (
-              <button type="button" onClick={createResi} disabled={Boolean(busy)} className={`w-full rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-50 ${accent}`}>
-                <Truck size={15} className="mr-1.5 inline" /> {busy === "resi" ? "Membuat resi…" : "Buat Resi Pengganti"}
-              </button>
+            {record.replacement_delivered_at ? (
+              <div className="dp-baris">
+                <span className="dp-baris-label">Pengganti Tiba</span>
+                <span className="dp-baris-nilai">{formatTanggalJamID(record.replacement_delivered_at)}</span>
+              </div>
             ) : null}
-
-            {isExchange && record.shipping_out_awb ? (
-              <button
-                type="button"
-                onClick={openLabel}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                <Printer size={15} /> Cetak Resi Pengganti
-              </button>
+            {record.completed_at ? (
+              <div className="dp-baris">
+                <span className="dp-baris-label">Selesai</span>
+                <span className="dp-baris-nilai">{formatTanggalJamID(record.completed_at)}</span>
+              </div>
             ) : null}
-
-            {["barang_diterima", "pengganti_dikirim"].includes(record.status) ? (
-              <button type="button" onClick={() => run("complete", "menyelesaikan")} disabled={Boolean(busy) || (isExchange && !record.shipping_out_awb)} className={`w-full rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-50 ${accent}`}>
-                {busy === "complete" ? "Menyelesaikan…" : "Selesaikan"}
-              </button>
+            {record.cancelled_at ? (
+              <div className="dp-baris">
+                <span className="dp-baris-label">Dibatalkan</span>
+                <span className="dp-baris-nilai">{formatTanggalJamID(record.cancelled_at)}</span>
+              </div>
             ) : null}
+            <div className="dp-baris">
+              <span className="dp-baris-label">Stok</span>
+              <span className="dp-baris-nilai">
+                {record.stock_applied_at ? "Sudah diterapkan" : "Belum diterapkan"}
+                <span className="dp-baris-sub">
+                  Asal +{itemsQty} · Pengganti -{itemsQty}
+                </span>
+              </span>
+            </div>
+          </section>
 
-            <button type="button" onClick={() => run("cancel", "membatalkan")} disabled={Boolean(busy)} className="w-full rounded-xl border-2 border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
-              {busy === "cancel" ? "Membatalkan…" : "Batalkan Retur"}
-            </button>
-          </div>
-        ) : null}
+          {error ? <p className="dp-catatan" style={{ color: "#a3355f" }}>{error}</p> : null}
+        </div>
 
-        <div className="border-t border-slate-200 pt-3 dark:border-slate-800">
-          <button
-            type="button"
-            onClick={deleteReturn}
-            disabled={Boolean(busy)}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-red-200 px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-900/50 dark:text-red-300 dark:hover:bg-red-900/20"
-          >
-            <Trash2 size={15} /> {busy === "delete" ? "Menghapus…" : "Hapus Data Retur"}
-          </button>
-          <p className="mt-1 text-center text-[10px] font-semibold text-slate-400">
-            Khusus koreksi/data uji — stok dibalik otomatis.
-          </p>
+        {/* Footer aksi — pola sama dengan Detail Pesanan. */}
+        <div className="dp-footer">
+          {(() => {
+            const aksi = [];
+            if (record.status === "diajukan") {
+              aksi.push({ key: "approve", label: "Setujui", jenis: "utama", onClick: () => run("approve", "menyetujui") });
+              aksi.push({ key: "reject", label: "Tolak", jenis: "sekunder", onClick: () => run("reject", "menolak") });
+            }
+            if (record.status === "disetujui") {
+              aksi.push({ key: "receive", label: "Barang Diterima", jenis: "utama", onClick: () => run("receive", "menerapkan stok") });
+            }
+            if (record.status === "barang_diterima" && isExchange && !record.shipping_out_awb) {
+              aksi.push({ key: "resi", label: "Buat Resi Pengganti", jenis: "utama", onClick: createResi });
+            }
+            if (isExchange && record.shipping_out_awb) {
+              aksi.push({
+                key: "cetak",
+                label: "Cetak Resi Pengganti",
+                jenis: "sekunder",
+                onClick: () =>
+                  window.open(
+                    `${isPanel ? "/panel-admin" : "/admin"}/label/${encodeURIComponent(record.return_number)}?size=100x150`,
+                    "_blank",
+                    "noopener,noreferrer",
+                  ),
+              });
+            }
+            if (["barang_diterima", "pengganti_dikirim"].includes(record.status)) {
+              aksi.push({ key: "complete", label: "Selesaikan", jenis: "utama", onClick: () => run("complete", "menyelesaikan") });
+            }
+            if (!final) {
+              aksi.push({ key: "cancel", label: "Batalkan Retur", jenis: "sekunder", onClick: cancelReturn });
+            }
+            if (!record.delete_locked) {
+              aksi.push({ key: "hapus", label: "Hapus Data", jenis: "bahaya", onClick: deleteReturn });
+            }
+            return (
+              <div className="dp-footer-baris">
+                {aksi.map((tombol) => (
+                  <button
+                    key={tombol.key}
+                    type="button"
+                    className={`dp-mini${tombol.jenis === "utama" ? " aktif" : ""}`}
+                    style={{ flex: 1, height: 34, justifyContent: "center" }}
+                    onClick={tombol.onClick}
+                    disabled={Boolean(busy)}
+                  >
+                    {busy === tombol.key ? "Memproses…" : tombol.label}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       </div>
-    </DrawerShell>
-  );
-}
-
-function Row({ label, value }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-slate-500 dark:text-slate-400">{label}</span>
-      <span className="font-semibold text-slate-900 dark:text-white">{value}</span>
-    </div>
+    </PanelDetailShell>
   );
 }
 
