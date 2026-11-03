@@ -532,7 +532,12 @@ export function deteksiAlamat(teks: string, sumber: WilayahSource): HasilDeteksi
   }
   if (!kecamatanKetemu) {
     const kecamatanUnik = [...new Set(kotaDalamProvinsi.flatMap((k) => sumber.districtsOf(k.kota)))];
-    const dariSegmen = cariTempat(segmen, kecamatanUnik, terpakai);
+    // Segmen yang jelas nama KOTA ("Kota Depok") jangan dianggap kecamatan kalau ada kandidat lain —
+    // contoh: "Kel. Sukamaju Kec. Cilodong, Kota Depok" → kecamatan harus Cilodong, bukan Depok.
+    const segmenKota = new Set(
+      segmen.map((isi, i) => (semuaKota.some((k) => skorCocok(isi, k.kota) === 3) ? i : -1)).filter((i) => i >= 0),
+    );
+    const dariSegmen = cariTempat(segmen, kecamatanUnik, new Set([...terpakai, ...segmenKota]));
     if (dariSegmen) {
       const sebaranDalamProvinsi = new Set(
         kotaDalamProvinsi.filter((k) => sumber.districtsOf(k.kota).some((d) => skorCocok(dariSegmen.nilai, d) > 0)).map((k) => k.kota),
@@ -541,9 +546,19 @@ export function deteksiAlamat(teks: string, sumber: WilayahSource): HasilDeteksi
         semuaKota.filter((k) => sumber.districtsOf(k.kota).some((d) => skorCocok(dariSegmen.nilai, d) > 0)).map((k) => k.kota),
       );
       const aman = sebaranDalamProvinsi.size <= 1 || sebaranDalamProvinsi.size === sebaranGlobal.size;
-      if (aman) {
+      // Jangan "memakan" segmen yang jelas nama KOTA ("Kota Depok") untuk kecamatan bernama sama —
+      // kalau dimakan di sini, kota kehilangan segmennya dan jatuh ke kecamatan ambigu (mis. Cirebon).
+      const segmenKotaJelas = semuaKota.some((k) => skorCocok(segmen[dariSegmen.segmen], k.kota) === 3);
+      // Potongan yang menempelkan kelurahan + kecamatan ("Kel. Sukamaju Kec. Cilodong") juga TIDAK
+      // ditandai terpakai — kelurahannya masih dibutuhkan sebagai bagian alamat.
+      const frasaKecDiSegmen = new RegExp(`(?:kecamatan|kec)\\.?\\s*${tanpaAwalan(dariSegmen.nilai).split(" ").join("[\\s.\\-]+")}\\s*$`, "i");
+      const masihAdaIsiLain = rapikan(segmen[dariSegmen.segmen].replace(frasaKecDiSegmen, "")) !== "";
+      if (aman && !segmenKotaJelas) {
         kecamatanKetemu = dariSegmen.nilai;
-        terpakai.add(dariSegmen.segmen);
+        if (!masihAdaIsiLain) terpakai.add(dariSegmen.segmen);
+      } else if (aman && segmenKotaJelas) {
+        // Segmen kota tetap dipakai kota; kecamatan diisi tanpa menandai segmen terpakai.
+        kecamatanKetemu = dariSegmen.nilai;
       }
     }
   }
@@ -642,11 +657,18 @@ export function deteksiAlamat(teks: string, sumber: WilayahSource): HasilDeteksi
 
   /* 10 · Alamat lengkap: buang segmen terpakai, label, kecamatan/kota/provinsi, kode pos, nama, HP.
      Kecamatan hanya dibuang dari SATU kemunculan (paling belakang) supaya kelurahan dengan nama
-     sama tetap ikut tampil. */
+     sama tetap ikut tampil. Pengecualian: potongan yang menempelkan kelurahan + kecamatan
+     ("Kel. Sukamaju Kec. Cilodong") hanya kata kecamatannya yang dibuang, kelurahannya tetap tampil. */
+  const frasaKecamatan = hasil.kecamatan
+    ? new RegExp(`(?:kecamatan|kec)\\.?\\s*${tanpaAwalan(hasil.kecamatan).split(" ").join("[\\s.\\-]+")}\\s*$`, "i")
+    : null;
   let segmenKecamatanDibuang = -1;
-  if (hasil.kecamatan) {
+  if (hasil.kecamatan && frasaKecamatan) {
     for (let i = segmen.length - 1; i >= 0; i -= 1) {
       if (terpakai.has(i) || POLA_LABEL.test(segmen[i])) continue;
+      const sisaTanpaKecamatan = rapikan(segmen[i].replace(frasaKecamatan, ""));
+      // Potongan "Kel. Sukamaju Kec. Cilodong" → masih ada isi lain, jadi bukan segmen kecamatan murni.
+      if (frasaKecamatan.test(segmen[i]) && sisaTanpaKecamatan) continue;
       if (skorCocok(segmen[i], hasil.kecamatan) > 0 || normal(segmen[i]).includes(normal(hasil.kecamatan))) {
         segmenKecamatanDibuang = i;
         break;
@@ -662,6 +684,9 @@ export function deteksiAlamat(teks: string, sumber: WilayahSource): HasilDeteksi
     // lengkap:..." → "…) tetap bermula dari label; kalau sisa labelnya tanpa isi, buang.
     let isi = buangAwalanLabel(segmen[i]);
     if (!isi || POLA_LABEL.test(isi)) continue;
+    // "Kel. Sukamaju Kec. Cilodong" → buang hanya frasa kecamatannya, kelurahan tetap tampil.
+    if (frasaKecamatan) isi = rapikan(isi.replace(frasaKecamatan, ""));
+    if (!isi) continue;
     if (i === segmenKecamatanDibuang) isi = hapusKemunculan(isi, hasil.kecamatan);
     // Nama kecamatan/kota/provinsi yang muncul sebagai SEGMEN UTUH ("…, TUNGKAL ILIR, JAMBI, ID,
     // 36513") termasuk bagian wilayah, bukan alamat. Hanya skor 3 (persis) — skor 2 akan ikut
