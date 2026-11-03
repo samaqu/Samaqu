@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
-import { trackShipment } from "@/lib/jnt/track";
 import { notifyCustomerReturnBilling } from "@/lib/fonnte";
 
 /**
@@ -59,19 +58,46 @@ export async function POST(req: NextRequest) {
       const awb = String(record.shipping_out_awb || "").trim();
       if (!awb) return NextResponse.json({ error: "Resi pengganti belum dibuat." }, { status: 400 });
 
-      const track = await trackShipment(awb);
-      if (!track.success || !track.data) {
-        return NextResponse.json(
-          { error: "Gagal mengambil data J&T.", awb },
-          { status: 502 },
-        );
+      /**
+       * Pakai endpoint lacak yang SAMA dengan drawer Transaksi (`/api/jnt/track`), bukan
+       * `trackShipment()` mentah. Endpoint itu sudah menangani: cache, validasi format resi,
+       * data kurir/penerima untuk admin, dan fallback ke riwayat tersimpan saat J&T menolak.
+       * Memanggil J&T langsung dulu membuat pesan mentah J&T ("Tidak diizinkan") muncul
+       * apa adanya tanpa penjelasan.
+       */
+      try {
+        const trackUrl = new URL("/api/jnt/track", req.nextUrl.origin);
+        trackUrl.searchParams.set("awb", awb);
+        trackUrl.searchParams.set("refresh", "1");
+        const trackRes = await fetch(trackUrl, {
+          headers: { Authorization: req.headers.get("authorization") || "" },
+          cache: "no-store",
+        });
+        const payload = await trackRes.json().catch(() => null);
+
+        if (!payload) {
+          return NextResponse.json({ error: "Gagal mengambil data J&T. Coba lagi." }, { status: 502 });
+        }
+        // `/api/jnt/track` membalas { success:false, error } (HTTP 200) saat J&T menolak.
+        if (payload.success === false) {
+          return NextResponse.json({
+            awb,
+            error: payload.error || "Data pelacakan tidak ditemukan.",
+            history: [],
+            detail: null,
+            return_status: record.status,
+          });
+        }
+        return NextResponse.json({
+          awb,
+          detail: payload.detail || null,
+          history: payload.history || [],
+          return_status: record.status,
+        });
+      } catch (err) {
+        console.error("[OPS] returns track:", err);
+        return NextResponse.json({ awb, error: "Gagal menghubungi layanan J&T.", history: [] });
       }
-      return NextResponse.json({
-        awb,
-        detail: track.data.detail || null,
-        history: track.data.history || [],
-        return_status: record.status,
-      });
     }
 
     if (action === "history") {
