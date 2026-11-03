@@ -88,10 +88,16 @@ export async function POST(req: NextRequest) {
             return_status: record.status,
           });
         }
+        /**
+         * Bentuk respons `/api/jnt/track` adalah `{ success: true, data: { detail, history } }`
+         * — isinya dibungkus `data`, bukan di akar. Membaca `payload.history` langsung
+         * membuat riwayat selalu kosong dan layar menulis "Belum ada pemindaian J&T."
+         */
+        const tracked = payload.data || {};
         return NextResponse.json({
           awb,
-          detail: payload.detail || null,
-          history: payload.history || [],
+          detail: tracked.detail || null,
+          history: tracked.history || [],
           return_status: record.status,
         });
       } catch (err) {

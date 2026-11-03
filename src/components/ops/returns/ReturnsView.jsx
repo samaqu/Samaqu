@@ -3049,8 +3049,13 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
               </p>
               {trackInfo?.detail ? (
                 <p className="mt-1 text-[11px] font-bold text-slate-700 dark:text-slate-200">
-                  {trackInfo.detail.status || "-"}
-                  {trackInfo.detail.receiver?.name ? ` · diterima ${trackInfo.detail.receiver.name}` : ""}
+                  {[
+                    trackInfo.detail.services_code ? `Layanan ${trackInfo.detail.services_code}` : null,
+                    trackInfo.detail.weight ? `${trackInfo.detail.weight} g` : null,
+                    trackInfo.detail.receiver?.city ? `Tujuan ${trackInfo.detail.receiver.city}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
               ) : null}
               {trackInfo?.error ? (
