@@ -6,17 +6,15 @@ import { useSafeLocale, useSafeTranslations } from "@/lib/safe-i18n";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { MobileDrawer, MobileDrawerCtx } from "@/components/ui/drawer";
-import {
-  Storefront,
-  BookOpen,
-  Ruler,
-  ListChecks,
-  Question,
-  ChatCircle as MessageCircle,
-  CaretDown,
-  Bag,
-  User,
-} from "@phosphor-icons/react";
+import { Storefront } from "@phosphor-icons/react/dist/csr/Storefront";
+import { BookOpen } from "@phosphor-icons/react/dist/csr/BookOpen";
+import { Ruler } from "@phosphor-icons/react/dist/csr/Ruler";
+import { ListChecks } from "@phosphor-icons/react/dist/csr/ListChecks";
+import { Question } from "@phosphor-icons/react/dist/csr/Question";
+import { ChatCircle as MessageCircle } from "@phosphor-icons/react/dist/csr/ChatCircle";
+import { CaretDown } from "@phosphor-icons/react/dist/csr/CaretDown";
+import { Bag } from "@phosphor-icons/react/dist/csr/Bag";
+import { User } from "@phosphor-icons/react/dist/csr/User";
 import { ShieldCheckIcon } from "@phosphor-icons/react/dist/csr/ShieldCheck";
 import HouseIcon from "@/components/icons/HouseIcon";
 import menu from "@/components/MobileMenu.module.css";

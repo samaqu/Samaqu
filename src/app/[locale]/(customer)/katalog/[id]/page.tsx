@@ -4,7 +4,7 @@ import { useState, use, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Minus, Plus, ChevronLeft, ChevronRight, ChevronDown, Play, ShoppingCart } from "lucide-react";
-import { Bag } from "@phosphor-icons/react";
+import { Bag } from "@phosphor-icons/react/dist/csr/Bag";
 import ImageZoom, { type ZoomMedia } from "@/components/ImageZoom";
 import KainSeriesModal, { getKainSwatchColor } from "@/components/KainSeriesModal";
 import Breadcrumb from "@/components/Breadcrumb";

@@ -60,7 +60,10 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    optimizePackageImports: ["framer-motion", "lucide-react"],
+    // Didaftarkan supaya resolusi import tetap eksplisit kalau ada penambahan ikon baru.
+    // Catatan: paket ini sudah `sideEffects: false`, jadi tree-shaking tetap bekerja
+    // tanpanya — daftar ini bukan penghematan ukuran bundle.
+    optimizePackageImports: ["framer-motion", "lucide-react", "@phosphor-icons/react"],
   },
   // Font laporan PDF dibaca dari filesystem saat request (bukan lewat import), jadi
   // perlu didaftarkan eksplisit supaya ikut ter-bundle di deploy serverless.

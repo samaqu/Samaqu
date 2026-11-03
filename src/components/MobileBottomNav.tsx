@@ -13,7 +13,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
-import { SquaresFour, Package, TShirt, User } from "@phosphor-icons/react";
+import { SquaresFour } from "@phosphor-icons/react/dist/csr/SquaresFour";
+import { Package } from "@phosphor-icons/react/dist/csr/Package";
+import { TShirt } from "@phosphor-icons/react/dist/csr/TShirt";
+import { User } from "@phosphor-icons/react/dist/csr/User";
 import HouseIcon from "@/components/icons/HouseIcon";
 import { useSafeLocale } from "@/lib/safe-i18n";
 import { useIsCustomerLoggedIn } from "@/lib/use-customer-login";
