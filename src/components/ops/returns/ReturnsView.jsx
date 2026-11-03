@@ -1193,14 +1193,18 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
 
     setOngkirState({ status: "loading", message: "", grams: 0 });
     try {
-      const response = await fetch("/api/ops/ongkir", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ city: destination.city, kecamatan: destination.kecamatan, items: itemsForWeight }),
+      /**
+       * Lewat shim `base44` (`Ongkir.check`) supaya header Authorization ikut. Memakai
+       * `fetch()` polos membuat endpoint ber-guard membalas 401 dan pesannya
+       * ("Tidak diizinkan") terbaca seolah penolakan dari J&T.
+       */
+      const json = await base44.entities.Ongkir.check({
+        city: destination.city,
+        kecamatan: destination.kecamatan,
+        items: itemsForWeight,
       });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setOngkirState({ status: "error", message: json?.error || "Gagal cek ongkir.", grams: 0 });
+      if (!json) {
+        setOngkirState({ status: "error", message: "Gagal cek ongkir.", grams: 0 });
         return;
       }
       const options = Array.isArray(json?.data) ? json.data : [];
@@ -1218,8 +1222,13 @@ function CreateReturnDrawer({ type, isPanel, accent, accentSoft, variants, onClo
         message: `${cheapest.service || cheapest.description || "J&T"} · Rp ${formatRupiah(Number(cheapest.cost) || 0)} (dari J&T, bisa diubah manual)`,
         grams: Number(json?.weight_grams) || 0,
       });
-    } catch {
-      setOngkirState({ status: "error", message: "Gagal cek ongkir. Coba lagi.", grams: 0 });
+    } catch (err) {
+      // `call()` melempar Error berisi pesan server — tampilkan apa adanya, jangan disamarkan.
+      setOngkirState({
+        status: "error",
+        message: err instanceof Error && err.message ? err.message : "Gagal cek ongkir. Coba lagi.",
+        grams: 0,
+      });
     }
   };
 
