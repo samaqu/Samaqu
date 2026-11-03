@@ -57,11 +57,12 @@ export async function GET(req: NextRequest) {
   const includeOptions = sp.get("options") !== "0";
 
   const admin = getSupabaseAdmin();
+  // Terbaru di atas: tanggal menurun, lalu jam menurun dalam tanggal yang sama.
   let query = admin
     .from("leads")
     .select("*", { count: "exact" })
-    .order("tanggal", { ascending: true })
-    .order("jam", { ascending: true })
+    .order("tanggal", { ascending: false })
+    .order("jam", { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (start) query = query.gte("tanggal", start);

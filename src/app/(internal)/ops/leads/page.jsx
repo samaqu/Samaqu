@@ -86,9 +86,9 @@ export default function Leads() {
       const query = { tanggal: { $gte: start, $lte: end } };
       if (search) query.kontak = { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
       const page = await base44.entities.Lead.filter(query, { sort: 'tanggal', limit: 1000 });
-      // Urut pasti: tgl 1 di atas, dalam satu tanggal urut jam
+      // Urut pasti: yang terbaru di atas, dalam satu tanggal jam paling akhir dulu
       return (page.items || []).sort((a, b) =>
-        (a.tanggal || '').localeCompare(b.tanggal || '') || (a.jam || '').localeCompare(b.jam || '')
+        (b.tanggal || '').localeCompare(a.tanggal || '') || (b.jam || '').localeCompare(a.jam || '')
       );
     },
   });
@@ -324,9 +324,10 @@ export default function Leads() {
                   <th className="w-[8%] px-2 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Jam</th>
                   <th className="w-[16%] px-2 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Kontak</th>
                   <th className="w-[12%] px-2 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Sumber</th>
+                  <th className="w-[12%] px-2 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">PIC</th>
                   <th className="w-[16%] px-2 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Keterangan</th>
                   <th className="w-[16%] px-2 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">Nominal</th>
-                  <th className="w-[14%] px-3 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">Aksi</th>
+                  <th className="w-[12%] px-3 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -344,6 +345,14 @@ export default function Leads() {
                     <td className="px-3 py-3">
                       <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${SUMBER_STYLES[lead.sumber] || 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
                         {lead.sumber}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 align-middle">
+                      <span
+                        className="block truncate text-xs font-semibold text-slate-600 dark:text-slate-300"
+                        title={lead.pic || undefined}
+                      >
+                        {lead.pic || '-'}
                       </span>
                     </td>
                     <td className="px-3 py-3">
@@ -409,15 +418,9 @@ export default function Leads() {
                 </div>
 
                 <div className="mt-2.5 flex items-center justify-between gap-2">
-                  {lead.status === "closing" ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-green-100 px-2.5 py-1 text-xs font-bold text-green-700 dark:bg-green-900/40 dark:text-green-300">
-                      <CheckCircle2 size={12} /> Closing
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                      <Clock size={12} /> Belum Closing
-                    </span>
-                  )}
+                  <span className="min-w-0 truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    PIC: {lead.pic || "-"}
+                  </span>
                   <span className="shrink-0 text-sm font-extrabold text-slate-900 dark:text-white">
                     {lead.status === "closing" && lead.nominal ? `Rp ${formatRupiah(lead.nominal)}` : "—"}
                   </span>
