@@ -4,11 +4,13 @@ import { supabase } from "@/lib/supabase";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, localeAlternates } from "@/lib/site-config";
 
 /**
- * Shell + metadata produk di-cache. 600 detik (dulu 300): harga & stok yang dibeli tetap
- * dibaca di browser, dan admin yang menyimpan produk sudah menyegarkan halaman ini lewat
- * `/api/revalidate` (per produk, bukan seluruh katalog).
+ * Shell + metadata produk di-cache. 86400 detik (24 jam; dulu 600): yang di-cache di sini
+ * hanya metadata + JSON-LD, sedangkan harga & stok yang dibeli tetap dibaca di browser —
+ * jadi regenerasi berkala hampir tidak mengubah isi, sementara tiap regenerasi memakai
+ * kuota ISR Write Vercel Hobby. Admin yang menyimpan produk atau mengubah status tampil
+ * tetap menyegarkan halaman ini seketika lewat `/api/revalidate` (per produk + kedua locale).
  */
-export const revalidate = 600;
+export const revalidate = 86400;
 
 /** Semua produk terbit diprerender saat build; produk baru dibuat on-demand lalu di-cache. */
 export async function generateStaticParams() {
