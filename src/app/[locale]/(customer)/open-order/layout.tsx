@@ -2,15 +2,25 @@ import type { Metadata } from "next";
 import { localePageMetadata } from "@/lib/seo-metadata";
 
 /**
- * Metadata halaman Open Order.
+ * Metadata halaman Open Order (id + en).
  *
  * Judul & deskripsi khusus halaman ini (bukan mewarisi judul homepage) supaya hasil
- * pencarian tidak kembar. Sengaja TANPA harga spesifik: harga berubah sewaktu-waktu,
- * sedangkan halaman ini ter-cache 180 detik dan ikut diindeks mesin pencari.
+ * pencarian tidak kembar. Teksnya tidak menulis angka harga spesifik — cukup
+ * "mulai dari harga minimal" — karena harga berubah sewaktu-waktu sedangkan
+ * halaman ini ikut diindeks mesin pencari.
  */
-const OPEN_ORDER_TITLE = "Open Order SAMAQU — Pesan Busana Muslim Pria Premium";
-const OPEN_ORDER_DESCRIPTION =
-  "Ikut Open Order SAMAQU: pilih thobe, kandora, koko, dan vest pilihan, tentukan kain serta ukuran, lalu selesaikan pesanan langsung dari halaman ini. Periode dan kuota Open Order dibuka berkala.";
+const META = {
+  id: {
+    title: "Open Order SAMAQU | Thobe & Kandora, Pilih Harga Sendiri",
+    description:
+      "Pesan thobe dan kandora SAMAQU lewat Open Order. Ada produk pilihan yang harganya bisa kamu tentukan sendiri, mulai dari harga minimal. Bahan premium, pesan mudah via website atau WhatsApp.",
+  },
+  en: {
+    title: "SAMAQU Open Order | Thobe & Kandora, Set Your Own Price",
+    description:
+      "Order SAMAQU thobe and kandora through Open Order. Selected pieces let you set the price yourself, starting from a minimum price. Premium fabric, easy ordering via website or WhatsApp.",
+  },
+} as const;
 
 export async function generateMetadata({
   params,
@@ -18,15 +28,18 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const meta = locale === "en" ? META.en : META.id;
+  const base = localePageMetadata(locale, "/open-order");
+
   return {
-    ...localePageMetadata(locale, "/open-order"),
-    title: OPEN_ORDER_TITLE,
-    description: OPEN_ORDER_DESCRIPTION,
+    ...base,
+    title: meta.title,
+    description: meta.description,
     robots: { index: true, follow: true },
     openGraph: {
-      ...localePageMetadata(locale, "/open-order").openGraph,
-      title: OPEN_ORDER_TITLE,
-      description: OPEN_ORDER_DESCRIPTION,
+      ...base.openGraph,
+      title: meta.title,
+      description: meta.description,
     },
   };
 }
