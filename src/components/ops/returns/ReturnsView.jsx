@@ -27,6 +27,12 @@ import {
 } from "lucide-react";
 import { base44 } from "@/lib/ops-api";
 import { resolveColorName } from "@/lib/sku";
+import {
+  formatTrackingTime,
+  sortHistoryDesc,
+  trackingRow,
+  trackingSummary,
+} from "@/lib/jnt/track-status";
 import { formatRupiah, formatTanggalJamID, formatTanggalSingkatID } from "@/components/ops/transaksi/transaksi-format";
 
 /**
@@ -2446,8 +2452,18 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
   const [city, setCity] = useState(record.shipping_city || "");
   const [kec, setKec] = useState(record.shipping_kecamatan || "");
   const [postal, setPostal] = useState(record.shipping_postal_code || "");
-  /** Hasil lacak J&T; null = belum ditekan. `history` diisi setelah tombol Lacak. */
+  /** Hasil lacak J&T; null = belum ditekan. */
   const [trackInfo, setTrackInfo] = useState(null);
+  /** Panel riwayat dibuka setelah tombol Lacak ditekan (pola sama dengan detail transaksi). */
+  const [trackOpened, setTrackOpened] = useState(false);
+
+  /**
+   * Baris riwayat memakai helper BERSAMA `src/lib/jnt/track-status.ts` — bukan format sendiri.
+   * Urutan terbaru di atas, dan label situs (DPK_GATEWAY → "Gateway Depok (DPK_GATEWAY)")
+   * sama persis dengan yang tampil di detail transaksi.
+   */
+  const trackRows = trackOpened ? sortHistoryDesc(trackInfo?.history || []).map(trackingRow) : [];
+  const trackSummary = trackOpened ? trackingSummary(trackInfo?.history || []) : null;
 
   const isExchange = record.type === "tukar_size";
   const final = ["selesai", "ditolak", "dibatalkan"].includes(record.status);
@@ -2514,6 +2530,7 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
    */
   const trackReturn = async () => {
     setBusy("track");
+    setTrackOpened(true);
     try {
       // Lewat shim `base44` supaya header Authorization ikut terkirim (kalau tidak: 401).
       const result = await base44.entities.Return.action(record.return_number, "track");
@@ -3030,65 +3047,113 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
           )}
         </section>
 
-        <section className="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Lacak Pengganti
-            </p>
-            {record.shipping_out_awb ? (
+        {/*
+          Lacak pengganti — markup & helper SAMA dengan "Lacak Resi" di detail transaksi
+          (`TransaksiDetailDrawer`): tombol lebar berikon truk, ringkasan penerima, daftar
+          riwayat ber-divider, footer jumlah riwayat. Memakai `trackingRow`,
+          `sortHistoryDesc`, dan `formatTrackingTime` dari `src/lib/jnt/track-status.ts`
+          supaya teks/label situs dan format waktunya identik, bukan versi kedua.
+        */}
+        {record.shipping_out_awb ? (
+          <section className="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Pengiriman Pengganti
+              </p>
+              <span className="font-mono text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                {record.shipping_out_awb}
+              </span>
+            </div>
+
+            <div className="pt-2">
               <button
                 type="button"
                 onClick={trackReturn}
                 disabled={Boolean(busy)}
-                className={`text-[11px] font-bold disabled:opacity-50 ${isPanel ? "text-[#c2255c]" : "text-slate-700 underline dark:text-slate-200"}`}
+                className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-[13px] font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                {busy === "track" ? "Memuat…" : "Lacak"}
+                <Truck size={15} /> {busy === "track" ? "Memuat…" : trackOpened ? "Muat ulang" : "Lacak Resi"}
               </button>
-            ) : null}
-          </div>
 
-          {!record.shipping_out_awb ? (
-            <p className="mt-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
-              Resi pengganti belum dibuat.
-            </p>
-          ) : (
-            <>
-              <p className="mt-1 font-mono text-xs font-bold text-slate-700 dark:text-slate-200">
-                {record.shipping_out_awb}
-              </p>
-              {trackInfo?.detail ? (
-                <p className="mt-1 text-[11px] font-bold text-slate-700 dark:text-slate-200">
-                  {[
-                    trackInfo.detail.services_code ? `Layanan ${trackInfo.detail.services_code}` : null,
-                    trackInfo.detail.weight ? `${trackInfo.detail.weight} g` : null,
-                    trackInfo.detail.receiver?.city ? `Tujuan ${trackInfo.detail.receiver.city}` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              ) : null}
-              {trackInfo?.error ? (
-                <p className="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">{trackInfo.error}</p>
-              ) : null}
-              {trackInfo?.history?.length ? (
-                <div className="mt-2 max-h-52 space-y-1.5 overflow-y-auto">
-                  {trackInfo.history.map((event, index) => (
-                    <div key={`${event.date_time}-${index}`} className="border-l-2 border-slate-200 pl-2 dark:border-slate-700">
-                      <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{event.status}</p>
-                      <p className="text-[10.5px] font-semibold text-slate-500 dark:text-slate-400">
-                        {[event.city_name, event.date_time].filter(Boolean).join(" · ")}
-                      </p>
-                    </div>
-                  ))}
+              {trackOpened ? (
+                <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
+                  {trackSummary?.receiver ? (
+                    <p className="border-b border-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:text-slate-200">
+                      Diterima oleh: {trackSummary.receiver}
+                    </p>
+                  ) : null}
+
+                  {busy === "track" ? (
+                    <p className="px-3 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      Memuat riwayat dari J&T…
+                    </p>
+                  ) : trackInfo?.error ? (
+                    <p className="px-3 py-2.5 text-xs font-semibold text-red-600 dark:text-red-400">
+                      {trackInfo.error}
+                    </p>
+                  ) : trackRows.length === 0 ? (
+                    <p className="px-3 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      Belum ada riwayat dari J&T.
+                    </p>
+                  ) : (
+                    <ul className="no-scrollbar max-h-[196px] divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
+                      {trackRows.map((row, index) => (
+                        <li key={`${row.dateTime}-${index}`} className="px-3 py-2">
+                          <p
+                            className={`text-xs font-bold ${
+                              row.warning
+                                ? "text-amber-600 dark:text-amber-400"
+                                : "text-slate-800 dark:text-slate-100"
+                            }`}
+                          >
+                            {row.status}
+                          </p>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            {[row.location, formatTrackingTime(row.dateTime)].filter(Boolean).join(" • ")}
+                          </p>
+                          {row.note ? (
+                            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                              Catatan: {row.note}
+                            </p>
+                          ) : null}
+                          {row.driver ? (
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Kurir: {row.driver}</p>
+                          ) : null}
+                          {row.receiver ? (
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                              Diterima oleh: {row.receiver}
+                            </p>
+                          ) : null}
+                          {row.receivedByThirdParty ? (
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                              Diterima oleh: {row.receivedByThirdParty}
+                            </p>
+                          ) : null}
+                          {row.handoverNote ? (
+                            <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                              {row.handoverNote}
+                            </p>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <div className="flex items-center justify-between gap-2 bg-slate-50 px-3 py-2 dark:bg-slate-900">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      {trackRows.length > 0 ? `${trackRows.length} riwayat` : "Riwayat J&T"}
+                    </span>
+                    {busy === "track" ? (
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        Memuat…
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
-              ) : trackInfo && !trackInfo.error ? (
-                <p className="mt-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
-                  Belum ada pemindaian J&T.
-                </p>
               ) : null}
-            </>
-          )}
-        </section>
+            </div>
+          </section>
+        ) : null}
 
         <section className="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Riwayat</p>
