@@ -246,6 +246,45 @@ export async function PATCH(req: NextRequest) {
     if (!["draft", "ditolak"].includes(session.status)) {
       return NextResponse.json({ error: "Sesi ini sudah dikunci." }, { status: 400 });
     }
+
+    /*
+     * Dua bentuk payload:
+     *  - `patch`: [{ id, counted_stock, reason, reason_note }] — dipakai simpan otomatis,
+     *    hanya baris yang berubah (jangan kirim 571 baris tiap ketikan).
+     *  - `lines`: bentuk lama (seluruh baris) — dipakai tombol "Simpan draft".
+     * Keduanya menulis ke kolom yang sama di tabel.
+     */
+    if (Array.isArray(body?.patch)) {
+      const patches = (body.patch as Array<Record<string, unknown>>).slice(0, 500);
+      let saved = 0;
+      for (const item of patches) {
+        const lineId = String(item?.id || "");
+        if (!lineId) continue;
+        const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        if ("counted_stock" in item) update.counted_stock = cleanCount(item.counted_stock);
+        if ("reason" in item) update.reason = item.reason ? String(item.reason) : null;
+        if ("reason_note" in item) {
+          update.reason_note = item.reason_note ? String(item.reason_note).slice(0, 300) : null;
+        }
+        const { error } = await admin
+          .from("stock_opname_lines")
+          .update(update)
+          .eq("id", lineId)
+          .eq("session_id", id)
+          .eq("is_derived", false);
+        if (error) {
+          console.error("[OPNAME] patch line:", error.message);
+          return NextResponse.json({ error: "Gagal menyimpan hitungan" }, { status: 500 });
+        }
+        saved += 1;
+      }
+      await admin
+        .from("stock_opname_sessions")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", id);
+      return NextResponse.json({ saved });
+    }
+
     const lines: IncomingLine[] = Array.isArray(body?.lines) ? body.lines : [];
     for (const line of lines) {
       const { error } = await admin
@@ -339,11 +378,23 @@ export async function PATCH(req: NextRequest) {
     }
 
     const result = (data || {}) as { adjusted?: number; skipped?: number; movements?: number };
-    console.log("[OPNAME] diterapkan:", session.code, "baris disesuaikan:", result.adjusted || 0);
+    const adjusted = result.adjusted || 0;
+    const skipped = result.skipped || 0;
+    console.log("[OPNAME] diterapkan:", session.code, "baris disesuaikan:", adjusted, "dilewati:", skipped);
+
+    /*
+     * Baris "dilewati" = baris hitung yang variannya tidak ketemu saat diterapkan. Dulu
+     * sesi tetap ditandai "selesai" walau semua barisnya dilewati, sehingga tampak berhasil
+     * padahal stok tidak berubah. Sekarang jumlahnya dilaporkan supaya admin tahu.
+     */
     return NextResponse.json({
       status: "selesai",
-      adjusted: result.adjusted || 0,
-      skipped: result.skipped || 0,
+      adjusted,
+      skipped,
+      warning:
+        skipped > 0
+          ? `${skipped} baris dilewati karena variannya tidak ditemukan di stok. Periksa produk tersebut.`
+          : null,
     });
   }
 

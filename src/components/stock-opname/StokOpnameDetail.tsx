@@ -244,6 +244,95 @@ export default function StokOpnameDetail({
     return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
   };
 
+  /* ── Simpan otomatis ────────────────────────────────────────────────────
+     Dulu hitungan hanya tersimpan saat tombol "Simpan draft" diklik. Kalau halaman
+     di-refresh atau ditinggal sebelum itu, semua isian hilang tanpa peringatan.
+     Sekarang setiap perubahan dikirim ke server dengan jeda singkat (debounce),
+     jadi refresh tidak menghapus apa pun. `saveDraft` manual tetap ada. */
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<"idle" | "menyimpan" | "tersimpan" | "gagal">("idle");
+  /** Isian yang belum terkirim ke server. */
+  const pending = useRef<Record<string, { counted_stock: number | null; reason: string | null; reason_note: string | null }>>({});
+  const savingRef = useRef(false);
+  const timerRef = useRef<number | null>(null);
+
+  const flushPending = useCallback(async () => {
+    if (savingRef.current) return;
+    const changes = pending.current;
+    if (Object.keys(changes).length === 0) return;
+    pending.current = {};
+    savingRef.current = true;
+    setSaveState("menyimpan");
+    try {
+      const { data: { session: auth } } = await supabase.auth.getSession();
+      const res = await fetch("/api/ops/stock-opname", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(auth?.access_token ? { Authorization: `Bearer ${auth.access_token}` } : {}),
+        },
+        body: JSON.stringify({
+          id: sessionId,
+          action: "save",
+          // `patch` = hanya baris yang berubah, bukan seluruh 571 baris tiap ketikan.
+          patch: Object.entries(changes).map(([lineId, v]) => ({ id: lineId, ...v })),
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || "Gagal menyimpan.");
+      setSaveState("tersimpan");
+      setSavedAt(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }));
+    } catch {
+      // Kembalikan ke antrean supaya percobaan berikutnya tidak menghilangkan isian.
+      for (const [lineId, v] of Object.entries(changes)) {
+        if (!pending.current[lineId]) pending.current[lineId] = v;
+      }
+      setSaveState("gagal");
+    } finally {
+      savingRef.current = false;
+    }
+  }, [sessionId]);
+
+  /** Catat satu baris sebagai berubah, lalu jadwalkan pengiriman. */
+  const queueSave = useCallback(
+    (lineId: string, patch: Partial<{ counted_stock: number | null; reason: string | null; reason_note: string | null }>) => {
+      const current = pending.current[lineId] || { counted_stock: null, reason: null, reason_note: null };
+      pending.current[lineId] = { ...current, ...patch };
+      setSaveState("idle");
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+      timerRef.current = window.setTimeout(() => {
+        void flushPending();
+      }, 700);
+    },
+    [flushPending],
+  );
+
+  // Kirim sisa isian saat halaman ditinggal (refresh / pindah halaman).
+  useEffect(() => {
+    const onHide = () => {
+      if (Object.keys(pending.current).length === 0) return;
+      void flushPending();
+    };
+    window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onHide);
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    };
+  }, [flushPending]);
+
+  // Peringatan kalau masih ada isian belum terkirim.
+  useEffect(() => {
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (Object.keys(pending.current).length === 0) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
+
   const lineStateOf = (line: Line) => {
     if (line.is_derived) return "info";
     const value = countedValue(line);
@@ -513,6 +602,9 @@ export default function StokOpnameDetail({
     setError("");
     setNotice("");
     try {
+      // Kirim sisa isian otomatis dulu supaya tidak hilang saat simpan penuh berikutnya.
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+      await flushPending();
       await call({ action: "save", lines: collectPayload() });
       if (!silent) setNotice("Hitungan tersimpan sebagai draft. Stok belum berubah.");
       return true;
@@ -549,8 +641,10 @@ export default function StokOpnameDetail({
     setBlockedRows([]);
     try {
       const result = await call({ action: "apply" });
+      const skipped = Number(result?.skipped ?? 0);
       setNotice(
-        `Diterapkan. ${result?.adjusted ?? 0} baris stok disesuaikan${result?.skipped ? `, ${result.skipped} dilewati` : ""}.`,
+        `Diterapkan. ${result?.adjusted ?? 0} baris stok disesuaikan${skipped ? `, ${skipped} dilewati` : ""}.` +
+          (result?.warning ? ` ${result.warning}` : ""),
       );
       await load();
     } catch (e) {
@@ -568,7 +662,10 @@ export default function StokOpnameDetail({
       for (const cell of Object.values(row.cells)) {
         if (cell.is_derived) continue;
         const diff = diffOf(cell);
-        if (diff !== null && diff !== 0) next[cell.id] = value;
+        if (diff !== null && diff !== 0) {
+          next[cell.id] = value;
+          queueSave(cell.id, { reason: value || null });
+        }
       }
       return next;
     });
@@ -869,7 +966,16 @@ export default function StokOpnameDetail({
                                 inputMode="numeric"
                                 min={0}
                                 value={counts[line.id] ?? ""}
-                                onChange={(e) => setCounts((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setCounts((prev) => ({ ...prev, [line.id]: value }));
+                                  const parsed = value === "" ? null : Number(value);
+                                  queueSave(line.id, {
+                                    counted_stock: Number.isFinite(parsed as number) && (parsed as number) >= 0
+                                      ? Math.round(parsed as number)
+                                      : null,
+                                  });
+                                }}
                                 onFocus={(e) => e.currentTarget.select()}
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter" || e.key === "ArrowDown") {
@@ -964,6 +1070,7 @@ export default function StokOpnameDetail({
                                     for (const cell of rowDiffLines) next[cell.id] = value;
                                     return next;
                                   });
+                                  for (const cell of rowDiffLines) queueSave(cell.id, { reason_note: value || null });
                                 }}
                                 disabled={readOnly}
                                 placeholder="Catatan"
@@ -1066,6 +1173,24 @@ export default function StokOpnameDetail({
             <div className="min-w-0 flex-1">
               <p className="truncate text-[11px] font-bold text-slate-600 dark:text-slate-300">
                 {summary.dihitung}/{summary.total} dihitung · {summary.selisih} baris selisih
+                <span
+                  className={`ml-2 font-semibold ${
+                    saveState === "gagal"
+                      ? "text-red-600"
+                      : saveState === "tersimpan"
+                        ? "text-emerald-600"
+                        : "text-slate-400"
+                  }`}
+                  title="Hitungan tersimpan otomatis ke server"
+                >
+                  {saveState === "menyimpan"
+                    ? "· menyimpan…"
+                    : saveState === "tersimpan"
+                      ? `· tersimpan ${savedAt ?? ""}`
+                      : saveState === "gagal"
+                        ? "· gagal menyimpan, coba lagi"
+                        : ""}
+                </span>
               </p>
               <p className="truncate text-[10px] text-slate-500 dark:text-slate-400">
                 total kurang {summary.kurang} pcs · total lebih {summary.lebih} pcs · nilai selisih{" "}
