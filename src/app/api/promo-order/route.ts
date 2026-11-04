@@ -35,6 +35,7 @@ import {
 } from "@/lib/meta-capi";
 import { metaCatalogContents } from "@/lib/meta-catalog";
 import { PROMO_FCH_SOURCE, PROMO_ORDER_PREFIX } from "@/lib/promo/free-cover-hanger";
+import { withFchPrice } from "@/lib/promo/free-cover-hanger-pricing";
 
 /**
  * POST /api/promo-order — pesanan dari landing "Free Cover Hanger".
@@ -167,12 +168,14 @@ export async function POST(request: NextRequest) {
      */
     const promoRows = (catalogRows ?? []).map((row) => {
       const value = (row as Record<string, unknown>).promo_fch_enabled;
-      return {
+      // Blok harga Open Order dikosongkan: promo memakai harga katalog (`products.price`)
+      // saja, supaya `buildOpenOrderProducts` tidak mengambil `open_order_minimum_price`.
+      return withFchPrice({
         ...(row as Record<string, unknown>),
         open_order_enabled: true,
         // Kolom belum dibuat (migrasi belum jalan) → `undefined` → produk tetap ikut.
         _promo_enabled: value !== false,
-      };
+      });
     });
 
     const filtered = promoRows.filter((row) => row._promo_enabled !== false);

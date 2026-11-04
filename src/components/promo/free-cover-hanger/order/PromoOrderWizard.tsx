@@ -38,6 +38,7 @@ import {
   formatOpenOrderMoment,
 } from "@/lib/open-order-window";
 import type { PromoFchSettings } from "@/lib/promo/free-cover-hanger-settings";
+import { withFchPrice } from "@/lib/promo/free-cover-hanger-pricing";
 import { useSafeLocale } from "@/lib/safe-i18n";
 import { useStoreSettings } from "@/lib/store-settings";
 import { getCurrentCustomer } from "@/lib/customer-auth";
@@ -117,7 +118,8 @@ function defaultDraft(products: OpenOrderProduct[], productId: string, color: st
   const chosenColor = product.colors.includes(color) ? color : product.colors[0] ?? "";
   const sizes = openOrderVariantFor(product, chosenColor, seriesName)?.sizes ?? [];
   const size = sizes.includes("M") ? "M" : sizes[0] ?? "M";
-  const price = product.series[0]?.price ?? product.minimumPrice ?? product.price;
+  // Promo FCH selalu memakai harga katalog — `minimumPrice` (harga Open Order) TIDAK dipakai.
+  const price = product.series[0]?.price ?? product.price;
   return {
     productId: product.id,
     color: chosenColor,
@@ -293,7 +295,13 @@ export default function PromoOrderWizard({
       buildOpenOrderProducts(
         catalog
           .filter((row) => (row as unknown as { promo_fch_enabled?: boolean }).promo_fch_enabled !== false)
-          .map((row) => ({ ...row, open_order_enabled: true })),
+          .map((row) => {
+            const base = { ...row, open_order_enabled: true };
+            // KOSONGKAN blok harga Open Order: promo memakai harga katalog (`price`) saja.
+            // `buildOpenOrderProducts` memakai `open_order_*` begitu kolomnya terisi — di sini
+            // dikosongkan supaya `price` yang dipakai, tanpa mengubah helper bersama.
+            return withFchPrice(base);
+          }),
         stockRows,
       ),
     [catalog, stockRows],

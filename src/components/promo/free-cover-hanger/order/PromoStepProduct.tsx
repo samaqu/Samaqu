@@ -84,9 +84,13 @@ export default function PromoStepProduct({
    * Promo Free Cover Hanger: harga SELALU dari katalog/series, tidak ada Create Your Price.
    * Karena itu `cypEnabled` dikunci `false` — akibatnya `finalPrice` = `minimum` (harga
    * series/katalog) dan blok input harga tidak dirender.
+   *
+   * `product.minimumPrice` SENGAJA tidak dipakai sebagai cadangan: di jalur Open Order nilai
+   * itu berasal dari `open_order_minimum_price`, sehingga harga kampanye Open Order bocor ke
+   * promo (mis. Kandora 329.000 padahal katalog 374.000). Cadangannya `product.price` (katalog).
    */
   const cypEnabled = false;
-  const minimum = series?.price ?? product?.minimumPrice ?? 0;
+  const minimum = series?.price ?? product?.price ?? 0;
 
   const [price, setPrice] = useState(draft.price);
   const [photo, setPhoto] = useState(0);
