@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, opsActorEmail, unauthorized } from "@/lib/ops-auth";
+import { cleanErrorMessage, recordAnomalyFromError } from "@/lib/stock-guard";
 
 /**
  * Retur & Tukar Size.
@@ -513,7 +514,11 @@ export async function DELETE(req: NextRequest) {
         p_return_id: String(record.id),
       });
       if (reverseError) {
-        return bad(reverseError.message || "Gagal membalik stok retur; data belum dihapus", 400);
+        // Transaksi SQL sudah rollback, jadi anomali yang dicatat di dalamnya ikut hilang.
+        // Rinciannya dibawa lewat penanda STOCK_ANOMALY → dicatat di luar transaksi di sini.
+        const message = reverseError.message || "";
+        await recordAnomalyFromError(admin, message, "returns-reverse", returnNumber);
+        return bad(cleanErrorMessage(message) || "Gagal membalik stok retur; data belum dihapus", 400);
       }
     }
 
@@ -597,7 +602,11 @@ export async function PATCH(req: NextRequest) {
     } else if (action === "receive") {
       if (record.status !== "disetujui") return bad("Setujui retur dulu sebelum menerima barang");
       const { error } = await admin.rpc("samaqu_apply_return_stock", { p_return_id: String(record.id) });
-      if (error) return bad(error.message || "Gagal menerapkan pergerakan stok", 400);
+      if (error) {
+        const message = error.message || "";
+        await recordAnomalyFromError(admin, message, "returns-apply", record.return_number);
+        return bad(cleanErrorMessage(message) || "Gagal menerapkan pergerakan stok", 400);
+      }
       patch.status = "barang_diterima";
       patch.received_at = now;
     } else if (action === "complete") {

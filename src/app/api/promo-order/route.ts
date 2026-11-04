@@ -36,6 +36,12 @@ import {
 import { metaCatalogContents } from "@/lib/meta-catalog";
 import { PROMO_FCH_SOURCE, PROMO_ORDER_PREFIX } from "@/lib/promo/free-cover-hanger";
 import { withFchPrice } from "@/lib/promo/free-cover-hanger-pricing";
+import {
+  canSkipStockCheck,
+  recordStockAnomaly,
+  resolveFailureReason,
+  stockFailureMessage,
+} from "@/lib/stock-guard";
 
 /**
  * POST /api/promo-order — pesanan dari landing "Free Cover Hanger".
@@ -358,7 +364,25 @@ export async function POST(request: NextRequest) {
     }
 
     for (const item of validatedItems) {
-      if (!item.color || !item.size || item.color === "-") continue;
+      // Item tanpa warna/ukuran hanya boleh dilewati kalau produknya memang tidak punya
+      // baris varian. Kalau punya varian, data ini rusak → tolak + catat.
+      if (!item.color || !item.size || item.color === "-") {
+        const { skip } = await canSkipStockCheck(supabaseAdmin, item.productId);
+        if (skip) continue;
+        await recordStockAnomaly(supabaseAdmin, {
+          productId: item.productId,
+          color: item.color ?? "",
+          size: item.size ?? "",
+          qty: item.quantity,
+          reason: "missing_variant_input",
+          orderId: orderNumber,
+          source: "promo-order",
+        });
+        await rollbackStock();
+        return bad(
+          `Data varian "${item.productName}" tidak lengkap (warna/ukuran kosong) padahal produknya punya varian. Pilih varian yang benar.`
+        );
+      }
 
       const { data: stockOk, error: stockError } = await supabaseAdmin.rpc("samaqu_decrement_stock", {
         p_product_id: item.productId,
@@ -373,8 +397,10 @@ export async function POST(request: NextRequest) {
         return bad("Gagal memvalidasi stok. Silakan coba lagi.", 500);
       }
       if (!stockOk) {
+        const reason = await resolveFailureReason(supabaseAdmin, item.productId, item.color, item.size);
+        console.error("[PROMO-ORDER] Stock FAILED:", { item, reason });
         await rollbackStock();
-        return bad(`Stok "${item.productName}" (${item.color} / ${item.size}) tidak mencukupi.`);
+        return bad(stockFailureMessage(reason ?? "insufficient_stock", item.productName, item.color, item.size));
       }
 
       decremented.push({ productId: item.productId, color: item.color, size: item.size, quantity: item.quantity });

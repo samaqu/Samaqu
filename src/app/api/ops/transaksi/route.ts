@@ -8,6 +8,7 @@ import { notifyCustomerInvoice } from "@/lib/fonnte";
 import { kotaFromShipping } from "@/lib/kota";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { resolveItemPhotos } from "@/lib/order-photo";
+import { cleanErrorMessage, recordAnomalyFromError } from "@/lib/stock-guard";
 import {
   productWeightMapFromRows,
   resolveLineWeight,
@@ -1273,7 +1274,9 @@ export async function PATCH(req: NextRequest) {
     });
     if (rpcError) {
       console.error("[OPS] transaksi PATCH rpc:", rpcError.message);
-      return bad(rpcError.message);
+      // Transaksi SQL sudah rollback → catat anomali dari penanda STOCK_ANOMALY di luar transaksi.
+      await recordAnomalyFromError(admin, rpcError.message || "", "ops-edit-order", order.order_number);
+      return bad(cleanErrorMessage(rpcError.message || "") || "Gagal menyimpan perubahan item");
     }
 
     // Alamat baru (kalau admin menambahkannya) ikut masuk buku alamat pelanggan.

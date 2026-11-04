@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   BarChart3,
   FileText,
   LayoutDashboard,
@@ -66,6 +67,7 @@ const BASE_MENU_GROUPS: MenuGroup[] = [
     label: "Produk & Stok",
     items: [
       { title: "Produk", href: "/ops/master-produk", icon: Package },
+      { title: "Anomali Stok", href: "/ops/anomali-stok", icon: AlertTriangle },
       { title: "Pembelian", href: "/ops/rekap-pembelian", icon: ShoppingBag, soon: true },
     ],
   },

@@ -126,18 +126,51 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const { error, count } = await admin.from("stock_in").delete({ count: "exact" }).eq("id", id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-    // Tarik kembali stoknya. RPC increment sekarang juga resolve stok bersama.
+    // Tarik kembali stoknya LEBIH DULU, baru hapus barisnya.
+    // Urutan ini penting: kalau stok tidak cukup untuk ditarik, penghapusan dibatalkan
+    // supaya tidak ada baris "barang masuk" hilang tanpa stok ikut berkurang.
     if (row && row.variant_color && row.variant_size && Number(row.qty) > 0) {
-      await admin.rpc("samaqu_increment_stock", {
+      const { data: stokOk, error: stokError } = await admin.rpc("samaqu_increment_stock", {
         p_product_id: row.product_id,
         p_color: String(row.variant_color),
         p_size: String(row.variant_size),
         p_qty: -Math.abs(Number(row.qty)),
       });
+
+      if (stokError) {
+        console.error("[OPS] stock-in DELETE tarik stok:", stokError);
+        return NextResponse.json(
+          { error: "Gagal menarik stok untuk penghapusan ini. Barang masuk tidak dihapus." },
+          { status: 500 },
+        );
+      }
+
+      if (stokOk === false) {
+        // Bisa karena variannya tidak ada, atau stok tidak cukup untuk ditarik.
+        const { data: varian } = await admin
+          .from("product_variants")
+          .select("stock")
+          .eq("product_id", row.product_id)
+          .eq("color", String(row.variant_color))
+          .eq("size", String(row.variant_size))
+          .maybeSingle();
+
+        const sisa = varian?.stock ?? null;
+        return NextResponse.json(
+          {
+            error:
+              sisa === null
+                ? `Varian ${row.product_name || row.product_id} (${row.variant_color} / ${row.variant_size}) tidak ditemukan di data stok. Barang masuk tidak dihapus.`
+                : `Stok ${row.product_name || row.product_id} (${row.variant_color} / ${row.variant_size}) hanya tersisa ${sisa}, tidak cukup untuk menarik ${Math.abs(Number(row.qty))}. Barang masuk tidak dihapus.`,
+          },
+          { status: 400 },
+        );
+      }
     }
+
+    const { error, count } = await admin.from("stock_in").delete({ count: "exact" }).eq("id", id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
     return NextResponse.json({ deleted: count ?? 0 });
   } catch (e) {
     console.error("[OPS] stock-in DELETE:", e);

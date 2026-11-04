@@ -25,6 +25,12 @@ import {
 import { sendOnce } from "@/lib/order-notify";
 import { orderItemPhoto } from "@/lib/order-photo";
 import { loadOrderPhotoLookup } from "@/lib/order-photo-data";
+import {
+  canSkipStockCheck,
+  recordStockAnomaly,
+  resolveFailureReason,
+  stockFailureMessage,
+} from "@/lib/stock-guard";
 import { createOrderPaymentLink } from "@/lib/mayar";
 import { formatProductLabel } from "@/lib/item-label";
 import { resolveAttribution } from "@/lib/affiliate/referral";
@@ -452,8 +458,28 @@ export async function POST(request: NextRequest) {
     }
 
     for (const item of validatedItems) {
-      // Produk tanpa varian (tanpa warna/ukuran) → stok tidak dikelola, lewati.
-      if (!item.color || !item.size || item.color === "-") continue;
+      // Item tanpa warna/ukuran hanya boleh dilewati kalau produknya memang tidak punya
+      // baris varian. Kalau punya varian, data ini rusak → tolak + catat.
+      if (!item.color || !item.size || item.color === "-") {
+        const { skip } = await canSkipStockCheck(supabaseAdmin, item.productId);
+        if (skip) continue;
+        await recordStockAnomaly(supabaseAdmin, {
+          productId: item.productId,
+          color: item.color ?? "",
+          size: item.size ?? "",
+          qty: item.quantity,
+          reason: "missing_variant_input",
+          orderId: orderNumber,
+          source: "open-order",
+        });
+        await rollbackStock();
+        return NextResponse.json(
+          {
+            error: `Data varian "${item.productName}" tidak lengkap (warna/ukuran kosong) padahal produknya punya varian. Pilih varian yang benar.`,
+          },
+          { status: 400 }
+        );
+      }
 
       const { data: stockOk, error: stockError } = await supabaseAdmin.rpc("samaqu_decrement_stock", {
         p_product_id: item.productId,
@@ -468,12 +494,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Gagal memvalidasi stok. Silakan coba lagi." }, { status: 500 });
       }
       if (!stockOk) {
-        console.error("[OPEN-ORDER] Stock INSUFFICIENT:", item);
+        const reason = await resolveFailureReason(supabaseAdmin, item.productId, item.color, item.size);
+        console.error("[OPEN-ORDER] Stock FAILED:", { item, reason });
         await rollbackStock();
         return NextResponse.json(
-          {
-            error: `Stok "${item.productName}" (${item.color} / ${item.size}) tidak mencukupi. Silakan kurangi jumlah atau pilih varian lain.`,
-          },
+          { error: stockFailureMessage(reason ?? "insufficient_stock", item.productName, item.color, item.size) },
           { status: 400 }
         );
       }
