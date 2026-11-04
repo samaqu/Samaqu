@@ -146,16 +146,38 @@ export async function DELETE(req: NextRequest) {
       }
 
       if (stokOk === false) {
-        // Bisa karena variannya tidak ada, atau stok tidak cukup untuk ditarik.
-        const { data: varian } = await admin
+        /*
+         * Pesan "sisa X" harus akurat. Fungsi stok mencocokkan case-insensitive dan
+         * mengarahkan series turunan ke produk induk (`base_product_id` → `base_size`),
+         * jadi pencarian di sini WAJIB memakai aturan yang sama. Kalau tidak, admin diberi
+         * angka sisa dari baris yang salah (atau "tidak ditemukan" padahal ada).
+         */
+        const warna = String(row.variant_color).trim();
+        const ukuran = String(row.variant_size).trim();
+
+        // Baris asal (bisa berupa series turunan) untuk menemukan induknya.
+        const { data: asalRows } = await admin
+          .from("product_variants")
+          .select("base_product_id, base_size")
+          .eq("product_id", row.product_id)
+          .ilike("color", warna)
+          .ilike("size", ukuran)
+          .limit(1);
+        const asal = Array.isArray(asalRows) ? asalRows[0] : null;
+
+        const targetProduct = asal?.base_product_id || row.product_id;
+        const targetSize = asal?.base_product_id && asal?.base_size ? String(asal.base_size) : ukuran;
+
+        const { data: targetRows } = await admin
           .from("product_variants")
           .select("stock")
-          .eq("product_id", row.product_id)
-          .eq("color", String(row.variant_color))
-          .eq("size", String(row.variant_size))
-          .maybeSingle();
+          .eq("product_id", targetProduct)
+          .ilike("color", warna)
+          .ilike("size", targetSize)
+          .limit(1);
+        const target = Array.isArray(targetRows) ? targetRows[0] : null;
 
-        const sisa = varian?.stock ?? null;
+        const sisa = target?.stock ?? null;
         return NextResponse.json(
           {
             error:

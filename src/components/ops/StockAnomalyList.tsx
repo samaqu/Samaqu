@@ -30,6 +30,7 @@ const REASON_LABEL: Record<string, string> = {
   phantom_product: "ID bayangan (bukan produk)",
   restore_variant_not_found: "Restore ke varian tidak ada",
   increment_variant_not_found: "Tambah ke varian tidak ada",
+  increment_insufficient_stock: "Tarik stok, sisa kurang",
   insufficient_stock: "Stok tidak cukup",
 };
 
@@ -39,6 +40,7 @@ const REASON_TONE: Record<string, string> = {
   phantom_product: "bg-slate-200 text-slate-700",
   restore_variant_not_found: "bg-amber-100 text-amber-800",
   increment_variant_not_found: "bg-amber-100 text-amber-800",
+  increment_insufficient_stock: "bg-orange-100 text-orange-800",
   insufficient_stock: "bg-orange-100 text-orange-800",
 };
 

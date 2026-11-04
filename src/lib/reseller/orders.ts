@@ -10,6 +10,7 @@
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { verifyJntShipping } from "@/lib/shipping-verify";
 import { sumWeightGramsBySize, productWeightMapFromRows, variantWeightMapFromRows } from "@/lib/shipping-weight";
+import { cleanErrorMessage, recordAnomalyFromError } from "@/lib/stock-guard";
 import { orderItemPhoto } from "@/lib/order-photo";
 import { loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { notifyAdminNewOrder } from "@/lib/fonnte";
@@ -292,7 +293,10 @@ export async function createResellerOrder(
       /order_number/i.test((error as { message?: string }).message || "");
     if (!isDuplicate) {
       console.error("[RESELLER-ORDER] RPC gagal:", error?.message || error);
-      return { ok: false, error: "Gagal menyimpan pesanan. Coba lagi.", status: 500 };
+      // Transaksi SQL sudah rollback → catat anomali stok dari penanda STOCK_ANOMALY.
+      const message = error?.message || "";
+      await recordAnomalyFromError(supabase, message, "reseller-create-order", orderNumber);
+      return { ok: false, error: cleanErrorMessage(message) || "Gagal menyimpan pesanan. Coba lagi.", status: 500 };
     }
     orderNumber = generateResellerOrderNumber();
   }

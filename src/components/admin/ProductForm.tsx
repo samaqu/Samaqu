@@ -141,6 +141,50 @@ function weightPatch(raw?: string): { weight?: number } {
 }
 
 /**
+ * Error penulisan `product_variants` yang dibaca admin.
+ *
+ * Sejak database punya unique index `(product_id, lower(color), lower(size))`, dua varian
+ * yang hanya beda kapital ("navy" vs "Navy") DITOLAK database. Tanpa pengecekan, form dulu
+ * diam saja dan admin tidak tahu kenapa variannya tidak tersimpan.
+ *
+ * Pesannya sengaja dibedakan: bentrok nama varian (23505) diberi saran yang bisa ditindak,
+ * sisanya memakai pesan bawaan Supabase.
+ */
+class VariantWriteError extends Error {}
+
+function variantWriteMessage(
+  error: { code?: string; message?: string } | null,
+  context: { color?: string | null; size?: string | null; existingColor?: string | null }
+): string {
+  const message = String(error?.message || "");
+  if (error?.code === "23505" || /duplicate key|unique constraint/i.test(message)) {
+    const color = (context.color ?? "").trim();
+    const size = (context.size ?? "").trim();
+    const existing = (context.existingColor ?? "").trim();
+    const label = [color, size].filter(Boolean).join(" / ");
+    if (existing && existing.toLowerCase() === color.toLowerCase() && existing !== color) {
+      return `Varian "${color}" sudah ada sebagai "${existing}". Nama varian tidak boleh sama walau beda huruf besar/kecil.`;
+    }
+    return `Varian "${label}" sudah ada. Hapus salah satu atau ubah namanya.`;
+  }
+  return message || "Gagal menyimpan varian produk.";
+}
+
+/**
+ * Jalankan satu penulisan ke `product_variants` dan WAJIB memeriksa hasilnya.
+ * Melempar `VariantWriteError` supaya `handleSubmit` bisa menampilkan pesan ke admin
+ * dan proses simpan berhenti (tidak setengah tersimpan lalu pindah halaman).
+ */
+async function writeVariants<T extends { error: { code?: string; message?: string } | null }>(
+  result: PromiseLike<T>,
+  context: { color?: string | null; size?: string | null; existingColor?: string | null } = {}
+): Promise<T> {
+  const res = await result;
+  if (res?.error) throw new VariantWriteError(variantWriteMessage(res.error, context));
+  return res;
+}
+
+/**
  * Tabel ukuran yang dipakai dua tempat (blok series Thobe & varian biasa).
  * Di layar sempit tiap ukuran jadi satu kartu berlabel (tidak ada tabel yang
  * melebar keluar layar), di sm+ kembali jadi satu baris rapi berkolom tetap.
@@ -1608,7 +1652,7 @@ export default function TambahProdukPage({
                   !keptIds.has(row.id) && !keptKeys.has(`${row.color ?? ""}|${row.size ?? ""}`.trim().toLowerCase()),
               )
               .map((row: { id: string }) => row.id);
-            if (removedIds.length > 0) await supabase.from("product_variants").delete().in("id", removedIds);
+            if (removedIds.length > 0) await writeVariants(supabase.from("product_variants").delete().in("id", removedIds));
             await supabase.from("product_images").delete().eq("product_id", seriesSlug);
           }
           if (variantRows.length > 0) {
@@ -1616,10 +1660,16 @@ export default function TambahProdukPage({
             const withoutId = variantRows.filter((row) => !(row as { id?: string }).id);
             for (const row of withId) {
               const { id, ...patch } = row as { id: string } & Record<string, unknown>;
-              await supabase.from("product_variants").update(patch).eq("id", id);
+              await writeVariants(supabase.from("product_variants").update(patch).eq("id", id), {
+                color: (patch as { color?: string }).color,
+                size: (patch as { size?: string }).size,
+              });
             }
             if (withoutId.length > 0) {
-              await supabase.from("product_variants").upsert(withoutId, { onConflict: "product_id,color,size" });
+              await writeVariants(
+                supabase.from("product_variants").upsert(withoutId, { onConflict: "product_id,color,size" }),
+                { color: (withoutId[0] as { color?: string }).color, size: (withoutId[0] as { size?: string }).size }
+              );
             }
           }
 
@@ -1643,7 +1693,7 @@ export default function TambahProdukPage({
           const { data: oldSiblings } = await supabase.from("products").select("id, series").eq("category", "Thobe").in("name", namesToCheck);
           for (const old of oldSiblings || []) {
             if (old.series && originalSelectedSeries.includes(old.series) && !selectedSeries.includes(old.series)) {
-              await supabase.from("product_variants").delete().eq("product_id", old.id);
+              await writeVariants(supabase.from("product_variants").delete().eq("product_id", old.id));
               await supabase.from("product_images").delete().eq("product_id", old.id);
               await supabase.from("products").delete().eq("id", old.id);
             }
@@ -1722,7 +1772,7 @@ export default function TambahProdukPage({
             // diperbarui in-place (ID tetap). Aturan varian biasa tidak diubah.
             const idDisimpan = new Set(variantRows.map((row) => row.id).filter((id): id is string => Boolean(id)));
             const idHapus = paketIdsLamaRef.current.filter((id) => !idDisimpan.has(id));
-            if (idHapus.length > 0) await supabase.from("product_variants").delete().in("id", idHapus);
+            if (idHapus.length > 0) await writeVariants(supabase.from("product_variants").delete().in("id", idHapus));
           } else {
             // Varian biasa: hapus HANYA baris yang benar-benar dicabut dari form (mis. ukuran
             // atau warna yang dihapus admin). Baris yang masih ada diperbarui in-place lewat
@@ -1739,7 +1789,7 @@ export default function TambahProdukPage({
                   !keptIds.has(row.id) && !keptKeys.has(`${row.color ?? ""}|${row.size ?? ""}`.trim().toLowerCase()),
               )
               .map((row: { id: string }) => row.id);
-            if (idHapus.length > 0) await supabase.from("product_variants").delete().in("id", idHapus);
+            if (idHapus.length > 0) await writeVariants(supabase.from("product_variants").delete().in("id", idHapus));
           }
           await supabase.from("product_images").delete().eq("product_id", slug);
         }
@@ -1748,10 +1798,18 @@ export default function TambahProdukPage({
             for (const row of variantRows) {
               if (!row.id) continue;
               const { id, ...patch } = row;
-              await supabase.from("product_variants").update(patch).eq("id", id);
+              await writeVariants(supabase.from("product_variants").update(patch).eq("id", id), {
+                color: (patch as { color?: string }).color,
+                size: (patch as { size?: string }).size,
+              });
             }
             const rowsBaru = variantRows.filter((row) => !row.id);
-            if (rowsBaru.length > 0) await supabase.from("product_variants").insert(rowsBaru);
+            if (rowsBaru.length > 0) {
+              await writeVariants(supabase.from("product_variants").insert(rowsBaru), {
+                color: (rowsBaru[0] as { color?: string }).color,
+                size: (rowsBaru[0] as { size?: string }).size,
+              });
+            }
           } else {
             // Baris lama diperbarui lewat `id`; baris baru (tanpa id) di-upsert agar varian
             // yang sudah ada dengan kunci sama tidak dobel.
@@ -1759,10 +1817,16 @@ export default function TambahProdukPage({
             const withoutId = variantRows.filter((row) => !row.id);
             for (const row of withId) {
               const { id, ...patch } = row;
-              await supabase.from("product_variants").update(patch).eq("id", id);
+              await writeVariants(supabase.from("product_variants").update(patch).eq("id", id), {
+                color: (patch as { color?: string }).color,
+                size: (patch as { size?: string }).size,
+              });
             }
             if (withoutId.length > 0) {
-              await supabase.from("product_variants").upsert(withoutId, { onConflict: "product_id,color,size" });
+              await writeVariants(
+                supabase.from("product_variants").upsert(withoutId, { onConflict: "product_id,color,size" }),
+                { color: (withoutId[0] as { color?: string }).color, size: (withoutId[0] as { size?: string }).size }
+              );
             }
           }
         }
@@ -1796,7 +1860,9 @@ export default function TambahProdukPage({
       window.location.assign(backHref);
     } catch (err) {
       console.error("Save error:", err);
-      alert("Gagal menyimpan produk");
+      // Pesan bentrok varian ditampilkan apa adanya supaya admin tahu persis apa yang salah.
+      // Sebelumnya semua kegagalan menjadi "Gagal menyimpan produk" tanpa sebab.
+      alert(err instanceof VariantWriteError ? err.message : "Gagal menyimpan produk");
     } finally {
       setSaving(false);
     }

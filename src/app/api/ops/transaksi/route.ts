@@ -1046,7 +1046,9 @@ export async function PATCH(req: NextRequest) {
       });
       if (rpcError) {
         console.error("[OPS] transaksi PATCH reseller rpc:", rpcError.message);
-        return bad(rpcError.message);
+        // Transaksi SQL sudah rollback → catat anomali dari penanda STOCK_ANOMALY di luar transaksi.
+        await recordAnomalyFromError(admin, rpcError.message || "", "ops-edit-reseller-order", order.order_number);
+        return bad(cleanErrorMessage(rpcError.message || "") || "Gagal menyimpan perubahan item");
       }
 
       return NextResponse.json({
