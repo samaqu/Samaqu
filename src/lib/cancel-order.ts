@@ -5,6 +5,7 @@ import { claimOrderNotification } from "@/lib/order-notify";
 import { syncCommissionStatus } from "@/lib/affiliate/commission";
 import { claimResellerNotification, notifyResellerOrderCancelled } from "@/lib/reseller/notify";
 import { refundResellerOnCancel } from "@/lib/reseller/refund";
+import { revertLeadOnOrderCancelled } from "@/lib/ops-lead-sync";
 
 /**
  * Satu jalur pembatalan pesanan untuk semua pemanggil: customer (`/api/orders/cancel`),
@@ -208,6 +209,15 @@ export async function cancelOrderCompletely(
   }
 
   console.log("[CANCEL] Order cancelled:", order.order_number);
+
+  // Lead yang closing karena pesanan ini dikembalikan ke Belum Closing (nominal dikosongkan).
+  // Hanya menyentuh lead yang `order_id`-nya pesanan ini DAN masih `closing`; lead yang sudah
+  // diubah manual tidak diganggu. Gagal di sini tidak membatalkan pembatalan.
+  try {
+    await revertLeadOnOrderCancelled(supabase, order.id);
+  } catch (e) {
+    console.error("[CANCEL] Gagal mengembalikan lead:", e);
+  }
 
   // Komisi affiliate: pesanan batal → komisi dibatalkan/reversal (audit trail tetap tersimpan).
   // Status pesanan tidak diubah oleh modul ini — hanya baris komisi yang diselaraskan.

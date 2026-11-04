@@ -15,7 +15,7 @@ import {
 } from "@/lib/open-order-offering";
 import { sumWeightGramsBySize, productWeightMapFromRows, variantWeightMapFromRows } from "@/lib/shipping-weight";
 import { verifyJntShipping } from "@/lib/shipping-verify";
-import { markLeadBoughtForOrder } from "@/lib/ops-lead-sync";
+import { syncLeadOnOrderSaved } from "@/lib/ops-lead-sync";
 import {
   notifyAdminNewOrder,
   notifyCustomerOrderCreated,
@@ -612,7 +612,12 @@ export async function POST(request: NextRequest) {
     // Sinkron ke lead: kalau nomor ini cocok dengan lead yang masih aktif, tandai Closing/Beli
     // (order tidak membuat lead baru). Kegagalan sync tidak menggagalkan pesanan.
     try {
-      await markLeadBoughtForOrder(supabaseAdmin, { whatsapp, orderNumber, total });
+      await syncLeadOnOrderSaved(supabaseAdmin, {
+        whatsapp,
+        orderId: order.id,
+        orderNumber,
+        total,
+      });
     } catch (e) {
       console.error("[OPEN-ORDER] Lead sync gagal:", e);
     }

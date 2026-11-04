@@ -27,6 +27,7 @@ import {
   resolveAddonWeight,
 } from "@/lib/open-order-config";
 import { openOrderEffectivePrice } from "@/lib/open-order-offering";
+import { syncLeadOnOrderSaved } from "@/lib/ops-lead-sync";
 
 /**
  * Menu "Transaksi" dashboard internal.
@@ -847,6 +848,21 @@ export async function POST(req: NextRequest) {
 
     // Alamat baru (kalau admin menambahkannya) ikut masuk buku alamat pelanggan.
     if (body?.save_address) await saveCustomerAddress(admin, customerId, customerName, customerWhatsapp, shipping);
+
+    // Sinkron ke lead: nomor HP yang sama + lead Belum Closing (maks. 60 hari sebelum order)
+    // → otomatis Closing, nominal dari total, relasi disimpan di `leads.order_id`.
+    // Kegagalan sync tidak boleh menggagalkan transaksi yang sudah tersimpan.
+    try {
+      await syncLeadOnOrderSaved(admin, {
+        whatsapp: customerWhatsapp,
+        orderId: order.id,
+        orderNumber: order.order_number,
+        total,
+        orderCreatedAt: createdAt.toISOString(),
+      });
+    } catch (leadError) {
+      console.error("[OPS] transaksi lead sync:", leadError);
+    }
 
     // Belum lunas → invoice otomatis ke WA pembeli. Nomor rekening diambil dari Pengaturan →
     // Payment Methods (`payment_methods`, method_type "bank" & aktif). Kalau pengiriman gagal,

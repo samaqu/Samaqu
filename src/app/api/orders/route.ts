@@ -12,7 +12,7 @@ import { sendOnce } from "@/lib/order-notify";
 import { orderItemPhoto } from "@/lib/order-photo";
 import { loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { createOrderPaymentLink } from "@/lib/mayar";
-import { markLeadBoughtForOrder } from "@/lib/ops-lead-sync";
+import { syncLeadOnOrderSaved } from "@/lib/ops-lead-sync";
 import { sumWeightGramsBySize, productWeightMapFromRows, variantWeightMapFromRows } from "@/lib/shipping-weight";
 import { orderLookupToken } from "@/lib/order-token";
 import { PAKET_SIZE, formatProductLabel, isPaketKategori } from "@/lib/item-label";
@@ -476,7 +476,12 @@ export async function POST(request: NextRequest) {
     // (order tidak membuat lead baru). Pakai service role (tabel `leads` tanpa policy RLS).
     // Kegagalan sync tidak boleh menggagalkan pesanan yang sudah tersimpan.
     try {
-      await markLeadBoughtForOrder(getSupabaseAdmin(), { whatsapp: customer.whatsapp, orderNumber, total });
+      await syncLeadOnOrderSaved(getSupabaseAdmin(), {
+        whatsapp: customer.whatsapp,
+        orderId: order.id,
+        orderNumber,
+        total,
+      });
     } catch (e) {
       console.error("[ORDERS] Lead sync gagal:", e);
     }

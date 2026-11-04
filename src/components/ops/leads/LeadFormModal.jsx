@@ -290,6 +290,20 @@ export default function LeadFormModal({ isOpen, onClose, initialData = null, def
               </div>
             )}
 
+            {/* Relasi transaksi: hanya tampil kalau lead ini closing karena sebuah pesanan. */}
+            {isEdit && initialData?.order_number && (
+              <div>
+                <label className={labelClass}>Transaksi</label>
+                <a
+                  href={`/ops/transaksi?search=${encodeURIComponent(initialData.order_number)}`}
+                  className="flex items-center justify-between gap-2 rounded-lg border-2 border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-blue-700 transition-colors hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-blue-300"
+                >
+                  <span className="font-mono">{initialData.order_number}</span>
+                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Buka transaksi →</span>
+                </a>
+              </div>
+            )}
+
             {/* Follow-up: setiap lead baru langsung punya jadwalnya sendiri */}
             <div className="rounded-xl border-2 border-blue-100 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-900/10 p-3.5">
               <div className="flex items-center gap-2 mb-2">

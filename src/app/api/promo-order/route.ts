@@ -20,7 +20,7 @@ import {
   FALLBACK_ITEM_WEIGHT_GRAMS,
 } from "@/lib/shipping-weight";
 import { verifyJntShipping } from "@/lib/shipping-verify";
-import { markLeadBoughtForOrder } from "@/lib/ops-lead-sync";
+import { syncLeadOnOrderSaved } from "@/lib/ops-lead-sync";
 import { notifyAdminNewOrder, notifyCustomerOrderCreated } from "@/lib/fonnte";
 import { sendOnce } from "@/lib/order-notify";
 import { orderItemPhoto } from "@/lib/order-photo";
@@ -501,7 +501,12 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await markLeadBoughtForOrder(supabaseAdmin, { whatsapp, orderNumber, total });
+      await syncLeadOnOrderSaved(supabaseAdmin, {
+        whatsapp,
+        orderId: order.id,
+        orderNumber,
+        total,
+      });
     } catch (e) {
       console.error("[PROMO-ORDER] Lead sync gagal:", e);
     }
