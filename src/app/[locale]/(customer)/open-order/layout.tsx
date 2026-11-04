@@ -33,11 +33,18 @@ export async function generateMetadata({
 
   return {
     ...base,
-    title: meta.title,
+    // `absolute` supaya template "%s | SAMAQU" dari ROOT_METADATA tidak menempel lagi
+    // (dulu jadi "…, Pilih Harga Sendiri | SAMAQU").
+    title: { absolute: meta.title },
     description: meta.description,
     robots: { index: true, follow: true },
     openGraph: {
       ...base.openGraph,
+      title: meta.title,
+      description: meta.description,
+    },
+    // Twitter card masih mewarisi judul/deskripsi homepage — samakan dengan halaman ini.
+    twitter: {
       title: meta.title,
       description: meta.description,
     },
