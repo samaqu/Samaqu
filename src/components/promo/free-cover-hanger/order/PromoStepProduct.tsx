@@ -370,7 +370,7 @@ export default function PromoStepProduct({
                     type="button"
                     onClick={() => onChange({ color })}
                     disabled={habis}
-                    title={habis ? "Stok habis" : `Stok ${stock}`}
+                    title={habis ? "Stok habis" : stock <= 5 ? "Stok terbatas" : "Tersedia"}
                     className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 md:py-2 text-[11px] md:text-[12px] font-ui rounded-sm transition-all duration-200 disabled:cursor-not-allowed"
                     style={{
                       background: color === draft.color ? "var(--espresso)" : "transparent",

@@ -212,7 +212,7 @@
     "viewDetail": "View Detail",
     "starting": "From",
     "soldOut": "Sold Out",
-    "lowStock": "Low Stock — {count} left",
+    "lowStock": "Limited stock",
     "readyStock": "Ready stock",
     "seriesAvail": "{count} series available",
     "emptyState": "No products match this filter.",
@@ -237,12 +237,12 @@
     "addToCart": "Add to Cart",
     "buyWa": "Order via WA",
     "stockHabis": "Out of Stock",
-    "stockMenipis": "Low Stock — {count} left",
+    "stockMenipis": "Low Stock",
     "stockTersedia": "Available",
     "addedToCart": "Added to cart",
     "selectSizeFirst": "Select a size first",
     "outOfStock": "Out of stock — this product cannot be added",
-    "stockLimit": "Only {count} pcs left for this variant",
+    "stockLimit": "Quantity exceeds available stock",
     "relatedTitle": "Other products from this fabric"
   },
   "tracking": {

@@ -83,7 +83,7 @@ export default function PromoStepCart({
   /** Jenis cover bonus yang dipakai (sudah termasuk pilihan awal otomatis). */
   addonCover: string;
   /** Pilihan yang bisa diklik customer, dengan status stok masing-masing. */
-  addonCoverOptions: { color: string; label: string; available: boolean; stock: number | null }[];
+  addonCoverOptions: { color: string; label: string; available: boolean; lowStock: boolean; stock: number | null }[];
   onSelectAddonCover: (color: string) => void;
   /** Berat barang saja (gram) — tanpa add-on. */
   itemsWeight: number;
@@ -213,7 +213,8 @@ export default function PromoStepCart({
                 >
                   <span className="block leading-tight">{option.label}</span>
                   <span className="mt-0.5 block text-[10.5px] font-medium opacity-70">
-                    {option.available ? `Stok ${option.stock ?? 0}` : "Habis"}
+                    {/* Customer hanya melihat STATUS, bukan jumlah stok. */}
+                    {option.available ? (option.lowStock ? "Stok terbatas" : "Tersedia") : "Habis"}
                   </span>
                 </button>
               );

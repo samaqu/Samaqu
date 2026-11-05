@@ -542,7 +542,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     const finalCYPPrice = selectedPrice || defaultCYPPrice;
     if (isCYP && finalCYPPrice < minimumPrice) return;
     if (isOutOfStock) { toast.show("Stok habis — produk ini tidak dapat ditambahkan"); return; }
-    if (stockExceeded) { toast.show(`Stok hanya tersisa ${stock} pcs untuk varian ini`); return; }
+    if (stockExceeded) { toast.show("Jumlah melebihi stok yang tersedia"); return; }
 
     // Find image for selected color, fallback to main product image
     const colorImage = media.find((m) => m.type === "image" && m.src?.toLowerCase().includes(selectedColor?.toLowerCase() || ""))?.src
@@ -597,7 +597,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     if (!product) return;
     if (!selectedSize) { toast.show("Pilih ukuran terlebih dahulu"); return; }
     if (isOutOfStock) { toast.show("Stok habis — produk ini tidak dapat dipesan"); return; }
-    if (stockExceeded) { toast.show(`Stok hanya tersisa ${stock} pcs untuk varian ini`); return; }
+    if (stockExceeded) { toast.show("Jumlah melebihi stok yang tersedia"); return; }
     const seriesName = availableSeries.find((s) => s.id === displayId)?.series || product.series || "";
     const kainName = product.jenis_kain?.name || product.kain || "";
     const color = selectedColor || product.colors[0] || "-";
@@ -942,7 +942,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               {stock === 0 ? (
                 <span className="inline-flex items-center gap-1 text-[11px] font-ui font-medium px-2.5 py-1 rounded-full" style={{ background: "#fde8e8", color: "#c0392b" }}>Habis</span>
               ) : stock !== null && stock <= 5 ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-ui font-medium px-2.5 py-1 rounded-full" style={{ background: "#fef3cd", color: "#856404" }}>Stok Menipis — Tersisa {stock}</span>
+                <span className="inline-flex items-center gap-1 text-[11px] font-ui font-medium px-2.5 py-1 rounded-full" style={{ background: "#fef3cd", color: "#856404" }}>Stok Menipis</span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-[11px] font-ui font-medium px-2.5 py-1 rounded-full" style={{ background: "#e7ecdf", color: "#5b6b45" }}>Tersedia</span>
               )}
@@ -1239,7 +1239,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 {stock === 0 ? (
                   <span className="inline-flex items-center gap-1 text-[11px] font-ui font-medium px-2.5 py-1 rounded-full" style={{ background: "#fde8e8", color: "#c0392b" }}>Habis</span>
                 ) : stock !== null && stock <= 5 ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-ui font-medium px-2.5 py-1 rounded-full" style={{ background: "#fef3cd", color: "#856404" }}>Stok Menipis — Tersisa {stock}</span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-ui font-medium px-2.5 py-1 rounded-full" style={{ background: "#fef3cd", color: "#856404" }}>Stok Menipis</span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-[11px] font-ui font-medium px-2.5 py-1 rounded-full" style={{ background: "#e7ecdf", color: "#5b6b45" }}>Tersedia</span>
                 )}

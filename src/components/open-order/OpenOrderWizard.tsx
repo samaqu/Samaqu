@@ -867,6 +867,8 @@ export default function OpenOrderWizard({
                   color: entry.option.color,
                   label: entry.option.label,
                   available: entry.available,
+                  // Ambang "menipis" dibagi dengan tampilan lain: 5 atau kurang.
+                  lowStock: entry.available && (entry.stock ?? 0) <= 5,
                   stock: entry.stock,
                 }))}
                 onSelectAddonCover={setAddonCover}

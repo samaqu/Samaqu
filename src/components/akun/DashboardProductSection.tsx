@@ -10,7 +10,9 @@ import { useWishlist } from "@/lib/use-wishlist";
 import { catalogPrice, groupCatalogProducts, type CatalogProduct } from "@/lib/catalog-group";
 import type { Product } from "@/lib/katalog-data";
 
-const LOW_STOCK = 3;
+// Ambang "stok terbatas" — 5 atau kurang, SAMA dengan halaman katalog & detail produk.
+// Customer hanya melihat label, tidak pernah angka stoknya.
+const LOW_STOCK = 5;
 const BADGE_LABEL: Record<string, string> = {
   terlaris: "Terlaris",
   rekomendasi: "Rekomendasi",
@@ -87,7 +89,7 @@ function ProductCard({
 
         {lowStock ? (
           <span className="absolute bottom-2.5 left-2.5 rounded-full bg-amber-50/95 px-2 py-1 text-[10px] font-bold text-amber-700">
-            Sisa {stock}
+            Stok terbatas
           </span>
         ) : null}
       </div>

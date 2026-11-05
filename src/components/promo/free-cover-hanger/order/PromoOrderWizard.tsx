@@ -909,6 +909,7 @@ export default function PromoOrderWizard({
                   color: entry.option.color,
                   label: entry.option.label,
                   available: entry.available,
+                  lowStock: entry.available && (entry.stock ?? 0) <= 5,
                   stock: entry.stock,
                 }))}
                 onSelectAddonCover={setBonusCover}

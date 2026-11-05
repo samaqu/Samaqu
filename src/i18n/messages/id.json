@@ -212,7 +212,7 @@
     "viewDetail": "Lihat Detail",
     "starting": "Mulai",
     "soldOut": "Sold Out",
-    "lowStock": "Menipis — sisa {count}",
+    "lowStock": "Stok terbatas",
     "readyStock": "Ready stock",
     "seriesAvail": "{count} series tersedia",
     "emptyState": "Belum ada produk yang cocok dengan filter ini.",
@@ -237,12 +237,12 @@
     "addToCart": "Keranjang",
     "buyWa": "Pesan via WA",
     "stockHabis": "Stok Habis",
-    "stockMenipis": "Stok Menipis — Tersisa {count}",
+    "stockMenipis": "Stok Menipis",
     "stockTersedia": "Tersedia",
     "addedToCart": "Ditambahkan ke keranjang",
     "selectSizeFirst": "Pilih ukuran terlebih dahulu",
     "outOfStock": "Stok habis — produk ini tidak dapat ditambahkan",
-    "stockLimit": "Stok hanya tersisa {count} pcs untuk varian ini",
+    "stockLimit": "Jumlah melebihi stok yang tersedia",
     "relatedTitle": "Produk lain dari kain ini"
   },
   "tracking": {
