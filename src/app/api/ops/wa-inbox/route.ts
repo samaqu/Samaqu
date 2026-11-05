@@ -87,6 +87,26 @@ export async function POST(req: NextRequest) {
 
   const admin = getSupabaseAdmin();
 
+  // Anti-dobel level server: satu pesan masuk hanya boleh dibalas sekali.
+  // Kalau run lain (atau Claude yang sama) mencoba mengirim lagi dengan inbox_id
+  // yang sudah `sent`, permintaannya ditolak sebelum menyentuh Fonnte.
+  if (inboxId) {
+    const { data: existing } = await admin
+      .from("wa_inbox")
+      .select("status, replied_at")
+      .eq("id", inboxId)
+      .maybeSingle();
+    if (!existing) {
+      return NextResponse.json({ error: "Pesan masuk tidak ditemukan" }, { status: 404 });
+    }
+    if (existing.status === "sent") {
+      return NextResponse.json(
+        { error: "Pesan ini sudah dibalas sebelumnya. Tidak dikirim ulang." },
+        { status: 409 },
+      );
+    }
+  }
+
   // Pengaman anti-banned: batasi kecepatan & volume kirim. Dihitung dari database
   // (bukan memori) supaya tetap berlaku walau request dilayani instance berbeda.
   const gapSeconds = Number(process.env.WA_SEND_MIN_GAP_SEC || 8);
