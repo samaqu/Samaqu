@@ -18,6 +18,7 @@ import { useStoreSettings } from "@/lib/store-settings";
 import { usePageUrl } from "@/lib/ops-router";
 import { requestRevalidate } from "@/lib/admin-revalidate";
 import { duplicateSkus, generateBaseSku, generateVariantSku, resolveColorName, seriesCode } from "@/lib/sku";
+import { findProductSkuClashes, findVariantSkuClashes, skuClashMessage, skuErrorFromDatabase } from "@/lib/sku-unique";
 
 const CATEGORIES = ["Thobe", "Kandora", "Koko", "Vest", "Kabak", "Cover & Hanger"] as const;
 const SIZES = ["S", "M", "L", "XL", "XXL"] as const;
@@ -195,6 +196,9 @@ function variantWriteMessage(
   context: { color?: string | null; size?: string | null; existingColor?: string | null }
 ): string {
   const message = String(error?.message || "");
+  // Index unik SKU (products_sku_uidx / product_variants_sku_uidx).
+  const skuMessage = skuErrorFromDatabase(error);
+  if (skuMessage) return skuMessage;
   if (error?.code === "23505" || /duplicate key|unique constraint/i.test(message)) {
     const color = (context.color ?? "").trim();
     const size = (context.size ?? "").trim();
@@ -1516,7 +1520,7 @@ export default function TambahProdukPage({
   // ── End Thobe multi-series helpers ──
 
   // Validate
-  function validate(): boolean {
+  async function validate(): Promise<boolean> {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = "Nama produk wajib diisi";
     if (!category) e.category = "Kategori wajib dipilih";
@@ -1650,6 +1654,17 @@ export default function TambahProdukPage({
       if (duplicates.length > 0) {
         e.sku = `SKU dobel: ${duplicates.join(", ")}. Ubah salah satu SKU.`;
       }
+
+      // Bentrok dengan produk/varian LAIN di katalog (index unik per tabel di database).
+      // Dicek di sini supaya admin melihat pesan jelas, bukan error database mentah.
+      if (!e.sku) {
+        const [productClash, variantClash] = await Promise.all([
+          findProductSkuClashes(supabase, productSkus, isEdit ? editProductId : null),
+          findVariantSkuClashes(supabase, variantSkus, isEdit ? editProductId : null),
+        ]);
+        const clashes = [...productClash, ...variantClash];
+        if (clashes.length > 0) e.sku = skuClashMessage(clashes);
+      }
     }
 
     setErrors(e);
@@ -1658,7 +1673,7 @@ export default function TambahProdukPage({
 
   // Submit
   async function handleSubmit() {
-    if (!validate()) return;
+    if (!(await validate())) return;
     setSaving(true);
 
     try {
@@ -1751,7 +1766,7 @@ export default function TambahProdukPage({
           const { error: productError } = isOpenOrderPrice
             ? await supabase.from("products").update(productRow).eq("id", seriesSlug)
             : await supabase.from("products").upsert(productRow, { onConflict: "id" });
-          if (productError) throw productError;
+          if (productError) throw new Error(skuErrorFromDatabase(productError) ?? productError.message);
 
           // Varian baris series ini.
           //
@@ -1889,7 +1904,7 @@ export default function TambahProdukPage({
         const { error: productError } = isOpenOrderPrice
           ? await supabase.from("products").update(productRow).eq("id", slug)
           : await supabase.from("products").upsert(productRow, { onConflict: "id" });
-        if (productError) throw productError;
+        if (productError) throw new Error(skuErrorFromDatabase(productError) ?? productError.message);
 
         // Insert variants
         const variantRows = variants.flatMap((v, vi) =>
