@@ -144,6 +144,27 @@ type SizeRow = { size: string; stock: number; priceOverride: string; sku: string
 };
 
 /**
+ * Warna yang disimpan ke `products.colors` — HANYA varian yang masih dijual.
+ *
+ * `products.colors` adalah sumber daftar pilihan di halaman katalog. Kalau varian pensiun
+ * (is_sellable = false) ikut masuk, pilihan itu tampil dan terlihat tersedia tapi checkout
+ * ditolak. Varian pensiun tetap disimpan di `product_variants` untuk pesanan lama.
+ */
+function savedColors(variants: Variant[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const variant of variants) {
+    // `notSellable` diisi dari `is_sellable === false` saat memuat data.
+    if (variant.sizes.some((size) => size.notSellable)) continue;
+    const color = String(variant.color ?? "").trim();
+    if (!color || seen.has(color)) continue;
+    seen.add(color);
+    out.push(color);
+  }
+  return out;
+}
+
+/**
  * Potongan kolom `weight` untuk simpan varian.
  *
  * Kosong → `undefined` (kolom TIDAK dikirim) supaya `upsert`/`update` mempertahankan berat
@@ -1713,7 +1734,9 @@ export default function TambahProdukPage({
             image: block.media.find((m) => m.url)?.url || "",
             images: block.media.filter((m) => m.url).map((m) => m.url),
             // Jangan pernah menimpa warna lama dengan array kosong.
-            ...(block.variants.length > 0 ? { colors: block.variants.map((v) => v.color) } : {}),
+            // Varian pensiun (is_sellable = false) TIDAK dimasukkan lagi: kalau ikut, pilihan
+            // itu muncul di katalog tapi checkout-nya ditolak.
+            ...(savedColors(block.variants).length > 0 ? { colors: savedColors(block.variants) } : {}),
             jenis_kain_id: selectedJenisKainId || null,
             series: seriesName,
             catatan_harga: catatanHarga.trim() || null,
@@ -1851,7 +1874,8 @@ export default function TambahProdukPage({
           image: media.find((m) => m.url)?.url || "",
           images: media.filter((m) => m.url).map((m) => m.url),
           // Jangan pernah menimpa warna lama dengan array kosong.
-          ...(variants.length > 0 ? { colors: variants.map((v) => v.color) } : {}),
+          // Varian pensiun (is_sellable = false) tidak dimasukkan lagi.
+          ...(savedColors(variants).length > 0 ? { colors: savedColors(variants) } : {}),
           jenis_kain_id: selectedJenisKainId || null,
           series: series.trim() || null,
           catatan_harga: catatanHarga.trim() || null,

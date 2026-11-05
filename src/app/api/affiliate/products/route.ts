@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
 
   const { data: variantRows } = await supabase
     .from("product_variants")
-    .select("product_id, color, size, stock")
+    .select("product_id, color, size, stock, is_sellable")
     .in("product_id", ids);
 
   const { data: promotedRows } = await supabase
@@ -72,8 +72,10 @@ export async function GET(req: NextRequest) {
   const stockMap = new Map<string, number>();
   const sizeMap = new Map<string, string[]>();
   const colorMap = new Map<string, string[]>();
-  for (const row of (variantRows || []) as { product_id: string; color: string | null; size: string | null; stock: number | null }[]) {
+  for (const row of (variantRows || []) as { product_id: string; color: string | null; size: string | null; stock: number | null; is_sellable: boolean | null }[]) {
     if (!row.product_id) continue;
+    // Varian pensiun tidak ditawarkan ke affiliate (sama seperti katalog customer).
+    if (row.is_sellable === false) continue;
     stockMap.set(row.product_id, (stockMap.get(row.product_id) || 0) + Number(row.stock || 0));
     if (row.size) {
       const sizes = sizeMap.get(row.product_id) || [];

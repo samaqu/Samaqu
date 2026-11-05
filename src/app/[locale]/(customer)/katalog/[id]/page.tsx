@@ -231,6 +231,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [stock, setStock] = useState<number | null>(null);
   // Query stok GAGAL ≠ stok habis. Tanpa ini, error query tampil sebagai "Stok Habis".
   const [stockError, setStockError] = useState(false);
+  /** Varian terpilih sudah tidak dijual (`is_sellable = false`) — tidak boleh dibeli. */
+  const [variantRetired, setVariantRetired] = useState(false);
   const [qty, setQty] = useState(1);
   const [activeIndex, setActiveIndex] = useState(0);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -293,6 +295,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         const params = new URLSearchParams(window.location.search);
         const urlColor = params.get("color");
         const urlSize = params.get("size");
+        // HANYA warna yang ada di `p.colors` (= varian yang masih dijual) yang dipakai.
+        // Warna pensiun dari URL (mis. link lama "Set Hanger + Cover") jatuh ke pilihan pertama.
         const initialColor = urlColor && p.colors.includes(urlColor) ? urlColor : (p.colors[0] || "");
         setSelectedColor(initialColor);
         if (urlSize) setSelectedSize(urlSize);
@@ -459,12 +463,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         setVariantWeight(Number(data?.weight) || null);
         // View sudah memecahkan stok sharing, jadi `effective_stock` langsung dipakai.
         setStock(typeof data?.effective_stock === "number" ? data.effective_stock : null);
+        // Varian pensiun tidak boleh bisa dibeli, termasuk lewat `?color=` di URL.
+        setVariantRetired(data?.is_sellable === false);
       });
   }, [displayId, selectedColor, selectedSize]);
 
   const currentPrice = variantPrice ?? product?.price ?? 0;
   // Stok varian yang sedang dipilih (color + size). null = varian tidak dikelola stoknya
-  const isOutOfStock = stock === 0;
+  // Varian pensiun (is_sellable = false) diperlakukan tidak tersedia.
+  const isOutOfStock = stock === 0 || variantRetired;
   const stockExceeded = stock !== null && qty > stock;
   const isCYP = product?.create_your_price_enabled ?? false;
   const minimumPrice = product?.minimum_price ?? currentPrice;
