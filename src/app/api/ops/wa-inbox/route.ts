@@ -85,8 +85,65 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const sent = await sendFonnteMessage(customer.token, target, message);
   const admin = getSupabaseAdmin();
+
+  // Pengaman anti-banned: batasi kecepatan & volume kirim. Dihitung dari database
+  // (bukan memori) supaya tetap berlaku walau request dilayani instance berbeda.
+  const gapSeconds = Number(process.env.WA_SEND_MIN_GAP_SEC || 8);
+  const maxPerHour = Number(process.env.WA_SEND_MAX_PER_HOUR || 20);
+  const maxPerDay = Number(process.env.WA_SEND_MAX_PER_DAY || 80);
+  const nowMs = Date.now();
+  const hourAgo = new Date(nowMs - 60 * 60 * 1000).toISOString();
+  const dayAgo = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString();
+
+  const [{ data: lastSent }, { count: hourCount }, { count: dayCount }] = await Promise.all([
+    admin
+      .from("wa_inbox")
+      .select("replied_at")
+      .not("replied_at", "is", null)
+      .order("replied_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    admin.from("wa_inbox").select("id", { count: "exact", head: true }).gte("replied_at", hourAgo),
+    admin.from("wa_inbox").select("id", { count: "exact", head: true }).gte("replied_at", dayAgo),
+  ]);
+
+  const sinceLast = lastSent?.replied_at
+    ? nowMs - new Date(lastSent.replied_at).getTime()
+    : Number.POSITIVE_INFINITY;
+
+  const releaseClaim = async () => {
+    if (!inboxId) return;
+    await admin
+      .from("wa_inbox")
+      .update({ status: "pending", claimed_at: null, updated_at: new Date().toISOString() })
+      .eq("id", inboxId);
+  };
+
+  if (sinceLast < gapSeconds * 1000) {
+    await releaseClaim();
+    const wait = Math.ceil((gapSeconds * 1000 - sinceLast) / 1000);
+    return NextResponse.json(
+      { error: `Terlalu cepat. Tunggu ${wait} detik sebelum kirim pesan berikutnya.`, retry_after: wait },
+      { status: 429 },
+    );
+  }
+  if ((hourCount || 0) >= maxPerHour) {
+    await releaseClaim();
+    return NextResponse.json(
+      { error: `Batas ${maxPerHour} pesan/jam tercapai. Pesan dikembalikan ke antrean.`, retry_after: 3600 },
+      { status: 429 },
+    );
+  }
+  if ((dayCount || 0) >= maxPerDay) {
+    await releaseClaim();
+    return NextResponse.json(
+      { error: `Batas ${maxPerDay} pesan/24 jam tercapai. Pesan dikembalikan ke antrean.`, retry_after: 3600 },
+      { status: 429 },
+    );
+  }
+
+  const sent = await sendFonnteMessage(customer.token, target, message);
   const now = new Date().toISOString();
 
   if (!sent) {
