@@ -62,7 +62,21 @@ export async function GET(req: NextRequest) {
     if (updated) claimed.push(updated);
   }
 
-  return NextResponse.json({ items: claimed, claimed: claimed.length });
+  // Sertakan riwayat percakapan dengan pengirim yang sama, supaya balasan
+  // nyambung dengan pesan sebelumnya (mis. customer menjawab "yg ini" saja).
+  const withHistory: Record<string, unknown>[] = [];
+  for (const row of claimed) {
+    const { data: history } = await admin
+      .from("wa_inbox")
+      .select("created_at, message, reply_text")
+      .eq("sender", row.sender)
+      .neq("id", row.id)
+      .order("created_at", { ascending: false })
+      .limit(8);
+    withHistory.push({ ...row, riwayat: (history || []).reverse() });
+  }
+
+  return NextResponse.json({ items: withHistory, claimed: withHistory.length });
 }
 
 export async function POST(req: NextRequest) {
