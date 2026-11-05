@@ -54,7 +54,7 @@ import ImportProductModal from "@/components/ops/ImportProductModal"; // Import 
 import { useToast } from "@/components/ops/ui/use-toast";
 import { usePageUrl } from "@/lib/ops-router";
 import { MetricCardSkeleton } from "@/components/ops/ui/skeleton";
-import { SIZES, stockStatus } from "@/lib/ops-variants";
+import { SIZES, stockStatus, varianPensiun, varianKomponen } from "@/lib/ops-variants";
 import { isPaketKategori } from "@/lib/item-label";
 import { IconBoxes, IconLayers, IconCalendarClock, IconPackageX, IconArrowDownToLine, IconAlertTriangle } from "@/components/ops/icons";
 
@@ -69,6 +69,12 @@ import { IconBoxes, IconLayers, IconCalendarClock, IconPackageX, IconArrowDownTo
  * Dulu varian seperti itu terbaca total 0 / status "Habis" padahal stoknya ada
  * (mis. produk `cover-thobe`).
  */
+/**
+ * Varian yang sudah tidak dijual / stoknya dari komponen — aturan bersama di
+ * `src/lib/ops-variants.js` supaya laci, Laporan Stok, dan dashboard sepakat.
+ * Lihat `varianPensiun` & `varianKomponen` di sana.
+ */
+
 const stokVarianTotal = (v) => {
   const src = v?.stock_efektif ?? v?.stock;
   if (!src || typeof src !== "object") return 0;
@@ -308,8 +314,22 @@ function MultiFilter({ label, options, selected, onChange }) {
 function ProductDetailModal({ isOpen, onClose, product, stockIns = [], transactions = [], variants = [], onTogglePublish, publishing = false }) {
   if (!isOpen || !product) return null;
 
-  const pv = (variants || []).filter((v) => v.product_id === product.id);
-  const totalStock = pv.reduce((s, v) => s + stokVarianTotal(v), 0);
+  const pvSemua = (variants || []).filter((v) => v.product_id === product.id);
+  /*
+   * Varian pensiun (`is_sellable = false`) DITAMPILKAN dengan label, tetapi TIDAK dihitung
+   * ke total, status, maupun jumlah varian — data & pesanan lamanya tetap utuh.
+   */
+  const pvAktif = pvSemua.filter((v) => !varianPensiun(v));
+  const pvPensiun = pvSemua.filter((v) => varianPensiun(v));
+  /*
+   * Varian berkomponen (`track_stock = false`) memakai stok EFEKTIF-nya (dari API), tapi
+   * TIDAK dijumlahkan ke total gudang: stoknya milik KOMPONENNYA. Kalau ikut dijumlah,
+   * hanger terhitung dua kali (sekali sendiri, sekali lewat cover + hanger).
+   */
+  const totalStock = pvAktif.reduce((s, v) => s + (varianKomponen(v) ? 0 : stokVarianTotal(v)), 0);
+  const stokKomponen = pvAktif
+    .filter(varianKomponen)
+    .reduce((s, v) => s + stokVarianTotal(v), 0);
   // Stok yang ditampilkan di detail = stok efektif (series turunan menumpang stok basisnya).
   const stokEfektif = product.stock_efektif ?? totalStock;
   const status = product.status_efektif || stockStatus(stokEfektif);
@@ -322,7 +342,7 @@ function ProductDetailModal({ isOpen, onClose, product, stockIns = [], transacti
   const paket = isPaketKategori(product.category);
   // SAMAQU menyimpan warna asli di NAMA produk; `color: "default"` hanyalah sisa
   // struktur varian lama. Yang benar-benar multi-warna tetap ditampilkan.
-  const realColorRows = pv.filter((v) => {
+  const realColorRows = pvAktif.filter((v) => {
     const color = String(v.color || "").trim().toLowerCase();
     return color !== "" && color !== "default";
   });
@@ -345,7 +365,8 @@ function ProductDetailModal({ isOpen, onClose, product, stockIns = [], transacti
       : `${sharedNames.slice(0, -1).join(", ")} dan ${sharedNames[sharedNames.length - 1]}`;
 
   // Satu baris ukuran untuk produk default; baris per warna hanya kalau warna asli.
-  const displayRows = hasRealColors ? realColorRows : pv.slice(0, 1);
+  // Varian pensiun tetap ditampilkan di bawah tabel utama, dengan label "Tidak dijual".
+  const displayRows = hasRealColors ? realColorRows : pvAktif.slice(0, 1);
   const detailSizeLayout = {
     showSizes: displayRows.some(punyaUkuranStandar),
     showExtra: displayRows.some(punyaUkuranNonStandar),
@@ -545,6 +566,12 @@ function ProductDetailModal({ isOpen, onClose, product, stockIns = [], transacti
                                   <td className="px-3 py-2 text-[13px] font-semibold text-slate-900 dark:text-white whitespace-nowrap">
                                     {displayVariantColor(v.color, product)}
                                     {v.series_name ? <span className="block text-[10px] text-slate-400 font-medium">{v.series_name}</span> : null}
+                                    {/* Varian berkomponen: angkanya dari cover + hanger, bukan stok sendiri. */}
+                                    {varianKomponen(v) ? (
+                                      <span className="mt-0.5 inline-block rounded px-1.5 py-0.5 text-[9.5px] font-bold bg-blue-50 text-blue-700 border border-blue-200" title="Stok dihitung dari Cover + Hanger; tidak dijumlahkan ke total gudang">
+                                        dari komponen
+                                      </span>
+                                    ) : null}
                                   </td>
                                 ) : null}
                                 {detailSizeLayout.showSizes && SIZES.map((sz) => {
@@ -582,6 +609,26 @@ function ProductDetailModal({ isOpen, onClose, product, stockIns = [], transacti
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                )}
+
+                {/* Varian yang sudah tidak dijual — ditampilkan supaya admin tahu, TIDAK
+                    dihitung ke total/status/jumlah varian. Datanya tetap ada untuk pesanan lama. */}
+                {pvPensiun.length > 0 && (
+                  <div className="mt-2 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/60 dark:bg-amber-900/10 px-3 py-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                      Tidak dijual ({pvPensiun.length})
+                    </p>
+                    <ul className="mt-1 space-y-1">
+                      {pvPensiun.map((v, i) => (
+                        <li key={v.id || i} className="flex items-center justify-between gap-2 text-[12px] text-amber-900 dark:text-amber-200">
+                          <span className="min-w-0 truncate font-semibold">{displayVariantColor(v.color, product)}</span>
+                          <span className="shrink-0 text-[11px] text-amber-700/80 dark:text-amber-400/80">
+                            stok {stokVarianTotal(v)} · tidak ditawarkan ke customer
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </section>

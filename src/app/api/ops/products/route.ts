@@ -34,21 +34,56 @@ async function withTotals(admin: ReturnType<typeof getSupabaseAdmin>, products: 
   // Jadi stok yang benar-benar bisa dijual = stok produk basisnya.
   const { data: variants } = await admin
     .from("product_variants")
-    .select("product_id, stock, base_product_id");
+    .select("product_id, color, size, stock, base_product_id, track_stock, is_sellable");
+
+  /*
+   * Stok EFEKTIF dihitung database lewat fungsi yang sama dengan checkout:
+   * stok sendiri → induk sharing → MIN stok komponen.
+   *
+   * Dua penyaringan:
+   *  - `is_sellable = false` tidak dihitung sama sekali (varian pensiun, mis. Set Hanger + Cover)
+   *  - `track_stock = false` tidak dijumlahkan ke total gudang (stoknya milik KOMPONENNYA;
+   *    kalau ikut dijumlah, hanger terhitung dua kali)
+   */
+  const effectiveMap = new Map<string, number>();
+  {
+    const { data: eff, error } = await admin.rpc("samaqu_effective_stock_map");
+    if (error) console.error("[OPS-PRODUCTS] gagal memuat stok efektif:", error.message);
+    for (const row of (eff ?? []) as { product_id: string; color: string | null; size: string | null; effective_stock: number | null }[]) {
+      const key = `${row.product_id}|${String(row.color ?? "").trim().toLowerCase()}|${String(row.size ?? "").trim().toLowerCase()}`;
+      effectiveMap.set(key, Number(row.effective_stock) || 0);
+    }
+  }
+
   const ownStock: Record<string, number> = {};
   const baseLink: Record<string, string> = {};
   for (const v of variants || []) {
+    if (v.is_sellable === false) continue;
     if (v.base_product_id) {
       baseLink[v.product_id] = v.base_product_id;
       continue;
     }
+    // Varian berkomponen: stoknya milik komponen, jangan dijumlahkan lagi di sini.
+    if (v.track_stock === false) continue;
     ownStock[v.product_id] = (ownStock[v.product_id] || 0) + (Number(v.stock) || 0);
   }
+
+  // Stok efektif khusus varian berkomponen (produk itu sendiri, bukan turunan sharing).
+  const componentStock: Record<string, number> = {};
+  for (const v of variants || []) {
+    if (v.is_sellable === false || v.track_stock !== false || v.base_product_id) continue;
+    const key = `${v.product_id}|${String(v.color ?? "").trim().toLowerCase()}|${String(v.size ?? "").trim().toLowerCase()}`;
+    componentStock[v.product_id] =
+      (componentStock[v.product_id] || 0) + (effectiveMap.get(key) ?? 0);
+  }
+
   return products.map((p) => {
     const total = ownStock[p.id] || 0;
+    const fromComponents = componentStock[p.id] || 0;
     const baseId = baseLink[p.id] as string | undefined;
-    // Stok efektif: series turunan memakai stok basis; produk biasa memakai stoknya sendiri.
-    const efektif = baseId ? ownStock[baseId] || 0 : total;
+    // Stok efektif: series turunan memakai stok basis; produk berkomponen memakai stok
+    // komponennya; produk biasa memakai stoknya sendiri.
+    const efektif = baseId ? ownStock[baseId] || 0 : total + fromComponents;
     const baseProduk = baseId ? products.find((b) => b.id === baseId) : null;
     return {
       id: p.id,

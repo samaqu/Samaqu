@@ -31,3 +31,28 @@ export function totalStockOfVariants(variants, productId) {
     .filter((v) => v.product_id === productId)
     .reduce((sum, v) => sum + sumStock(v.stock), 0);
 }
+
+/**
+ * Varian yang sudah tidak dijual (`is_sellable = false`).
+ *
+ * Sumber utama: penanda `is_sellable` yang dikirim `/api/ops/product-variants` per baris.
+ * Cadangan untuk respons lama: `__blocked_sizes` (semua ukuran diblokir = varian pensiun).
+ */
+export function varianPensiun(v) {
+  if (v?.is_sellable === false) return true;
+  if (v?.is_sellable === true) return false;
+  const blocked = v?.__blocked_sizes || {};
+  const sizes = Object.keys(v?.stock || {});
+  if (sizes.length === 0) return Object.keys(blocked).length > 0;
+  return sizes.every((size) => blocked[size] === true);
+}
+
+/**
+ * Varian yang stoknya berasal dari KOMPONEN (`track_stock = false`).
+ * Stoknya sah untuk ditampilkan, tetapi tidak boleh dijumlahkan ke total gudang —
+ * komponennya sudah dihitung sebagai produk sendiri (hindari hitung ganda).
+ */
+export function varianKomponen(v) {
+  if (v?.track_stock === false) return true;
+  return Boolean(v?.component_tracked) || Object.keys(v?.component_sizes || {}).length > 0;
+}

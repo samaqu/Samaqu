@@ -71,7 +71,9 @@ export async function GET(req: NextRequest) {
     countOf((q) => q.is("do_not_contact", false).not("next_followup_at", "is", null).lt("next_followup_at", startIso).or(activeLead)),
     countOf((q) => q.eq("outcome", "bought").gte("last_contact_at", month.startIso).lt("last_contact_at", month.endIso)),
     admin.from("orders").select("id, total, shipping_cost, status, created_at, payment_provider, payment_ref").gte("created_at", month.startIso).lt("created_at", month.endIso),
-    admin.from("product_variants").select("product_id, stock, base_product_id"),
+    // `is_sellable`/`track_stock` ikut dibaca supaya angka stok dashboard SAMA dengan
+    // Daftar Produk: varian pensiun tidak dihitung, varian berkomponen tidak didobel.
+    admin.from("product_variants").select("product_id, stock, base_product_id, is_sellable, track_stock"),
     admin.from("lead_activities").select("id, lead_id, action, note, created_at, actor").order("created_at", { ascending: false }).limit(6),
     // Order 7 hari terakhir (WIB) — sumber grafik `trendHarian` (batas bulan ≠ jendela 7 hari).
     admin.from("orders").select("id, total, shipping_cost, status, created_at").gte("created_at", trendStartIso).lt("created_at", endIso),
@@ -203,8 +205,15 @@ export async function GET(req: NextRequest) {
 
   /* ── Stok ──
      Memakai resolver yang sama dengan /api/ops/products & /api/ops/product-variants:
-     produk series yang menumpang stok produk basisnya tidak lagi dihitung "habis". */
-  const { effectiveTotal } = resolveStock((variants.data || []) as any);
+     produk series yang menumpang stok produk basisnya tidak lagi dihitung "habis".
+
+     Varian `is_sellable = false` dibuang (sudah tidak dijual) dan varian
+     `track_stock = false` dilewati (stoknya milik komponen, jangan didobel) —
+     supaya angka dashboard = Daftar Produk. */
+  const variantsHitung = ((variants.data || []) as any[]).filter(
+    (v) => v.is_sellable !== false && v.track_stock !== false
+  );
+  const { effectiveTotal } = resolveStock(variantsHitung);
   const totalPerProduk = Object.values(effectiveTotal);
   const totalUnit = totalPerProduk.reduce((a, b) => a + b, 0);
   const varianHabis = totalPerProduk.filter((n) => n === 0).length;

@@ -34,6 +34,27 @@ function normalizeStockMap(stock: unknown): Record<string, number> {
 
 type Admin = ReturnType<typeof getSupabaseAdmin>;
 
+/**
+ * Stok efektif semua varian, dihitung DATABASE (satu fungsi dengan checkout).
+ * Kunci: `product_id||color||size` huruf kecil semua.
+ */
+async function loadEffectiveStock(admin: Admin): Promise<Map<string, number>> {
+  const { data, error } = await admin.rpc("samaqu_effective_stock_map");
+  const map = new Map<string, number>();
+  if (error) {
+    console.error("[OPS] gagal memuat stok efektif:", error.message);
+    return map;
+  }
+  for (const row of (data ?? []) as { product_id: string; color: string | null; size: string | null; effective_stock: number | null }[]) {
+    map.set(effKey(row.product_id, row.color, row.size), Number(row.effective_stock) || 0);
+  }
+  return map;
+}
+
+function effKey(productId: string, color: string | null | undefined, size: string | null | undefined): string {
+  return `${String(productId ?? "").trim().toLowerCase()}|${String(color ?? "").trim().toLowerCase()}|${String(size ?? "").trim().toLowerCase()}`;
+}
+
 /** Tulis satu kelompok (produk, warna): ukuran yang sudah ada diperbarui,
  *  ukuran yang belum ada ditambahkan. `base_product_id`/`base_size` tidak disentuh. */
 async function writeVariantGroup(
@@ -140,6 +161,13 @@ export async function GET(req: NextRequest) {
   // Resolusinya sama dengan /api/ops/products supaya angka di Laporan Stok = Daftar Produk.
   const resolution = resolveStock((rows || []) as any);
 
+  /*
+   * Stok EFEKTIF per varian (produk + warna + ukuran), dihitung database lewat fungsi yang
+   * sama dengan checkout: stok sendiri → induk sharing → MIN stok komponen.
+   * Tanpa ini, varian berkomponen (`track_stock = false`) tampil 0 padahal bisa dijual.
+   */
+  const effectiveMap = await loadEffectiveStock(admin);
+
   const grouped: Record<string, any> = {};
   for (const r of rows || []) {
     const key = groupKey(r.product_id, r.color || "default");
@@ -199,6 +227,10 @@ export async function GET(req: NextRequest) {
         grouped[key].component_tracked = true;
         grouped[key].component_sizes = { ...(grouped[key].component_sizes || {}), [size]: true };
       }
+      // Penanda EKSPLISIT per baris — dipakai UI supaya tidak perlu menebak dari peta ukuran
+      // (varian paket punya satu ukuran "ALL SIZE", sehingga "semua ukuran diblokir" ambigu).
+      if (r.is_sellable === false) grouped[key].is_sellable = false;
+      if (r.track_stock === false) grouped[key].track_stock = false;
     }
     const weight = Number(r.weight) || 0;
     if (size && weight > 0) grouped[key].weights[size] = weight;
@@ -206,8 +238,17 @@ export async function GET(req: NextRequest) {
 
   const items = Object.values(grouped).map((v: any) => {
     const total = Object.values(v.stock).reduce((a: number, b: any) => a + (Number(b) || 0), 0);
-    // Stok efektif: varian turunan memakai stok basisnya (per ukuran), bukan stoknya yang 0.
-    const efektifMap = v.base_product_id ? ownSizeMap(resolution, v.base_product_id) : { ...v.stock };
+    /*
+     * Stok efektif per ukuran — SUMBER UTAMA: fungsi database.
+     * Urutan cadangan: peta database → aturan sharing lama → stok mentah.
+     * Varian berkomponen kini memakai stok komponennya (bukan 0).
+     */
+    const shared = v.base_product_id ? ownSizeMap(resolution, v.base_product_id) : null;
+    const efektifMap: Record<string, number> = {};
+    for (const [size, raw] of Object.entries(v.stock as Record<string, number>)) {
+      const fromDb = effectiveMap.get(effKey(v.product_id, v.color, size));
+      efektifMap[size] = fromDb ?? (shared ? (shared[size] ?? 0) : Number(raw) || 0);
+    }
     const totalEfektif = Object.values(efektifMap).reduce((a: number, b: any) => a + (Number(b) || 0), 0);
     return {
       ...v,

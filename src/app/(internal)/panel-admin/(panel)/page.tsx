@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import { statusLabel, SALE_BASIS_NOTE, SALE_STATUSES, saleCount, orderRevenue } from "@/lib/transaksi";
 import { orderStatusKey } from "@/lib/order-flow";
+import { varianPensiun, varianKomponen } from "@/lib/ops-variants";
 import { opsGet } from "../panel-api";
 import { useWibGreeting, useWibToday, wibDateOffset, dailyIndexForDate } from "../wib-date";
 import styles from "../panel.module.css";
@@ -251,7 +252,10 @@ export default function PanelAdminHome() {
     transaksiYest > 0 ? Math.round(((transaksiToday - transaksiYest) / transaksiYest) * 100) : transaksiToday > 0 ? 100 : 0;
 
   const perluDikirim = orders.filter((o) => o.status === "diproses" && !o.awb_no).length;
+  // "Stok menipis" — varian pensiun (is_sellable = false) TIDAK dihitung, dan varian
+  // berkomponen tidak ikut (stoknya milik komponen). Harus sama dengan Daftar Produk.
   const lowStock = variants.filter((v) => {
+    if (varianPensiun(v) || varianKomponen(v)) return false;
     const total = sumStock(v.stock_efektif);
     return total > 0 && total <= 5;
   });
