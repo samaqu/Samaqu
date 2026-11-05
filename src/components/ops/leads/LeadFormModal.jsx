@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/lib/ops-api";
 import { motion } from "framer-motion";
-import { X, Save, CalendarClock, User, AlertCircle } from "lucide-react";
+import { X, Save, CalendarClock, CalendarDays, User, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ops/ui/use-toast";
-import { defaultFirstFollowup, isoToWibInput, wibInputToIso } from "@/lib/ops-followup";
+import { defaultFirstFollowup, isoToWibInput, wibInputToIso, formatTanggalId } from "@/lib/ops-followup";
 
 const SUMBER_OPTIONS = ["Website", "IG", "WA", "Meta ads"];
 
@@ -41,6 +41,16 @@ export default function LeadFormModal({ isOpen, onClose, initialData = null, def
   const [form, setForm] = useState(emptyForm);
   const [displayNominal, setDisplayNominal] = useState('');
   const [saveError, setSaveError] = useState('');
+  const dateInputRef = useRef(null);
+
+  const openDatePicker = () => {
+    const el = dateInputRef.current;
+    if (!el) return;
+    if (typeof el.showPicker === 'function') {
+      try { el.showPicker(); return; } catch { /* jatuh ke focus */ }
+    }
+    el.focus();
+  };
 
   // Pilihan produk (katalog asli) & PIC (dari PIC yang sudah dipakai + akun admin)
   const { data: products = [] } = useQuery({
@@ -164,13 +174,27 @@ export default function LeadFormModal({ isOpen, onClose, initialData = null, def
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelClass}>Tanggal <span className="text-red-500">*</span></label>
-                <input
-                  type="date"
-                  required
-                  value={form.tanggal}
-                  onChange={(e) => setForm({ ...form, tanggal: e.target.value })}
-                  className={inputClass}
-                />
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={openDatePicker}
+                    className={`${inputClass} flex items-center justify-between gap-2 text-left`}
+                  >
+                    <span className={form.tanggal ? '' : 'font-normal text-slate-400'}>
+                      {form.tanggal ? formatTanggalId(form.tanggal) : 'Pilih tanggal'}
+                    </span>
+                    <CalendarDays size={16} className="shrink-0 text-slate-400" />
+                  </button>
+                  <input
+                    ref={dateInputRef}
+                    type="date"
+                    required
+                    value={form.tanggal}
+                    onChange={(e) => setForm({ ...form, tanggal: e.target.value })}
+                    className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
+                    aria-label="Tanggal"
+                  />
+                </div>
               </div>
               <div>
                 <label className={labelClass}>Jam</label>
