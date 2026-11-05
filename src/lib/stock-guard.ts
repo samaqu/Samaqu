@@ -17,7 +17,14 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type DbFailureReason = "variant_not_found" | "no_variants" | "phantom_product" | "insufficient_stock";
+export type DbFailureReason =
+  | "variant_not_found"
+  | "no_variants"
+  | "phantom_product"
+  | "insufficient_stock"
+  | "component_out_of_stock"
+  | "component_variant_not_found"
+  | "component_none_configured";
 
 /**
  * Apakah item ini boleh dilewati dari pemeriksaan stok?
@@ -88,6 +95,13 @@ export function stockFailureMessage(
       return `Produk "${name}" belum punya data varian stok, jadi tidak bisa diperiksa stoknya. Lengkapi varian produknya dulu.`;
     case "phantom_product":
       return `Produk "${name}" tidak terdaftar sebagai produk (hanya penanda add-on lama), jadi tidak bisa dipotong stoknya.`;
+    // Varian tanpa stok sendiri: penyebabnya selalu komponennya, bukan stok varian ini.
+    case "component_out_of_stock":
+      return `Stok komponen "${name}" (${variant}) tidak mencukupi — Cover atau Hanger-nya habis. Silakan pilih varian lain.`;
+    case "component_variant_not_found":
+      return `Komponen untuk "${name}" (${variant}) belum punya data stok. Periksa stok Cover dan Hanger di menu Produk.`;
+    case "component_none_configured":
+      return `Varian "${name}" (${variant}) belum punya komponen terdaftar, jadi tidak bisa dipesan. Hubungi admin.`;
     default:
       return `Stok "${name}" (${variant}) tidak mencukupi. Silakan kurangi jumlah atau pilih varian lain.`;
   }

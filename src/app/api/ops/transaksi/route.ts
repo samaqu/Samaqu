@@ -8,7 +8,7 @@ import { notifyCustomerInvoice } from "@/lib/fonnte";
 import { kotaFromShipping } from "@/lib/kota";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { resolveItemPhotos } from "@/lib/order-photo";
-import { cleanErrorMessage, recordAnomalyFromError, recordStockAnomaly } from "@/lib/stock-guard";
+import { cleanErrorMessage, recordAnomalyFromError, recordStockAnomaly, resolveFailureReason, stockFailureMessage } from "@/lib/stock-guard";
 import {
   productWeightMapFromRows,
   resolveLineWeight,
@@ -467,10 +467,14 @@ async function deductStock(admin: Admin, items: Snapshot[], orderId: string) {
     });
     if (error) return { ok: false as const, done, message: "Gagal memeriksa stok produk" };
     if (data === false) {
+      // Pesan dibedakan: stok kurang, varian tidak ada, atau KOMPONENnya (Cover/Hanger) habis.
+      const warna = item.color ?? "";
+      const ukuran = item.size ?? "";
+      const reason = await resolveFailureReason(admin, item.product_id, warna, ukuran);
       return {
         ok: false as const,
         done,
-        message: `Stok ${item.product_name} (${item.color} / ${item.size}) tidak mencukupi`,
+        message: stockFailureMessage(reason ?? "insufficient_stock", item.product_name, warna, ukuran),
       };
     }
     done.push(item);

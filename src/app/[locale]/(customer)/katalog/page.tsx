@@ -351,16 +351,23 @@ export default function KatalogPage() {
       setLoading(false);
       // Warna hex tersimpan (hex bebas dari admin) → fallback colorMap
       if (data.length > 0) {
+        /*
+         * Stok kartu dibaca dari VIEW `product_variant_stock`, bukan tabel mentah.
+         * `effective_stock` sudah memecahkan stok sharing dan stok komponen, jadi varian
+         * berkomponen (mis. Cover Thobe + Hanger) tidak dianggap "Habis" hanya karena
+         * kolom `stock`-nya 0. Varian `is_sellable = false` tidak ikut dijumlahkan.
+         */
         supabase
-          .from("product_variants")
-          .select("product_id, color, hex, stock")
+          .from("product_variant_stock")
+          .select("product_id, color, hex, effective_stock, is_sellable")
           .in("product_id", data.map((p) => p.id))
           .then(({ data: rows }) => {
             const map: Record<string, string> = {};
             const stockMap: Record<string, number> = {};
             (rows || []).forEach((v) => {
+              if (v.is_sellable === false) return;
               if (v.hex) map[`${v.product_id}::${v.color}`] = v.hex;
-              stockMap[v.product_id] = (stockMap[v.product_id] || 0) + (v.stock || 0);
+              stockMap[v.product_id] = (stockMap[v.product_id] || 0) + (Number(v.effective_stock) || 0);
             });
             setColorHex(map);
             setStockByProduct(stockMap);

@@ -215,10 +215,24 @@ export default function OpenOrderWizard({
       })
       .catch(() => {});
     supabase
-      .from("product_variants")
-      .select("product_id, color, size, stock, weight")
+      // VIEW `product_variant_stock`: `stock` di view ini sudah `effective_stock`
+      // (stok sharing & stok komponen ikut), jadi varian berkomponen tidak jadi "Sold Out".
+      .from("product_variant_stock")
+      .select("product_id, color, size, effective_stock, weight, is_sellable")
       .then(({ data }) => {
-        if (active && data) setStockRows(data as OpenOrderStockRow[]);
+        if (active && data) {
+          setStockRows(
+            data
+              .filter((row) => row.is_sellable !== false)
+              .map((row) => ({
+                product_id: row.product_id,
+                color: row.color,
+                size: row.size,
+                stock: Number(row.effective_stock) || 0,
+                weight: row.weight,
+              })) as OpenOrderStockRow[]
+          );
+        }
       });
     return () => {
       active = false;

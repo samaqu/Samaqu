@@ -126,14 +126,17 @@ export default function DashboardProductSection() {
         setProducts(data);
 
         if (data.length > 0) {
+          // VIEW `product_variant_stock`: pakai `effective_stock` (mencakup stok sharing &
+          // stok komponen) dan lewati varian yang tidak boleh dijual.
           const { data: rows } = await supabase
-            .from("product_variants")
-            .select("product_id, stock")
+            .from("product_variant_stock")
+            .select("product_id, effective_stock, is_sellable")
             .in("product_id", data.map((product) => product.id));
           if (!alive) return;
           const map: Record<string, number> = {};
-          (rows || []).forEach((row: { product_id: string; stock: number | null }) => {
-            map[row.product_id] = (map[row.product_id] || 0) + (Number(row.stock) || 0);
+          (rows || []).forEach((row: { product_id: string; effective_stock: number | null; is_sellable: boolean | null }) => {
+            if (row.is_sellable === false) return;
+            map[row.product_id] = (map[row.product_id] || 0) + (Number(row.effective_stock) || 0);
           });
           setStockByProduct(map);
         }

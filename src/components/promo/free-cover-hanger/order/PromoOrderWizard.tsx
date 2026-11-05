@@ -230,17 +230,25 @@ export default function PromoOrderWizard({
       })
       .catch(() => {});
     supabase
-      .from("product_variants")
+      // VIEW `product_variant_stock`: pakai `effective_stock` (stok sharing & komponen
+      // sudah ikut), dan lewati varian yang tidak boleh dijual.
       // `promo_fch_enabled` = sakelar promo PER UKURAN (diatur di panel admin "Promo").
-      .select("product_id, color, size, stock, weight, promo_fch_enabled")
+      .from("product_variant_stock")
+      .select("product_id, color, size, effective_stock, weight, promo_fch_enabled, is_sellable")
       .then(({ data }) => {
         if (!active || !data) return;
         // Ukuran yang dimatikan admin dibuang di sini → otomatis hilang dari pilihan ukuran
         // di langkah detail produk. Produk tetap tampil selama masih ada ukuran yang ikut.
         setStockRows(
-          (data as (OpenOrderStockRow & { promo_fch_enabled?: boolean | null })[])
-            .filter((row) => row.promo_fch_enabled !== false)
-            .map(({ product_id, color, size, stock, weight }) => ({ product_id, color, size, stock, weight })),
+          (data as (OpenOrderStockRow & { promo_fch_enabled?: boolean | null; is_sellable?: boolean | null; effective_stock?: number | null })[])
+            .filter((row) => row.promo_fch_enabled !== false && row.is_sellable !== false)
+            .map((row) => ({
+              product_id: row.product_id,
+              color: row.color,
+              size: row.size,
+              stock: Number(row.effective_stock) || 0,
+              weight: row.weight,
+            })),
         );
       });
     return () => {

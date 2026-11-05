@@ -433,18 +433,24 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     if (!displayId || !selectedColor || !selectedSize) { setVariantPrice(null); setVariantWeight(null); setStock(null); return; }
-    supabase.from("product_variants").select("price_override, stock, weight, base_product_id, base_size").eq("product_id", displayId).eq("color", selectedColor).eq("size", selectedSize).maybeSingle().then(async ({ data, error }) => {
-      if (error) { setVariantPrice(null); setVariantWeight(null); setStock(null); return; }
-      setVariantPrice(data?.price_override ?? null);
-      setVariantWeight(Number(data?.weight) || null);
-      // If variant has a base product link, fetch stock from the base product instead
-      if (data?.base_product_id && data?.base_size) {
-        const { data: baseVariant } = await supabase.from("product_variants").select("stock").eq("product_id", data.base_product_id).eq("color", selectedColor).eq("size", data.base_size).maybeSingle();
-        setStock(baseVariant?.stock ?? null);
-      } else {
-        setStock(data?.stock ?? null);
-      }
-    });
+    /*
+     * Stok dibaca dari VIEW `product_variant_stock`, bukan tabel mentah.
+     *
+     * View mengekspos `effective_stock` = angka stok yang benar untuk customer:
+     * stok varian sendiri, stok induk (stok sharing), atau stok TERKECIL komponennya
+     * (varian `track_stock = false`, mis. Cover Thobe + Hanger). Tabel mentah akan
+     * menampilkan 0 untuk varian berkomponen sehingga produk tampak "Habis".
+     */
+    supabase.from("product_variant_stock")
+      .select("price_override, effective_stock, weight, base_product_id, base_size, is_sellable")
+      .eq("product_id", displayId).eq("color", selectedColor).eq("size", selectedSize).maybeSingle()
+      .then(({ data, error }) => {
+        if (error) { setVariantPrice(null); setVariantWeight(null); setStock(null); return; }
+        setVariantPrice(data?.price_override ?? null);
+        setVariantWeight(Number(data?.weight) || null);
+        // View sudah memecahkan stok sharing, jadi `effective_stock` langsung dipakai.
+        setStock(typeof data?.effective_stock === "number" ? data.effective_stock : null);
+      });
   }, [displayId, selectedColor, selectedSize]);
 
   const currentPrice = variantPrice ?? product?.price ?? 0;
