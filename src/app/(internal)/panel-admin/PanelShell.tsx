@@ -47,7 +47,7 @@ const THEME_SWATCH_CLASS: Record<PanelTheme, string> = {
 };
 const themeLabel = (id: PanelTheme) => THEMES.find((option) => option.id === id)?.label ?? "Berry";
 
-type IconName = "home" | "card" | "box" | "users" | "spark" | "return" | "star" | "reseller" | "tag";
+type IconName = "home" | "card" | "box" | "users" | "spark" | "return" | "star" | "reseller" | "tag" | "alert";
 
 function NavIcon({ name }: { name: IconName }) {
   switch (name) {
@@ -98,6 +98,14 @@ function NavIcon({ name }: { name: IconName }) {
           <path d="M3 4v5h5" />
         </svg>
       );
+    case "alert":
+      return (
+        <svg viewBox="0 0 24 24">
+          <path d="M12 3 2.5 20h19z" />
+          <path d="M12 9v5" />
+          <path d="M12 17.5v.01" />
+        </svg>
+      );
     case "star":
       return (
         <svg viewBox="0 0 24 24">
@@ -134,6 +142,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
     items: [
       { label: "Produk", href: "/panel-admin/produk", icon: "box" },
       { label: "Stok Opname", href: "/panel-admin/stok-opname", icon: "box" },
+      { label: "Anomali Stok", href: "/panel-admin/anomali-stok", icon: "alert" },
       { label: "Leads", href: "/panel-admin/leads", icon: "users" },
     ],
   },
