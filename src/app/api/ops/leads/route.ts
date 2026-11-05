@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { defaultFirstFollowup, normalizeKontak, formatTanggalId } from "@/lib/ops-followup";
 import { isOpsAdmin } from "@/lib/ops-auth";
+import { syncLeadOnLeadSaved } from "@/lib/ops-lead-sync";
 
 /**
  * API dashboard internal (/ops) — modul Leads.
@@ -170,6 +171,24 @@ export async function POST(req: NextRequest) {
       }));
       const { error: actErr } = await admin.from("lead_activities").insert(activities);
       if (actErr) console.error("[OPS] leads POST activity:", actErr.message);
+    }
+
+    /*
+     * Arah LEAD → TRANSAKSI.
+     *
+     * Admin kadang menyimpan transaksi lebih dulu, baru mencatat lead-nya. Dulu arah ini
+     * tidak pernah tertaut. Sekarang setiap lead baru dicoba dipasangkan ke transaksi
+     * dengan nomor sama yang dibuat maksimal 24 jam sebelumnya (lihat ops-lead-sync).
+     * Kegagalan di sini TIDAK boleh menggagalkan penyimpanan lead.
+     */
+    if (data && data.length > 0) {
+      for (const lead of data as Array<{ id: string }>) {
+        try {
+          await syncLeadOnLeadSaved(admin, { leadId: lead.id });
+        } catch (syncError) {
+          console.error("[OPS] leads POST link ke transaksi:", syncError);
+        }
+      }
     }
 
     return NextResponse.json({ items: data || [], inserted: data?.length || 0 });

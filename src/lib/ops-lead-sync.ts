@@ -23,6 +23,17 @@ import { normalizeKontak } from "@/lib/ops-followup";
 /** Jendela pencocokan: lead harus dibuat maksimal 60 hari sebelum tanggal order. */
 export const LEAD_MATCH_WINDOW_DAYS = 60;
 
+/**
+ * Toleransi kalau lead dicatat SESUDAH transaksi.
+ *
+ * Admin kadang menyimpan transaksi lebih dulu, baru ingat mencatat lead-nya (terbukti:
+ * OPS-20261104-321 dibuat 23:46 UTC, lead 082324655088 baru 00:57 UTC — 1 jam kemudian,
+ * jadi dulu tidak pernah bertaut). Lead yang dibuat dalam 24 jam SETELAH order masih
+ * dianggap orang yang sama. Lebih dari itu diabaikan supaya lead baru tidak tertaut ke
+ * transaksi lama yang tidak berhubungan.
+ */
+export const LEAD_MATCH_LATE_TOLERANCE_MS = 24 * 60 * 60 * 1000;
+
 const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
 
 /**
@@ -94,6 +105,11 @@ export async function findMatchableLead(
 
   const orderDate = wibDate(input.orderCreatedAt || new Date());
   const earliest = earliestMatchDate(orderDate);
+  // Toleransi: lead yang dicatat SESUDAH transaksi (maks. 24 jam) ikut dicocokkan.
+  // Tanpa ini, admin yang lupa mencatat lead lebih dulu tidak akan pernah bertaut.
+  const latest = wibDate(
+    new Date(new Date(input.orderCreatedAt || new Date()).getTime() + LEAD_MATCH_LATE_TOLERANCE_MS)
+  );
 
   // Jendela sudah disaring di query, lalu dibandingkan di aplikasi dengan normalisasi yang
   // sama (SQL tidak punya fungsi normalisasi nomor). Tabel `leads` kecil (ribuan baris).
@@ -102,7 +118,7 @@ export async function findMatchableLead(
     .select("id, kontak, tanggal, jam, status, order_id")
     .eq("status", "belum_closing")
     .gte("tanggal", earliest)
-    .lte("tanggal", orderDate)
+    .lte("tanggal", latest)
     .order("tanggal", { ascending: false })
     .order("jam", { ascending: false })
     .limit(2000);
@@ -213,4 +229,119 @@ export async function revertLeadOnOrderCancelled(
   if (actError) console.error("[LEAD-SYNC] Gagal mencatat aktivitas:", actError.message);
 
   return { reverted: true, leadId: data.id };
+}
+
+/**
+ * Arah sebaliknya: LEAD disimpan → cari transaksi yang cocok dan tandai Closing.
+ *
+ * Dipakai saat admin mencatat lead SETELAH transaksinya (urutan yang dulu tidak pernah
+ * bertaut). Syaratnya:
+ *   - nomor HP sama setelah normalisasi,
+ *   - transaksi dibuat maksimal 24 jam SEBELUM lead (`LEAD_MATCH_LATE_TOLERANCE_MS`),
+ *   - transaksi tidak dibatalkan,
+ *   - transaksi belum terhubung ke lead lain.
+ *
+ * Kalau ada beberapa transaksi yang cocok, dipakai yang PALING DEKAT dengan waktu lead.
+ */
+export async function syncLeadOnLeadSaved(
+  admin: SupabaseClient,
+  input: { leadId: string }
+): Promise<{ linked: boolean; orderNumber?: string }> {
+  const { data: lead, error: leadError } = await admin
+    .from("leads")
+    .select("id, kontak, status, order_id, created_at")
+    .eq("id", input.leadId)
+    .maybeSingle();
+
+  if (leadError || !lead) {
+    if (leadError) console.error("[LEAD-SYNC] Gagal membaca lead:", leadError.message);
+    return { linked: false };
+  }
+
+  // Sudah tertaut atau bukan Belum Closing → tidak disentuh.
+  if (lead.order_id || lead.status !== "belum_closing") return { linked: false };
+
+  const target = normalizeLeadPhone(lead.kontak);
+  if (!target) return { linked: false };
+
+  const leadAt = new Date(lead.created_at as string).getTime();
+  if (!Number.isFinite(leadAt)) return { linked: false };
+
+  // Transaksi yang mungkin: dibuat dalam 24 jam sebelum lead. Ambil rentang lebar lalu
+  // disaring di aplikasi (nomor HP tidak punya fungsi normalisasi di SQL).
+  const since = new Date(leadAt - LEAD_MATCH_LATE_TOLERANCE_MS).toISOString();
+
+  const { data: orders, error: orderError } = await admin
+    .from("orders")
+    .select("id, order_number, customer_whatsapp, total, status, created_at")
+    .gte("created_at", since)
+    .lte("created_at", new Date(leadAt).toISOString())
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (orderError) {
+    console.error("[LEAD-SYNC] Gagal membaca orders:", orderError.message);
+    return { linked: false };
+  }
+
+  const candidates = ((orders || []) as Array<{
+    id: string;
+    order_number: string;
+    customer_whatsapp: string | null;
+    total: number | null;
+    status: string | null;
+    created_at: string;
+  }>).filter(
+    (o) =>
+      o.status !== "dibatalkan" &&
+      normalizeLeadPhone(o.customer_whatsapp) === target
+  );
+  if (candidates.length === 0) return { linked: false };
+
+  // Jangan pakai transaksi yang sudah tertaut ke lead lain.
+  const orderIds = candidates.map((o) => o.id);
+  const { data: linkedLeads } = await admin
+    .from("leads")
+    .select("order_id")
+    .in("order_id", orderIds);
+  const takenOrderIds = new Set(
+    ((linkedLeads || []) as Array<{ order_id: string | null }>)
+      .map((l) => l.order_id)
+      .filter(Boolean) as string[]
+  );
+
+  const free = candidates.filter((o) => !takenOrderIds.has(o.id));
+  if (free.length === 0) return { linked: false };
+
+  // Paling dekat waktunya dengan lead (query sudah desc, jadi ambil yang terakhir cocok).
+  const order = free[free.length - 1];
+  const nominal = Math.max(0, Math.round(Number(order.total) || 0));
+
+  const { error: updateError } = await admin
+    .from("leads")
+    .update({
+      status: "closing",
+      nominal,
+      order_id: order.id,
+      order_number: order.order_number,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", lead.id)
+    .eq("status", "belum_closing")
+    .is("order_id", null);
+
+  if (updateError) {
+    console.error("[LEAD-SYNC] Gagal menautkan lead ke order:", updateError.message);
+    return { linked: false };
+  }
+
+  const { error: actError } = await admin.from("lead_activities").insert({
+    lead_id: lead.id,
+    actor: "system",
+    action: "order_created",
+    note: `Closing otomatis dari transaksi ${order.order_number} · Rp ${nominal.toLocaleString("id-ID")} (dicatat setelah transaksi)`,
+  });
+  if (actError) console.error("[LEAD-SYNC] Gagal mencatat aktivitas:", actError.message);
+
+  return { linked: true, orderNumber: order.order_number };
 }
