@@ -12,12 +12,14 @@ import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
  *   GET /api/ops/orders?limit=50                  → 50 pesanan terbaru
  *   GET /api/ops/orders?from=…&to=…&limit=1000    → pesanan pada rentang tanggal (dashboard bulan)
  *   GET /api/ops/orders?order_number=SMQ-…        → satu pesanan + item (halaman label & detail)
+ *   GET /api/ops/orders?search=ali                → cari nama pemesan / no WhatsApp / nomor pesanan
  */
 export async function GET(req: NextRequest) {
   if (!(await isOpsAdmin(req))) return unauthorized();
 
   const sp = new URL(req.url).searchParams;
   const orderNumber = String(sp.get("order_number") || "").trim();
+  const search = String(sp.get("search") || "").trim();
   const from = String(sp.get("from") || "").trim();
   const to = String(sp.get("to") || "").trim();
   const limitRaw = Number(sp.get("limit") || 50);
@@ -58,6 +60,17 @@ export async function GET(req: NextRequest) {
 
   if (from) query = query.gte("created_at", from);
   if (to) query = query.lt("created_at", to);
+
+  if (search) {
+    // `.or()` PostgREST memakai koma & tanda kurung sebagai pemisah — buang dari kata kunci
+    // supaya pencarian tidak mengubah sintaks filternya.
+    const term = search.replace(/[,()%*\\"']/g, " ").replace(/\s+/g, " ").trim();
+    if (term) {
+      query = query.or(
+        `order_number.ilike.%${term}%,customer_name.ilike.%${term}%,customer_whatsapp.ilike.%${term}%`,
+      );
+    }
+  }
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
