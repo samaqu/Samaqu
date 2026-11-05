@@ -30,13 +30,87 @@ export const OPEN_ORDER_ADDON = {
 export const OPEN_ORDER_ADDON_TARGET_ID = "cover-hanger";
 
 /**
- * Varian katalog yang dipakai saat add-on dipilih: satu-satunya varian produk Cover Hanger
- * (`Set Hanger + Cover`, SKU CVH-SHC, size "ALL SIZE"). Stok add-on adalah stok varian ini.
+ * Varian katalog yang dipakai saat add-on dipilih. Dulu hanya satu ("Set Hanger + Cover");
+ * sejak cover dipecah jadi produk berkomponen, customer memilih antara Cover Thobe dan
+ * Cover Koko. Varian lama tetap dikenali untuk pesanan lama, tetapi sudah tidak dijual.
  */
 export const OPEN_ORDER_ADDON_VARIANT = {
   color: "Set Hanger + Cover",
   size: "ALL SIZE",
 };
+
+/** Pilihan cover yang bisa dipilih customer (berkomponen: 1 cover + 1 hanger). */
+export interface AddonCoverOption {
+  /** Nilai di kolom `color` varian `cover-hanger` — juga nama paket di UI. */
+  color: string;
+  /** Label singkat untuk segmented control. */
+  label: string;
+  /** Kategori pesanan yang membuat pilihan ini jadi default. */
+  forCategories: string[];
+  /** Urutan tampil. */
+  order: number;
+}
+
+/**
+ * Daftar pilihan cover, urut tampil. `forCategories` dicocokkan ke kategori item pesanan
+ * (huruf kecil, dicari sebagai bagian nama kategori) untuk menentukan pilihan awal.
+ */
+export const ADDON_COVER_OPTIONS: AddonCoverOption[] = [
+  {
+    color: "Cover Thobe + Hanger",
+    label: "Cover Thobe + Hanger",
+    forCategories: ["thobe", "kandora"],
+    order: 1,
+  },
+  {
+    color: "Cover Koko + Hanger",
+    label: "Cover Koko + Hanger",
+    forCategories: ["koko"],
+    order: 2,
+  },
+];
+
+/** Pilihan cover bawaan kalau isi pesanan tidak bisa ditentukan (mis. campuran). */
+export const ADDON_COVER_DEFAULT = "Cover Thobe + Hanger";
+
+/** Semua nama varian add-on yang dikenali — lama DAN baru. */
+export const ADDON_COVER_COLORS = ["Set Hanger + Cover", ...ADDON_COVER_OPTIONS.map((o) => o.color)];
+
+/** True kalau `color` adalah salah satu varian cover yang boleh dipilih customer. */
+export function isSelectableCoverColor(color: unknown): boolean {
+  const c = String(color ?? "").trim();
+  return ADDON_COVER_OPTIONS.some((option) => option.color === c);
+}
+
+/** Ambil pilihan cover yang valid; selain itu null (server menolak). */
+export function resolveSelectableCover(color: unknown): AddonCoverOption | null {
+  const c = String(color ?? "").trim();
+  return ADDON_COVER_OPTIONS.find((option) => option.color === c) ?? null;
+}
+
+/** True kalau `color` varian `cover-hanger` adalah varian add-on (lama atau baru). */
+export function isAddonCoverColor(color: unknown): boolean {
+  const c = String(color ?? "").trim();
+  return ADDON_COVER_COLORS.includes(c);
+}
+
+/**
+ * Pilihan awal dari isi pesanan: Thobe/Kandora → Cover Thobe, Koko → Cover Koko,
+ * campuran atau tidak diketahui → Cover Thobe. Tidak ada yang hardcode per nomor pesanan.
+ */
+export function defaultCoverForCategories(categories: (string | null | undefined)[]): string {
+  const found = new Set<string>();
+  for (const raw of categories) {
+    const category = String(raw ?? "").toLowerCase().trim();
+    if (!category) continue;
+    for (const option of ADDON_COVER_OPTIONS) {
+      if (option.forCategories.some((keyword) => category.includes(keyword))) found.add(option.color);
+    }
+  }
+  // Campuran (lebih dari satu jenis) → pilihan default.
+  if (found.size === 1) return Array.from(found)[0];
+  return ADDON_COVER_DEFAULT;
+}
 
 /**
  * Berat kirim add-on Cover & Hanger (gram). Sumber utamanya berat varian katalog
@@ -126,11 +200,9 @@ export function isOpenOrderAddonLine(line?: AddonLineLike | null): boolean {
   if (name && name !== OPEN_ORDER_ADDON.name) return false;
 
   if (name === OPEN_ORDER_ADDON.name) return true;
-  // Varian add-on yang persis (baris DB hasil checkout Open Order).
-  if (
-    color === OPEN_ORDER_ADDON_VARIANT.color &&
-    size === OPEN_ORDER_ADDON_VARIANT.size.toUpperCase()
-  ) {
+  // Varian add-on (lama "Set Hanger + Cover" maupun baru "Cover Thobe/Koko + Hanger"),
+  // yaitu baris DB hasil checkout Open Order / promo.
+  if (isAddonCoverColor(color) && size === OPEN_ORDER_ADDON_VARIANT.size.toUpperCase()) {
     return true;
   }
   // Tanpa nama maupun warna = pemanggil hanya membawa id (mis. input form baris add-on).

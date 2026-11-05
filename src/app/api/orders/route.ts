@@ -15,6 +15,8 @@ import { createOrderPaymentLink } from "@/lib/mayar";
 import { syncLeadOnOrderSaved } from "@/lib/ops-lead-sync";
 import {
   canSkipStockCheck,
+  isSellableVariant,
+  loadSellableVariants,
   recordStockAnomaly,
   resolveFailureReason,
   stockFailureMessage,
@@ -309,6 +311,13 @@ export async function POST(request: NextRequest) {
       decremented.length = 0;
     }
 
+    // Daftar varian yang sudah tidak dijual — dibaca SEKALI untuk semua item.
+    // Hanya memeriksa checkout BARU: pesanan lama yang sudah tersimpan tidak lewat jalur ini.
+    const sellableMap = await loadSellableVariants(
+      supabase,
+      Array.from(new Set(validatedItems.map((item) => item.productId)))
+    );
+
     for (const item of validatedItems) {
       if (!item.quantity || item.quantity < 1) {
         console.error("[ORDERS] Stock validation: quantity invalid:", item);
@@ -337,6 +346,20 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error: `Data varian "${item.name}" tidak lengkap (warna/ukuran kosong) padahal produknya punya varian. Pilih varian yang benar, atau hubungi admin.`,
+          },
+          { status: 400 }
+        );
+      }
+
+      // Varian yang sudah tidak dijual (is_sellable = false): TOLAK dengan pesan jelas.
+      // Ini yang menangkap keranjang lama yang masih berisi "Set Hanger + Cover" —
+      // customer diarahkan memilih varian baru, bukan dibiarkan lolos atau error samar.
+      if (!isSellableVariant(item.productId, item.color, item.size, sellableMap)) {
+        await rollbackStock();
+        return NextResponse.json(
+          {
+            error: `Varian "${item.color} / ${item.size}" untuk "${item.name}" sudah tidak dijual. Hapus dari keranjang lalu pilih varian yang tersedia sekarang.`,
+            code: "variant_not_sellable",
           },
           { status: 400 }
         );

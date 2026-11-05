@@ -11,6 +11,8 @@ import {
   OPEN_ORDER_ADDON,
   OPEN_ORDER_ADDON_TARGET_ID,
   OPEN_ORDER_ADDON_VARIANT,
+  defaultCoverForCategories,
+  resolveSelectableCover,
   resolveAddonWeightFromCatalog,
 } from "@/lib/open-order-config";
 import {
@@ -190,6 +192,8 @@ export async function POST(request: NextRequest) {
 
     // ── Validasi item: produk, varian, ukuran, jumlah, harga dari katalog ──
     const validatedItems: ValidatedItem[] = [];
+    /** Kategori item pesanan — untuk menentukan pilihan cover awal bonus. */
+    const itemCategories: (string | null)[] = [];
 
     for (const raw of rawItems) {
       const product = findOpenOrderProduct(products, String(raw.productId ?? ""));
@@ -219,6 +223,9 @@ export async function POST(request: NextRequest) {
         price,
         isBonus: false,
       });
+
+      // Kategori hanya untuk menentukan pilihan cover awal (Thobe/Kandora vs Koko).
+      itemCategories.push(product.category ?? null);
     }
 
     // ── Bonus Cover Hanger: hanya untuk nomor WhatsApp yang belum pernah beli ──
@@ -236,6 +243,16 @@ export async function POST(request: NextRequest) {
     const linkedEmail: string | null = accountEmail;
 
     // Berat & harga add-on dari katalog, fallback ke setting admin.
+    //
+    // Bonus memakai varian cover berkomponen. Customer memilih Thobe atau Koko; kalau tidak
+    // mengirim pilihan yang valid, server memakai pilihan awal dari isi pesanan. Yang dikirim
+    // browser SELALU divalidasi — bukan dipercaya begitu saja.
+    const chosenCover =
+      resolveSelectableCover(body?.addonCover ?? null) ??
+      resolveSelectableCover(
+        defaultCoverForCategories(itemCategories),
+      )!;
+
     const { data: addonProduct } = await supabaseAdmin
       .from("products")
       .select("id, weight, price, name")
@@ -243,9 +260,9 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
     const { data: addonVariant } = await supabaseAdmin
       .from("product_variants")
-      .select("product_id, color, size, stock, weight")
+      .select("product_id, color, size, stock, weight, is_sellable")
       .eq("product_id", OPEN_ORDER_ADDON_TARGET_ID)
-      .eq("color", OPEN_ORDER_ADDON_VARIANT.color)
+      .eq("color", chosenCover.color)
       .eq("size", OPEN_ORDER_ADDON_VARIANT.size)
       .maybeSingle();
     const { data: addonSetting } = await supabaseAdmin
@@ -254,8 +271,14 @@ export async function POST(request: NextRequest) {
       .eq("id", 1)
       .maybeSingle();
 
-    // Stok bonus: bila habis, bonus dilewati — pesanan tetap jalan.
-    const bonusStock = typeof addonVariant?.stock === "number" ? addonVariant.stock : 0;
+    // Stok bonus = STOK EFEKTIF (min stok cover & hanger). Bila habis, bonus dilewati —
+    // pesanan tetap jalan.
+    const { data: effectiveBonusStock } = await supabaseAdmin.rpc("samaqu_variant_effective_stock", {
+      p_product_id: OPEN_ORDER_ADDON_TARGET_ID,
+      p_color: chosenCover.color,
+      p_size: OPEN_ORDER_ADDON_VARIANT.size,
+    });
+    const bonusStock = Math.max(0, Number(effectiveBonusStock) || 0);
 
     /**
      * Syarat bonus: pelanggan baru + produk/varian bonus ada + stok bonus + **kuota promo**
@@ -274,7 +297,14 @@ export async function POST(request: NextRequest) {
 
     const quotaAvailable = quotaLeft > 0;
     const giveBonus =
-      bonusEligible && promoActive && inPeriod && quotaAvailable && Boolean(addonProduct) && Boolean(addonVariant) && bonusStock > 0;
+      bonusEligible &&
+      promoActive &&
+      inPeriod &&
+      quotaAvailable &&
+      Boolean(addonProduct) &&
+      Boolean(addonVariant) &&
+      addonVariant?.is_sellable !== false &&
+      bonusStock > 0;
 
     const addonWeight = resolveAddonWeightFromCatalog(
       addonVariant?.weight,
@@ -286,7 +316,7 @@ export async function POST(request: NextRequest) {
       validatedItems.push({
         productId: OPEN_ORDER_ADDON_TARGET_ID,
         productName: OPEN_ORDER_ADDON.name,
-        color: OPEN_ORDER_ADDON_VARIANT.color,
+        color: chosenCover.color,
         size: OPEN_ORDER_ADDON_VARIANT.size,
         // `series` diisi penanda agar mudah dikenali di order_items.
         series: null,

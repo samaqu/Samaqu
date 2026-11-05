@@ -27,6 +27,53 @@ export type DbFailureReason =
   | "component_none_configured";
 
 /**
+ * Kumpulan kunci varian yang sudah TIDAK dijual (`product_variants.is_sellable = false`).
+ *
+ * Dipakai checkout untuk menolak keranjang lama yang masih berisi varian pensiun
+ * (mis. "Set Hanger + Cover" setelah cover dipecah). Pesanan lama tidak terpengaruh —
+ * pemeriksaan ini hanya jalan untuk checkout baru.
+ */
+export type SellableMap = Set<string>;
+
+function variantKey(productId: string, color: string, size: string): string {
+  return `${String(productId ?? "").trim()}|${String(color ?? "").trim().toLowerCase()}|${String(size ?? "").trim().toLowerCase()}`;
+}
+
+/** Baca semua varian pensiun untuk produk-produk ini. Gagal baca → himpunan kosong. */
+export async function loadSellableVariants(
+  client: SupabaseClient,
+  productIds: string[]
+): Promise<SellableMap> {
+  const blocked: SellableMap = new Set();
+  if (productIds.length === 0) return blocked;
+
+  const { data, error } = await client
+    .from("product_variants")
+    .select("product_id, color, size, is_sellable")
+    .in("product_id", productIds);
+
+  if (error) {
+    console.error("[STOCK] Gagal membaca is_sellable:", error.message);
+    return blocked;
+  }
+
+  for (const row of (data ?? []) as { product_id: string; color: string | null; size: string | null; is_sellable: boolean | null }[]) {
+    if (row.is_sellable === false) blocked.add(variantKey(row.product_id, row.color ?? "", row.size ?? ""));
+  }
+  return blocked;
+}
+
+/** True kalau varian ini MASIH dijual (atau tidak dikenal — dianggap boleh, dicek jalur lain). */
+export function isSellableVariant(
+  productId: string,
+  color: string | null | undefined,
+  size: string | null | undefined,
+  blocked: SellableMap
+): boolean {
+  return !blocked.has(variantKey(productId, color ?? "", size ?? ""));
+}
+
+/**
  * Apakah item ini boleh dilewati dari pemeriksaan stok?
  *
  * Hanya kalau produknya memang tidak punya satu pun baris `product_variants`.

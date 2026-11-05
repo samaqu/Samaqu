@@ -59,8 +59,9 @@ type VariantRow = {
   product_id: string;
   color: string | null;
   size: string | null;
-  stock: number | null;
-  base_product_id: string | null;
+  /** Dari VIEW `product_variant_stock` — sudah stok efektif (sharing & komponen). */
+  effective_stock: number | null;
+  is_sellable: boolean | null;
   hex: string | null;
 };
 
@@ -91,9 +92,12 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
   const ids = products.map((p) => String(p.id));
 
   const [{ data: rawVariants, error: variantError }, photoLookup] = await Promise.all([
+    // VIEW `product_variant_stock`: `stock` di sini SUDAH stok efektif (stok sendiri, induk
+    // sharing, atau min stok komponen), jadi varian berkomponen tidak tampil habis.
+    // Varian `is_sellable = false` dibuang — reseller tidak boleh menjual varian lama.
     supabase
-      .from("product_variants")
-      .select("product_id, color, size, stock, base_product_id, hex")
+      .from("product_variant_stock")
+      .select("product_id, color, size, effective_stock, hex, is_sellable")
       .in("product_id", ids)
       .order("display_order"),
     loadOrderPhotoLookup(ids, [], supabase),
@@ -104,22 +108,7 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
     throw new Error("Gagal memuat varian reseller");
   }
 
-  const variants = (rawVariants ?? []) as VariantRow[];
-
-  // Stok efektif: baris varian dengan base_product_id TIDAK memegang stok —
-  // angkanya hidup di baris (product_id basis, color, size) yang sama.
-  // Aturan ini = resolveStock (src/lib/ops-stock.ts) pada level varian.
-  const stockByKey = new Map<string, number>();
-  for (const v of variants) {
-    if (!v.base_product_id) {
-      stockByKey.set(`${v.product_id}|${v.color}|${v.size}`, Math.max(0, Number(v.stock) || 0));
-    }
-  }
-
-  const effectiveStock = (v: VariantRow): number => {
-    if (!v.base_product_id) return Math.max(0, Number(v.stock) || 0);
-    return stockByKey.get(`${v.base_product_id}|${v.color}|${v.size}`) ?? 0;
-  };
+  const variants = (rawVariants ?? []) as unknown as VariantRow[];
 
   // Foto cadangan tingkat grup — aturan yang sama dengan kartu katalog website
   // (`groupCatalogProducts`): satu grup = kategori + nama; foto grup diambil
@@ -172,15 +161,15 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
       min_sell_price: minSell.value,
       min_sell_source: minSell.source,
       min_sell_reason: minSell.reason,
-      // Varian series turunan boleh dibeli, stoknya mengikuti basis —
-      // baris varian dikelompokkan per (color, size) tanpa duplikat.
+      // Varian series turunan boleh dibeli, stoknya sudah efektif dari view.
+      // Varian yang tidak dijual (is_sellable = false) tidak ditawarkan ke reseller.
       variants: own
-        .filter((v) => v.color && v.size)
+        .filter((v) => v.color && v.size && v.is_sellable !== false)
         .map((v) => ({
           color: String(v.color),
           hex: v.hex ?? null,
           size: String(v.size),
-          stock: effectiveStock(v),
+          stock: Math.max(0, Number(v.effective_stock) || 0),
         })),
     };
   }).filter((product) => product.variants.length > 0);

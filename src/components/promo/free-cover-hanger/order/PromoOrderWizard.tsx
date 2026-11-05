@@ -22,6 +22,8 @@ import {
   OPEN_ORDER_ADDON,
   OPEN_ORDER_ADDON_TARGET_ID,
   OPEN_ORDER_ADDON_VARIANT,
+  ADDON_COVER_OPTIONS,
+  defaultCoverForCategories,
   OPEN_ORDER_PERIOD,
   resolveAddonWeightFromCatalog,
 } from "@/lib/open-order-config";
@@ -182,6 +184,8 @@ export default function PromoOrderWizard({
   const [nextKey, setNextKey] = useState(1);
   const [customer, setCustomer] = useState<CustomerData>(EMPTY_CUSTOMER);
   const [extraCover, setExtraCover] = useState(false);
+  /** Jenis cover bonus yang dipilih customer. Kosong = otomatis dari isi pesanan. */
+  const [bonusCover, setBonusCover] = useState<string>("");
   const [shipping, setShipping] = useState<DraftShipping | null>(null);
   const [loadingOngkir, setLoadingOngkir] = useState(false);
   const [ongkirError, setOngkirError] = useState(false);
@@ -341,33 +345,57 @@ export default function PromoOrderWizard({
   const total = subtotal + (extraCover ? OPEN_ORDER_ADDON.price : 0) + (shipping?.cost ?? 0);
 
   // ── Bonus Cover Hanger = produk katalog `cover-hanger` ──
-  // Stok & berat dibaca dari varian katalog yang sama dengan server (`Set Hanger + Cover`
-  // / ALL SIZE), jadi angka ongkir di sini = angka server = angka resi.
+  // Stok & berat dibaca dari varian katalog yang sama dengan server, jadi angka ongkir di sini
+  // = angka server = angka resi. Bonus memakai varian cover berkomponen, jadi stok yang dipakai
+  // adalah STOK EFEKTIF (min stok cover & hanger) — sudah dihitung view.
   //
   // PENTING: berat produk/varian Cover Hanger di katalog masih NULL. Tanpa penanganan
   // khusus, `sumWeightGramsBySize` menghitungnya sebagai 1.200 g (berat fallback per item)
   // sehingga total berat melonjak. Karena bonus SELALU ikut di pesanan promo, beratnya
   // SELALU ditambahkan — termasuk dari sumber cadangan settings.
+  const addonCoverOptions = useMemo(
+    () =>
+      ADDON_COVER_OPTIONS.map((option) => {
+        const variantRow = stockRows.find(
+          (row) =>
+            row.product_id === OPEN_ORDER_ADDON_TARGET_ID &&
+            row.color === option.color &&
+            row.size === OPEN_ORDER_ADDON_VARIANT.size
+        );
+        const productRow = catalog.find((row) => row.id === OPEN_ORDER_ADDON_TARGET_ID);
+        const rows = {
+          variantStock: variantRow && typeof variantRow.stock === "number" ? variantRow.stock : null,
+          variantWeight: variantRow?.weight ?? null,
+          productWeight: productRow?.weight ?? null,
+        };
+        return {
+          option,
+          stock: addonStockOf(rows),
+          available: isAddonAvailable(rows),
+          weight: resolveAddonWeightFromCatalog(rows.variantWeight, rows.productWeight, settings.open_order_addon_weight),
+        };
+      }),
+    [catalog, stockRows, settings.open_order_addon_weight]
+  );
+
+  /** Pilihan awal bonus dari isi pesanan — Thobe/Kandora → Thobe, Koko → Koko, campuran → Thobe. */
+  const bonusDefaultCover = useMemo(
+    () => defaultCoverForCategories(lines.map((line) => line.category)),
+    [lines]
+  );
+  const effectiveBonusCover = bonusCover || bonusDefaultCover;
+
   const addonCatalog = useMemo(() => {
-    const variantRow = stockRows.find(
-      (row) =>
-        row.product_id === OPEN_ORDER_ADDON_TARGET_ID &&
-        row.color === OPEN_ORDER_ADDON_VARIANT.color &&
-        row.size === OPEN_ORDER_ADDON_VARIANT.size
-    );
-    const productRow = catalog.find((row) => row.id === OPEN_ORDER_ADDON_TARGET_ID);
-    const rows = {
-      variantStock: variantRow && typeof variantRow.stock === "number" ? variantRow.stock : null,
-      variantWeight: variantRow?.weight ?? null,
-      productWeight: productRow?.weight ?? null,
-    };
+    const picked =
+      addonCoverOptions.find((entry) => entry.option.color === effectiveBonusCover) ??
+      addonCoverOptions[0];
     return {
-      rows,
-      stock: addonStockOf(rows),
-      available: isAddonAvailable(rows),
-      weight: resolveAddonWeightFromCatalog(rows.variantWeight, rows.productWeight, settings.open_order_addon_weight),
+      rows: picked,
+      stock: picked?.stock ?? null,
+      available: picked?.available ?? false,
+      weight: picked?.weight ?? resolveAddonWeightFromCatalog(null, null, settings.open_order_addon_weight),
     };
-  }, [catalog, stockRows, settings.open_order_addon_weight]);
+  }, [addonCoverOptions, effectiveBonusCover, settings.open_order_addon_weight]);
 
   // Add-on yang sudah tidak bisa dipilih (stok habis saat halaman terbuka) dilepas dari
   // keranjang supaya ringkasan & ongkir tidak memakai add-on yang tidak akan lolos di server.
@@ -515,7 +543,11 @@ export default function PromoOrderWizard({
   }
 
   function addDraftToCart(line: ProductDraft) {
-    setLines((prev) => [...prev, { ...line, key: nextKey }]);
+    // Kategori disimpan untuk menentukan pilihan awal cover bonus (Thobe/Kandora vs Koko).
+    const product = products.find((item) =>
+      item.variants.some((variant) => variant.productId === line.productId)
+    );
+    setLines((prev) => [...prev, { ...line, key: nextKey, category: product?.category ?? null }]);
     setNextKey((key) => key + 1);
     setDraft(null);
     setStep(3);
@@ -640,6 +672,9 @@ export default function PromoOrderWizard({
        *
        * `extraCover` sengaja tidak dikirim — bonus Cover Hanger diputuskan SERVER setelah
        * memeriksa apakah nomor ini pelanggan baru (`checkPurchaseEligibility`).
+       *
+       * `addonCover` = jenis cover pilihan customer (Thobe/Koko). Server memvalidasi ulang;
+       * kalau kosong, server memakai pilihan awal dari isi pesanan.
        */
       const {
         data: { session },
@@ -669,6 +704,8 @@ export default function PromoOrderWizard({
             shippingCost: shipping?.cost ?? 0,
           },
           paymentMethod,
+          // Jenis cover bonus pilihan customer; server memvalidasi ulang.
+          addonCover: effectiveBonusCover,
           // Meta CAPI: identifier browser (fbp/fbc) + URL halaman, dipakai server saat Purchase.
           meta: {
             ...getMetaBrowserIds(),
@@ -867,6 +904,14 @@ export default function PromoOrderWizard({
                 extraCover={extraCover}
                 onToggleExtra={setExtraCover}
                 addonAvailable={addonCatalog.available}
+                addonCover={effectiveBonusCover}
+                addonCoverOptions={addonCoverOptions.map((entry) => ({
+                  color: entry.option.color,
+                  label: entry.option.label,
+                  available: entry.available,
+                  stock: entry.stock,
+                }))}
+                onSelectAddonCover={setBonusCover}
                 itemsWeight={itemsWeight}
                 addonWeight={addonWeight}
                 totalWeight={totalWeight}

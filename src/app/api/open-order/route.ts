@@ -2,7 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { buildFbc, getClientIp, getMetaCookies, sendMetaPurchaseEvent } from "@/lib/meta-capi";
 import { metaCatalogContents } from "@/lib/meta-catalog";
-import { OPEN_ORDER_ADDON, OPEN_ORDER_ADDON_TARGET_ID, OPEN_ORDER_ADDON_VARIANT, resolveAddonWeight, resolveAddonWeightFromCatalog } from "@/lib/open-order-config";
+import { OPEN_ORDER_ADDON, OPEN_ORDER_ADDON_TARGET_ID, OPEN_ORDER_ADDON_VARIANT, resolveAddonWeight, resolveAddonWeightFromCatalog, resolveSelectableCover } from "@/lib/open-order-config";
 import { readOpenOrderWindow } from "@/lib/open-order-settings";
 import { resolveOpenOrderState } from "@/lib/open-order-window";
 import {
@@ -304,11 +304,20 @@ export async function POST(request: NextRequest) {
     const addonSettingWeight = resolveAddonWeight(addonSetting?.open_order_addon_weight);
 
     // ── Add-on Cover & Hanger = produk katalog `cover-hanger` ──
-    // Add-on memakai varian "Set Hanger + Cover" / ALL SIZE yang SAMA dengan katalog: stoknya
-    // dipotong seperti produk lain (dan dikembalikan saat batal), beratnya diambil dari berat
-    // varian itu supaya ongkir checkout = berat resi = berat label.
+    // Add-on memakai varian cover yang DIPILIH customer ("Cover Thobe + Hanger" atau
+    // "Cover Koko + Hanger"). Varian itu berkomponen: stoknya = min stok cover & hanger,
+    // jadi stok dicek lewat fungsi stok efektif, bukan kolom `stock` mentah (yang 0).
     let addonWeight = addonSettingWeight;
     if (extraCover) {
+      // Server WAJIB memvalidasi pilihan customer — jangan percaya nilai dari browser.
+      const chosenCover = resolveSelectableCover(body?.addonCover ?? null);
+      if (!chosenCover) {
+        return NextResponse.json(
+          { error: "Pilih jenis cover dulu: Cover Thobe + Hanger atau Cover Koko + Hanger." },
+          { status: 400 },
+        );
+      }
+
       const [{ data: addonProduct }, { data: addonVariant }] = await Promise.all([
         supabaseAdmin
           .from("products")
@@ -317,9 +326,9 @@ export async function POST(request: NextRequest) {
           .maybeSingle(),
         supabaseAdmin
           .from("product_variants")
-          .select("product_id, color, size, stock, weight")
+          .select("product_id, color, size, stock, weight, is_sellable")
           .eq("product_id", OPEN_ORDER_ADDON_TARGET_ID)
-          .eq("color", OPEN_ORDER_ADDON_VARIANT.color)
+          .eq("color", chosenCover.color)
           .eq("size", OPEN_ORDER_ADDON_VARIANT.size)
           .maybeSingle(),
       ]);
@@ -331,20 +340,26 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Variannya wajib ada: tanpa baris varian, stok add-on tidak bisa dipotong dan resi akan
-      // memakai berat fallback — dua-duanya tidak diinginkan.
-      if (!addonVariant) {
+      // Variannya wajib ada DAN masih dijual.
+      if (!addonVariant || addonVariant.is_sellable === false) {
         return NextResponse.json(
           { error: "Extra Cover & Hanger sedang tidak tersedia. Hapus add-on lalu coba lagi." },
           { status: 400 },
         );
       }
 
-      // Stok kosong → tolak di server (UI hanya lapisan pertama).
-      const availableStock = Math.max(0, Number(addonVariant.stock) || 0);
+      // Stok efektif = min stok komponen (cover & hanger). Tolak di server, UI hanya lapis pertama.
+      const { data: effectiveStock } = await supabaseAdmin.rpc("samaqu_variant_effective_stock", {
+        p_product_id: OPEN_ORDER_ADDON_TARGET_ID,
+        p_color: chosenCover.color,
+        p_size: OPEN_ORDER_ADDON_VARIANT.size,
+      });
+      const availableStock = Math.max(0, Number(effectiveStock) || 0);
       if (availableStock < 1) {
         return NextResponse.json(
-          { error: "Stok Extra Cover & Hanger sudah habis. Hapus add-on lalu coba lagi." },
+          {
+            error: `Stok ${chosenCover.label} sudah habis (cover atau hanger kurang). Pilih jenis cover lain atau hapus add-on.`,
+          },
           { status: 400 },
         );
       }
@@ -359,7 +374,7 @@ export async function POST(request: NextRequest) {
       validatedItems.push({
         productId: OPEN_ORDER_ADDON_TARGET_ID,
         productName: OPEN_ORDER_ADDON.name,
-        color: OPEN_ORDER_ADDON_VARIANT.color,
+        color: chosenCover.color,
         size: OPEN_ORDER_ADDON_VARIANT.size,
         series: null,
         kain: null,

@@ -142,6 +142,27 @@ export async function createResellerOrder(
 
   const validated: ValidatedItem[] = [];
 
+  // Varian yang sudah tidak dijual (is_sellable = false) ditolak di server — pilihan di UI
+  // hanya lapisan pertama. Pesanan lama tidak terpengaruh: validasi ini hanya untuk order baru.
+  const { data: sellableRows, error: sellableError } = await supabase
+    .from("product_variants")
+    .select("product_id, color, size, is_sellable")
+    .in("product_id", productIds);
+
+  if (sellableError) {
+    console.error("[RESELLER-ORDER] Gagal membaca varian:", sellableError.message);
+    return { ok: false, error: "Gagal memvalidasi produk", status: 500 };
+  }
+
+  const blockedVariant = new Set<string>();
+  for (const row of sellableRows ?? []) {
+    if (row.is_sellable === false) {
+      blockedVariant.add(
+        `${row.product_id}|${String(row.color ?? "").trim().toLowerCase()}|${String(row.size ?? "").trim().toLowerCase()}`
+      );
+    }
+  }
+
   for (const raw of items) {
     const product = productsById.get(String(raw?.productId || "").trim());
     if (!product) {
@@ -161,6 +182,15 @@ export async function createResellerOrder(
     const size = String(raw?.size || "").trim();
     if (!color || !size) {
       return { ok: false, error: `Warna/ukuran untuk "${product.name}" tidak lengkap`, status: 400 };
+    }
+
+    // Varian lama / tidak dijual: tolak dengan pesan jelas, jangan biarkan lolos diam-diam.
+    if (blockedVariant.has(`${product.id}|${color.toLowerCase()}|${size.toLowerCase()}`)) {
+      return {
+        ok: false,
+        error: `Varian "${color} / ${size}" untuk "${product.name}" sudah tidak dijual. Pilih varian lain.`,
+        status: 400,
+      };
     }
 
     const buyPrice = resellerBuyPrice(product, defaultDiscount);

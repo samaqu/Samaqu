@@ -135,6 +135,12 @@ type SizeRow = { size: string; stock: number; priceOverride: string; sku: string
    */
   trackStock?: boolean;
   effectiveStock?: number | null;
+  /**
+   * Varian sudah tidak ditawarkan (`is_sellable = false`) — mis. "Set Hanger + Cover" setelah
+   * cover dipecah. Baris tetap ditampilkan supaya admin tahu dan tidak bingung, diberi label
+   * "tidak dijual". Menyimpan form TIDAK mengubah flag ini (tidak pernah dikirim saat simpan).
+   */
+  notSellable?: boolean;
 };
 
 /**
@@ -312,6 +318,14 @@ function SizeGrid({
         const weightEmpty = String(s.weight ?? "").trim() === "";
         return (
           <div key={i} className="pf-size-row">
+            {/* Varian yang sudah tidak ditawarkan tetap terlihat, diberi label jelas supaya
+                admin tahu kenapa produk ini tidak muncul di katalog / pemilih transaksi. */}
+            {s.notSellable ? (
+              <p className="mb-1 w-full rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[10.5px] font-semibold text-amber-900">
+                Tidak dijual — varian ini tidak muncul di katalog, keranjang, checkout, add-on,
+                atau pemilih transaksi. Data & pesanan lama tetap utuh.
+              </p>
+            ) : null}
             <div className="pf-size-head">
               <label className="pf-size-field pf-f-size">
                 <span className="pf-size-label">Ukuran</span>
@@ -630,6 +644,11 @@ export default function TambahProdukPage({
   const [category, setCategory] = useState("");
   /** ID baris `product_variants` Cover & Hanger yang dimuat saat Edit (supaya ID-nya tidak putus). */
   const paketIdsLamaRef = useRef<string[]>([]);
+  /**
+   * ID varian yang sudah pensiun (`is_sellable = false`). Baris ini TIDAK PERNAH dihapus
+   * lewat form: pesanan lama, add-on, dan promo masih membutuhkannya.
+   */
+  const idPensiunRef = useRef<Set<string>>(new Set());
   const [description, setDescription] = useState("");
   const [basePrice, setBasePrice] = useState("");
   const [weight, setWeight] = useState("");
@@ -869,7 +888,7 @@ export default function TambahProdukPage({
           // dibaca dari `color` (data lama bisa menyimpannya di `series`/nama produk), ukuran
           // penanda (ALL SIZE) diabaikan sepenuhnya; stok, berat, harga khusus, dan SKU baris lama
           // terbawa apa adanya. ID baris disimpan supaya menyimpan ulang tidak memutus referensi.
-          const rowsPaket = (dbVariants || []).map((v: { id: string; color: string | null; stock: number; weight: number | null; price_override: number | null; sku: string | null }) => ({
+          const rowsPaket = (dbVariants || []).map((v: { id: string; color: string | null; stock: number; weight: number | null; price_override: number | null; sku: string | null; is_sellable?: boolean | null }) => ({
             color: (isPaketSize(v.color) ? "" : variantName(v.color)) || variantName(product.series) || variantName(product.name),
             hex: "",
             sizes: [{
@@ -879,14 +898,21 @@ export default function TambahProdukPage({
               priceOverride: v.price_override ? String(v.price_override) : "",
               sku: v.sku || "",
               weight: v.weight ? String(v.weight) : "",
+              // Baris lama yang sudah tidak dijual tetap tampil (dengan label), bukan disembunyikan.
+              notSellable: v.is_sellable === false,
             }],
           }));
           paketIdsLamaRef.current = rowsPaket.map((row) => row.sizes[0].id).filter((id): id is string => Boolean(id));
+          idPensiunRef.current = new Set(
+            (dbVariants || [])
+              .filter((v: { id: string; is_sellable?: boolean | null }) => v.is_sellable === false)
+              .map((v: { id: string }) => v.id)
+          );
           setVariants(rowsPaket.length > 0 ? rowsPaket : [emptyPaketVariant()]);
           setPaketMediaColor(rowsPaket[0]?.color || "");
         } else if (dbVariants && dbVariants.length > 0) {
           const colorGroups: Record<string, Variant> = {};
-          dbVariants.forEach((v: { id: string; color: string; hex: string | null; size: string; stock: number; weight: number | null; price_override: number | null; sku: string | null; track_stock?: boolean | null }) => {
+          dbVariants.forEach((v: { id: string; color: string; hex: string | null; size: string; stock: number; weight: number | null; price_override: number | null; sku: string | null; track_stock?: boolean | null; is_sellable?: boolean | null }) => {
             if (!colorGroups[v.color]) colorGroups[v.color] = { color: v.color, hex: v.hex || colorMap[v.color] || "#141414", sizes: [] };
             // `id` dibawa supaya simpan berikutnya memperbarui baris ini, bukan membuat ulang.
             colorGroups[v.color].sizes.push({
@@ -898,6 +924,8 @@ export default function TambahProdukPage({
               sku: v.sku || "",
               // Varian tanpa stok sendiri: kolom stok dikunci, angka efektif menyusul di bawah.
               trackStock: v.track_stock !== false,
+              // Varian yang sudah tidak dijual tetap tampil (dengan label), tidak diubah.
+              notSellable: v.is_sellable === false,
             });
           });
           const varList = Object.values(colorGroups);
@@ -1872,7 +1900,11 @@ export default function TambahProdukPage({
             // Cover & Hanger: hapus HANYA baris yang memang dibuang di form; baris yang masih ada
             // diperbarui in-place (ID tetap). Aturan varian biasa tidak diubah.
             const idDisimpan = new Set(variantRows.map((row) => row.id).filter((id): id is string => Boolean(id)));
-            const idHapus = paketIdsLamaRef.current.filter((id) => !idDisimpan.has(id));
+            // Varian pensiun (is_sellable = false) yang sudah dihapus dari form JANGAN ikut
+            // dihapus — pesanan lama, add-on, dan promo masih mereferensikannya.
+            const idHapus = (paketIdsLamaRef.current ?? []).filter(
+              (id) => !idDisimpan.has(id) && !idPensiunRef.current.has(id)
+            );
             if (idHapus.length > 0) await writeVariants(supabase.from("product_variants").delete().in("id", idHapus));
           } else {
             // Varian biasa: hapus HANYA baris yang benar-benar dicabut dari form (mis. ukuran
@@ -1887,7 +1919,9 @@ export default function TambahProdukPage({
             const idHapus = (existing || [])
               .filter(
                 (row: { id: string; color: string | null; size: string | null }) =>
-                  !keptIds.has(row.id) && !keptKeys.has(`${row.color ?? ""}|${row.size ?? ""}`.trim().toLowerCase()),
+                  !keptIds.has(row.id) &&
+                  !keptKeys.has(`${row.color ?? ""}|${row.size ?? ""}`.trim().toLowerCase()) &&
+                  !idPensiunRef.current.has(row.id)
               )
               .map((row: { id: string }) => row.id);
             if (idHapus.length > 0) await writeVariants(supabase.from("product_variants").delete().in("id", idHapus));

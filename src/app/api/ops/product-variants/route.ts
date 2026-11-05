@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
         "id, name, series, price, minimum_price, create_your_price_enabled, open_order_enabled, open_order_price, open_order_minimum_price, open_order_cyp_enabled, hpp, category, weight, jenis_kain(name)",
       ),
     // `weight` = berat per ukuran (gram) — sumber utama yang sama dengan cek ongkir & resi.
-    admin.from("product_variants").select("product_id, color, size, stock, sku, price_override, hex, display_order, base_product_id, weight, track_stock"),
+    admin.from("product_variants").select("product_id, color, size, stock, sku, price_override, hex, display_order, base_product_id, weight, track_stock, is_sellable"),
   ]);
 
   const byId: Record<string, any> = {};
@@ -184,6 +184,11 @@ export async function GET(req: NextRequest) {
     }
     const size = (r.size || "").toUpperCase();
     if (size) {
+      // Varian yang sudah tidak dijual: dicatat per ukuran, disaring hanya untuk `?for=sale`
+      // (pemilih item baru). Server tanpa `for` tetap mengembalikannya untuk edit pesanan lama.
+      if (r.is_sellable === false) {
+        grouped[key].__blocked_sizes = { ...(grouped[key].__blocked_sizes || {}), [size]: true };
+      }
       grouped[key].stock[size] = Number(r.stock) || 0;
       grouped[key].skus[size] = String(r.sku || "").trim();
       const override = Number(r.price_override);
@@ -216,12 +221,44 @@ export async function GET(req: NextRequest) {
   // → warna → series urut tetap. Lihat src/lib/ops-order.ts.
   items.sort((a, b) => compareOpsRows(variantSortKey(a), variantSortKey(b)));
 
-  // `?for=sale`: sembunyikan produk yang berperan sebagai komponen (mis. Box Kabak).
-  const visible = forSale && componentIds.size > 0
-    ? items.filter((item: any) => !componentIds.has(String(item.product_id)))
-    : items;
+  // `?for=sale` = pemilih varian untuk ITEM BARU (Tambah Transaksi / edit item / reseller).
+  // Di sini varian yang sudah tidak dijual (is_sellable = false) TIDAK boleh muncul.
+  // Pesanan lama tetap bisa dibuka & diedit karena barisnya sudah tersimpan di order_items.
+  let visible: any[] = items;
+  if (forSale) {
+    if (componentIds.size > 0) {
+      visible = visible.filter((item: any) => !componentIds.has(String(item.product_id)));
+    }
+    visible = visible
+      .map((item: any) => filterSellableSizes(item))
+      .filter((item: any) => item !== null);
+  }
 
   return NextResponse.json({ items: visible });
+}
+
+/**
+ * Buang ukuran/varian yang `is_sellable = false` dari baris pemilih varian.
+ * Baris dikelompokkan per warna, jadi penyaringan dilakukan per ukuran.
+ * Baris yang seluruh ukurannya tidak dijual tidak dikembalikan (null).
+ */
+function filterSellableSizes(item: any): any | null {
+  const blocked: Record<string, true> = item.__blocked_sizes || {};
+  const keep = (value: any) =>
+    Object.fromEntries(Object.entries(value || {}).filter(([size]) => !blocked[size]));
+
+  const stock = keep(item.stock);
+  if (Object.keys(stock).length === 0) return null;
+
+  return {
+    ...item,
+    stock,
+    skus: keep(item.skus),
+    prices: keep(item.prices),
+    weights: keep(item.weights),
+    stock_efektif: keep(item.stock_efektif),
+    status: stockStatus(Object.values(stock).reduce((a: number, b: any) => a + (Number(b) || 0), 0)),
+  };
 }
 
 /** Tambah varian baru (satu baris = satu kombinasi produk + warna). */

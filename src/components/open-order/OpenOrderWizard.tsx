@@ -22,6 +22,8 @@ import {
   OPEN_ORDER_ADDON,
   OPEN_ORDER_ADDON_TARGET_ID,
   OPEN_ORDER_ADDON_VARIANT,
+  ADDON_COVER_OPTIONS,
+  defaultCoverForCategories,
   OPEN_ORDER_PERIOD,
   resolveAddonWeightFromCatalog,
 } from "@/lib/open-order-config";
@@ -169,6 +171,8 @@ export default function OpenOrderWizard({
   const [nextKey, setNextKey] = useState(1);
   const [customer, setCustomer] = useState<CustomerData>(EMPTY_CUSTOMER);
   const [extraCover, setExtraCover] = useState(false);
+  /** Jenis cover yang dipilih customer. Kosong = belum dipilih → otomatis dari isi pesanan. */
+  const [addonCover, setAddonCover] = useState<string>("");
   const [shipping, setShipping] = useState<DraftShipping | null>(null);
   const [loadingOngkir, setLoadingOngkir] = useState(false);
   const [ongkirError, setOngkirError] = useState(false);
@@ -328,28 +332,57 @@ export default function OpenOrderWizard({
   }, [focusProductId, products]);
 
   // ── Add-on Extra Cover & Hanger = produk katalog `cover-hanger` ──
-  // Stok & berat add-on dibaca dari varian katalog yang sama dengan yang dipakai server
-  // (`Set Hanger + Cover` / ALL SIZE), jadi angka ongkir di sini = angka server = angka resi.
+  // Customer memilih "Cover Thobe + Hanger" atau "Cover Koko + Hanger". Keduanya varian
+  // berkomponen, jadi stok di sini adalah STOK EFEKTIF (min stok cover & hanger) — persis
+  // angka yang dipakai server, sehingga ongkir & ketersediaan tidak beda.
+  const addonCoverOptions = useMemo(() =>
+      ADDON_COVER_OPTIONS.map((option) => {
+        const variantRow = stockRows.find(
+          (row) =>
+            row.product_id === OPEN_ORDER_ADDON_TARGET_ID &&
+            row.color === option.color &&
+            row.size === OPEN_ORDER_ADDON_VARIANT.size
+        );
+        const productRow = catalog.find((row) => row.id === OPEN_ORDER_ADDON_TARGET_ID);
+        const rows = {
+          variantStock: variantRow && typeof variantRow.stock === "number" ? variantRow.stock : null,
+          variantWeight: variantRow?.weight ?? null,
+          productWeight: productRow?.weight ?? null,
+        };
+        return {
+          option,
+          stock: addonStockOf(rows),
+          available: isAddonAvailable(rows),
+          weight: resolveAddonWeightFromCatalog(rows.variantWeight, rows.productWeight, settings.open_order_addon_weight),
+        };
+      }),
+    [catalog, stockRows, settings.open_order_addon_weight]
+  );
+
+  /** Pilihan awal dari isi pesanan — dihitung ulang tiap keranjang berubah. */
+  const addonDefaultCover = useMemo(
+    () => defaultCoverForCategories(lines.map((line) => line.category)),
+    [lines]
+  );
+
+  /**
+   * Pilihan cover yang benar-benar dipakai: pilihan customer kalau ada, kalau belum
+   * → otomatis dari isi pesanan (Thobe/Kandora → Cover Thobe, Koko → Cover Koko,
+   * campuran → Cover Thobe). Server menghitung hal yang sama sebagai cadangan.
+   */
+  const effectiveAddonCover = addonCover || addonDefaultCover;
+
   const addonCatalog = useMemo(() => {
-    const variantRow = stockRows.find(
-      (row) =>
-        row.product_id === OPEN_ORDER_ADDON_TARGET_ID &&
-        row.color === OPEN_ORDER_ADDON_VARIANT.color &&
-        row.size === OPEN_ORDER_ADDON_VARIANT.size
-    );
-    const productRow = catalog.find((row) => row.id === OPEN_ORDER_ADDON_TARGET_ID);
-    const rows = {
-      variantStock: variantRow && typeof variantRow.stock === "number" ? variantRow.stock : null,
-      variantWeight: variantRow?.weight ?? null,
-      productWeight: productRow?.weight ?? null,
-    };
+    const picked =
+      addonCoverOptions.find((entry) => entry.option.color === effectiveAddonCover) ??
+      addonCoverOptions[0];
     return {
-      rows,
-      stock: addonStockOf(rows),
-      available: isAddonAvailable(rows),
-      weight: resolveAddonWeightFromCatalog(rows.variantWeight, rows.productWeight, settings.open_order_addon_weight),
+      rows: picked,
+      stock: picked?.stock ?? null,
+      available: picked?.available ?? false,
+      weight: picked?.weight ?? resolveAddonWeightFromCatalog(null, null, settings.open_order_addon_weight),
     };
-  }, [catalog, stockRows, settings.open_order_addon_weight]);
+  }, [addonCoverOptions, effectiveAddonCover, settings.open_order_addon_weight]);
 
   // Add-on yang sudah tidak bisa dipilih (stok habis saat halaman terbuka) dilepas dari
   // keranjang supaya ringkasan & ongkir tidak memakai add-on yang tidak akan lolos di server.
@@ -500,7 +533,11 @@ export default function OpenOrderWizard({
   }
 
   function addDraftToCart(line: ProductDraft) {
-    setLines((prev) => [...prev, { ...line, key: nextKey }]);
+    // Simpan kategori di baris keranjang: dipakai menentukan pilihan awal cover add-on.
+    const product = products.find((item) =>
+      item.variants.some((variant) => variant.productId === line.productId)
+    );
+    setLines((prev) => [...prev, { ...line, key: nextKey, category: product?.category ?? null }]);
     setNextKey((key) => key + 1);
     setDraft(null);
     setStep(3);
@@ -642,6 +679,8 @@ export default function OpenOrderWizard({
             notes: customer.notes,
           },
           extraCover,
+          // Jenis cover yang dipilih; server memvalidasi ulang.
+          addonCover: extraCover ? effectiveAddonCover : null,
           paymentMethod,
           // Meta CAPI: identifier browser (fbp/fbc) + URL halaman, dipakai server saat Purchase.
           meta: {
@@ -823,6 +862,14 @@ export default function OpenOrderWizard({
                 extraCover={extraCover}
                 onToggleExtra={setExtraCover}
                 addonAvailable={addonCatalog.available}
+                addonCover={effectiveAddonCover}
+                addonCoverOptions={addonCoverOptions.map((entry) => ({
+                  color: entry.option.color,
+                  label: entry.option.label,
+                  available: entry.available,
+                  stock: entry.stock,
+                }))}
+                onSelectAddonCover={setAddonCover}
                 itemsWeight={itemsWeight}
                 addonWeight={addonWeight}
                 totalWeight={totalWeight}

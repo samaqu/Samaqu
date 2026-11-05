@@ -21,7 +21,7 @@ import { getCatalogProducts } from "@/lib/db";
 import type { Product } from "@/lib/katalog-data";
 import { PROMO_ORDER_PATH } from "@/lib/promo/free-cover-hanger";
 import { SITE_URL } from "@/lib/site-config";
-import { OPEN_ORDER_ADDON_TARGET_ID, OPEN_ORDER_ADDON_VARIANT } from "@/lib/open-order-config";
+import { OPEN_ORDER_ADDON_TARGET_ID, OPEN_ORDER_ADDON_VARIANT, ADDON_COVER_OPTIONS } from "@/lib/open-order-config";
 import { supabase } from "@/lib/supabase";
 import { StatusCard } from "./promo-fch/StatusCard";
 import { TeksCard } from "./promo-fch/TeksCard";
@@ -161,17 +161,25 @@ export default function PromoFchSettingsForm() {
       });
 
     // Stok Cover & Hanger (produk bonus) — dipakai peringatan di Ringkasan.
-    supabase
-      .from("product_variants")
-      .select("stock")
-      .eq("product_id", OPEN_ORDER_ADDON_TARGET_ID)
-      .eq("color", OPEN_ORDER_ADDON_VARIANT.color)
-      .eq("size", OPEN_ORDER_ADDON_VARIANT.size)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!active) return;
-        setBonusStock(typeof data?.stock === "number" ? data.stock : 0);
-      });
+    // Varian bonus sekarang berkomponen, jadi stok yang ditampilkan adalah STOK EFEKTIF
+    // (min stok cover & hanger) untuk pilihan cover TERENDAH — angka yang sama dengan yang
+    // dipakai server saat memutuskan bonus. Diambil per pilihan agar tidak menyesatkan.
+    Promise.all(
+      ADDON_COVER_OPTIONS.map((option) =>
+        supabase
+          .from("product_variant_stock")
+          .select("effective_stock")
+          .eq("product_id", OPEN_ORDER_ADDON_TARGET_ID)
+          .eq("color", option.color)
+          .eq("size", OPEN_ORDER_ADDON_VARIANT.size)
+          .maybeSingle()
+          .then(({ data }) => (typeof data?.effective_stock === "number" ? data.effective_stock : 0))
+      )
+    ).then((stocks) => {
+      if (!active) return;
+      // Bonus masih bisa diberikan selama SALAH SATU jenis cover tersedia.
+      setBonusStock(Math.max(0, ...stocks));
+    });
 
     // Varian per produk: total stok untuk badge + daftar ukuran untuk sakelar promo per ukuran.
     supabase

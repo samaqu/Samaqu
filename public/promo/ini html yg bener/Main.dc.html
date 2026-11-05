@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SAMAQU — Gratis Cover Hanger untuk Pelanggan Baru</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&amp;family=Instrument+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#FFFFFF}
+a{color:#000000}a:hover{color:#3D3D3D}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid #000000;outline-offset:3px}
+.cq{container-type:inline-size;width:100%}
+.wrap{max-width:1240px;margin:0 auto;padding:0 28px;box-sizing:border-box}
+.disp{font-family:'Big Shoulders Display',Impact,sans-serif;text-transform:uppercase;letter-spacing:0.005em;line-height:0.88;margin:0}
+.hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr);gap:48px;align-items:center}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:64px;align-items:center}
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.coll{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);grid-template-rows:auto auto;gap:20px}
+.coll-big{grid-row:span 2}
+.coll-big-box{min-height:560px}
+.h-hero{font-size:118px}
+.h-sec{font-size:76px}
+.sec{padding-top:120px;padding-bottom:120px}
+.only-m{display:none}
+.sticky-cta{display:none}
+.btn-ink{transition:background .2s ease,transform .2s ease}
+.btn-ink:hover{background:#2B2B2B;color:#FFFFFF;transform:translateY(-2px)}
+.btn-ink:active,.btn-line:active,.tap:active{transform:scale(0.97)}
+.btn-line{transition:background .2s ease,transform .15s ease}
+.btn-line:hover{background:#EEEDE8}
+.tile-img{transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+.tile:hover .tile-img{transform:scale(1.03)}
+
+@keyframes rise{from{transform:translateY(105%)}to{transform:translateY(0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.line{display:block;overflow:hidden;padding-bottom:4px}
+.line>span{display:block;animation:rise .9s cubic-bezier(.2,.8,.2,1) both}
+.l2>span{animation-delay:.1s}.l3>span{animation-delay:.2s}
+.fu{animation:fadeUp .8s ease both;animation-delay:.5s}
+.fu2{animation:fadeUp .8s ease both;animation-delay:.65s}
+.fu3{animation:fadeUp .8s ease both;animation-delay:.8s}
+
+@keyframes sway{0%,100%{transform:rotate(0deg)}6%{transform:rotate(1.8deg)}12%{transform:rotate(-1.4deg)}18%{transform:rotate(0deg)}}
+@keyframes coverDrop{0%,18%{transform:translateY(-520px)}38%{transform:translateY(8px)}42%{transform:translateY(0)}86%{transform:translateY(0)}100%{transform:translateY(-520px)}}
+@keyframes zip{0%,42%{stroke-dashoffset:392}56%,86%{stroke-dashoffset:0}100%{stroke-dashoffset:392}}
+@keyframes stamp{0%,54%{transform:scale(0) rotate(-40deg);opacity:0}60%{transform:scale(1.18) rotate(-10deg);opacity:1}64%,84%{transform:scale(1) rotate(-12deg);opacity:1}90%,100%{transform:scale(0.6) rotate(-12deg);opacity:0}}
+@keyframes dust{0%,18%{opacity:.9;transform:translateY(0)}36%,100%{opacity:0;transform:translateY(30px)}}
+.sway{transform-box:fill-box;transform-origin:50% 0%;animation:sway 8s ease-in-out infinite}
+.cover{animation:coverDrop 8s cubic-bezier(.65,0,.25,1) infinite}
+.zip{stroke-dasharray:392;animation:zip 8s ease-in-out infinite}
+.stamp{transform-box:fill-box;transform-origin:50% 50%;animation:stamp 8s ease-out infinite}
+.dust{animation:dust 8s ease-out infinite}
+
+@keyframes fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.qfill{transform-origin:left center;animation:fill 1.6s cubic-bezier(.2,.8,.2,1) .9s both}
+.live{animation:blink 1.6s ease-in-out infinite}
+@keyframes ring{0%{box-shadow:0 0 0 0 rgba(0,0,0,.35)}100%{box-shadow:0 0 0 18px rgba(0,0,0,0)}}
+.knob{animation:ring 1.8s ease-out infinite}
+@keyframes ringW{0%{box-shadow:0 0 0 0 rgba(255,255,255,.5)}100%{box-shadow:0 0 0 22px rgba(255,255,255,0)}}
+.playring{animation:ringW 1.8s ease-out infinite}
+@keyframes slideIn{from{transform:translateY(100%)}to{transform:translateY(0)}}
+
+@supports (animation-timeline: view()){
+@keyframes reveal{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:translateY(0)}}
+.rv{animation:reveal linear both;animation-timeline:view();animation-range:entry 0% cover 28%}
+}
+
+/* tablet */
+@container (max-width:900px){
+.hero,.two{grid-template-columns:minmax(0,1fr) !important;gap:40px !important}
+.steps{grid-template-columns:minmax(0,1fr) !important}
+.h-hero{font-size:84px}
+.h-sec{font-size:58px}
+.sec{padding-top:88px;padding-bottom:88px}
+.hide-m{display:none !important}
+.wrap{padding-left:32px;padding-right:32px}
+}
+
+/* phone: app-like */
+@container (max-width:640px){
+.wrap{padding-left:24px;padding-right:24px}
+.h-hero{font-size:60px}
+.h-sec{font-size:46px;line-height:0.95 !important;margin-bottom:4px}
+.sec{padding-top:72px;padding-bottom:72px}
+.only-m{display:block}
+.nav{height:60px !important}
+.nav-logo{font-size:26px !important}
+.nav-btn{height:40px !important;padding:0 16px !important;font-size:14px !important}
+.hero-pad{padding-top:28px !important;padding-bottom:40px !important}
+.hero-copy{gap:22px !important}
+.hero-sub{font-size:17px !important}
+.stage{max-width:340px !important}
+.cta-row a{flex:1 1 100%;justify-content:center;height:56px !important}
+.quota{padding:16px 18px !important;border-radius:20px !important}
+.sheet{border-radius:28px 28px 0 0;margin-top:-28px;position:relative}
+.sheet-gap{padding-bottom:28px}
+.vid{max-width:300px !important}
+.ba{border-radius:22px !important}
+.step{flex-direction:row !important;align-items:center !important;gap:18px !important;padding:22px 0 !important;border-left:none !important;border-top:1.5px solid #000000}
+.step:first-child{border-top:none}
+.step-n{font-size:72px !important;width:52px;flex-shrink:0;text-align:center}
+.step-t{font-size:19px !important}
+.coll{display:flex !important;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-left:24px;gap:14px !important;margin:0 -24px;padding:0 24px 6px;scrollbar-width:none}
+.coll::-webkit-scrollbar{display:none}
+.coll>a{flex:0 0 80%;scroll-snap-align:start}
+.coll-big-box{min-height:0 !important;aspect-ratio:4 / 5}
+.tile-box{aspect-ratio:4 / 5 !important}
+.tile-name{font-size:38px !important}
+.tile-pill{display:none !important}
+.tag{transform:none !important}
+.faq-q{font-size:16px !important;padding:20px 0 !important}
+.faq-a{padding:0 0 22px 0 !important;font-size:15px !important}
+.sticky-cta{display:flex;position:sticky;bottom:0;z-index:30;animation:slideIn .5s ease 1.2s both}
+.footer-pad{padding-bottom:28px !important}
+}
+@media (prefers-reduced-motion:reduce){
+*{animation:none !important;transition:none !important}
+}
+</style>
+</helmet>
+<div class="cq">
+<div style="font-family: 'Instrument Sans', system-ui, sans-serif; color: #000000; background: #FFFFFF; width: 100%; overflow-x: clip">
+
+<!-- NAV -->
+<div style="border-bottom: 1.5px solid #000000; background: #FFFFFF">
+<div class="wrap nav" style="display: flex; align-items: center; justify-content: space-between; height: 76px; gap: 16px">
+<div class="disp nav-logo" style="font-size: 32px; letter-spacing: 0.14em; line-height: 1">SAMAQU</div>
+<div style="display: flex; align-items: center; gap: 22px">
+<span class="hide-m" style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500"><span class="live" style="width: 8px; height: 8px; border-radius: 50%; background: #000000"></span>Program pelanggan baru sedang berjalan</span>
+<a href="https://www.samaqu.id/katalog" class="btn-ink nav-btn" style="background: #000000; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 15px; padding: 0 22px; height: 46px; border-radius: 999px; display: inline-flex; align-items: center">Katalog</a>
+</div>
+</div>
+</div>
+
+<!-- HERO -->
+<div class="wrap hero hero-pad" style="padding-top: 64px; padding-bottom: 80px">
+<div class="hero-copy" style="display: flex; flex-direction: column; gap: 28px">
+<h1 class="disp h-hero" style="font-weight: 900">
+<span class="line"><span>Order pertama?</span></span>
+<span class="line l2"><span>Cover Hanger-nya</span></span>
+<span class="line l3"><span style="-webkit-text-stroke: 2.5px #000000; color: transparent">gratis.</span></span>
+</h1>
+<p class="fu hero-sub" style="margin: 0; font-size: 20px; line-height: 1.6; color: #3D3D3D; max-width: 32em">Kenalan pertama dengan SAMAQU jadi lebih istimewa. Setiap pembelian pertama Thobe, Kandora, atau Koko, kamu dapat Cover Hanger senilai Rp35.000 secara GRATIS. Otomatis masuk ke paketmu, tanpa kode promo.</p>
+
+<div class="fu2 quota" style="border: 1.5px solid #000000; border-radius: 18px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; max-width: 520px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px">
+<span style="font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px"><span class="live" style="width: 8px; height: 8px; border-radius: 50%; background: #000000"></span>Sisa bonus</span>
+<span><span class="disp" style="font-size: 36px; font-weight: 900">{{sisa}}</span><span style="color: #3D3D3D; font-size: 15px"> dari {{total}}</span></span>
+</div>
+<div style="height: 12px; background: #EEEDE8; border-radius: 999px; overflow: hidden">
+<div class="qfill" style="height: 100%; width: {{pct}}%; background: #000000; border-radius: 999px"></div>
+</div>
+<div style="font-size: 14px; color: #3D3D3D">Bonus terbatas. Begitu kuotanya habis, program selesai.</div>
+</div>
+
+<div class="fu3 cta-row" style="display: flex; gap: 12px; flex-wrap: wrap">
+<a href="https://www.samaqu.id/katalog" class="btn-ink" style="background: #000000; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 17px; padding: 0 30px; height: 58px; border-radius: 999px; display: inline-flex; align-items: center">Pilih Baju &amp; Ambil Bonus</a>
+<a href="https://wa.me/62895635965400" class="btn-line" style="background: #FFFFFF; color: #000000; border: 1.5px solid #000000; text-decoration: none; font-weight: 600; font-size: 17px; padding: 0 26px; height: 58px; box-sizing: border-box; border-radius: 999px; display: inline-flex; align-items: center">Tanya Admin Dulu</a>
+</div>
+</div>
+
+<!-- SIGNATURE STAGE -->
+<div class="stage" style="position: relative; width: 100%; max-width: 480px; justify-self: center">
+<div style="aspect-ratio: 400 / 520; background: #EEEDE8; border-radius: 240px 240px 28px 28px; overflow: hidden; position: relative">
+<svg viewBox="0 0 400 520" style="position: absolute; inset: 0; width: 100%; height: 100%" role="img" aria-label="Animasi Cover Hanger SAMAQU menutup thobe, lalu stempel gratis muncul">
+<g class="sway">
+<path d="M200 46 q0 -16 14 -16 q14 0 14 14 q0 11 -14 16 L200 82" fill="none" stroke="#000000" stroke-width="5" stroke-linecap="round"></path>
+<path d="M118 122 L200 80 L282 122" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M150 114 L250 114 L312 172 L292 198 L272 184 L282 482 L118 482 L128 184 L108 198 L88 172 Z" fill="#FFFFFF" stroke="#000000" stroke-width="4" stroke-linejoin="round"></path>
+<path d="M178 114 Q200 146 222 114" fill="none" stroke="#000000" stroke-width="4" stroke-linecap="round"></path>
+<path d="M200 134 L200 240" stroke="#000000" stroke-width="3"></path>
+<circle cx="208" cy="156" r="3" fill="#000000"></circle><circle cx="208" cy="184" r="3" fill="#000000"></circle><circle cx="208" cy="212" r="3" fill="#000000"></circle>
+<g class="dust">
+<circle cx="96" cy="250" r="3" fill="#8A8A85"></circle><circle cx="312" cy="300" r="2.5" fill="#8A8A85"></circle><circle cx="150" cy="340" r="2.5" fill="#8A8A85"></circle><circle cx="262" cy="230" r="3" fill="#8A8A85"></circle><circle cx="300" cy="420" r="3" fill="#8A8A85"></circle><circle cx="84" cy="400" r="2.5" fill="#8A8A85"></circle>
+</g>
+</g>
+<g class="cover">
+<rect x="76" y="98" width="248" height="398" rx="22" fill="#000000"></rect>
+<path d="M200 102 L200 492" class="zip" stroke="#FFFFFF" stroke-width="3" stroke-dasharray="392" stroke-linecap="round"></path>
+<rect x="194" y="104" width="12" height="18" rx="3" fill="#FFFFFF"></rect>
+<text x="200" y="330" text-anchor="middle" font-family="'Big Shoulders Display', Impact, sans-serif" font-weight="900" font-size="38" letter-spacing="6" fill="#FFFFFF">SAMAQU</text>
+<text x="200" y="356" text-anchor="middle" font-family="'Instrument Sans', sans-serif" font-weight="500" font-size="13" letter-spacing="2" fill="#BDBDB8">COVER HANGER</text>
+</g>
+<path d="M200 46 q0 -16 14 -16 q14 0 14 14 q0 11 -14 16 L200 82" fill="none" stroke="#000000" stroke-width="5" stroke-linecap="round"></path>
+<g class="stamp">
+<circle cx="318" cy="172" r="56" fill="#FFFFFF" stroke="#000000" stroke-width="3"></circle>
+<circle cx="318" cy="172" r="48" fill="none" stroke="#000000" stroke-width="1.5" stroke-dasharray="3 4"></circle>
+<text x="318" y="170" text-anchor="middle" font-family="'Big Shoulders Display', Impact, sans-serif" font-weight="900" font-size="30" fill="#000000">GRATIS</text>
+<text x="318" y="192" text-anchor="middle" font-family="'Instrument Sans', sans-serif" font-weight="700" font-size="14" fill="#000000">Rp35.000</text>
+</g>
+</svg>
+</div>
+<div class="hide-m" style="position: absolute; bottom: 26px; left: -36px; background: #FFFFFF; border: 1.5px solid #000000; border-radius: 14px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; box-shadow: 6px 6px 0 #000000">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12v9H4v-9"></path><path d="M2 7h20v5H2z"></path><path d="M12 21V7"></path><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg>
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-weight: 700; font-size: 15px">Langsung masuk paket</span>
+<span style="font-size: 13px; color: #3D3D3D">Kamu nggak perlu klaim apa-apa</span>
+</div>
+</div>
+</div>
+</div>
+
+<!-- VIDEO + STORY -->
+<div class="sheet" style="background: #000000; color: #FFFFFF">
+<div class="wrap sec two">
+<div class="rv" style="display: flex; flex-direction: column; gap: 24px">
+<h2 class="disp h-sec" style="font-weight: 900">Baru kenal SAMAQU? Ini sambutan dari kami.</h2>
+<p style="margin: 0; font-size: 19px; line-height: 1.7; color: #C8C8C3; max-width: 30em">Setiap awal perkenalan pasti punya kesan tersendiri. Kami ingin pengalaman pertamamu bersama SAMAQU terasa lebih berkesan. Karena itu, ada Cover Hanger gratis sebagai teman untuk menjaga pakaian barumu tetap rapi.</p>
+<div style="display: flex; flex-direction: column; gap: 14px">
+<sc-for list="{{proof}}" as="p" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 14px; font-size: 17px; font-weight: 500">
+<span style="width: 30px; height: 30px; border-radius: 50%; background: #FFFFFF; color: #000000; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+</span>{{p}}</div>
+</sc-for>
+</div>
+</div>
+<div class="rv vid" style="justify-self: center; width: 100%; max-width: 360px">
+<div style="aspect-ratio: 9 / 16; border-radius: 34px; border: 6px solid #2B2B2B; background: #000000; overflow: hidden; position: relative">
+<video src="./assets/8cec14720696de9ef42aef3b36d7a55c.mp4" poster="./assets/0d703740ef034edac4f4118c705ccbca.jpg" autoPlay="{{ true }}" muted="{{ true }}" loop="{{ true }}" playsInline="{{ true }}" controls="{{ true }}" preload="metadata" aria-label="Video program Free Cover Hanger SAMAQU" style="width: 100%; height: 100%; object-fit: cover; display: block"></video>
+</div>
+</div>
+</div>
+<div class="sheet-gap"></div>
+</div>
+
+<!-- BEFORE / AFTER -->
+<div class="sheet" style="background: #EEEDE8">
+<div class="wrap sec two">
+<div class="rv" style="display: flex; flex-direction: column; gap: 24px">
+<h2 class="disp h-sec" style="font-weight: 900">Bukan sekadar bonus, bajumu jadi lebih terjaga.</h2>
+<p style="margin: 0; font-size: 18px; line-height: 1.7; color: #3D3D3D; max-width: 30em">Belanja pertama Thobe, Kandora, atau Koko di SAMAQU, kamu langsung dapat Cover Hanger GRATIS senilai Rp35.000. Bajumu tetap bersih, rapi, dan siap dipakai kapan aja.</p>
+<div style="display: flex; flex-direction: column; border-top: 1.5px solid #000000">
+<sc-for list="{{benefits}}" as="b" hint-placeholder-count="3">
+<div style="display: flex; gap: 18px; align-items: flex-start; padding: 20px 0; border-bottom: 1.5px solid #000000">
+<div style="width: 46px; height: 46px; flex-shrink: 0; border-radius: 50%; background: #000000; color: #FFFFFF; display: flex; align-items: center; justify-content: center">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div style="font-weight: 700; font-size: 19px">{{b.t}}</div>
+<div style="font-size: 16px; color: #3D3D3D; line-height: 1.6">{{b.d}}</div>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div class="ba" style="position: relative; aspect-ratio: 4 / 5; border-radius: 28px; overflow: hidden; background: #FFFFFF; user-select: none; border: 1.5px solid #000000">
+<div style="position: absolute; inset: 0; background: #FFFFFF; display: flex; align-items: center; justify-content: center">
+<svg viewBox="0 0 240 320" style="width: 72%; height: auto" role="img" aria-label="Thobe tersimpan rapi di dalam Cover Hanger SAMAQU">
+<ellipse cx="120" cy="314" rx="70" ry="5" fill="#000000" opacity="0.08"></ellipse>
+<rect x="40" y="12" width="160" height="7" rx="3.5" fill="#000000"></rect>
+<path d="M120 19 q-11 0 -11 10 q0 9 11 10 L120 52" fill="none" stroke="#000000" stroke-width="3" stroke-linecap="round"></path>
+<path d="M120 50 L188 82 Q194 85 194 93 L194 298 Q194 308 184 308 L56 308 Q46 308 46 298 L46 93 Q46 85 52 82 Z" fill="#000000"></path>
+<path d="M120 50 L188 82 Q194 85 194 93 L194 120 L46 120 L46 93 Q46 85 52 82 Z" fill="#FFFFFF" opacity="0.06"></path>
+<rect x="80" y="92" width="80" height="66" rx="10" fill="#EEEDE8"></rect>
+<path d="M90 158 L94 112 L112 104 L128 104 L146 112 L150 158 Z" fill="#FFFFFF" stroke="#000000" stroke-width="1.6" stroke-linejoin="round"></path>
+<path d="M110 104 Q120 120 130 104" fill="none" stroke="#000000" stroke-width="1.6" stroke-linecap="round"></path>
+<path d="M120 114 L120 158" stroke="#000000" stroke-width="1.2"></path>
+<circle cx="124" cy="124" r="1.6" fill="#000000"></circle><circle cx="124" cy="136" r="1.6" fill="#000000"></circle><circle cx="124" cy="148" r="1.6" fill="#000000"></circle>
+<rect x="80" y="92" width="80" height="66" rx="10" fill="none" stroke="#FFFFFF" stroke-width="1.5" opacity="0.5"></rect>
+<path d="M120 166 L120 300" stroke="#FFFFFF" stroke-width="1.6" stroke-dasharray="2 3"></path>
+<rect x="115.5" y="164" width="9" height="14" rx="2.5" fill="#FFFFFF"></rect>
+<text x="120" y="236" text-anchor="middle" font-family="'Big Shoulders Display', Impact, sans-serif" font-size="26" font-weight="900" fill="#FFFFFF" letter-spacing="4">SAMAQU</text>
+<text x="120" y="252" text-anchor="middle" font-family="'Instrument Sans', sans-serif" font-size="8" font-weight="600" fill="#BDBDB8" letter-spacing="2.5">COVER HANGER</text>
+<path d="M60 130 L60 290" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" opacity="0.08"></path>
+</svg>
+<div style="position: absolute; top: 16px; right: 16px; background: #000000; color: #FFFFFF; font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 999px">Dengan Cover Hanger</div>
+</div>
+<div style="position: absolute; inset: 0; background: #D6D5CF; display: flex; align-items: center; justify-content: center; clip-path: inset(0 {{clipRight}}% 0 0)">
+<svg viewBox="0 0 240 320" style="width: 72%; height: auto" role="img" aria-label="Thobe digantung asal, kusut, bahu melar, dan berdebu">
+<ellipse cx="120" cy="314" rx="64" ry="5" fill="#000000" opacity="0.08"></ellipse>
+<rect x="40" y="12" width="160" height="7" rx="3.5" fill="#3D3D3D"></rect>
+<g transform="rotate(7 120 20)">
+<path d="M120 19 q-11 0 -11 10 q0 9 11 10 L120 50" fill="none" stroke="#3D3D3D" stroke-width="2" stroke-linecap="round"></path>
+<path d="M62 76 L120 50 L178 76" fill="none" stroke="#3D3D3D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M98 62 L142 62 L186 92 Q190 95 188 100 L176 124 L166 118 L172 302 L68 300 L74 118 L64 124 L52 100 Q50 95 54 90 L66 84 Q58 74 70 70 Z" fill="#B3B2AC" stroke="#3D3D3D" stroke-width="2" stroke-linejoin="round"></path>
+<path d="M106 62 Q120 80 134 62" fill="none" stroke="#3D3D3D" stroke-width="2" stroke-linecap="round"></path>
+<path d="M120 74 L121 150" stroke="#3D3D3D" stroke-width="1.5"></path>
+<circle cx="125" cy="88" r="1.8" fill="#3D3D3D"></circle><circle cx="126" cy="104" r="1.8" fill="#3D3D3D"></circle><circle cx="126" cy="120" r="1.8" fill="#3D3D3D"></circle>
+<path d="M66 84 q6 4 10 -2" fill="none" stroke="#3D3D3D" stroke-width="1.6" stroke-linecap="round"></path>
+<path d="M84 132 q8 7 18 0 q6 -5 12 1" fill="none" stroke="#5E5D58" stroke-width="1.6" stroke-linecap="round"></path>
+<path d="M128 168 q10 9 22 -1" fill="none" stroke="#5E5D58" stroke-width="1.6" stroke-linecap="round"></path>
+<path d="M82 196 q12 6 22 -3 q6 -4 14 2" fill="none" stroke="#5E5D58" stroke-width="1.6" stroke-linecap="round"></path>
+<path d="M130 232 q8 8 20 0" fill="none" stroke="#5E5D58" stroke-width="1.6" stroke-linecap="round"></path>
+<path d="M88 262 q10 6 18 -2" fill="none" stroke="#5E5D58" stroke-width="1.6" stroke-linecap="round"></path>
+<path d="M96 150 L92 290 M146 150 L150 288" stroke="#5E5D58" stroke-width="1" opacity="0.5"></path>
+<ellipse cx="146" cy="96" rx="14" ry="9" fill="#8A8A85" opacity="0.35"></ellipse>
+<ellipse cx="100" cy="226" rx="12" ry="8" fill="#8A8A85" opacity="0.3"></ellipse>
+</g>
+<circle cx="40" cy="70" r="2.4" fill="#5E5D58"></circle><circle cx="206" cy="58" r="1.8" fill="#5E5D58"></circle><circle cx="30" cy="160" r="2.2" fill="#5E5D58"></circle><circle cx="212" cy="196" r="2" fill="#5E5D58"></circle><circle cx="198" cy="132" r="1.6" fill="#5E5D58"></circle><circle cx="44" cy="262" r="2.4" fill="#5E5D58"></circle><circle cx="206" cy="276" r="1.8" fill="#5E5D58"></circle><circle cx="58" cy="210" r="1.4" fill="#5E5D58"></circle>
+<path d="M150 40 l6 2 M36 112 l5 -3 M214 240 l-5 3" stroke="#5E5D58" stroke-width="1.2" stroke-linecap="round"></path>
+</svg>
+<div style="position: absolute; top: 16px; left: 16px; background: #FFFFFF; color: #000000; font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 999px">Digantung asal</div>
+</div>
+<div style="position: absolute; top: 0; bottom: 0; left: {{split}}%; width: 2px; background: #000000; transform: translateX(-1px); pointer-events: none">
+<div class="knob" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 54px; height: 54px; border-radius: 50%; background: #000000; color: #FFFFFF; display: flex; align-items: center; justify-content: center">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6"></path></svg>
+</div>
+</div>
+<label for="ba-range" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Geser perbandingan sebelum dan sesudah</label>
+<input id="ba-range" type="range" min="0" max="100" value="{{split}}" onChange="{{onSplit}}" style="position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize">
+</div>
+<div style="text-align: center; font-size: 14px; color: #3D3D3D">Ilustrasi sementara, nanti diganti foto asli</div>
+</div>
+</div>
+<div class="sheet-gap"></div>
+</div>
+
+<!-- STEPS -->
+<div class="sheet" style="background: #FFFFFF">
+<div class="wrap sec">
+<h2 class="disp h-sec rv" style="font-weight: 900; margin-bottom: 48px">Cara ambil bonusnya.</h2>
+<div class="steps rv" style="border-top: 1.5px solid #000000; border-bottom: 1.5px solid #000000">
+<sc-for list="{{steps}}" as="s" hint-placeholder-count="3">
+<div class="step" style="padding: 36px 32px 40px; display: flex; flex-direction: column; gap: 16px; border-left: {{s.border}}">
+<div class="disp step-n" style="font-size: 120px; font-weight: 900; -webkit-text-stroke: 2px #000000; color: transparent; line-height: 0.8">{{s.n}}</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div class="step-t" style="font-weight: 700; font-size: 22px">{{s.t}}</div>
+<div style="font-size: 16px; color: #3D3D3D; line-height: 1.6; max-width: 22em">{{s.d}}</div>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+
+<!-- COLLECTIONS -->
+<div class="wrap" style="padding-bottom: 110px">
+<div class="rv" style="display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 36px">
+<h2 class="disp h-sec" style="font-weight: 900">Pilih baju pertamamu.</h2>
+<a href="https://www.samaqu.id/katalog" class="hide-m" style="font-weight: 600; font-size: 17px; text-underline-offset: 5px">Lihat semua di katalog</a>
+<span class="only-m" style="font-size: 14px; color: #3D3D3D">Geser untuk lihat koleksi lain</span>
+</div>
+<div class="coll">
+<a href="https://www.samaqu.id/katalog" class="tile coll-big tap" style="text-decoration: none; color: #000000; display: flex; flex-direction: column; gap: 16px">
+<div class="coll-big-box" style="flex: 1; border-radius: 28px; overflow: hidden; position: relative; background: #EEEDE8">
+<div class="tile-img" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #3D3D3D; font-size: 15px">[Foto Thobe]</div>
+<div style="position: absolute; top: 16px; left: 16px; background: #000000; color: #FFFFFF; font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 999px">Best seller</div>
+<div style="position: absolute; bottom: 16px; left: 16px; background: #FFFFFF; color: #000000; font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 999px; border: 1.5px solid #000000">+ Gratis Cover Hanger</div>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div class="disp tile-name" style="font-size: 52px; font-weight: 900">Thobe</div>
+<div style="font-size: 16px; color: #3D3D3D; line-height: 1.5">Potongan panjang yang bikin tampil rapi dan berwibawa.</div>
+</div>
+<span class="tile-pill" style="flex-shrink: 0; height: 50px; padding: 0 20px; border-radius: 999px; background: #000000; color: #FFFFFF; display: inline-flex; align-items: center; font-weight: 600; font-size: 15px">Lihat Thobe</span>
+</div>
+</a>
+<sc-for list="{{collections}}" as="c" hint-placeholder-count="2">
+<a href="https://www.samaqu.id/katalog" class="tile tap" style="text-decoration: none; color: #000000; display: flex; flex-direction: column; gap: 16px">
+<div class="tile-box" style="aspect-ratio: 16 / 10; border-radius: 28px; overflow: hidden; position: relative; background: #EEEDE8">
+<div class="tile-img" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #3D3D3D; font-size: 15px">[Foto {{c.name}}]</div>
+<div style="position: absolute; bottom: 16px; left: 16px; background: #FFFFFF; color: #000000; font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 999px; border: 1.5px solid #000000">+ Gratis Cover Hanger</div>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div class="disp tile-name" style="font-size: 40px; font-weight: 900">{{c.name}}</div>
+<div style="font-size: 15px; color: #3D3D3D; line-height: 1.5">{{c.d}}</div>
+</div>
+<span class="tile-pill" style="flex-shrink: 0; height: 46px; padding: 0 18px; border-radius: 999px; border: 1.5px solid #000000; display: inline-flex; align-items: center; font-weight: 600; font-size: 15px">Lihat {{c.name}}</span>
+</div>
+</a>
+</sc-for>
+</div>
+</div>
+<div class="sheet-gap"></div>
+</div>
+
+<!-- TERMS AS A GARMENT TAG -->
+<div class="sheet" style="background: #000000; color: #FFFFFF">
+<div class="wrap sec two">
+<div class="rv" style="display: flex; flex-direction: column; gap: 20px">
+<h2 class="disp h-sec" style="font-weight: 900">Syaratnya simpel.</h2>
+<p style="margin: 0; font-size: 18px; line-height: 1.7; color: #C8C8C3; max-width: 28em">Khusus pelanggan yang pertama kali berbelanja di SAMAQU. Selama kuota bonus masih tersedia, Cover Hanger otomatis diberikan untuk pesanan pertamamu. Satu pelanggan, satu Cover Hanger.</p>
+</div>
+<div class="rv" style="justify-self: center; width: 100%; max-width: 440px">
+<div class="tag" style="background: #FFFFFF; color: #000000; border-radius: 22px; padding: 60px 30px 30px; position: relative; transform: rotate(-2deg)">
+<div style="position: absolute; top: 22px; left: 50%; transform: translateX(-50%); width: 22px; height: 22px; border-radius: 50%; background: #000000"></div>
+<div class="disp" style="font-size: 38px; font-weight: 900; text-align: center; padding-bottom: 18px; border-bottom: 1.5px dashed #000000">Bonus pelanggan baru</div>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{terms}}" as="t" hint-placeholder-count="4">
+<div style="display: flex; justify-content: space-between; gap: 16px; padding: 15px 0; border-bottom: 1px solid #D6D5CF; font-size: 15px">
+<span style="color: #3D3D3D">{{t.k}}</span>
+<span style="font-weight: 700; text-align: right">{{t.v}}</span>
+</div>
+</sc-for>
+</div>
+<div style="padding-top: 16px; font-size: 13px; color: #3D3D3D; text-align: center">Dicek dari nomor WhatsApp yang dipakai saat order</div>
+</div>
+</div>
+</div>
+<div class="sheet-gap"></div>
+</div>
+
+<!-- FAQ -->
+<div class="sheet" style="background: #FFFFFF">
+<div class="wrap sec two" style="align-items: start">
+<div class="rv" style="display: flex; flex-direction: column; gap: 18px">
+<h2 class="disp h-sec" style="font-weight: 900">Yang sering ditanyain.</h2>
+<p style="margin: 0; font-size: 18px; color: #3D3D3D; line-height: 1.7; max-width: 26em">Belum ketemu jawabannya? Admin kami balas di WhatsApp.</p>
+<a href="https://wa.me/62895635965400" class="btn-line" style="align-self: flex-start; border: 1.5px solid #000000; color: #000000; text-decoration: none; font-weight: 600; font-size: 16px; padding: 0 24px; height: 52px; border-radius: 999px; display: inline-flex; align-items: center">Chat Admin</a>
+</div>
+<div style="display: flex; flex-direction: column; border-top: 1.5px solid #000000">
+<sc-for list="{{faqs}}" as="f" hint-placeholder-count="6">
+<div style="border-bottom: 1.5px solid #000000">
+<button type="button" class="faq-q" onClick="{{f.toggle}}" aria-expanded="{{f.open}}" style="width: 100%; background: none; border: none; text-align: left; padding: 24px 0; display: flex; justify-content: space-between; align-items: center; gap: 20px; cursor: pointer; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 18px; font-weight: 600; color: #000000; min-height: 44px">
+<span>{{f.q}}</span>
+<span style="flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; background: {{f.bg}}; color: {{f.fg}}; border: 1.5px solid #000000; display: flex; align-items: center; justify-content: center; transition: background .25s ease">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transition: transform .3s ease; transform: {{f.rot}}"><path d="M12 5v14M5 12h14"></path></svg>
+</span>
+</button>
+<sc-if value="{{f.open}}" hint-placeholder-val="{{ false }}">
+<div class="fu faq-a" style="animation-delay: 0s; padding: 0 56px 26px 0; font-size: 16px; color: #3D3D3D; line-height: 1.7">{{f.a}}</div>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+
+<!-- CLOSING -->
+<div style="border-top: 1.5px solid #000000">
+<div class="wrap sec" style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 28px">
+<h2 class="disp rv" style="font-weight: 900; font-size: clamp(54px, 10cqw, 150px)">Jadikan pembelian pertamamu<br><span style="-webkit-text-stroke: 2.5px #000000; color: transparent">lebih istimewa.</span></h2>
+<p style="margin: 0; font-size: 19px; color: #3D3D3D; max-width: 32em; line-height: 1.6">Pilih baju favoritmu dan dapatkan Cover Hanger gratis selama kuota masih tersedia.</p>
+<div class="cta-row" style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; width: 100%">
+<a href="https://www.samaqu.id/katalog" class="btn-ink" style="background: #000000; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 17px; padding: 0 32px; height: 60px; border-radius: 999px; display: inline-flex; align-items: center">Pilih Baju &amp; Ambil Bonus</a>
+<a href="https://wa.me/62895635965400" class="btn-line" style="color: #000000; border: 1.5px solid #000000; text-decoration: none; font-weight: 600; font-size: 17px; padding: 0 28px; height: 60px; box-sizing: border-box; border-radius: 999px; display: inline-flex; align-items: center">Order lewat WhatsApp</a>
+</div>
+</div>
+</div>
+</div>
+
+<!-- FOOTER -->
+<div style="background: #000000; color: #FFFFFF">
+<div class="wrap footer-pad" style="padding-top: 36px; padding-bottom: 60px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
+<div class="disp" style="font-size: 30px; letter-spacing: 0.14em; line-height: 1">SAMAQU</div>
+<div style="font-size: 15px; color: #BDBDB8">Untuk orang biasa yang sedang bertumbuh.</div>
+</div>
+</div>
+
+<!-- STICKY MOBILE BAR -->
+<div class="sticky-cta" style="background: rgba(255,255,255,0.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid #D6D5CF; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); gap: 10px; align-items: center">
+<div style="display: flex; flex-direction: column; gap: 2px; padding-left: 4px; flex-shrink: 0">
+<span style="font-size: 12px; color: #3D3D3D">Sisa bonus</span>
+<span class="disp" style="font-size: 24px; font-weight: 900; line-height: 1">{{sisa}}/{{total}}</span>
+</div>
+<a href="https://www.samaqu.id/katalog" class="tap" style="flex: 1; background: #000000; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 15px; height: 50px; border-radius: 999px; display: flex; align-items: center; justify-content: center">Ambil Bonus</a>
+<a href="https://wa.me/62895635965400" class="tap" aria-label="Chat WhatsApp SAMAQU" style="width: 50px; height: 50px; flex-shrink: 0; box-sizing: border-box; border-radius: 50%; border: 1.5px solid #000000; display: flex; align-items: center; justify-content: center; color: #000000; background: #FFFFFF">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.5A8.4 8.4 0 1 1 21 11.5z"></path></svg>
+</a>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"sisaKuota":{"editor":"int","default":63,"min":0,"max":1000,"section":"Kuota"},"totalKuota":{"editor":"int","default":100,"min":1,"max":1000,"section":"Kuota"},"$preview":{"width":1440,"height":6600}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { split: 50, openFaq: 0 };
+  }
+  renderVals() {
+    const total = Math.max(1, this.props.totalKuota ?? 100);
+    const sisa = Math.min(total, Math.max(0, this.props.sisaKuota ?? 63));
+    const split = this.state.split;
+    const faqData = [
+      { q: 'Gimana caranya tahu saya pelanggan baru?', a: 'Kami cek dari nomor WhatsApp yang kamu pakai waktu order. Kalau nomor itu belum pernah belanja di SAMAQU, Cover Hanger otomatis masuk ke pesananmu dengan harga Rp0.' },
+      { q: 'Perlu masukin kode promo?', a: 'Nggak perlu. Bonusnya masuk otomatis waktu checkout, selama kuota masih ada.' },
+      { q: 'Beli dua baju, dapat dua Cover Hanger?', a: 'Bonusnya satu Cover Hanger per pelanggan, berapa pun jumlah baju di pesanan pertamamu.' },
+      { q: 'Kalau order lewat WhatsApp, tetap dapat?', a: 'Tetap dapat. Admin yang masukkan bonusnya ke pesananmu, asal ini pembelian pertamamu.' },
+      { q: 'Cover Hanger bisa dibeli terpisah?', a: 'Bisa. Cover Hanger ada di katalog seharga Rp35.000, cocok kalau mau punya lebih dari satu.' },
+      { q: 'Promonya sampai kapan?', a: 'Sampai kuota bonus habis. Begitu kuotanya habis, program ini selesai.' }
+    ];
+    return {
+      sisa: sisa,
+      total: total,
+      pct: Math.round((sisa / total) * 100),
+      split: split,
+      clipRight: 100 - split,
+      onSplit: (e) => this.setState({ split: Number(e.target.value) }),
+      proof: ['Berlaku untuk Thobe, Kandora, dan Koko', 'Masuk otomatis, tanpa kode promo', 'Order di website atau lewat admin WhatsApp'],
+      benefits: [
+        { t: 'Lebih terlindungi dari debu', d: 'Simpan baju di lemari berminggu-minggu, tetap bersih saat mau dipakai.' },
+        { t: 'Tetap rapi saat disimpan', d: 'Hanger menopang bahu dengan pas, jadi potongan baju nggak melar.' },
+        { t: 'Siap menemani perjalanan', d: 'Tinggal tenteng saat mudik, kondangan, hingga perjalanan umrah.' }
+      ],
+      steps: [
+        { n: '1', t: 'Pilih baju', d: 'Thobe, Kandora, atau Koko di katalog. Pilih ukuran seperti biasa.', border: 'none' },
+        { n: '2', t: 'Checkout atau chat admin', d: 'Lewat website atau WhatsApp. Nggak ada kode yang perlu diingat.', border: '1.5px solid #000000' },
+        { n: '3', t: 'Terima paket + Cover Hanger', d: 'Bonusnya sudah tercatat di pesananmu dan dikirim bareng bajunya.', border: '1.5px solid #000000' }
+      ],
+      collections: [
+        { name: 'Kandora', d: 'Elegan untuk kondangan, kajian, sampai acara kantor.' },
+        { name: 'Koko', d: 'Adem dan ringan, nyaman dipakai ibadah tiap hari.' }
+      ],
+      terms: [
+        { k: 'Untuk', v: 'Pelanggan baru' },
+        { k: 'Bonus', v: '1 Cover Hanger' },
+        { k: 'Senilai', v: 'Rp35.000' },
+        { k: 'Berlaku di', v: 'Thobe, Kandora, Koko' },
+        { k: 'Berlaku', v: 'Selama kuota ada' }
+      ],
+      faqs: faqData.map((f, i) => {
+        const open = this.state.openFaq === i;
+        return {
+          q: f.q,
+          a: f.a,
+          open: open,
+          rot: open ? 'rotate(45deg)' : 'rotate(0deg)',
+          bg: open ? '#000000' : '#FFFFFF',
+          fg: open ? '#FFFFFF' : '#000000',
+          toggle: () => this.setState({ openFaq: this.state.openFaq === i ? -1 : i })
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

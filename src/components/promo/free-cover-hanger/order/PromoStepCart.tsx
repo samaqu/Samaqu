@@ -62,6 +62,9 @@ export default function PromoStepCart({
   extraCover,
   onToggleExtra,
   addonAvailable,
+  addonCover,
+  addonCoverOptions,
+  onSelectAddonCover,
   itemsWeight,
   addonWeight,
   totalWeight,
@@ -77,6 +80,11 @@ export default function PromoStepCart({
   onToggleExtra: (next: boolean) => void;
   /** false = stok varian katalog habis → kartu add-on tampil "Habis" dan tidak bisa dipilih. */
   addonAvailable: boolean;
+  /** Jenis cover bonus yang dipakai (sudah termasuk pilihan awal otomatis). */
+  addonCover: string;
+  /** Pilihan yang bisa diklik customer, dengan status stok masing-masing. */
+  addonCoverOptions: { color: string; label: string; available: boolean; stock: number | null }[];
+  onSelectAddonCover: (color: string) => void;
   /** Berat barang saja (gram) — tanpa add-on. */
   itemsWeight: number;
   /** Berat add-on Cover & Hanger (gram) bila dipilih. */
@@ -177,6 +185,42 @@ export default function PromoStepCart({
           <span className="text-[18px] font-extrabold">{addonAvailable ? "GRATIS" : "—"}</span>
         </div>
       </div>
+
+      {/* Pilihan jenis cover bonus — pilihan awal sudah terisi otomatis dari isi pesanan,
+          customer boleh menggantinya. Tetap gratis; yang dipilih hanya jenis covernya. */}
+      {addonAvailable && (
+        <div className="mt-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.06em]" style={{ color: MUTED }}>
+            Pilih jenis cover
+          </p>
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Jenis cover bonus">
+            {addonCoverOptions.map((option) => {
+              const active = option.color === addonCover;
+              return (
+                <button
+                  key={option.color}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  disabled={!option.available}
+                  onClick={() => onSelectAddonCover(option.color)}
+                  className="rounded-xl px-3 py-2.5 text-left text-[12px] font-semibold transition disabled:opacity-40"
+                  style={{
+                    background: active ? "#000" : "#fff",
+                    color: active ? "#fff" : "#000",
+                    border: `1.5px solid ${active ? "#000" : "rgba(0,0,0,.25)"}`,
+                  }}
+                >
+                  <span className="block leading-tight">{option.label}</span>
+                  <span className="mt-0.5 block text-[10.5px] font-medium opacity-70">
+                    {option.available ? `Stok ${option.stock ?? 0}` : "Habis"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Ringkasan */}
       <div className="mt-6 rounded-2xl p-5" style={{ background: FIELD_BG, border: "1px solid rgba(0,0,0,.25)" }}>

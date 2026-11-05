@@ -12,6 +12,8 @@ export interface ProductDraft {
 
 export interface CartLine extends ProductDraft {
   key: number;
+  /** Kategori produk (dari katalog) — dipakai menentukan pilihan awal cover add-on. */
+  category?: string | null;
 }
 
 export interface CustomerData {
