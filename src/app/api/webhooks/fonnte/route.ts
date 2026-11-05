@@ -34,7 +34,31 @@ async function readPayload(req: NextRequest): Promise<Record<string, unknown>> {
   return out;
 }
 
-function checkKey(req: NextRequest): NextResponse | null {
+/**
+ * Catat panggilan yang tidak jadi pesan masuk (kunci salah, grup, pesan sendiri).
+ * Berguna saat menelusuri "kenapa webhook tidak masuk": status `skipped` tidak
+ * pernah diambil agent, jadi tidak mengganggu antrean balasan.
+ */
+async function recordSkipped(reason: string, payload: Record<string, unknown>) {
+  try {
+    await getSupabaseAdmin()
+      .from("wa_inbox")
+      .insert({
+        dedupe_key: `debug-${crypto.randomUUID()}`,
+        device: String(payload.device ?? "") || null,
+        sender: String(payload.sender ?? payload.target ?? "") || "unknown",
+        sender_name: String(payload.name ?? "") || null,
+        message: String(payload.message ?? payload.text ?? "").slice(0, 500) || "(kosong)",
+        is_group: reason.includes("grup"),
+        status: "skipped",
+        error: reason,
+      });
+  } catch (e) {
+    console.error("[WA-INBOX] gagal mencatat skip:", e);
+  }
+}
+
+async function checkKey(req: NextRequest): Promise<NextResponse | null> {
   const secret = process.env.FONNTE_WEBHOOK_SECRET || "";
   const given =
     req.nextUrl.searchParams.get("key") || req.headers.get("x-webhook-key") || "";
@@ -43,6 +67,7 @@ function checkKey(req: NextRequest): NextResponse | null {
     return NextResponse.json({ error: "Webhook belum dikonfigurasi" }, { status: 500 });
   }
   if (given !== secret) {
+    await recordSkipped(`kunci webhook salah (diterima: ${given.slice(0, 40) || "kosong"})`, {});
     return NextResponse.json({ error: "Kunci webhook salah" }, { status: 401 });
   }
   return null;
@@ -50,13 +75,13 @@ function checkKey(req: NextRequest): NextResponse | null {
 
 /** Fonnte mewajibkan URL webhook menerima POST dan GET (GET dipakai untuk uji URL). */
 export async function GET(req: NextRequest) {
-  const rejected = checkKey(req);
+  const rejected = await checkKey(req);
   if (rejected) return rejected;
   return NextResponse.json({ ok: true, endpoint: "wa-inbox" });
 }
 
 export async function POST(req: NextRequest) {
-  const rejected = checkKey(req);
+  const rejected = await checkKey(req);
   if (rejected) return rejected;
 
   try {
@@ -72,11 +97,20 @@ export async function POST(req: NextRequest) {
     const name = String(body.name ?? "").trim();
     const timestamp = Number(body.timestamp) || 0;
 
-    if (!sender) return NextResponse.json({ ok: true, skipped: "sender kosong" });
-    if (device && sender === device) return NextResponse.json({ ok: true, skipped: "pesan sendiri" });
+    if (!sender) {
+      await recordSkipped("sender kosong", body);
+      return NextResponse.json({ ok: true, skipped: "sender kosong" });
+    }
+    if (device && sender === device) {
+      await recordSkipped("pesan sendiri (dari nomor device)", body);
+      return NextResponse.json({ ok: true, skipped: "pesan sendiri" });
+    }
 
     const isGroup = Boolean(member) || /@g\.us$/i.test(senderRaw) || senderRaw.includes("-");
-    if (isGroup) return NextResponse.json({ ok: true, skipped: "pesan grup" });
+    if (isGroup) {
+      await recordSkipped("pesan grup", body);
+      return NextResponse.json({ ok: true, skipped: "pesan grup" });
+    }
 
     const dedupeKey =
       inboxid ||
