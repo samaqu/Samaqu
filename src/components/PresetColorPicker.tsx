@@ -20,7 +20,17 @@ export default function PresetColorPicker({ existing, onAdd }: PresetColorPicker
   function addCustomColor() {
     const nama = customColorName.trim();
     if (!nama) { alert("Nama warna wajib diisi."); return; }
-    if (usedKeys.has(nama.toLowerCase())) { alert(`Warna "${nama}" sudah ada.`); return; }
+    if (usedKeys.has(nama.toLowerCase())) {
+      // Sebutkan bentuk yang sudah ada supaya admin tahu harus mengedit yang mana,
+      // bukan sekadar "sudah ada" tanpa petunjuk.
+      const kembar = existing.find((c) => c.toLowerCase() === nama.toLowerCase());
+      alert(
+        kembar && kembar !== nama
+          ? `Warna "${nama}" sudah ada sebagai "${kembar}". Nama varian tidak boleh sama walau beda huruf besar/kecil. Untuk mengganti nama, klik nama variannya lalu ubah.`
+          : `Warna "${nama}" sudah ada. Klik variannya untuk mengubah nama.`
+      );
+      return;
+    }
     onAdd(nama, customHex);
     setCustomColorName("");
   }
@@ -30,7 +40,7 @@ export default function PresetColorPicker({ existing, onAdd }: PresetColorPicker
   return (
     <div className="w-full rounded-xl p-3" style={{ border: "1px dashed rgba(0,0,0,.4)", background: "rgba(255,255,255,.4)" }}>
       <p className="text-[11px] font-medium mb-2" style={{ color: "var(--text-muted)" }}>
-        Pilih warna yang tersedia
+        Klik warna untuk menambahkannya — bisa lebih dari satu, semuanya tersimpan saat simpan.
       </p>
       {presets.length > 0 ? (
         <div className="flex flex-wrap gap-1.5 mb-2">

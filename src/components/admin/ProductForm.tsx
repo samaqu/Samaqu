@@ -647,6 +647,9 @@ export default function TambahProdukPage({
   // Variants
   const [variants, setVariants] = useState<Variant[]>([]);
   const [activeColor, setActiveColor] = useState<string | null>(null);
+  /** Nama varian yang sedang diedit (klik nama chip) + teks sementaranya. */
+  const [editingColor, setEditingColor] = useState<string | null>(null);
+  const [colorDraft, setColorDraft] = useState("");
   /** Produk SAMAQU biasa: satu varian `default`, warna ada di nama produk. */
   const onlyDefaultVariant =
     variants.length === 1 && String(variants[0]?.color || "").trim().toLowerCase() === "default";
@@ -974,6 +977,59 @@ export default function TambahProdukPage({
     setVariants(variants.filter((v) => v.color !== color));
     setMedia(media.filter((m) => m.color !== color));
     if (activeColor === color) setActiveColor(variants[0]?.color || null);
+  }
+
+  /**
+   * Ganti NAMA varian tanpa menghapus barisnya.
+   *
+   * Dulu satu-satunya cara mengubah nama adalah hapus lalu tambah baru — itu membuang stok,
+   * berat, SKU, dan ID baris. Fungsi ini hanya mengganti `color`, jadi seluruh ukuran dan
+   * stoknya tetap, dan saat simpan barisnya di-update lewat `id` (bukan insert).
+   *
+   * Nama baru ditolak kalau bentrok dengan varian lain tanpa membedakan huruf besar/kecil —
+   * sama dengan aturan unique index di database.
+   */
+  function renameColor(oldColor: string, nextRaw: string): { ok: boolean; message?: string } {
+    const next = nextRaw.trim();
+    if (!next) return { ok: false, message: "Nama varian tidak boleh kosong." };
+    if (next === oldColor) return { ok: true };
+
+    const clash = variants.find(
+      (v) => v.color !== oldColor && v.color.toLowerCase() === next.toLowerCase()
+    );
+    if (clash) {
+      return {
+        ok: false,
+        message: `Warna "${next}" sudah ada sebagai "${clash.color}". Nama varian tidak boleh sama walau beda huruf besar/kecil.`,
+      };
+    }
+
+    setVariants((prev) => prev.map((v) => (v.color === oldColor ? { ...v, color: next } : v)));
+    // Foto ikut pindah nama supaya tidak jadi media yatim.
+    setMedia((prev) => prev.map((m) => (m.color === oldColor ? { ...m, color: next } : m)));
+    if (activeColor === oldColor) setActiveColor(next);
+    if (paketMediaColor === oldColor) setPaketMediaColor(next);
+    return { ok: true };
+  }
+
+  /** Mulai mengedit nama varian (klik pada nama di chip). */
+  function startRename(color: string) {
+    setEditingColor(color);
+    setColorDraft(color);
+  }
+
+  /**
+   * Simpan nama baru. Kalau ditolak (kosong / bentrok), `editingColor` DIBIARKAN aktif
+   * supaya admin bisa langsung memperbaiki, bukan kehilangan ketikannya.
+   */
+  function commitRename(oldColor: string) {
+    const result = renameColor(oldColor, colorDraft);
+    if (!result.ok) {
+      alert(result.message);
+      return;
+    }
+    setEditingColor(null);
+    setColorDraft("");
   }
 
   // Add size to variant
@@ -2545,17 +2601,51 @@ export default function TambahProdukPage({
                 <>
                   {/* Color chips — disembunyikan untuk produk default SAMAQU. */}
                   {!onlyDefaultVariant ? (
-                    <div className="flex flex-wrap gap-2 mb-4">
+                    <div className="mb-4">
+                      <p className="text-[11px] font-medium mb-2" style={{ color: "var(--text-muted)" }}>
+                        Varian warna — klik nama untuk mengganti, klik <b>×</b> untuk menghapus seluruh varian itu beserta ukurannya.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
                       {variants.map((v) => (
-                        <button key={v.color} onClick={() => { setActiveColor(v.color); setPreviewIndex(0); }} className={`pf-chip${activeColor === v.color ? " active" : ""}`}>
-                          <span className="w-3 h-3 rounded-full" style={{ background: v.hex || colorMap[v.color] || "#ccc", border: "1px solid rgba(42,33,27,.1)" }} />
-                          {v.color}
-                          {/* Hapus warna memakai span role="button" — kontrol bersarang di dalam
-                              tombol chip membuat React melaporkan hydration error. */}
-                          <span role="button" tabIndex={0} aria-label={`Hapus warna ${v.color}`} onClick={(e) => { e.stopPropagation(); removeColor(v.color); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); removeColor(v.color); } }} className="ml-1 hover:opacity-60"><X size={12} /></span>
-                        </button>
+                        editingColor === v.color ? (
+                          <span key={v.color} className="pf-chip active" style={{ gap: 6 }}>
+                            <span className="w-3 h-3 rounded-full" style={{ background: v.hex || colorMap[v.color] || "#ccc", border: "1px solid rgba(42,33,27,.1)" }} />
+                            <input
+                              autoFocus
+                              value={colorDraft}
+                              onChange={(e) => setColorDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") { e.preventDefault(); commitRename(v.color); }
+                                else if (e.key === "Escape") { e.preventDefault(); setEditingColor(null); }
+                              }}
+                              onBlur={() => commitRename(v.color)}
+                              aria-label={`Nama varian ${v.color}`}
+                              className="w-[110px] bg-transparent outline-none text-[12px] font-semibold"
+                              style={{ color: "inherit" }}
+                            />
+                          </span>
+                        ) : (
+                          <button key={v.color} onClick={() => { setActiveColor(v.color); setPreviewIndex(0); }} className={`pf-chip${activeColor === v.color ? " active" : ""}`}>
+                            <span className="w-3 h-3 rounded-full" style={{ background: v.hex || colorMap[v.color] || "#ccc", border: "1px solid rgba(42,33,27,.1)" }} />
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              title="Klik untuk mengganti nama varian"
+                              aria-label={`Ganti nama varian ${v.color}`}
+                              onClick={(e) => { e.stopPropagation(); startRename(v.color); }}
+                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); startRename(v.color); } }}
+                              className="hover:underline"
+                            >
+                              {v.color}
+                            </span>
+                            {/* Hapus warna memakai span role="button" — kontrol bersarang di dalam
+                                tombol chip membuat React melaporkan hydration error. */}
+                            <span role="button" tabIndex={0} title={`Hapus varian ${v.color}`} aria-label={`Hapus warna ${v.color}`} onClick={(e) => { e.stopPropagation(); removeColor(v.color); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); removeColor(v.color); } }} className="ml-1 hover:opacity-60"><X size={12} /></span>
+                          </button>
+                        )
                       ))}
                       <PresetColorPicker existing={variants.map((v) => v.color)} onAdd={addColor} />
+                      </div>
                     </div>
                   ) : null}
                   {activeVariant && (
