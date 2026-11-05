@@ -443,16 +443,34 @@ export async function POST(request: NextRequest) {
     // ── Potong stok (atomik, rollback kalau ada yang gagal) ──
     // Sama seperti checkout website: stok dikurangi DULU, baru pesanan disimpan. Stok ini stok
     // yang sama dengan menu Produk, jadi otomatis sinkron.
+    //
+    // `orderId` dibuat SEBELUM potong stok: dipakai `ref_id` untuk komponen (box kabak) dan
+    // dikirim eksplisit saat insert, jadi ref tidak pernah berubah.
+    const orderId = crypto.randomUUID();
     const decremented: Array<{ productId: string; color: string; size: string; quantity: number }> = [];
 
     async function rollbackStock() {
       for (const item of decremented) {
-        await supabaseAdmin.rpc("samaqu_restore_stock", {
+        const { error: restoreError } = await supabaseAdmin.rpc("samaqu_restore_stock", {
           p_product_id: item.productId,
           p_color: item.color,
           p_size: item.size,
           p_qty: item.quantity,
+          p_ref_type: "component",
+          p_ref_id: orderId,
         });
+        if (restoreError) {
+          console.error("[OPEN-ORDER] Rollback stok gagal:", { orderId, item, message: restoreError.message });
+          await recordStockAnomaly(supabaseAdmin, {
+            productId: item.productId,
+            color: item.color,
+            size: item.size,
+            qty: item.quantity,
+            reason: "rollback_restore_failed",
+            orderId,
+            source: "open-order-rollback",
+          });
+        }
       }
       decremented.length = 0;
     }
@@ -486,6 +504,8 @@ export async function POST(request: NextRequest) {
         p_color: item.color,
         p_size: item.size,
         p_qty: item.quantity,
+        p_ref_type: "component",
+        p_ref_id: orderId,
       });
 
       if (stockError) {
@@ -523,6 +543,8 @@ export async function POST(request: NextRequest) {
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
       .insert({
+        // id dibuat sebelum potong stok (dipakai ref komponen) → dikirim eksplisit di sini.
+        id: orderId,
         order_number: orderNumber,
         customer_id: customerId,
         customer_name: name,

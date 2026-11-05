@@ -267,16 +267,44 @@ export async function POST(request: NextRequest) {
     // Stok dikurangi DULU secara atomik (RPC samaqu_decrement_stock, row lock FOR UPDATE
     // + guard stock >= qty). Kalau ada item gagal, semua decrement di-rollback & order ditolak.
     // Race condition 2 pembeli checkout stok terakhir: hanya 1 yang dapat decrement.
+    //
+    // `orderId` dibuat SEBELUM potong stok karena dipakai sebagai `ref_id` untuk komponen
+    // (box kabak). `orders.id` menerima id dari luar (default hanya cadangan), jadi id ini
+    // dipakai apa adanya saat insert — ref tidak pernah berubah antara potong dan simpan.
+    const orderId = crypto.randomUUID();
     const decremented: Array<{ productId: string; color?: string; size?: string; quantity: number }> = [];
 
     async function rollbackStock() {
       for (const d of decremented) {
-        await supabase.rpc("samaqu_restore_stock", {
+        const { error: restoreError } = await supabase.rpc("samaqu_restore_stock", {
           p_product_id: d.productId,
           p_color: d.color || "",
           p_size: d.size || "",
           p_qty: d.quantity,
+          p_ref_type: "component",
+          p_ref_id: orderId,
         });
+        // Pengembalian yang gagal TIDAK boleh dianggap sukses — tanpa ini stok bisa
+        // tertinggal terpotong. Dicatat supaya terlihat di halaman Anomali Stok.
+        if (restoreError) {
+          console.error("[ORDERS] Rollback stok gagal:", {
+            orderId,
+            productId: d.productId,
+            color: d.color,
+            size: d.size,
+            qty: d.quantity,
+            message: restoreError.message,
+          });
+          await recordStockAnomaly(supabase, {
+            productId: d.productId,
+            color: d.color ?? "",
+            size: d.size ?? "",
+            qty: d.quantity,
+            reason: "rollback_restore_failed",
+            orderId,
+            source: "orders-rollback",
+          });
+        }
       }
       decremented.length = 0;
     }
@@ -319,6 +347,8 @@ export async function POST(request: NextRequest) {
         p_color: item.color,
         p_size: item.size,
         p_qty: item.quantity,
+        p_ref_type: "component",
+        p_ref_id: orderId,
       });
 
       if (stockError) {
@@ -368,6 +398,9 @@ export async function POST(request: NextRequest) {
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .insert({
+        // id dibuat di awal (sebelum potong stok) dan dipakai eksplisit di sini, supaya
+        // `ref_id` komponen di stock_movements menunjuk ke order yang benar-benar tersimpan.
+        id: orderId,
         order_number: orderNumber,
         customer_id: linkedCustomerId,
         customer_name: customer.name,

@@ -91,12 +91,19 @@ export async function cancelOrderCompletely(
     );
 
     for (const item of restored) {
-      await supabase.rpc("samaqu_restore_stock", {
+      // `ref_id = order.id` supaya komponen (box kabak) ikut dikembalikan sebesar yang
+      // benar-benar dulu terpotong untuk order ini. Order lama tanpa baris komponen → 0.
+      const { error: restoreError } = await supabase.rpc("samaqu_restore_stock", {
         p_product_id: item.product_id,
         p_color: item.color,
         p_size: item.size,
         p_qty: item.quantity,
+        p_ref_type: "component",
+        p_ref_id: order.id,
       });
+      if (restoreError) {
+        console.error("[CANCEL] Rollback stok gagal:", { orderId: order.id, item, message: restoreError.message });
+      }
     }
 
     // Pengembalian stok DICATAT sebagai baris "Barang Masuk" (menu Produk → tab Barang Masuk)

@@ -63,7 +63,8 @@ export default function ResellerEditItemModal({
       }),
     );
 
-    base44.entities.ProductVariant.list()
+    // `"sale"` → sembunyikan produk komponen (mis. Box Kabak) dari pemilih produk jual.
+    base44.entities.ProductVariant.list("sale")
       .then((rows: any[]) => {
         if (!alive) return;
         const map: Record<string, VariantGroup[]> = {};

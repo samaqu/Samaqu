@@ -97,6 +97,28 @@ async function syncProductSeries(admin: Admin, productId: string, seriesName?: s
 export async function GET(req: NextRequest) {
   if (!(await isOpsAdmin(req))) return unauthorized();
 
+  /*
+   * `?for=sale` → buang produk yang berperan sebagai KOMPONEN (mis. Box Kabak).
+   *
+   * Endpoint ini dipakai BERSAMA: pemilih produk jual (Tambah/Ubah Transaksi) dan halaman
+   * yang memang harus melihat komponen (Barang Masuk, Laporan Stok, Produk, Retur). Karena
+   * itu filternya OPSIONAL lewat parameter — tanpa parameter, perilakunya sama seperti dulu.
+   *
+   * Sumber daftar komponen = tabel `product_components`, bukan id yang di-hardcode, supaya
+   * komponen lain otomatis ikut tersaring.
+   */
+  const forSale = new URL(req.url).searchParams.get("for") === "sale";
+  let componentIds = new Set<string>();
+  if (forSale) {
+    const { data: components } = await getSupabaseAdmin()
+      .from("product_components")
+      .select("component_product_id")
+      .eq("is_active", true);
+    componentIds = new Set(
+      (components ?? []).map((c) => String(c.component_product_id)).filter(Boolean)
+    );
+  }
+
   const admin = getSupabaseAdmin();
   const [{ data: products }, { data: rows }] = await Promise.all([
     // `weight` = berat produk (gram), fallback kalau berat per ukuran kosong.
@@ -188,7 +210,12 @@ export async function GET(req: NextRequest) {
   // → warna → series urut tetap. Lihat src/lib/ops-order.ts.
   items.sort((a, b) => compareOpsRows(variantSortKey(a), variantSortKey(b)));
 
-  return NextResponse.json({ items });
+  // `?for=sale`: sembunyikan produk yang berperan sebagai komponen (mis. Box Kabak).
+  const visible = forSale && componentIds.size > 0
+    ? items.filter((item: any) => !componentIds.has(String(item.product_id)))
+    : items;
+
+  return NextResponse.json({ items: visible });
 }
 
 /** Tambah varian baru (satu baris = satu kombinasi produk + warna). */

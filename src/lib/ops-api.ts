@@ -28,8 +28,9 @@ async function call<T = any>(method: string, path: string, body?: unknown): Prom
   return json as T;
 }
 
-async function fetchVariants(): Promise<any[]> {
-  const json = await call<{ items: any[] }>("GET", VARIANTS);
+async function fetchVariants(for_?: string): Promise<any[]> {
+  const qs = for_ ? `?for=${encodeURIComponent(for_)}` : "";
+  const json = await call<{ items: any[] }>("GET", `${VARIANTS}${qs}`);
   return json.items ?? [];
 }
 
@@ -145,8 +146,15 @@ export const base44 = {
     },
 
     ProductVariant: {
-      async list(_sort?: string) {
-        return fetchVariants();
+      /**
+       * `for` = "sale" → hanya produk yang boleh DIJUAL.
+       *
+       * Produk yang berperan sebagai komponen (mis. Box Kabak) disembunyikan dari pemilih
+       * produk jual. Tanpa argumen, perilakunya sama seperti dulu (semua varian tampil),
+       * karena halaman Barang Masuk / Laporan Stok / Retur memang perlu melihat komponen.
+       */
+      async list(for_?: "sale" | string) {
+        return fetchVariants(for_);
       },
       /** Varian milik satu produk (dipakai form edit produk). */
       async filter(query: any = {}) {

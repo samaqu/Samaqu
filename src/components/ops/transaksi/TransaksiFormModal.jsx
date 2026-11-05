@@ -318,7 +318,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
 
   const { data: variants = [], isSuccess: variantsLoaded } = useQuery({
     queryKey: ["transaksi", "variants"],
-    queryFn: () => base44.entities.ProductVariant.list(),
+    // `"sale"` → hanya produk yang boleh dijual. Produk komponen (mis. Box Kabak)
+    // disembunyikan supaya tidak bisa ditawarkan sebagai item berbayar.
+    queryFn: () => base44.entities.ProductVariant.list("sale"),
     enabled: isOpen,
     staleTime: 30_000,
   });

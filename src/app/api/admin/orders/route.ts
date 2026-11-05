@@ -606,11 +606,15 @@ export async function DELETE(request: NextRequest) {
     if (orderItems && orderItems.length > 0 && fullOrder?.status === "pending" && fullOrder?.stock_reserved === true) {
       for (const item of orderItems) {
         if (item.product_id && item.color && item.size && item.quantity) {
+          // `ref_id = order.id` supaya komponen (box kabak) ikut dikembalikan sebesar
+          // yang dulu benar-benar terpotong untuk order ini.
           await supabaseAdmin.rpc("samaqu_restore_stock", {
             p_product_id: item.product_id,
             p_color: item.color,
             p_size: item.size,
             p_qty: item.quantity,
+            p_ref_type: "component",
+            p_ref_id: uuidId,
           });
         }
       }

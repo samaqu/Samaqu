@@ -32,6 +32,11 @@ const REASON_LABEL: Record<string, string> = {
   increment_variant_not_found: "Tambah ke varian tidak ada",
   increment_insufficient_stock: "Tarik stok, sisa kurang",
   insufficient_stock: "Stok tidak cukup",
+  // Komponen (box kabak)
+  component_missing_ref: "Komponen tanpa referensi order",
+  component_out_of_stock: "Komponen habis",
+  component_variant_not_found: "Varian komponen tidak ada",
+  rollback_restore_failed: "Rollback stok gagal",
 };
 
 const REASON_TONE: Record<string, string> = {
@@ -42,6 +47,10 @@ const REASON_TONE: Record<string, string> = {
   increment_variant_not_found: "bg-amber-100 text-amber-800",
   increment_insufficient_stock: "bg-orange-100 text-orange-800",
   insufficient_stock: "bg-orange-100 text-orange-800",
+  component_missing_ref: "bg-slate-200 text-slate-700",
+  component_out_of_stock: "bg-orange-100 text-orange-800",
+  component_variant_not_found: "bg-red-100 text-red-700",
+  rollback_restore_failed: "bg-red-100 text-red-700",
 };
 
 function reasonLabel(reason: string) {

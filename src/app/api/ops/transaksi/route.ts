@@ -8,7 +8,7 @@ import { notifyCustomerInvoice } from "@/lib/fonnte";
 import { kotaFromShipping } from "@/lib/kota";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { resolveItemPhotos } from "@/lib/order-photo";
-import { cleanErrorMessage, recordAnomalyFromError } from "@/lib/stock-guard";
+import { cleanErrorMessage, recordAnomalyFromError, recordStockAnomaly } from "@/lib/stock-guard";
 import {
   productWeightMapFromRows,
   resolveLineWeight,
@@ -447,7 +447,14 @@ async function buildEditSnapshot(
 
   return { items };
 }
-async function deductStock(admin: Admin, items: Snapshot[]) {
+/**
+ * Potong stok transaksi ops.
+ *
+ * `orderId` WAJIB dikirim: dipakai sebagai `ref_id` komponen (box kabak) di
+ * stock_movements. Id ini dibuat sebelum pemotongan dan dipakai apa adanya saat insert
+ * order, jadi ref tidak pernah berubah (retry hanya mengganti nomor order, bukan id).
+ */
+async function deductStock(admin: Admin, items: Snapshot[], orderId: string) {
   const done: Snapshot[] = [];
   for (const item of items) {
     const { data, error } = await admin.rpc("samaqu_decrement_stock", {
@@ -455,6 +462,8 @@ async function deductStock(admin: Admin, items: Snapshot[]) {
       p_color: item.color,
       p_size: item.size,
       p_qty: item.quantity,
+      p_ref_type: "component",
+      p_ref_id: orderId,
     });
     if (error) return { ok: false as const, done, message: "Gagal memeriksa stok produk" };
     if (data === false) {
@@ -469,14 +478,29 @@ async function deductStock(admin: Admin, items: Snapshot[]) {
   return { ok: true as const, done };
 }
 
-async function restoreStock(admin: Admin, items: Snapshot[]) {
+/** Kembalikan stok yang sudah terpotong saat transaksi gagal — error dicatat, bukan diabaikan. */
+async function restoreStock(admin: Admin, items: Snapshot[], orderId: string) {
   for (const item of items) {
-    await admin.rpc("samaqu_restore_stock", {
+    const { error } = await admin.rpc("samaqu_restore_stock", {
       p_product_id: item.product_id,
       p_color: item.color,
       p_size: item.size,
       p_qty: item.quantity,
+      p_ref_type: "component",
+      p_ref_id: orderId,
     });
+    if (error) {
+      console.error("[OPS] Rollback stok gagal:", { orderId, item, message: error.message });
+      await recordStockAnomaly(admin, {
+        productId: item.product_id,
+        color: item.color,
+        size: item.size,
+        qty: item.quantity,
+        reason: "rollback_restore_failed",
+        orderId,
+        source: "ops-transaksi-rollback",
+      });
+    }
   }
 }
 
@@ -749,9 +773,12 @@ export async function POST(req: NextRequest) {
     const total = subtotal - finalDiscount + shippingCost;
 
     // Stok dipotong sebelum pesanan disimpan — kalau ada yang kurang, tidak ada yang tersimpan.
-    const deducted = await deductStock(admin, items);
+    // `orderId` dibuat DI SINI (sebelum potong) supaya bisa dipakai sebagai ref komponen.
+    // Saat insert nanti hanya `order_number` yang boleh berubah karena bentrok; id tetap.
+    const orderId = crypto.randomUUID();
+    const deducted = await deductStock(admin, items, orderId);
     if (!deducted.ok) {
-      await restoreStock(admin, deducted.done);
+      await restoreStock(admin, deducted.done, orderId);
       return bad(deducted.message);
     }
 
@@ -802,7 +829,9 @@ export async function POST(req: NextRequest) {
     let order: { id: string; order_number: string } | null = null;
     let insertError: { message: string } | null = null;
     for (let attempt = 0; attempt < 5 && !order; attempt += 1) {
-      const candidate = { ...orderRow, order_number: newOrderNumber(createdAt) };
+      // `id` HARUS tetap sama di setiap percobaan — ia sudah dipakai sebagai `ref_id`
+      // komponen saat memotong stok. Retry hanya mengganti `order_number`.
+      const candidate = { ...orderRow, id: orderId, order_number: newOrderNumber(createdAt) };
       const { data, error } = await admin.from("orders").insert(candidate).select("id, order_number").single();
       if (!error) {
         order = data;
@@ -814,7 +843,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!order) {
-      await restoreStock(admin, items);
+      await restoreStock(admin, items, orderId);
       console.error("[OPS] transaksi insert:", insertError?.message);
       return bad("Gagal menyimpan transaksi. Coba lagi.");
     }
@@ -835,7 +864,7 @@ export async function POST(req: NextRequest) {
 
     if (itemsError) {
       await admin.from("orders").delete().eq("id", order.id);
-      await restoreStock(admin, items);
+      await restoreStock(admin, items, order.id);
       console.error("[OPS] transaksi items:", itemsError.message);
       return bad("Gagal menyimpan produk transaksi. Coba lagi.");
     }

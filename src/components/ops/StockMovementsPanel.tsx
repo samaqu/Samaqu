@@ -32,6 +32,10 @@ const SOURCE_LABEL: Record<string, string> = {
   batal: "Pembatalan",
   manual: "Manual",
   koreksi_produksi: "Koreksi Produksi",
+  // Pergerakan komponen (box kabak) yang ikut terpotong/kembali saat produk terjual.
+  // `ref_type = 'component'`; disebut jelas supaya tidak disangka penjualan box.
+  component: "Komponen (dari penjualan)",
+  order: "Komponen (dari penjualan)",
 };
 
 function sourceLabel(source?: string | null): string {
