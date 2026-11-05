@@ -112,11 +112,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, skipped: "pesan grup" });
     }
 
-    const dedupeKey =
-      inboxid ||
-      createHash("sha256")
-        .update(`${device}|${sender}|${timestamp}|${message}`)
-        .digest("hex");
+    // `inboxid` dari Fonnte adalah id PERCAKAPAN, bukan id pesan — kalau dipakai
+    // langsung, semua pesan berikutnya dari orang yang sama dianggap duplikat.
+    // Kunci unik dibentuk dari percakapan + waktu kirim + isi, sehingga retry pesan
+    // yang sama tetap terdeteksi, tapi pesan baru di percakapan lama tetap masuk.
+    const dedupeKey = createHash("sha256")
+      .update(`${inboxid}|${device}|${sender}|${timestamp}|${message}`)
+      .digest("hex");
 
     const { error } = await getSupabaseAdmin()
       .from("wa_inbox")
