@@ -2323,12 +2323,17 @@ export default function TambahProdukPage({
                         </div>
                       </div>
 
-                      {/* ── Media (mode admin saja) ── */}
-                      {!isOps && (
+                      {/* ── Media (ops boleh juga; wajib hanya di form admin) ── */}
+                      {(
                       <div>
                         <p className="text-sm font-semibold mb-3" style={{ color: "var(--espresso)" }}>
                           <span style={{ color: "var(--gold)" }}>{sn}</span> — Foto &amp; Video
                         </p>
+                        {isOps && (
+                          <p className="pf-hint mb-2">
+                            Opsional di panel ops — bisa ditambahkan sekarang atau nanti.
+                          </p>
+                        )}
                         {errors[`series_${sn}_media`] && <p className="pf-error mb-2">{errors[`series_${sn}_media`]}</p>}
                         <div className="pf-panel">
                           <label className="pf-drop">
@@ -2676,8 +2681,10 @@ export default function TambahProdukPage({
                 )}
               </div>
 
-              {/* Non-Thobe: Media (mode admin saja) */}
-              {!isOps && (
+              {/* Non-Thobe: Media. Mode ops boleh mengunggah foto juga (opsi tanpa wajib),
+                  supaya produk dari panel-admin tidak perlu dibuka lagi di /admin hanya
+                  untuk menambah gambar. Aturan "foto wajib" tetap hanya di form admin. */}
+              {(
               <div className="pf-card p-5 lg:p-6">
                 <div className="pf-head">
                   <div className="pf-num">3</div>
@@ -2686,6 +2693,11 @@ export default function TambahProdukPage({
                     <p className="pf-sub">{isPaket ? "Foto & video produk per varian (fallback ke semua varian)." : "Foto & video produk per warna."}</p>
                   </div>
                 </div>
+                {isOps && (
+                  <p className="pf-hint mb-3">
+                    Opsional di panel ops — foto bisa ditambahkan sekarang atau nanti. Produk tetap belum tampil di katalog sampai sakelar “Muncul di katalog website” dinyalakan.
+                  </p>
+                )}
                 {errors.media && <p className="pf-error mb-3">{errors.media}</p>}
                 {!activeColor && !isPaket ? (
                   <p className="text-sm text-center py-6" style={{ color: "var(--text-muted)" }}>Pilih warna terlebih dahulu untuk upload media</p>
