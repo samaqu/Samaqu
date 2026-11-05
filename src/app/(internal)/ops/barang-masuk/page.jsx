@@ -606,9 +606,28 @@ export default function TambahBarangMasuk() {
                   const selectedProduct = pickerProducts.find((p) => p.id === item.product_id);
                   const variant = variantOf(item);
                   const groups = variantsOf(item.product_id);
-                  const needsVariant = groups.length > 1;
+                  // Chip varian selalu tampil — termasuk produk 1 varian (mis. Box Kabak),
+                  // supaya nama variannya terlihat dan admin yakin barang yang dipilih benar.
+                  const needsVariant = groups.length >= 1;
                   const paket = isPaketKategori(product?.category);
                   const sizeList = !paket && variant ? sizesFor(variant) : [];
+                  /**
+                   * Semua ukuran varian ini `ALL SIZE`? (mis. Box Kabak / Kabak)
+                   *
+                   * Kalau ya, field "Ukuran" tidak perlu ditampilkan: kuncinya tetap
+                   * `PAKET_SIZE` ("ALL SIZE", sama persis dengan isi product_variants),
+                   * jadi tidak ada data yang hilang — hanya satu kolom kosmetik.
+                   */
+                  const onlyAllSize = (() => {
+                    if (!variant) return false;
+                    const keys = new Set([
+                      ...Object.keys(variant.stock && typeof variant.stock === "object" ? variant.stock : {}),
+                      ...Object.keys(variant.stock_efektif && typeof variant.stock_efektif === "object" ? variant.stock_efektif : {}),
+                    ]);
+                    if (keys.size === 0) return false;
+                    return [...keys].every((key) => String(key).trim().toUpperCase() === PAKET_SIZE);
+                  })();
+                  const showSizeField = !(paket || onlyAllSize);
                   const quantities = item.quantities || {};
                   const incomingQty = totalQty(item);
                   const currentStock = variant
@@ -789,6 +808,7 @@ export default function TambahBarangMasuk() {
                           </div>
                         ) : (
                           <>
+                            {showSizeField ? (
                             <div className="space-y-2">
                               <label className="block font-inter tracking-label" style={{ fontSize: "12px", fontWeight: 700, color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em" }}>Ukuran</label>
                               <div className="rounded-xl border-2 border-gray-200 bg-white px-4 py-3.5 font-inter" style={{ fontSize: "15px", fontWeight: 600, color: "#475569" }}>
@@ -803,6 +823,7 @@ export default function TambahBarangMasuk() {
                                 </div>
                               ) : null}
                             </div>
+                            ) : null}
 
                             <div className="space-y-2">
                               <label className="block font-inter tracking-label" style={{ fontSize: "12px", fontWeight: 700, color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em" }}>
