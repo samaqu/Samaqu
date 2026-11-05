@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
         "id, name, series, price, minimum_price, create_your_price_enabled, open_order_enabled, open_order_price, open_order_minimum_price, open_order_cyp_enabled, hpp, category, weight, jenis_kain(name)",
       ),
     // `weight` = berat per ukuran (gram) — sumber utama yang sama dengan cek ongkir & resi.
-    admin.from("product_variants").select("product_id, color, size, stock, sku, price_override, hex, display_order, base_product_id, weight"),
+    admin.from("product_variants").select("product_id, color, size, stock, sku, price_override, hex, display_order, base_product_id, weight, track_stock"),
   ]);
 
   const byId: Record<string, any> = {};
@@ -188,6 +188,12 @@ export async function GET(req: NextRequest) {
       grouped[key].skus[size] = String(r.sku || "").trim();
       const override = Number(r.price_override);
       grouped[key].prices[size] = override > 0 ? override : Number(grouped[key].price) || 0;
+      // Varian tanpa stok sendiri: ditandai supaya Laporan Stok bisa menampilkan stok
+      // efektif (dari komponen) dan tidak menjumlahkannya ke total stok gudang.
+      if (r.track_stock === false) {
+        grouped[key].component_tracked = true;
+        grouped[key].component_sizes = { ...(grouped[key].component_sizes || {}), [size]: true };
+      }
     }
     const weight = Number(r.weight) || 0;
     if (size && weight > 0) grouped[key].weights[size] = weight;

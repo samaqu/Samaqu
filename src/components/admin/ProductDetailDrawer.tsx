@@ -58,6 +58,10 @@ interface Variant {
   price_override: number | null;
   sku: string | null;
   series: string | null;
+  /** FALSE = varian tanpa stok sendiri (stok dari komponen). */
+  track_stock?: boolean | null;
+  /** Stok tampil hasil hitung database; hanya terisi untuk `track_stock = false`. */
+  effective_stock?: number | null;
 }
 
 interface ProductImage {
@@ -140,6 +144,27 @@ export function ProductDetailPanel({
         if (prodRes.data) setProduct(prodRes.data as ProductData);
         if (varRes.data) {
           const rows = varRes.data as Variant[];
+
+          /*
+           * Stok efektif untuk varian tanpa stok sendiri (`track_stock = false`).
+           * Angkanya dihitung database (sama dengan katalog & checkout) lalu ditempel
+           * ke barisnya sebagai `effective_stock`, supaya tabel stok menampilkan angka
+           * yang benar — bukan 0 dari kolom `stock` yang memang tidak bermakna.
+           */
+          const needsEffective = rows.filter((v) => v.track_stock === false);
+          if (needsEffective.length > 0) {
+            await Promise.all(
+              needsEffective.map(async (v) => {
+                const { data: eff } = await supabase.rpc("samaqu_variant_effective_stock", {
+                  p_product_id: productId,
+                  p_color: v.color,
+                  p_size: v.size,
+                });
+                v.effective_stock = typeof eff === "number" ? eff : null;
+              })
+            );
+          }
+
           setVariants(rows);
           // Thobe memakai color "default" + beberapa series → tab default ke series pertama.
           const colors = [...new Set(rows.map((v) => v.color))];
@@ -176,11 +201,24 @@ export function ProductDetailPanel({
     ? images.filter((img) => img.color === "default" || !img.color)
     : images.filter((img) => img.color === activeTab);
 
-  const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
+  /**
+   * Stok satu baris varian untuk ditampilkan.
+   *
+   * `track_stock = false` → stok milik komponennya, jadi pakai `effective_stock` hasil
+   * hitung database. Kolom `stock` pada varian itu tidak bermakna (selalu 0).
+   */
+  const shownStock = (v: Variant) =>
+    v.track_stock === false ? Number(v.effective_stock ?? 0) : Number(v.stock) || 0;
+
+  // Varian berkomponen tidak dijumlahkan ke total: stoknya sudah dihitung di baris
+  // komponennya sendiri (mis. hanger), jadi menjumlahkan keduanya akan dobel.
+  const totalStock = variants
+    .filter((v) => v.track_stock !== false)
+    .reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
   const totalSold = orderItems.reduce((sum, item) => sum + item.quantity, 0);
   const revenue = orderItems.reduce((sum, item) => sum + item.quantity * (item.customer_price ?? item.price ?? 0), 0);
   const totalOrders = new Set(orderItems.map((i) => i.order_id)).size;
-  const lowStock = variants.filter((v) => v.stock > 0 && v.stock < 5).length;
+  const lowStock = variants.filter((v) => shownStock(v) > 0 && shownStock(v) < 5).length;
   const status = statusOf(totalStock);
 
   const sku = tabVariants.map((v) => v.sku).find(Boolean) || variants.map((v) => v.sku).find(Boolean) || "—";
@@ -506,9 +544,12 @@ export function ProductDetailPanel({
                       <p className="pd-item-sub">{v.sku || "Tanpa SKU"}{v.price_override ? ` · ${money(v.price_override)}` : ""}</p>
                     </div>
                     <div className="pd-item-right">
-                      <span className="pd-item-qty">{v.stock} unit</span>
-                      <span className={v.stock === 0 ? "pd-mini pd-mini-red" : v.stock < 5 ? "pd-mini pd-mini-amber" : "pd-mini pd-mini-green"}>
-                        {v.stock === 0 ? "Habis" : v.stock < 5 ? "Menipis" : "Tersedia"}
+                      <span className="pd-item-qty">
+                        {shownStock(v)} unit
+                        {v.track_stock === false ? <span className="pd-item-sub"> · dari komponen</span> : null}
+                      </span>
+                      <span className={shownStock(v) === 0 ? "pd-mini pd-mini-red" : shownStock(v) < 5 ? "pd-mini pd-mini-amber" : "pd-mini pd-mini-green"}>
+                        {shownStock(v) === 0 ? "Habis" : shownStock(v) < 5 ? "Menipis" : "Tersedia"}
                       </span>
                     </div>
                   </div>

@@ -124,7 +124,18 @@ interface SeriesBlock {
   productId: string;
 }
 
-type SizeRow = { size: string; stock: number; priceOverride: string; sku: string; weight?: string; /** ID baris `product_variants` lama (dipakai mode Edit supaya ID tidak putus). */ id?: string };
+type SizeRow = { size: string; stock: number; priceOverride: string; sku: string; weight?: string; /** ID baris `product_variants` lama (dipakai mode Edit supaya ID tidak putus). */ id?: string;
+
+  /**
+   * Varian tidak punya stok sendiri (stok dari komponen).
+   *
+   * Kolom stok dikunci — angkanya tidak bermakna karena stok sebenarnya milik
+   * komponennya (mis. Cover Thobe + Hanger = min stok cover-thobe & hanger).
+   * `effectiveStock` hanya untuk ditampilkan.
+   */
+  trackStock?: boolean;
+  effectiveStock?: number | null;
+};
 
 /**
  * Potongan kolom `weight` untuk simpan varian.
@@ -319,10 +330,17 @@ function SizeGrid({
             <div className="pf-size-body">
               <div className="pf-size-field pf-f-stock">
                 <span className="pf-size-label">Stok</span>
-                {stockLocked ? (
-                  <span className="pf-adorn is-locked" title={stockLockedLabel}>
+                {stockLocked || s.trackStock === false ? (
+                  <span
+                    className="pf-adorn is-locked"
+                    title={s.trackStock === false ? "Stok mengikuti komponen" : stockLockedLabel}
+                  >
                     <Lock size={12} aria-hidden />
-                    <span className="pf-locked-text">{stockLockedLabel}</span>
+                    <span className="pf-locked-text">
+                      {s.trackStock === false
+                        ? `komponen: ${s.effectiveStock ?? 0}`
+                        : stockLockedLabel}
+                    </span>
                   </span>
                 ) : (
                   <span className="pf-adorn">
@@ -868,12 +886,39 @@ export default function TambahProdukPage({
           setPaketMediaColor(rowsPaket[0]?.color || "");
         } else if (dbVariants && dbVariants.length > 0) {
           const colorGroups: Record<string, Variant> = {};
-          dbVariants.forEach((v: { id: string; color: string; hex: string | null; size: string; stock: number; weight: number | null; price_override: number | null; sku: string | null }) => {
+          dbVariants.forEach((v: { id: string; color: string; hex: string | null; size: string; stock: number; weight: number | null; price_override: number | null; sku: string | null; track_stock?: boolean | null }) => {
             if (!colorGroups[v.color]) colorGroups[v.color] = { color: v.color, hex: v.hex || colorMap[v.color] || "#141414", sizes: [] };
             // `id` dibawa supaya simpan berikutnya memperbarui baris ini, bukan membuat ulang.
-            colorGroups[v.color].sizes.push({ id: v.id, size: v.size, stock: v.stock, weight: v.weight ? String(v.weight) : "", priceOverride: v.price_override ? String(v.price_override) : "", sku: v.sku || "" });
+            colorGroups[v.color].sizes.push({
+              id: v.id,
+              size: v.size,
+              stock: v.stock,
+              weight: v.weight ? String(v.weight) : "",
+              priceOverride: v.price_override ? String(v.price_override) : "",
+              sku: v.sku || "",
+              // Varian tanpa stok sendiri: kolom stok dikunci, angka efektif menyusul di bawah.
+              trackStock: v.track_stock !== false,
+            });
           });
           const varList = Object.values(colorGroups);
+
+          // Stok efektif varian berkomponen dihitung di database (satu sumber dengan
+          // katalog & checkout), bukan dihitung ulang di browser.
+          for (const variant of varList) {
+            for (const row of variant.sizes) {
+              if (row.trackStock !== false) {
+                row.effectiveStock = row.stock;
+                continue;
+              }
+              const { data: eff } = await supabase.rpc("samaqu_variant_effective_stock", {
+                p_product_id: editProductId,
+                p_color: variant.color,
+                p_size: row.size,
+              });
+              row.effectiveStock = typeof eff === "number" ? eff : null;
+            }
+          }
+
           setVariants(varList);
           setActiveColor(varList[0]?.color || null);
         }

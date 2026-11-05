@@ -236,7 +236,9 @@ export default function TambahBarangMasuk() {
     const baseId = product?.base_product_id || linkedVariant?.base_product_id || null;
     const effectiveId = baseId || productId;
     const effectiveProduct = products.find((p) => p.id === effectiveId) || product;
-    const groups = allVariants.filter((v) => v.product_id === effectiveId);
+    // Varian berkomponen (track_stock = false) tidak boleh dipilih di Barang Masuk —
+    // stoknya bukan milik sendiri; yang diisi adalah komponennya.
+    const groups = allVariants.filter((v) => v.product_id === effectiveId && v.track_stock !== false);
     const originalColor = String(
       allVariants.find((v) => v.product_id === productId)?.color || "default"
     ).toLowerCase();
@@ -605,7 +607,7 @@ export default function TambahBarangMasuk() {
                   const product = productOf(item);
                   const selectedProduct = pickerProducts.find((p) => p.id === item.product_id);
                   const variant = variantOf(item);
-                  const groups = variantsOf(item.product_id);
+                  const groups = variantsOf(item.product_id).filter((g) => g.track_stock !== false);
                   // Chip varian selalu tampil — termasuk produk 1 varian (mis. Box Kabak),
                   // supaya nama variannya terlihat dan admin yakin barang yang dipilih benar.
                   const needsVariant = groups.length >= 1;

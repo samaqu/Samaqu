@@ -38,7 +38,7 @@ async function readStockSource() {
   const admin = getSupabaseAdmin();
   const [{ data: products }, { data: variants }] = await Promise.all([
     admin.from("products").select("id, name, series, price, hpp, category, jenis_kain(name)"),
-    admin.from("product_variants").select("product_id, color, size, stock, sku, base_product_id, base_size"),
+    admin.from("product_variants").select("product_id, color, size, stock, sku, base_product_id, base_size, track_stock"),
   ]);
   return buildOpnameLines((products || []) as any[], (variants || []) as any[]);
 }

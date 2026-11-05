@@ -109,6 +109,8 @@ export type StockBuildVariant = {
   sku?: string | null;
   base_product_id?: string | null;
   base_size?: string | null;
+  /** FALSE = varian tanpa stok sendiri (stok dari komponen) — dilewati dari hitungan opname. */
+  track_stock?: boolean | null;
 };
 
 /**
@@ -134,6 +136,14 @@ export function buildOpnameLines(
 
   const lines: OpnameLine[] = [];
   for (const v of variants || []) {
+    /*
+     * Varian tanpa stok sendiri (`track_stock = false`) TIDAK dihitung: stoknya milik
+     * komponennya (mis. Cover Thobe + Hanger = min stok cover-thobe & hanger). Kalau ikut
+     * dihitung, stok komponen akan tercatat dua kali — sekali di barisnya sendiri, sekali
+     * di baris varian ini. Yang dihitung adalah komponennya.
+     */
+    if (v.track_stock === false) continue;
+
     const size = String(v.size || "").toUpperCase();
     if (!size) continue;
     const color = String(v.color || "default").toLowerCase();
