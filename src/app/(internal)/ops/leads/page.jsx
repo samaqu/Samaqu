@@ -48,6 +48,17 @@ const formatDateID = (d) => {
   return `${parseInt(day, 10)} ${MONTHS[parseInt(m, 10) - 1] || m} ${y}`;
 };
 
+/**
+ * Tanggal HARI INI menurut WIB (YYYY-MM-DD).
+ *
+ * Dulu form baru memakai `${year}-${pad(month + 1)}-${pad(now.getDate())}` — `year` dan
+ * `month` berasal dari BULAN YANG SEDANG DIBUKA di daftar, bukan bulan hari ini. Akibatnya
+ * lead yang diinput saat daftar sedang di Mei tersimpan sebagai tanggal 5 Mei, bukan 5 Nov.
+ * Sekarang tanggalnya dihitung utuh dari jam WIB, jadi tidak bergantung pada bulan tampilan
+ * maupun zona waktu komputer admin.
+ */
+const todayWib = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+
 export default function Leads() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth());
@@ -467,7 +478,7 @@ export default function Leads() {
         isOpen={formOpen}
         onClose={() => setFormOpen(false)}
         initialData={editing}
-        defaultDate={`${year}-${pad(month + 1)}-${pad(now.getDate())}`}
+        defaultDate={todayWib()}
       />
 
       <ConfirmDeleteModal

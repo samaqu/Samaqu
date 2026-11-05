@@ -39,6 +39,16 @@ function pickLead(input: Record<string, unknown>) {
   if (out.status === "belum_closing") out.nominal = 0;
   if (out.produk !== undefined) out.produk = out.produk ? String(out.produk).trim() : null;
   if (out.pic !== undefined) out.pic = out.pic ? String(out.pic).trim() : null;
+
+  // Tanggal harus YYYY-MM-DD yang benar-benar ada. Mencegah nilai seperti "2026-02-31"
+  // atau format lain tersimpan sebagai tanggal ngawur.
+  if (out.tanggal !== undefined) {
+    const raw = String(out.tanggal ?? "").trim().slice(0, 10);
+    const valid = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+      && new Date(`${raw}T00:00:00Z`).toISOString().slice(0, 10) === raw;
+    out.tanggal = valid ? raw : null;
+  }
+
   return out;
 }
 
