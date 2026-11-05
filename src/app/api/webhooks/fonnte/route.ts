@@ -34,11 +34,10 @@ async function readPayload(req: NextRequest): Promise<Record<string, unknown>> {
   return out;
 }
 
-export async function POST(req: NextRequest) {
+function checkKey(req: NextRequest): NextResponse | null {
   const secret = process.env.FONNTE_WEBHOOK_SECRET || "";
   const given =
     req.nextUrl.searchParams.get("key") || req.headers.get("x-webhook-key") || "";
-
   if (!secret) {
     console.error("[WA-INBOX] FONNTE_WEBHOOK_SECRET belum diset — webhook ditolak.");
     return NextResponse.json({ error: "Webhook belum dikonfigurasi" }, { status: 500 });
@@ -46,6 +45,19 @@ export async function POST(req: NextRequest) {
   if (given !== secret) {
     return NextResponse.json({ error: "Kunci webhook salah" }, { status: 401 });
   }
+  return null;
+}
+
+/** Fonnte mewajibkan URL webhook menerima POST dan GET (GET dipakai untuk uji URL). */
+export async function GET(req: NextRequest) {
+  const rejected = checkKey(req);
+  if (rejected) return rejected;
+  return NextResponse.json({ ok: true, endpoint: "wa-inbox" });
+}
+
+export async function POST(req: NextRequest) {
+  const rejected = checkKey(req);
+  if (rejected) return rejected;
 
   try {
     const body = await readPayload(req);
