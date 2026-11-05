@@ -305,7 +305,7 @@ function MultiFilter({ label, options, selected, onChange }) {
   );
 }
 
-function ProductDetailModal({ isOpen, onClose, product, stockIns = [], transactions = [], variants = [] }) {
+function ProductDetailModal({ isOpen, onClose, product, stockIns = [], transactions = [], variants = [], onTogglePublish, publishing = false }) {
   if (!isOpen || !product) return null;
 
   const pv = (variants || []).filter((v) => v.product_id === product.id);
@@ -453,6 +453,36 @@ function ProductDetailModal({ isOpen, onClose, product, stockIns = [], transacti
                   {product.created_at ? (
                     <Info label="Dibuat" value={format(new Date(product.created_at), "dd MMM yyyy")} />
                   ) : null}
+                </div>
+              </section>
+
+              {/* Tampil di website.
+                  Produk baru dari panel-admin sengaja disimpan `is_published = false`,
+                  tetapi sakelar publikasinya dulu HANYA ada di dashboard /admin — panel
+                  tidak punya jalan untuk menerbitkannya. Sekarang bisa dari sini. */}
+              <section>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Tampilkan di website</p>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-slate-900 dark:text-white">Muncul di katalog website</p>
+                    <p className="text-[11px] text-slate-500">
+                      {product.is_published === false
+                        ? "Belum tayang — katalog, Open Order, dan reseller tidak menampilkannya."
+                        : "Tayang — produk bisa dilihat pembeli di katalog website."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onTogglePublish(product)}
+                    disabled={publishing}
+                    className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] font-bold border transition-colors ${
+                      product.is_published === false
+                        ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                        : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                    } disabled:opacity-60`}
+                  >
+                    {publishing ? "Menyimpan…" : product.is_published === false ? "Terbitkan" : "Sembunyikan"}
+                  </button>
                 </div>
               </section>
 
@@ -966,6 +996,26 @@ export default function MasterProduk() {
     setShowDeleteModal(false);
     setProductToDelete(null);
     setDeleteType(null);
+  };
+
+  /**
+   * Terbitkan / sembunyikan produk dari katalog website.
+   *
+   * Menulis `products.is_published` lewat API ops yang sama dengan form produk
+   * (`PATCH /api/ops/products` sudah menerima kolom ini). Daftar disegarkan supaya
+   * badge "Website" langsung berubah tanpa reload.
+   */
+  const publishMutation = useMutation({
+    mutationFn: ({ id, is_published }) => base44.entities.Product.update(id, { is_published }),
+    onSuccess: (item) => {
+      queryClient.invalidateQueries(['products']);
+      if (item) setSelectedProduct((prev) => (prev && prev.id === item.id ? { ...prev, ...item } : prev));
+    },
+  });
+
+  const handleTogglePublish = (product) => {
+    if (!product?.id) return;
+    publishMutation.mutate({ id: product.id, is_published: product.is_published === false });
   };
 
   const deleteProductMutation = useMutation({
@@ -2231,6 +2281,8 @@ export default function MasterProduk() {
         stockIns={stockIns}
         transactions={transactions}
         variants={variants}
+        onTogglePublish={handleTogglePublish}
+        publishing={publishMutation.isPending}
       />
 
       <StockInDetailDrawer
