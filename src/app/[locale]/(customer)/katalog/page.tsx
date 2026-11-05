@@ -341,6 +341,8 @@ export default function KatalogPage() {
   const [loading, setLoading] = useState(true);
   const [colorHex, setColorHex] = useState<Record<string, string>>({});
   const [stockByProduct, setStockByProduct] = useState<Record<string, number>>({});
+  // Query stok GAGAL ≠ semua produk habis. Tanpa ini setiap kartu tampil "Sold Out".
+  const [stockLoadFailed, setStockLoadFailed] = useState(false);
   const [katalogInfoImages, setKatalogInfoImages] = useState<{ id: string; category: string; type: string; image_url: string; alt_text: string }[]>([]);
   const wishlist = useWishlist();
 
@@ -361,7 +363,14 @@ export default function KatalogPage() {
           .from("product_variant_stock")
           .select("product_id, color, hex, effective_stock, is_sellable")
           .in("product_id", data.map((p) => p.id))
-          .then(({ data: rows }) => {
+          .then(({ data: rows, error }) => {
+            // Query gagal JANGAN membuat semua kartu tampak "Sold Out".
+            if (error) {
+              console.error("[katalog] gagal memuat stok varian:", error.message, error.details ?? "");
+              setStockLoadFailed(true);
+              return;
+            }
+            setStockLoadFailed(false);
             const map: Record<string, string> = {};
             const stockMap: Record<string, number> = {};
             (rows || []).forEach((v) => {
@@ -495,6 +504,13 @@ export default function KatalogPage() {
         },
       }) }} />
       {/* ── Page Header ── */}
+      {stockLoadFailed && (
+        <div className="max-w-[1200px] mx-auto px-5 sm:px-8 lg:px-14 pt-6">
+          <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-[12px] font-semibold text-amber-900">
+            Stok belum termuat. Muat ulang halaman — jangan mengira produk habis.
+          </div>
+        </div>
+      )}
       <div className="pt-24 pb-6 sm:pt-32 sm:pb-16 lg:pt-36 lg:pb-16">
         <div className="max-w-[1200px] mx-auto px-5 sm:px-8 lg:px-14">
           <div className="mb-3 sm:mb-8">

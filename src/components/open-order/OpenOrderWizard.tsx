@@ -162,6 +162,8 @@ export default function OpenOrderWizard({
   const [catalog, setCatalog] = useState<Product[]>([]);
   /** Baris `product_variants` — sumber daftar ukuran per warna (produk lintas kategori). */
   const [stockRows, setStockRows] = useState<OpenOrderStockRow[]>([]);
+  // Query stok GAGAL ≠ stok habis. Tanpa ini, error query tampil sebagai "Sold Out".
+  const [stockError, setStockError] = useState(false);
   const [draft, setDraft] = useState<ProductDraft | null>(null);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [nextKey, setNextKey] = useState(1);
@@ -219,20 +221,27 @@ export default function OpenOrderWizard({
       // (stok sharing & stok komponen ikut), jadi varian berkomponen tidak jadi "Sold Out".
       .from("product_variant_stock")
       .select("product_id, color, size, effective_stock, weight, is_sellable")
-      .then(({ data }) => {
-        if (active && data) {
-          setStockRows(
-            data
-              .filter((row) => row.is_sellable !== false)
-              .map((row) => ({
-                product_id: row.product_id,
-                color: row.color,
-                size: row.size,
-                stock: Number(row.effective_stock) || 0,
-                weight: row.weight,
-              })) as OpenOrderStockRow[]
-          );
+      .then(({ data, error }) => {
+        if (!active) return;
+        // Query gagal JANGAN dianggap "stok habis".
+        if (error) {
+          console.error("[open-order] gagal memuat stok varian:", error.message, error.details ?? "");
+          setStockError(true);
+          return;
         }
+        setStockError(false);
+        if (!data) return;
+        setStockRows(
+          data
+            .filter((row) => row.is_sellable !== false)
+            .map((row) => ({
+              product_id: row.product_id,
+              color: row.color,
+              size: row.size,
+              stock: Number(row.effective_stock) || 0,
+              weight: row.weight,
+            })) as OpenOrderStockRow[]
+        );
       });
     return () => {
       active = false;
@@ -771,6 +780,11 @@ export default function OpenOrderWizard({
       </header>
 
       <main className="mx-auto max-w-6xl px-5 pb-20">
+        {stockError && (
+          <div className="mt-6 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-[13px] font-semibold text-amber-900">
+            Stok belum termuat. Muat ulang halaman ini — jangan mengira produk habis.
+          </div>
+        )}
         {step === 1 && (
           <StepCatalog
             products={products}

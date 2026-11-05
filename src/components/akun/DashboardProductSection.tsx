@@ -114,6 +114,8 @@ export default function DashboardProductSection() {
   const wishlist = useWishlist();
   const [products, setProducts] = useState<Product[]>([]);
   const [stockByProduct, setStockByProduct] = useState<Record<string, number>>({});
+  // Query stok GAGAL ≠ semua produk habis. Tanpa ini setiap kartu tampil "Sold Out".
+  const [stockError, setStockError] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -128,11 +130,18 @@ export default function DashboardProductSection() {
         if (data.length > 0) {
           // VIEW `product_variant_stock`: pakai `effective_stock` (mencakup stok sharing &
           // stok komponen) dan lewati varian yang tidak boleh dijual.
-          const { data: rows } = await supabase
+          const { data: rows, error: stockErr } = await supabase
             .from("product_variant_stock")
             .select("product_id, effective_stock, is_sellable")
             .in("product_id", data.map((product) => product.id));
           if (!alive) return;
+          // Query gagal JANGAN membuat semua produk tampak "Sold Out".
+          if (stockErr) {
+            console.error("[dashboard-produk] gagal memuat stok varian:", stockErr.message, stockErr.details ?? "");
+            setStockError(true);
+            return;
+          }
+          setStockError(false);
           const map: Record<string, number> = {};
           (rows || []).forEach((row: { product_id: string; effective_stock: number | null; is_sellable: boolean | null }) => {
             if (row.is_sellable === false) return;
@@ -180,6 +189,12 @@ export default function DashboardProductSection() {
           Lihat Semua Produk
         </Link>
       </div>
+
+      {stockError && (
+        <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-[11.5px] font-semibold text-amber-900">
+          Stok belum termuat. Muat ulang halaman — jangan mengira produk habis.
+        </div>
+      )}
 
       {loading ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">

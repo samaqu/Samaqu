@@ -229,6 +229,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   /** Berat varian/paket yang sedang dipilih (gram) — dipakai untuk Cover & Hanger. */
   const [variantWeight, setVariantWeight] = useState<number | null>(null);
   const [stock, setStock] = useState<number | null>(null);
+  // Query stok GAGAL ≠ stok habis. Tanpa ini, error query tampil sebagai "Stok Habis".
+  const [stockError, setStockError] = useState(false);
   const [qty, setQty] = useState(1);
   const [activeIndex, setActiveIndex] = useState(0);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -445,7 +447,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       .select("price_override, effective_stock, weight, base_product_id, base_size, is_sellable")
       .eq("product_id", displayId).eq("color", selectedColor).eq("size", selectedSize).maybeSingle()
       .then(({ data, error }) => {
-        if (error) { setVariantPrice(null); setVariantWeight(null); setStock(null); return; }
+        // Query gagal JANGAN ditampilkan sebagai "Habis".
+        if (error) {
+          console.error("[katalog] gagal memuat stok varian:", error.message, error.details ?? "");
+          setStockError(true);
+          setVariantPrice(null); setVariantWeight(null); setStock(null);
+          return;
+        }
+        setStockError(false);
         setVariantPrice(data?.price_override ?? null);
         setVariantWeight(Number(data?.weight) || null);
         // View sudah memecahkan stok sharing, jadi `effective_stock` langsung dipakai.
@@ -980,6 +989,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             </p>
           </div>
           {/* Action buttons */}
+          {stockError && (
+            <p className="mb-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-900">
+              Stok belum termuat. Muat ulang halaman — jangan mengira produk habis.
+            </p>
+          )}
           <div className="flex gap-2">
             <button onClick={handleAddToCart} disabled={(isCYP && !isPriceValid) || stockExceeded || isOutOfStock}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] tracking-[0.06em] uppercase font-ui font-semibold transition-all duration-300 active:scale-[0.98] disabled:opacity-40"
