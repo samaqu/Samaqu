@@ -1400,6 +1400,9 @@ export async function DELETE(req: NextRequest) {
           p_color: item.color,
           p_size: item.size,
           p_qty: item.quantity,
+          // Ref order WAJIB: tanpa ini komponen (box kabak / cover & hanger) tidak kembali.
+          p_ref_type: "component",
+          p_ref_id: order.id,
         });
       }
     }
