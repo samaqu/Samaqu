@@ -155,11 +155,13 @@ async function periodStats(
     inboxRows(admin, month.startIso, month.endIso),
     approvedDrafts(admin, month.startIso, month.endIso),
     academyClosings(month.startIso, month.endIso).catch(() => null),
+    // Leads memakai tanggal bisnis (`leads.tanggal`), sama seperti menu Leads —
+    // bukan `created_at`, karena import/paste bisa memasukkan lead bertanggal bulan lalu.
     admin
       .from("leads")
       .select("kontak", { count: "exact" })
-      .gte("created_at", month.startIso)
-      .lt("created_at", month.endIso)
+      .gte("tanggal", `${month.value}-01`)
+      .lte("tanggal", `${month.value}-${String(month.daysInMonth).padStart(2, "0")}`)
       .limit(5000),
     escalationRows(admin, month.startIso, month.endIso),
   ]);
