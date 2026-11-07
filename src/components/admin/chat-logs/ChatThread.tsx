@@ -11,13 +11,13 @@ export default function ChatThread({
   onBack,
   onAddToFaq,
   addingId,
-  mobileDetails,
+  detailsPanel,
 }: {
   session: SessionGroup | null;
   onBack: () => void;
   onAddToFaq: (id: string) => void;
   addingId: string | null;
-  mobileDetails?: ReactNode;
+  detailsPanel?: ReactNode;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -97,7 +97,7 @@ export default function ChatThread({
         ) : null}
       </div>
 
-      {mobileDetails ? <div className="shrink-0 lg:hidden">{mobileDetails}</div> : null}
+      {detailsPanel ? <div className="shrink-0">{detailsPanel}</div> : null}
 
       <div
         ref={scrollRef}

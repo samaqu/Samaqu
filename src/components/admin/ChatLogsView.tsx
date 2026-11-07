@@ -187,7 +187,7 @@ export default function ChatLogsView() {
           <Loader2 size={18} className="animate-spin" /> Memuat...
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[300px_minmax(0,1fr)_320px] lg:gap-4">
+        <div className="flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[minmax(300px,30%)_minmax(0,1fr)] lg:gap-4">
           <div className={`${mobileView === "chat" ? "hidden lg:block" : "block"} min-h-0 h-full`}>
             <SessionList
               sessions={filteredSessions}
@@ -204,9 +204,9 @@ export default function ChatLogsView() {
               onBack={() => setMobileView("list")}
               onAddToFaq={addToFaq}
               addingId={addingId}
-              mobileDetails={
+              detailsPanel={
                 selectedSession ? (
-                  <details className="lg:hidden" style={{ borderBottom: "1px solid #E7E6E1" }}>
+                  <details className="max-h-[40vh] overflow-y-auto" style={{ borderBottom: "1px solid #E7E6E1" }}>
                     <summary
                       className="cursor-pointer px-4 py-3 text-sm font-semibold"
                       style={{ color: "#141414" }}
@@ -220,19 +220,6 @@ export default function ChatLogsView() {
                 ) : null
               }
             />
-          </div>
-
-          <div className="hidden min-h-0 h-full lg:block">
-            {selectedSession ? (
-              <CustomerPanel session={selectedSession} products={products} />
-            ) : (
-              <div
-                className="flex h-full items-center justify-center rounded-2xl border bg-white p-6 text-sm"
-                style={{ borderColor: "#E7E6E1", color: "#6B6A64" }}
-              >
-                Pilih sesi untuk melihat detail pelanggan.
-              </div>
-            )}
           </div>
         </div>
       )}
