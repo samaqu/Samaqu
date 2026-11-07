@@ -5,11 +5,8 @@ import {
   Check,
   Copy,
   Loader2,
-  MessageSquare,
   Pencil,
-  RefreshCw,
   Send,
-  ShoppingBag,
   Sparkles,
   Trash2,
   X,
@@ -17,6 +14,12 @@ import {
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ops/ui/use-toast";
 import DraftEditor from "./DraftEditor";
+import DraftList from "./DraftList";
+import DraftDetailHeader from "./DraftDetailHeader";
+import RecipientCard from "./RecipientCard";
+import PaymentProofCard from "./PaymentProofCard";
+import OrderSummaryCard from "./OrderSummaryCard";
+import ActionBar from "./ActionBar";
 
 type Tab = "ai" | "transaksi";
 
@@ -253,48 +256,50 @@ export default function PerluReviewView() {
   };
 
   return (
-    <section className="flex h-[calc(100dvh-140px)] min-h-0 flex-col gap-3 overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+    <section className={`flex min-h-0 flex-col gap-4 ${tab === "ai" ? "h-[calc(100dvh-140px)] overflow-hidden" : ""}`}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-black" style={{ color: "#141414" }}>
             Perlu Review
           </h1>
-          <p className="mt-1 text-sm" style={{ color: "#6B6A64" }}>
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed" style={{ color: "#6B6A64" }}>
             Kasus AI yang butuh instruksi admin dan draft transaksi yang menunggu persetujuan.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="inline-flex h-10 items-center gap-2 rounded-xl border bg-white px-3 text-xs font-semibold"
-          style={{ borderColor: "#E7E6E1", color: "#141414" }}
-        >
-          <RefreshCw size={15} /> Muat ulang
-        </button>
-      </div>
-
-      <div className="inline-flex w-fit shrink-0 gap-1 rounded-xl border bg-white p-1" style={{ borderColor: "#E7E6E1" }}>
-        {[
-          { id: "ai" as const, label: "Pertanyaan AI", count: data.counts.escalations, icon: MessageSquare },
-          { id: "transaksi" as const, label: "Transaksi", count: data.counts.drafts, icon: ShoppingBag },
-        ].map((item) => {
-          const Icon = item.icon;
-          const active = tab === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setTab(item.id)}
-              className="inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition"
-              style={{ background: active ? "#141414" : "transparent", color: active ? "#fff" : "#6B6A64" }}
-            >
-              <Icon size={15} /> {item.label}
-              <span className="rounded-full px-1.5 py-0.5 text-[10px]" style={{ background: active ? "#3a3a38" : "#F1F0EC" }}>
-                {item.count}
-              </span>
-            </button>
-          );
-        })}
+        <div className="flex flex-col gap-2 sm:items-end">
+          <div className="inline-flex w-full rounded-xl bg-[#F1F0EC] p-1 sm:w-auto" role="tablist" aria-label="Jenis review">
+            {[
+              { id: "ai" as const, label: "Pertanyaan AI", count: data.counts.escalations },
+              { id: "transaksi" as const, label: "Transaksi", count: data.counts.drafts },
+            ].map((item) => {
+              const active = tab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(item.id)}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-[10px] px-3 py-2 text-[11px] font-bold transition-colors sm:flex-none ${active ? "bg-white shadow-[0_1px_2px_rgba(20,20,20,0.08)]" : "bg-transparent"}`}
+                  style={{ color: active ? "#141414" : "#77756F" }}
+                >
+                  {item.label}
+                  <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ background: active ? "#F1F0EC" : "#E7E5DF", color: active ? "#4E4C47" : "#77756F" }}>
+                    {item.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="h-9 px-1 text-[11px] font-bold underline-offset-4 hover:underline"
+            style={{ color: "#6B6A64" }}
+          >
+            Muat ulang
+          </button>
+        </div>
       </div>
 
       {error ? (
@@ -304,8 +309,8 @@ export default function PerluReviewView() {
       ) : null}
 
       {loading ? (
-        <div className="flex flex-1 items-center justify-center gap-2 rounded-2xl border bg-white text-sm" style={{ borderColor: "#E7E6E1", color: "#6B6A64" }}>
-          <Loader2 className="animate-spin" size={18} /> Memuat antrean...
+        <div className="flex flex-1 items-center justify-center rounded-2xl border bg-white text-sm" style={{ borderColor: "#E7E6E1", color: "#6B6A64" }}>
+          Memuat antrean...
         </div>
       ) : tab === "ai" ? (
         <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -471,51 +476,38 @@ export default function PerluReviewView() {
           </div>
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)]">
-          <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border bg-white" style={{ borderColor: "#E7E6E1" }}>
-            <div className="shrink-0 border-b px-4 py-3" style={{ borderColor: "#E7E6E1" }}>
-              <p className="text-sm font-bold" style={{ color: "#141414" }}>Draft transaksi</p>
-              <p className="mt-0.5 text-[11px]" style={{ color: "#6B6A64" }}>{data.drafts.length} menunggu review</p>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-2">
-              {data.drafts.length === 0 ? (
-                <p className="p-4 text-center text-xs" style={{ color: "#6B6A64" }}>Belum ada draft transaksi.</p>
-              ) : (
-                data.drafts.map((draft) => (
-                  <button
-                    key={draft.id}
-                    type="button"
-                    onClick={() => setSelectedDraftId(draft.id)}
-                    className="mb-1.5 w-full rounded-xl border p-3 text-left"
-                    style={{ borderColor: draft.id === selectedDraftId ? "#C8A45D" : "#E7E6E1", background: draft.id === selectedDraftId ? "#FBF6EA" : "#fff" }}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-xs font-bold" style={{ color: "#141414" }}>{draft.customer_name || phone(draft.customer_whatsapp || "")}</p>
-                      <Badge status={draft.status} />
-                    </div>
-                    <p className="mt-1 text-[11px]" style={{ color: "#6B6A64" }}>{money(totalDraft(draft.payload))} · {time(draft.created_at)}</p>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
+        <div className="grid items-start gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <DraftList drafts={data.drafts} selectedId={selectedDraftId} onSelect={setSelectedDraftId} />
 
-          <div className="h-full min-h-0 overflow-y-auto rounded-2xl border bg-white p-4" style={{ borderColor: "#E7E6E1" }}>
+          <div className="min-w-0">
             {!selectedDraft ? (
-              <div className="flex h-full min-h-[300px] items-center justify-center text-sm" style={{ color: "#6B6A64" }}>Pilih draft di kiri.</div>
+              <div className="flex min-h-[320px] items-center justify-center rounded-2xl border bg-white px-6 text-center text-sm" style={{ borderColor: "#E7E6E1", color: "#8A8880" }}>
+                Pilih draft di kiri untuk melihat detail.
+              </div>
             ) : (
-              <DraftDetail
-                draft={selectedDraft}
-                busy={Boolean(busy)}
-                onApprove={askApprove}
-                onReject={askReject}
-                onViewProof={() => {
-                  setProofError(false);
-                  setProofOpen(true);
-                }}
-                onEdit={() => setEditDraft(selectedDraft)}
-                onDelete={askDelete}
-              />
+              <div className="rounded-2xl border bg-white shadow-[0_1px_3px_rgba(20,20,20,0.04)]" style={{ borderColor: "#E7E6E1" }}>
+                <DraftDetailHeader draft={selectedDraft} />
+                <div className="grid gap-3 p-4 sm:p-5 lg:grid-cols-2">
+                  <RecipientCard draft={selectedDraft} />
+                  <PaymentProofCard
+                    proofUrl={selectedDraft.proof_url}
+                    onView={() => {
+                      setProofError(false);
+                      setProofOpen(true);
+                    }}
+                  />
+                  <div className="lg:col-span-2">
+                    <OrderSummaryCard draft={selectedDraft} />
+                  </div>
+                </div>
+                <ActionBar
+                  busy={Boolean(busy)}
+                  onEdit={() => setEditDraft(selectedDraft)}
+                  onApprove={askApprove}
+                  onReject={askReject}
+                  onDelete={askDelete}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -551,11 +543,10 @@ export default function PerluReviewView() {
               <button
                 type="button"
                 onClick={() => setProofOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border"
+                className="rounded-lg border px-3 py-1.5 text-[11px] font-bold"
                 style={{ borderColor: "#E7E6E1", color: "#6B6A64" }}
-                aria-label="Tutup bukti transfer"
               >
-                <X size={16} />
+                Tutup
               </button>
             </div>
             <div className="flex min-h-[240px] items-center justify-center overflow-auto bg-[#111]" style={{ maxHeight: "70dvh" }}>
@@ -589,28 +580,17 @@ export default function PerluReviewView() {
             style={{ borderColor: "#E7E6E1" }}
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <div className="flex items-start gap-3 p-5 pb-3">
-              <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-                style={{
-                  background: dialog.kind === "approve" ? "#E3F2E8" : "#FCE8E8",
-                  color: dialog.kind === "approve" ? "#1F7A4D" : "#9B2C2C",
-                }}
-              >
-                {dialog.kind === "approve" ? <Check size={20} /> : dialog.kind === "delete" ? <Trash2 size={19} /> : <X size={20} />}
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-base font-black" style={{ color: "#141414" }}>
-                  {dialog.kind === "approve" ? "Setujui draft transaksi?" : dialog.kind === "delete" ? "Hapus draft transaksi?" : "Tolak draft transaksi?"}
-                </h2>
-                <p className="mt-1 text-sm" style={{ color: "#6B6A64" }}>
-                  {dialog.kind === "approve"
-                    ? `${dialog.draft.customer_name || "Customer"} · ${money(totalDraft(dialog.draft.payload))}`
-                    : dialog.kind === "delete"
-                      ? "Draft akan dihapus dari antrean."
-                      : "Draft akan ditolak dan tidak membuat order."}
-                </p>
-              </div>
+            <div className="p-5 pb-3">
+              <h2 className="text-base font-black" style={{ color: "#141414" }}>
+                {dialog.kind === "approve" ? "Setujui draft transaksi?" : dialog.kind === "delete" ? "Hapus draft transaksi?" : "Tolak draft transaksi?"}
+              </h2>
+              <p className="mt-1 text-sm" style={{ color: "#6B6A64" }}>
+                {dialog.kind === "approve"
+                  ? `${dialog.draft.customer_name || "Customer"} · ${money(totalDraft(dialog.draft.payload))}`
+                  : dialog.kind === "delete"
+                    ? "Draft akan dihapus dari antrean."
+                    : "Draft akan ditolak dan tidak membuat order."}
+              </p>
             </div>
 
             {dialog.kind === "approve" ? (
@@ -654,8 +634,7 @@ export default function PerluReviewView() {
                 className="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold text-white disabled:opacity-50"
                 style={{ background: dialog.kind === "approve" ? "#1F7A4D" : "#9B2C2C" }}
               >
-                {busy ? <Loader2 className="animate-spin" size={15} /> : dialog.kind === "approve" ? <Check size={15} /> : dialog.kind === "delete" ? <Trash2 size={15} /> : <X size={15} />}
-                {dialog.kind === "approve" ? "Setujui & Proses" : dialog.kind === "delete" ? "Hapus draft" : "Tolak draft"}
+                {busy ? "Memproses..." : dialog.kind === "approve" ? "Setujui & Proses" : dialog.kind === "delete" ? "Hapus draft" : "Tolak draft"}
               </button>
             </div>
           </div>
