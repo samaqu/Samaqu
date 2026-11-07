@@ -1,8 +1,7 @@
 import { Metadata } from "next";
 import { SITE_URL, OG_IMAGE, localeAlternates } from "@/lib/site-config";
 
-// Shell halaman katalog boleh statis; produk baru langsung tampil dari client + revalidate admin.
-export const revalidate = 300;
+// Shell halaman katalog statis; data produk dibaca client-side, detail produk punya revalidate sendiri.
 
 export async function generateMetadata({
   params,
