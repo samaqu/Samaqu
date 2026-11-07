@@ -373,6 +373,29 @@ export async function PATCH(req: NextRequest) {
           { status: 400 },
         );
       }
+      // Baris terhitung yang variannya tidak ketemu: apply dibatalkan, sesi tetap draft.
+      const missingMarker = "BARIS_TIDAK_KETEMU:";
+      const missingAt = message.indexOf(missingMarker);
+      if (missingAt >= 0) {
+        let rows: Array<{ product_name?: string; color?: string; size?: string }> = [];
+        try {
+          rows = JSON.parse(message.slice(missingAt + missingMarker.length));
+        } catch {
+          rows = [];
+        }
+        const list = rows
+          .slice(0, 5)
+          .map((r) => `${r.product_name || "-"} · ${r.color || "-"} · ${r.size || "-"}`)
+          .join(", ");
+        return NextResponse.json(
+          {
+            error: `Stok belum diterapkan: ${rows.length} baris tidak menemukan variannya di stok${
+              list ? ` (${list}${rows.length > 5 ? ", ..." : ""})` : ""
+            }. Periksa produk itu, lalu terapkan lagi.`,
+          },
+          { status: 400 },
+        );
+      }
       console.error("[OPNAME] apply gagal:", message);
       return NextResponse.json({ error: `Gagal menerapkan ke stok: ${message}` }, { status: 400 });
     }
