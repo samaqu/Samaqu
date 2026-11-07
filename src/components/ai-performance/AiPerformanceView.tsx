@@ -17,7 +17,13 @@ type Stats = {
   conversations: number;
   messages: number;
   handled: number;
+  needsAdmin: number;
+  aiHandled: number;
+  aiShare: number;
+  needsAdminShare: number;
   leads: number;
+  leadsFromChat: number;
+  leadsFromChatShare: number;
   closing: number;
   nominal: number;
   handledRate: number;
@@ -47,6 +53,9 @@ const wibMonth = () => {
 
 const money = (value: number) => "Rp" + Math.round(Number(value) || 0).toLocaleString("id-ID");
 const number = (value: number) => Math.round(Number(value) || 0).toLocaleString("id-ID");
+/** Persentase gaya Indonesia (koma desimal); kosong/NaN tetap "0%". */
+const percent = (value: number) =>
+  `${(Number(value) || 0).toLocaleString("id-ID", { maximumFractionDigits: 1 })}%`;
 const phone = (value: string) => {
   const digits = String(value || "").replace(/\D/g, "");
   return digits.startsWith("62") ? `0${digits.slice(2)}` : digits;
@@ -75,6 +84,7 @@ function KpiCard({
   label,
   value,
   hint,
+  secondary,
   delta,
   tone = "#2f6f9e",
   icon,
@@ -82,6 +92,7 @@ function KpiCard({
   label: string;
   value: string;
   hint?: string;
+  secondary?: string;
   delta?: number | null;
   tone?: string;
   icon: React.ReactNode;
@@ -93,6 +104,9 @@ function KpiCard({
         <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${tone}14`, color: tone }}>{icon}</span>
       </div>
       <p className="mt-2 text-2xl font-black tabular-nums" style={{ color: "#2a1a22" }}>{value}</p>
+      {secondary ? (
+        <p className="mt-0.5 text-sm font-black tabular-nums" style={{ color: tone }}>{secondary}</p>
+      ) : null}
       <p className="mt-1 text-[11px] font-semibold" style={{ color: "#8a7d83" }}>
         {delta !== undefined ? <Delta value={delta} /> : hint}
       </p>
@@ -181,19 +195,19 @@ export default function AiPerformanceView() {
         </div>
       ) : stats ? (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
             <KpiCard
-              label="Total percakapan"
-              value={number(stats.conversations)}
-              delta={stats.growth.conversations}
-              hint={`${number(stats.messages)} pesan masuk`}
+              label="Chat ditangani AI"
+              value={number(stats.aiHandled)}
+              secondary={percent(stats.aiShare)}
+              hint={`Dari ${number(stats.conversations)} percakapan · ${number(stats.messages)} pesan masuk`}
               icon={<MessageSquare size={16} />}
             />
             <KpiCard
-              label="Leads masuk"
-              value={number(stats.leads)}
-              delta={stats.growth.leads}
-              hint="Lead baru periode ini"
+              label="Leads dicatat AI"
+              value={number(stats.leadsFromChat)}
+              secondary={percent(stats.leadsFromChatShare)}
+              hint={`Dari ${number(stats.leads)} lead baru`}
               icon={<Users size={16} />}
               tone="#1f8a58"
             />
@@ -201,7 +215,7 @@ export default function AiPerformanceView() {
               label="Berhasil closing"
               value={number(stats.closing)}
               delta={stats.growth.closing}
-              hint={`${stats.closingRate}% dari total chat`}
+              hint={`${percent(stats.closingRate)} dari total chat`}
               icon={<Check size={16} />}
               tone="#8a5a12"
             />
@@ -252,7 +266,10 @@ export default function AiPerformanceView() {
             ) : (
               <>Closing dihitung dari draft AI yang <b>disetujui admin</b> dan order-nya masih sah (diproses/dikirim/selesai).</>
             )}{" "}
-            Leads masuk dihitung dari lead baru pada periode. Ditangani AI = nomor unik yang punya balasan keluar; pesan grup dan draft/order batal tidak dihitung.
+            Chat ditangani AI = percakapan unik periode ini dikurangi yang perlu bantuan admin
+            (handover ke Pertanyaan AI atau sudah dibalas admin). Leads dicatat AI = lead periode
+            ini yang nomornya ada di percakapan WhatsApp periode ini. Pesan grup dan draft/order
+            batal tidak dihitung.
           </p>
         </>
       ) : null}

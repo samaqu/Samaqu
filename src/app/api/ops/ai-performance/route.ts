@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
 import { jakartaMonthBounds } from "@/lib/ops-followup";
 import { SALE_STATUSES } from "@/lib/transaksi";
+import { getAiConversationMetrics, type EscalationRef } from "@/lib/ai-performance-metrics";
 
 /**
  * AI Performance Center.
@@ -12,7 +13,10 @@ import { SALE_STATUSES } from "@/lib/transaksi";
  * - Closing AI: `order_drafts` berstatus approved yang menghasilkan `orders` sah.
  * - Nominal: `orders.total` dari order hasil draft AI tersebut.
  *
- * "Ditangani AI" = nomor unik yang punya `reply_text` pada periode itu.
+ * "Perlu bantuan admin" = nomor unik yang masuk `wa_escalations` (Pertanyaan AI)
+ * atau pernah dibalas admin pada periode itu. "Chat ditangani AI" = total percakapan
+ * unik dikurangi angka itu. "Leads dicatat AI" = lead periode itu yang nomornya ada
+ * di percakapan WA periode itu. Semua rumusnya di `getAiConversationMetrics`.
  * "Closing" = draft AI yang disetujui admin dan order-nya masih sah (diproses/dikirim/selesai).
  * Draft yang ditolak atau order batal tidak dihitung.
  */
@@ -51,6 +55,34 @@ async function inboxRows(
     if ((data || []).length < PAGE) break;
   }
   return rows;
+}
+
+/**
+ * Nomor yang masuk "Pertanyaan AI" (handover) atau pernah dibalas admin pada periode.
+ * Dua query terpisah karena nilai ISO tidak aman ditaruh mentah di filter `or`.
+ */
+async function escalationRows(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  startIso: string,
+  endIso: string,
+): Promise<EscalationRef[]> {
+  const [created, replied] = await Promise.all([
+    admin
+      .from("wa_escalations")
+      .select("sender")
+      .gte("created_at", startIso)
+      .lt("created_at", endIso)
+      .limit(5000),
+    admin
+      .from("wa_escalations")
+      .select("sender")
+      .gte("replied_at", startIso)
+      .lt("replied_at", endIso)
+      .limit(5000),
+  ]);
+  if (created.error) throw new Error(created.error.message);
+  if (replied.error) throw new Error(replied.error.message);
+  return [...(created.data || []), ...(replied.data || [])];
 }
 
 type ClosingStats = { count: number; nominal: number; source: "wa_closings" | "drafts" };
@@ -119,20 +151,30 @@ async function periodStats(
   admin: ReturnType<typeof getSupabaseAdmin>,
   month: ReturnType<typeof jakartaMonthBounds>,
 ) {
-  const [rows, drafts, closingStats, leadsResult] = await Promise.all([
+  const [rows, drafts, closingStats, leadsResult, escalations] = await Promise.all([
     inboxRows(admin, month.startIso, month.endIso),
     approvedDrafts(admin, month.startIso, month.endIso),
     academyClosings(month.startIso, month.endIso).catch(() => null),
     admin
       .from("leads")
-      .select("id", { count: "exact", head: true })
+      .select("kontak", { count: "exact" })
       .gte("created_at", month.startIso)
-      .lt("created_at", month.endIso),
+      .lt("created_at", month.endIso)
+      .limit(5000),
+    escalationRows(admin, month.startIso, month.endIso),
   ]);
   if (leadsResult.error) throw new Error(leadsResult.error.message);
   const leads = leadsResult.count || 0;
 
-  const senders = new Set(rows.map((row) => String(row.sender || "")).filter(Boolean));
+  // Satu rumus untuk semua card: total percakapan unik, AI vs perlu admin, dan
+  // lead yang benar-benar berasal dari percakapan WA periode ini.
+  const metrics = getAiConversationMetrics({
+    senders: rows.map((row) => row.sender as string | null),
+    messages: rows.length,
+    escalations,
+    leadContacts: (leadsResult.data || []).map((row) => row.kontak as string | null),
+  });
+
   const handledSenders = new Set(
     rows
       .filter((row) => String(row.reply_text || "").trim())
@@ -161,13 +203,19 @@ async function periodStats(
     }
   }
 
-  const conversations = senders.size;
+  const conversations = metrics.conversations;
   const handled = handledSenders.size;
   return {
     conversations,
-    messages: rows.length,
+    messages: metrics.messages,
     handled,
+    needsAdmin: metrics.needsAdmin,
+    aiHandled: metrics.aiHandled,
+    aiShare: metrics.aiShare,
+    needsAdminShare: metrics.needsAdminShare,
     leads,
+    leadsFromChat: metrics.leadsFromChat,
+    leadsFromChatShare: metrics.leadsFromChatShare,
     closing,
     nominal,
     handledRate: conversations > 0 ? Math.round((handled / conversations) * 1000) / 10 : 0,
