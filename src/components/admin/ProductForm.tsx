@@ -13,7 +13,8 @@ import JenisKainForm from "@/components/JenisKainForm";
 import PresetColorPicker from "@/components/PresetColorPicker";
 import { colorMap } from "@/lib/katalog-data";
 import { PAKET_SIZE, isCoverHangerKategori, isKabakKategori, isPaketKategori, isPaketSize, variantName } from "@/lib/item-label";
-import { uploadToCloudinary, validateMediaFile } from "@/lib/cloudinary";
+import { validateMediaFile } from "@/lib/cloudinary";
+import { uploadToR2 } from "@/lib/r2-upload-client";
 import { useStoreSettings } from "@/lib/store-settings";
 import { usePageUrl } from "@/lib/ops-router";
 import { requestRevalidate } from "@/lib/admin-revalidate";
@@ -1203,7 +1204,7 @@ export default function TambahProdukPage({
     // Upload each file
     for (const item of newMedia) {
       try {
-        const url = await uploadToCloudinary(item.file!);
+        const url = await uploadToR2(item.file!, "katalog");
         setMedia((prev) => prev.map((m) => m.id === item.id ? { ...m, url, uploading: false } : m));
       } catch {
         setMedia((prev) => prev.map((m) => m.id === item.id ? { ...m, uploading: false, error: "Upload gagal" } : m));
@@ -1463,7 +1464,7 @@ export default function TambahProdukPage({
 
     for (const item of newMedia) {
       try {
-        const url = await uploadToCloudinary(item.file!);
+        const url = await uploadToR2(item.file!, "katalog");
         setSeriesBlocks((prev) => ({
           ...prev,
           [seriesName]: {
