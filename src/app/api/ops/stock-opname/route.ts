@@ -252,64 +252,51 @@ export async function PATCH(req: NextRequest) {
      *  - `patch`: [{ id, counted_stock, reason, reason_note }] — dipakai simpan otomatis,
      *    hanya baris yang berubah (jangan kirim 571 baris tiap ketikan).
      *  - `lines`: bentuk lama (seluruh baris) — dipakai tombol "Simpan draft".
-     * Keduanya menulis ke kolom yang sama di tabel.
+     * Keduanya dikirim ke satu RPC supaya semua baris di-update dalam SATU statement.
+     * Dulu route ini meng-update baris satu per satu: 251 baris = 251 round-trip
+     * Vercel → Supabase, jadi Simpan draft terasa belasan detik.
      */
+    let payload: Array<Record<string, unknown>> = [];
+
     if (Array.isArray(body?.patch)) {
-      const patches = (body.patch as Array<Record<string, unknown>>).slice(0, 500);
-      let saved = 0;
-      for (const item of patches) {
-        const lineId = String(item?.id || "");
-        if (!lineId) continue;
-        const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
-        if ("counted_stock" in item) update.counted_stock = cleanCount(item.counted_stock);
-        if ("reason" in item) update.reason = item.reason ? String(item.reason) : null;
-        if ("reason_note" in item) {
-          update.reason_note = item.reason_note ? String(item.reason_note).slice(0, 300) : null;
-        }
-        const { error } = await admin
-          .from("stock_opname_lines")
-          .update(update)
-          .eq("id", lineId)
-          .eq("session_id", id)
-          .eq("is_derived", false);
-        if (error) {
-          console.error("[OPNAME] patch line:", error.message);
-          return NextResponse.json({ error: "Gagal menyimpan hitungan" }, { status: 500 });
-        }
-        saved += 1;
-      }
-      await admin
-        .from("stock_opname_sessions")
-        .update({ updated_at: new Date().toISOString() })
-        .eq("id", id);
-      return NextResponse.json({ saved });
+      payload = (body.patch as Array<Record<string, unknown>>)
+        .slice(0, 500)
+        .flatMap((item) => {
+          const lineId = String(item?.id || "");
+          if (!lineId) return [];
+          const row: Record<string, unknown> = { id: lineId };
+          if ("counted_stock" in item) row.counted_stock = cleanCount(item.counted_stock);
+          if ("reason" in item) row.reason = item.reason ? String(item.reason) : null;
+          if ("reason_note" in item) {
+            row.reason_note = item.reason_note ? String(item.reason_note).slice(0, 300) : null;
+          }
+          return [row];
+        });
+    } else {
+      const lines: IncomingLine[] = Array.isArray(body?.lines) ? body.lines : [];
+      payload = lines.map((line) => ({
+        product_id: line.product_id,
+        color: line.color,
+        size: line.size,
+        counted_stock: cleanCount(line.counted_stock),
+        reason: line.reason || null,
+        reason_note: line.reason_note ? String(line.reason_note).slice(0, 300) : null,
+      }));
     }
 
-    const lines: IncomingLine[] = Array.isArray(body?.lines) ? body.lines : [];
-    for (const line of lines) {
-      const { error } = await admin
-        .from("stock_opname_lines")
-        .update({
-          counted_stock: cleanCount(line.counted_stock),
-          reason: line.reason || null,
-          reason_note: line.reason_note ? String(line.reason_note).slice(0, 300) : null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("session_id", id)
-        .eq("product_id", line.product_id)
-        .eq("color", line.color)
-        .eq("size", line.size)
-        .eq("is_derived", false);
-      if (error) {
-        console.error("[OPNAME] save line:", error.message);
-        return NextResponse.json({ error: "Gagal menyimpan hitungan" }, { status: 500 });
-      }
+    if (payload.length === 0) return NextResponse.json({ saved: 0 });
+
+    const { data, error } = await admin.rpc("samaqu_save_stock_opname_lines", {
+      p_session_id: id,
+      p_lines: payload,
+    });
+    if (error) {
+      console.error("[OPNAME] save batch:", error.message);
+      return NextResponse.json({ error: "Gagal menyimpan hitungan" }, { status: 500 });
     }
-    await admin
-      .from("stock_opname_sessions")
-      .update({ updated_at: new Date().toISOString() })
-      .eq("id", id);
-    return NextResponse.json({ saved: lines.length });
+
+    const saved = Number((data as { saved?: number } | null)?.saved ?? 0);
+    return NextResponse.json({ saved });
   }
 
   // ── Terapkan ke stok (alur approval dihapus: admin yang input juga yang menerapkan) ──
