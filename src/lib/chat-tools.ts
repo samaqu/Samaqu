@@ -53,6 +53,12 @@ export const CHAT_TOOLS = [
             description: "Kata kunci: nama produk, kategori (thobe/kandora/koko/vest/kabak), kain, atau series. Boleh kosong.",
           },
           kategori: { type: "string", description: "Filter kategori (opsional), mis. 'Thobe'." },
+          series: { type: "string", description: "Filter series (opsional), mis. 'Nahawand'." },
+          product_id: {
+            type: "string",
+            description:
+              "ID produk dari konteks tombol Tanya. Pakai ini untuk produk tertentu; lebih akurat daripada query.",
+          },
           max_harga: { type: "number", description: "Batas harga maksimum dalam Rupiah (opsional)." },
           warna: { type: "string", description: "Filter warna (opsional), mis. 'hitam'." },
         },
@@ -205,6 +211,8 @@ async function cariProduk(args: Record<string, unknown>): Promise<ChatToolResult
   const admin = getSupabaseAdmin();
   const term = sanitize(args.query);
   const kategori = sanitize(args.kategori);
+  const series = sanitize(args.series);
+  const productId = sanitize(args.product_id, 120);
   const warna = sanitize(args.warna).toLowerCase();
   const maxHarga = typeof args.max_harga === "number" ? args.max_harga : Number(args.max_harga) || 0;
 
@@ -217,7 +225,13 @@ async function cariProduk(args: Record<string, unknown>): Promise<ChatToolResult
     )
     .eq("is_published", true);
 
-  if (term) query = query.or(`name.ilike.%${term}%,category.ilike.%${term}%,kain.ilike.%${term}%,series.ilike.%${term}%`);
+  if (productId) {
+    // Produk yang pasti dari tombol "Tanya": jangan campur dengan query teks bebas.
+    query = query.eq("id", productId);
+  } else {
+    if (term) query = query.or(`name.ilike.%${term}%,category.ilike.%${term}%,kain.ilike.%${term}%,series.ilike.%${term}%`);
+    if (series) query = query.ilike("series", `%${series}%`);
+  }
   if (kategori) query = query.ilike("category", `%${kategori}%`);
 
   const { data, error } = await query.limit(30);

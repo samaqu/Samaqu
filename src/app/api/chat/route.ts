@@ -107,6 +107,7 @@ export async function POST(req: NextRequest) {
     locale?: unknown;
     customerName?: unknown;
     customerPhone?: unknown;
+    productId?: unknown;
   };
   try {
     body = await req.json();
@@ -166,6 +167,8 @@ export async function POST(req: NextRequest) {
     typeof body.customerPhone === "string"
       ? body.customerPhone.replace(/[^\d+]/g, "").slice(0, 20)
       : null;
+  const productId =
+    typeof body.productId === "string" ? body.productId.trim().slice(0, 120) : null;
   const question = messages[messages.length - 1].content;
   const questionImages = messages[messages.length - 1].images ?? [];
 
@@ -177,7 +180,13 @@ export async function POST(req: NextRequest) {
     .slice(0, 1800);
 
   const knowledge = await getKnowledgeContext();
-  const system = buildSystemPrompt(knowledge, profile.extraInstructions, CHAT_PERSONA);
+  const productNote = productId
+    ? `\n\nKONTEKS PRODUK: Pelanggan menekan tombol Tanya untuk produk id="${productId}". ` +
+      `Saat butuh data produk, panggil cari_produk dengan product_id="${productId}". ` +
+      `Jangan bilang produk tidak ditemukan sebelum memakai product_id ini.`
+    : "";
+  const system =
+    buildSystemPrompt(knowledge, profile.extraInstructions, CHAT_PERSONA) + productNote;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({

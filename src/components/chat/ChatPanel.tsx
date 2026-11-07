@@ -123,7 +123,7 @@ export default function ChatPanel({
     }
   }
 
-  async function send(textOverride?: string) {
+  async function send(textOverride?: string, productId?: string) {
     if (!identityReady) return;
     const text = (textOverride ?? input).trim();
     if ((!text && !imageUrl) || loading || uploading) return;
@@ -150,6 +150,7 @@ export default function ChatPanel({
           locale,
           customerName: identity.name,
           customerPhone: identity.phone,
+          ...(productId ? { productId } : {}),
         }),
       });
 
@@ -334,7 +335,12 @@ export default function ChatPanel({
                       </a>
                       <button
                         type="button"
-                        onClick={() => send(`${t("askProductMsg")} ${p.name}`)}
+                        onClick={() =>
+                          send(
+                            `${t("askProductMsg")} ${p.name}${p.series ? ` series ${p.series}` : ""}`,
+                            p.id,
+                          )
+                        }
                         className="text-[11px] font-medium px-2 py-0.5"
                         style={{ color: "var(--fg3, #a1a1aa)" }}
                       >
