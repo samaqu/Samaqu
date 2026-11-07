@@ -127,6 +127,8 @@ export default function PerluReviewView() {
   const [preview, setPreview] = useState("");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
+  const [dialog, setDialog] = useState<{ kind: "approve" | "reject"; draft: Draft } | null>(null);
+  const [rejectReason, setRejectReason] = useState("Data belum sesuai");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -202,19 +204,29 @@ export default function PerluReviewView() {
     setNotice("Balasan terkirim ke customer dan instruksi disimpan sebagai pelajaran.");
   };
 
-  const approveDraft = async () => {
-    if (!selectedDraft) return;
-    if (!window.confirm(`Setujui draft ${selectedDraft.customer_name || "ini"}? Order dan stok akan dibuat.`)) return;
-    const json = await run("draft_approve", { id: selectedDraft.id });
-    if (json?.order_number) setNotice(`Order ${json.order_number} berhasil dibuat.`);
+  const askApprove = () => {
+    if (selectedDraft) setDialog({ kind: "approve", draft: selectedDraft });
   };
 
-  const rejectDraft = async () => {
-    if (!selectedDraft) return;
-    const reason = window.prompt("Alasan tolak draft?", "Data belum sesuai");
-    if (!reason) return;
-    await run("draft_reject", { id: selectedDraft.id, reason });
-    setNotice("Draft ditolak. Tidak ada order/stok yang berubah.");
+  const askReject = () => {
+    if (selectedDraft) {
+      setRejectReason("Data belum sesuai");
+      setDialog({ kind: "reject", draft: selectedDraft });
+    }
+  };
+
+  const confirmDialog = async () => {
+    if (!dialog) return;
+    if (dialog.kind === "approve") {
+      const json = await run("draft_approve", { id: dialog.draft.id });
+      if (json?.order_number) setNotice(`Order ${json.order_number} berhasil dibuat.`);
+    } else {
+      const reason = rejectReason.trim();
+      if (!reason) return;
+      await run("draft_reject", { id: dialog.draft.id, reason });
+      setNotice("Draft ditolak. Tidak ada order/stok yang berubah.");
+    }
+    setDialog(null);
   };
 
   return (
@@ -430,13 +442,92 @@ export default function PerluReviewView() {
               <DraftDetail
                 draft={selectedDraft}
                 busy={Boolean(busy)}
-                onApprove={() => void approveDraft()}
-                onReject={() => void rejectDraft()}
+                onApprove={askApprove}
+                onReject={askReject}
               />
             )}
           </div>
         </div>
       )}
+
+      {dialog ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]"
+          onMouseDown={() => {
+            if (!busy) setDialog(null);
+          }}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-2xl border bg-white shadow-2xl"
+            style={{ borderColor: "#E7E6E1" }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start gap-3 p-5 pb-3">
+              <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                style={{
+                  background: dialog.kind === "approve" ? "#E3F2E8" : "#FCE8E8",
+                  color: dialog.kind === "approve" ? "#1F7A4D" : "#9B2C2C",
+                }}
+              >
+                {dialog.kind === "approve" ? <Check size={20} /> : <X size={20} />}
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-base font-black" style={{ color: "#141414" }}>
+                  {dialog.kind === "approve" ? "Setujui draft transaksi?" : "Tolak draft transaksi?"}
+                </h2>
+                <p className="mt-1 text-sm" style={{ color: "#6B6A64" }}>
+                  {dialog.kind === "approve"
+                    ? `${dialog.draft.customer_name || "Customer"} · ${money(totalDraft(dialog.draft.payload))}`
+                    : "Draft akan ditolak dan tidak membuat order."}
+                </p>
+              </div>
+            </div>
+
+            {dialog.kind === "approve" ? (
+              <div className="mx-5 rounded-xl border px-3 py-2.5 text-xs" style={{ background: "#FBF6EA", borderColor: "#E8D4A4", color: "#6B4D12" }}>
+                Stok akan dipotong, order dibuat, dan status menjadi <b>Lunas</b>. Pastikan bukti transfer dan alamat sudah benar.
+              </div>
+            ) : (
+              <div className="mx-5">
+                <label className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "#8A8880" }}>
+                  Alasan penolakan
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(event) => setRejectReason(event.target.value)}
+                  rows={3}
+                  autoFocus
+                  className="mt-1.5 w-full resize-none rounded-xl border px-3 py-2 text-sm outline-none"
+                  style={{ borderColor: "#E7E6E1", color: "#141414" }}
+                />
+              </div>
+            )}
+
+            <div className="mt-4 flex justify-end gap-2 border-t p-4" style={{ borderColor: "#E7E6E1" }}>
+              <button
+                type="button"
+                onClick={() => setDialog(null)}
+                disabled={Boolean(busy)}
+                className="h-10 rounded-xl border px-4 text-xs font-bold disabled:opacity-50"
+                style={{ borderColor: "#E7E6E1", color: "#6B6A64", background: "#fff" }}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmDialog()}
+                disabled={Boolean(busy) || (dialog.kind === "reject" && !rejectReason.trim())}
+                className="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold text-white disabled:opacity-50"
+                style={{ background: dialog.kind === "approve" ? "#1F7A4D" : "#9B2C2C" }}
+              >
+                {busy ? <Loader2 className="animate-spin" size={15} /> : dialog.kind === "approve" ? <Check size={15} /> : <X size={15} />}
+                {dialog.kind === "approve" ? "Setujui & Proses" : "Tolak draft"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
