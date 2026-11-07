@@ -15,6 +15,7 @@ import { checkTariffSemua } from "./jnt/tariff";
 import { layananByCode } from "./jnt/layanan";
 import { getJntConfig } from "./jnt/config";
 import { getSendSiteCode, resolveTariffCodes, JNT_AREAS } from "./jnt/area-mapping";
+import { isVideoUrl } from "./product-thumbnail";
 import {
   FALLBACK_ITEM_WEIGHT_GRAMS,
   productWeightMapFromRows,
@@ -26,6 +27,7 @@ export interface ChatProductCard {
   id: string;
   name: string;
   category: string;
+  series: string | null;
   price: number;
   cyp: boolean;
   image: string | null;
@@ -250,6 +252,28 @@ async function cariProduk(args: Record<string, unknown>): Promise<ChatToolResult
     byProduct.set(p.id as string, variants);
   }
 
+  // Foto kartu: ambil foto pertama yang BUKAN video dari `product_images`.
+  // `products.image` sering berisi video (00_semua_video.mp4), jadi tidak bisa dipakai langsung.
+  const imageIds = products.map((p) => String(p.id));
+  const { data: imageRows, error: imageError } = await admin
+    .from("product_images")
+    .select("product_id, url, is_video, display_order")
+    .in("product_id", imageIds)
+    .order("display_order");
+  if (imageError) console.error("[CHAT-TOOL] product_images error:", imageError.message);
+
+  const imageByProduct = new Map<string, string>();
+  for (const row of (imageRows ?? []) as {
+    product_id?: string | null;
+    url?: string | null;
+    is_video?: boolean | null;
+  }[]) {
+    const productId = String(row.product_id ?? "");
+    const url = String(row.url ?? "");
+    if (!productId || !url || row.is_video || isVideoUrl(url)) continue;
+    if (!imageByProduct.has(productId)) imageByProduct.set(productId, url);
+  }
+
   const cards: ChatProductCard[] = [];
   const lines = products.map((p) => {
     const jenis = p.jenis_kain as { name?: string; material?: string } | null;
@@ -262,9 +286,11 @@ async function cariProduk(args: Record<string, unknown>): Promise<ChatToolResult
       id: p.id as string,
       name: p.name as string,
       category: (p.category as string) || "-",
+      series: (p.series as string) || null,
       price,
       cyp,
-      image: toThumbnail((p.image as string) || null),
+      image:
+        imageByProduct.get(String(p.id)) || toThumbnail((p.image as string) || null),
     });
     return `- ${p.name} [${p.category}] (id: ${p.id}) | kain ${kain}${jenis?.material ? ` (${jenis.material})` : ""}${p.series ? ` | series ${p.series}` : ""} | ${priceLabel} | warna: ${colors} | stok (warna → ukuran:jumlah): ${summarizeStock(byProduct.get(p.id as string) || [])}`;
   });

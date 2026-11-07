@@ -317,7 +317,11 @@ export default function ChatPanel({
                       <p className="text-xs font-semibold truncate" style={{ color: "var(--fg, #18181b)" }}>{p.name}</p>
                       <p className="text-[11px] font-medium" style={{ color: "var(--gold, #b08d57)" }}>
                         {p.cyp ? `Mulai Rp ${p.price.toLocaleString("id-ID")}` : `Rp ${p.price.toLocaleString("id-ID")}`}
-                        <span style={{ color: "var(--fg3, #a1a1aa)" }}>{" · "}{p.category}</span>
+                        <span style={{ color: "var(--fg3, #a1a1aa)" }}>
+                          {" · "}
+                          {p.series ? `${p.series} · ` : ""}
+                          {p.category}
+                        </span>
                       </p>
                     </div>
                     <div className="shrink-0 flex flex-col items-end gap-1">
