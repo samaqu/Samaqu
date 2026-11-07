@@ -8,9 +8,9 @@ import { supabase } from "@/lib/supabase";
 
 /* ── Video hero ──
    URL-nya diganti dari dashboard admin: Konten Website → Hero / Banner Utama →
-   "Video Hero (link Cloudinary)", disimpan di `hero_content.video_url`.
+   "Video Hero", disimpan di `hero_content.video_url`.
    Kalau kolomnya kosong atau videonya gagal dimuat, dipakai video bawaan di bawah. */
-const HERO_VIDEO_DEFAULT = "https://res.cloudinary.com/kq5d3al5/video/upload/v1791866370/KONTEN_VIDEO_WEBSITE.mp4";
+const HERO_VIDEO_DEFAULT = "https://samaqu-media.samaqu.workers.dev/KONTEN%20VIDEO%20WEBSITE.mp4";
 
 /** Semua teks hero hitam (video sudah final, terang) — lihat permintaan pemilik. */
 const HERO_TEXT = "#000000";
