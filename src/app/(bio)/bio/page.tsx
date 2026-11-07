@@ -10,10 +10,10 @@ import {
 } from "@/lib/open-order-window";
 
 /**
- * Konten Bio + status Open Order global. 180 detik (dulu 60): konten Biolink diatur admin
- * dan jarang berubah, sementara banner status tetap akurat dalam hitungan menit.
+ * Konten Bio + status Open Order global. 600 detik (dulu 180/60): konten Biolink diatur admin
+ * dan jarang berubah, sementara banner status masih akurat dalam hitungan menit.
  */
-export const revalidate = 180;
+export const revalidate = 600;
 
 export default async function Page() {
   const content = await fetchBioPageContent();

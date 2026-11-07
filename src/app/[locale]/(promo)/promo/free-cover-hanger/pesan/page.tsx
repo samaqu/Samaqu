@@ -14,12 +14,12 @@ import PromoOrderWizard from "@/components/promo/free-cover-hanger/order/PromoOr
  * tersentuh.
  */
 /**
- * 180 detik (dulu 60). Halaman ini memang membaca data server (status promo, kuota,
- * periode), jadi tidak bisa dibiarkan basi lama — tapi 60 detik membuang 3× lebih banyak
+ * 600 detik (dulu 180/60). Halaman ini membaca data server (status promo, kuota,
+ * periode), jadi tidak bisa dibiarkan basi lama — tapi 180 detik membuang lebih banyak
  * penulisan cache tanpa manfaat: katalog & ongkir di wizard tetap diambil di browser.
  * Perubahan dari admin tetap instan untuk produk/katalog lewat /api/revalidate.
  */
-export const revalidate = 180;
+export const revalidate = 600;
 
 export default async function PromoOrderPage() {
   const promo = await readPromoFchSettings();
