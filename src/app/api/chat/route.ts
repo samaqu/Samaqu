@@ -25,6 +25,12 @@ const ERROR_REPLY = "Maaf, asisten sedang tidak bisa menjawab. Coba lagi ya \u{1
 const MEDIA_ERROR_REPLY =
   "Maaf Kak, gambarnya belum bisa dibaca. Coba kirim ulang atau tulis pertanyaannya ya \u{1F64F}";
 
+// Kartu produk hanya relevan untuk pertanyaan produk. Saat customer sudah masuk
+// ongkir/total/checkout, kartu produk justru bikin layar penuh dan mengaburkan jawaban.
+const SHIPPING_INTENT_RE = /\b(ongkir|ongkos|kirim|pengiriman|total|checkout|bayar|pembayaran)\b/i;
+const PRODUCT_INTENT_RE =
+  /\b(produk|rekomendasi|rekomendasiin|thobe|kandora|koko|vest|kabak|warna|ukuran|size|stok|ready|harga|series)\b/i;
+
 const R2_PUBLIC_BASE = (process.env.R2_PUBLIC_BASE_URL || "").replace(/\/+$/, "");
 
 function allowedImageUrl(url: string): boolean {
@@ -273,7 +279,13 @@ export async function POST(req: NextRequest) {
           break;
         }
 
-        if (productCards.length) send({ products: productCards.slice(0, 4) });
+        if (
+          productCards.length > 0 &&
+          PRODUCT_INTENT_RE.test(question) &&
+          !SHIPPING_INTENT_RE.test(question)
+        ) {
+          send({ products: productCards.slice(0, 4) });
+        }
         send({ done: true });
       } catch (error) {
         console.error("[CHAT] Permintaan gagal:", error);
