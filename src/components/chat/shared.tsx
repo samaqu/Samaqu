@@ -13,10 +13,8 @@ export interface Msg {
 // Tombol "Lanjut chat ke WhatsApp admin" di panel chat — dimatikan sementara.
 export const SHOW_WHATSAPP_HANDOFF = false;
 
-/** Kunci localStorage riwayat chat (biar percakapan awet saat refresh). */
+/** Kunci localStorage lama; dihapus saat chat dibuka (riwayat tidak disimpan lagi). */
 export const HISTORY_KEY = "samaqu_chat_history";
-/** Batas pesan yang disimpan/ditampilkan dari riwayat. */
-export const HISTORY_MAX = 30;
 
 /** Empat pertanyaan cepat yang muncul di awal percakapan. */
 export const SUGGESTION_KEYS = ["suggestStock", "suggestSize", "suggestOrder", "suggestPay"] as const;

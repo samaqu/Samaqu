@@ -8,7 +8,6 @@ import { validateMediaFile } from "@/lib/cloudinary";
 import { uploadChatImage } from "@/lib/chat-upload";
 import {
   HISTORY_KEY,
-  HISTORY_MAX,
   SHOW_WHATSAPP_HANDOFF,
   SUGGESTION_KEYS,
   RobotIcon,
@@ -17,7 +16,7 @@ import {
 } from "./shared";
 
 /**
- * Panel chat yang berat (streaming, upload, riwayat). Dimuat terpisah oleh
+ * Panel chat yang berat (streaming, upload). Dimuat terpisah oleh
  * ChatWidget hanya saat pengunjung membuka chat atau saat idle.
  */
 export default function ChatPanel({
@@ -32,18 +31,10 @@ export default function ChatPanel({
   const t = useSafeTranslations("chat");
   const locale = useSafeLocale();
 
-  const [messages, setMessages] = useState<Msg[]>(() => {
-    try {
-      const raw = localStorage.getItem(HISTORY_KEY);
-      if (raw) {
-        const saved = JSON.parse(raw) as Msg[];
-        if (Array.isArray(saved) && saved.length) return saved.slice(-HISTORY_MAX);
-      }
-    } catch {
-      // riwayat rusak → mulai dari awal
-    }
-    return [{ role: "assistant", content: greeting || t("greeting") }];
-  });
+  // Riwayat chat TIDAK disimpan. Begitu panel ditutup/pindah halaman, percakapan hilang.
+  const [messages, setMessages] = useState<Msg[]>(() => [
+    { role: "assistant", content: greeting || t("greeting") },
+  ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -108,14 +99,14 @@ export default function ChatPanel({
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
 
-  // Riwayat awet: percakapan tidak hilang saat refresh.
+  // Bersihkan riwayat lama yang sempat tersimpan di browser pengunjung.
   useEffect(() => {
     try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(messages.slice(-HISTORY_MAX)));
+      localStorage.removeItem(HISTORY_KEY);
     } catch {
-      // storage penuh / mode privat → abaikan
+      // storage diblokir / mode privat → tidak ada yang perlu dibersihkan
     }
-  }, [messages]);
+  }, []);
 
   async function handleImageFile(file: File | null | undefined) {
     if (!file) return;

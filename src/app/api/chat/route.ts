@@ -22,6 +22,8 @@ import { checkRateLimit } from "@/lib/rate-limit";
 const REFUSAL =
   "Maaf ya Kak, aku cuma bisa bantu seputar produk & layanan SAMAQU \u{1F60A}";
 const ERROR_REPLY = "Maaf, asisten sedang tidak bisa menjawab. Coba lagi ya \u{1F64F}";
+const MEDIA_ERROR_REPLY =
+  "Maaf Kak, gambarnya belum bisa dibaca. Coba kirim ulang atau tulis pertanyaannya ya \u{1F64F}";
 
 const R2_PUBLIC_BASE = (process.env.R2_PUBLIC_BASE_URL || "").replace(/\/+$/, "");
 
@@ -135,8 +137,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Tidak ada pertanyaan." }, { status: 400 });
   }
 
+  // Gambar dari pesan LAMA tidak dikirim ulang ke model. URL lama bisa sudah mati
+  // dan membuat MiMo menolak seluruh request ("failed to download media content").
+  const lastMessageIndex = messages.length - 1;
+  const messagesForModel = messages.map((m, index) => ({
+    ...m,
+    images: index === lastMessageIndex ? m.images : [],
+  }));
+
   // Pesan untuk MiMo: kalau ada gambar, content jadi array (teks + image_url) — MiMo multimodal.
-  const mimoMessages = messages.map((m) =>
+  const mimoMessages = messagesForModel.map((m) =>
     m.images.length
       ? {
           role: m.role,
@@ -183,24 +193,52 @@ export async function POST(req: NextRequest) {
       try {
         const convo: Array<Record<string, unknown>> = [{ role: "system", content: system }, ...mimoMessages];
 
-        for (let round = 0; round < profile.maxToolRounds; round++) {
-          if (round > 0) send({ reset: true }); // buang teks parsial sebelum putaran tool berikutnya
-
-          const res = await streamChatCompletion({
+        const callModel = (msgs: Array<Record<string, unknown>>) =>
+          streamChatCompletion({
             baseUrl: profile.baseUrl,
             apiKey: profile.apiKey,
             model: profile.model,
-            messages: convo,
+            messages: msgs,
             tools: CHAT_TOOLS,
             temperature: profile.temperature,
             maxTokens: profile.maxTokens,
             timeoutMs: profile.timeoutMs,
           });
 
-          if (!res.ok || !res.body) {
-            const detail = await res.text().catch(() => "");
-            console.error("[CHAT] MiMo error:", res.status, detail);
-            failure = `MiMo HTTP ${res.status}: ${String(detail).slice(0, 300)}`;
+        for (let round = 0; round < profile.maxToolRounds; round++) {
+          if (round > 0) send({ reset: true }); // buang teks parsial sebelum putaran tool berikutnya
+
+          let res = await callModel(convo);
+
+          if (!res.ok) {
+            let detail = await res.text().catch(() => "");
+            const mediaError =
+              res.status === 400 && /media content|download or process media/i.test(detail);
+
+            // Kalau gambar gagal diproses, ulangi sekali tanpa gambar supaya pertanyaan teks tetap dijawab.
+            if (mediaError) {
+              const textOnly = mimoMessages.map((m) => {
+                if (!Array.isArray(m.content)) return m;
+                const text = m.content
+                  .filter((part) => (part as { type?: string }).type === "text")
+                  .map((part) => (part as { text?: string }).text || "")
+                  .join("\n");
+                return { role: m.role, content: text || "(gambar tidak bisa dibaca)" };
+              });
+              convo.splice(0, convo.length, { role: "system", content: system }, ...textOnly);
+              res = await callModel(convo);
+              if (!res.ok) detail = await res.text().catch(() => "");
+            }
+
+            if (!res.ok || !res.body) {
+              console.error("[CHAT] MiMo error:", res.status, detail);
+              failure = `MiMo HTTP ${res.status}: ${String(detail).slice(0, 300)}`;
+              send({ error: mediaError ? MEDIA_ERROR_REPLY : ERROR_REPLY });
+              break;
+            }
+          } else if (!res.body) {
+            console.error("[CHAT] MiMo error:", res.status, "empty body");
+            failure = `MiMo HTTP ${res.status}: empty body`;
             send({ error: ERROR_REPLY });
             break;
           }
