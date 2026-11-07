@@ -86,9 +86,25 @@ export async function POST(req: NextRequest) {
   const target = normalizeWhatsappTarget(String(body?.target ?? ""));
   const message = String(body?.message ?? "").trim();
   const inboxId = body?.inbox_id ? String(body.inbox_id) : null;
+  const mediaUrl = String(body?.url ?? "").trim();
+  const mediaFilename = String(body?.filename ?? "").trim().slice(0, 120);
 
   if (!target || !message) {
     return NextResponse.json({ error: "target dan message wajib" }, { status: 400 });
+  }
+
+  if (mediaUrl) {
+    const base = (process.env.R2_PUBLIC_BASE_URL || "").replace(/\/+$/, "");
+    const allowed =
+      /^https:\/\/res\.cloudinary\.com\//.test(mediaUrl) ||
+      /^https:\/\/samaqu-media\.samaqu\.workers\.dev\//.test(mediaUrl) ||
+      (Boolean(base) && mediaUrl.startsWith(`${base}/`));
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "URL attachment harus dari R2/Cloudinary SAMAQU" },
+        { status: 400 },
+      );
+    }
   }
 
   const { customer } = await getFonnteConfigs();
@@ -116,6 +132,13 @@ export async function POST(req: NextRequest) {
     if (existing.status === "sent") {
       return NextResponse.json(
         { error: "Pesan ini sudah dibalas sebelumnya. Tidak dikirim ulang." },
+        { status: 409 },
+      );
+    }
+    // Admin sudah ambil alih / pesan sudah ditutup: bot yang telanjur klaim tidak boleh kirim.
+    if (existing.status === "skipped" || existing.status === "failed") {
+      return NextResponse.json(
+        { error: "Pesan ini sudah ditutup atau diambil alih admin. Bot tidak mengirim." },
         { status: 409 },
       );
     }
@@ -177,7 +200,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const sent = await sendFonnteMessage(customer.token, target, message);
+  const sent = await sendFonnteMessage(customer.token, target, message, {
+    url: mediaUrl || undefined,
+    filename: mediaFilename || undefined,
+  });
   const now = new Date().toISOString();
 
   if (!sent) {

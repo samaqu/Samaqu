@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized, stockStatus } from "@/lib/ops-auth";
 import { compareOpsRows, productSortKey } from "@/lib/ops-order";
+import { isVideoUrl } from "@/lib/product-thumbnail";
 
 /**
  * Produk untuk dashboard internal.
@@ -77,6 +78,27 @@ async function withTotals(admin: ReturnType<typeof getSupabaseAdmin>, products: 
       (componentStock[v.product_id] || 0) + (effectiveMap.get(key) ?? 0);
   }
 
+  // Foto produk untuk bot WA (attachment). `products.image` sering video, jadi
+  // ambil foto pertama yang BUKAN video dari `product_images`.
+  const productIds = products.map((p) => p.id).filter(Boolean);
+  const { data: imageRows } = await admin
+    .from("product_images")
+    .select("product_id, url, is_video, display_order")
+    .in("product_id", productIds)
+    .order("display_order");
+
+  const photoMap = new Map<string, string>();
+  for (const row of (imageRows ?? []) as {
+    product_id?: string | null;
+    url?: string | null;
+    is_video?: boolean | null;
+  }[]) {
+    const productId = String(row.product_id ?? "");
+    const url = String(row.url ?? "");
+    if (!productId || !url || row.is_video || isVideoUrl(url)) continue;
+    if (!photoMap.has(productId)) photoMap.set(productId, url);
+  }
+
   return products.map((p) => {
     const total = ownStock[p.id] || 0;
     const fromComponents = componentStock[p.id] || 0;
@@ -130,6 +152,10 @@ async function withTotals(admin: ReturnType<typeof getSupabaseAdmin>, products: 
       series: p.series,
       colors: p.colors,
       image: p.image,
+      // Foto pertama non-video (untuk attachment WA); null kalau produk belum punya foto.
+      photo:
+        photoMap.get(p.id) ||
+        (typeof p.image === "string" && p.image && !isVideoUrl(p.image) ? p.image : null),
       // Penanda "tampil di website" (kolom `products.is_published`, default true).
       is_published: p.is_published !== false,
     };

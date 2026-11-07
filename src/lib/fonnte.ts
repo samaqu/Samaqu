@@ -186,18 +186,23 @@ export async function resolveAdminTargets(configuredNumber?: string): Promise<st
 export async function sendFonnteMessage(
   token: string,
   target: string,
-  message: string
+  message: string,
+  opts: { url?: string; filename?: string } = {}
 ): Promise<boolean> {
   if (!token || !target) return false;
 
   try {
+    const form = new URLSearchParams({ target, message, countryCode: "62" });
+    if (opts.url) form.set("url", opts.url);
+    if (opts.filename) form.set("filename", opts.filename);
+
     const response = await fetch(FONNTE_ENDPOINT, {
       method: "POST",
       headers: {
         Authorization: token,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({ target, message, countryCode: "62" }).toString(),
+      body: form.toString(),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
 
