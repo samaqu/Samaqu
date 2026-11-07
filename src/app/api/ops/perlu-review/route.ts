@@ -213,6 +213,54 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, item: data });
   }
 
+  if (action === "draft_reject") {
+    const { error } = await admin
+      .from("order_drafts")
+      .update({
+        status: "rejected",
+        reject_reason: String(body?.reason || "Ditolak admin"),
+        reviewed_by: actor,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("status", "pending");
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === "draft_approve") {
+    const { data: draft, error } = await admin
+      .from("order_drafts")
+      .select("*")
+      .eq("id", id)
+      .eq("status", "pending")
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!draft) return bad("Draft sudah diproses.", 409);
+    const token = req.headers.get("authorization") || "";
+    const txRes = await fetch(new URL("/api/ops/transaksi", req.url), {
+      method: "POST",
+      headers: { Authorization: token, "Content-Type": "application/json" },
+      body: JSON.stringify(draft.payload),
+    });
+    const txJson = await txRes.json().catch(() => null);
+    if (!txRes.ok) return bad(txJson?.error || `Gagal membuat transaksi (${txRes.status})`);
+    await admin
+      .from("order_drafts")
+      .update({
+        status: "approved",
+        approved_order_number: txJson?.order_number || null,
+        reviewed_by: actor,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+    return NextResponse.json({ ok: true, order_number: txJson?.order_number, total: txJson?.total });
+  }
+
+  if (!action.startsWith("escalation_")) return bad("Aksi tidak dikenal.");
+
   const { data: escalation, error: escalationError } = await admin
     .from("wa_escalations")
     .select("*")
@@ -302,52 +350,6 @@ export async function POST(req: NextRequest) {
       .eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
-  }
-
-  if (action === "draft_reject") {
-    const { error } = await admin
-      .from("order_drafts")
-      .update({
-        status: "rejected",
-        reject_reason: String(body?.reason || "Ditolak admin"),
-        reviewed_by: actor,
-        reviewed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .eq("status", "pending");
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true });
-  }
-
-  if (action === "draft_approve") {
-    const { data: draft, error } = await admin
-      .from("order_drafts")
-      .select("*")
-      .eq("id", id)
-      .eq("status", "pending")
-      .maybeSingle();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    if (!draft) return bad("Draft sudah diproses.", 409);
-    const token = req.headers.get("authorization") || "";
-    const txRes = await fetch(new URL("/api/ops/transaksi", req.url), {
-      method: "POST",
-      headers: { Authorization: token, "Content-Type": "application/json" },
-      body: JSON.stringify(draft.payload),
-    });
-    const txJson = await txRes.json().catch(() => null);
-    if (!txRes.ok) return bad(txJson?.error || `Gagal membuat transaksi (${txRes.status})`);
-    await admin
-      .from("order_drafts")
-      .update({
-        status: "approved",
-        approved_order_number: txJson?.order_number || null,
-        reviewed_by: actor,
-        reviewed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-    return NextResponse.json({ ok: true, order_number: txJson?.order_number, total: txJson?.total });
   }
 
   return bad("Aksi tidak dikenal.");
