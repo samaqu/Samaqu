@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Loader2, MessageSquare, RefreshCw, Send, Sparkles, Wallet } from "lucide-react";
+import { Check, Loader2, MessageSquare, RefreshCw, Sparkles, Users, Wallet } from "lucide-react";
 import { opsGet } from "@/app/(internal)/panel-admin/panel-api";
 
 type Activity = {
@@ -17,6 +17,7 @@ type Stats = {
   conversations: number;
   messages: number;
   handled: number;
+  leads: number;
   closing: number;
   nominal: number;
   handledRate: number;
@@ -26,6 +27,7 @@ type Stats = {
   growth: {
     conversations: number | null;
     handled: number | null;
+    leads: number | null;
     closing: number | null;
     nominal: number | null;
   };
@@ -188,11 +190,11 @@ export default function AiPerformanceView() {
               icon={<MessageSquare size={16} />}
             />
             <KpiCard
-              label="Ditangani AI"
-              value={number(stats.handled)}
-              delta={stats.growth.handled}
-              hint={`${stats.handledRate}% dari total chat`}
-              icon={<Send size={16} />}
+              label="Leads masuk"
+              value={number(stats.leads)}
+              delta={stats.growth.leads}
+              hint="Lead baru periode ini"
+              icon={<Users size={16} />}
               tone="#1f8a58"
             />
             <KpiCard
@@ -250,7 +252,7 @@ export default function AiPerformanceView() {
             ) : (
               <>Closing dihitung dari draft AI yang <b>disetujui admin</b> dan order-nya masih sah (diproses/dikirim/selesai).</>
             )}{" "}
-            Ditangani AI = nomor unik yang punya balasan keluar. Pesan grup dan draft/order batal tidak dihitung.
+            Leads masuk dihitung dari lead baru pada periode. Ditangani AI = nomor unik yang punya balasan keluar; pesan grup dan draft/order batal tidak dihitung.
           </p>
         </>
       ) : null}

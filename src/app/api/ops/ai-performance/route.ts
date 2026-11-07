@@ -119,11 +119,18 @@ async function periodStats(
   admin: ReturnType<typeof getSupabaseAdmin>,
   month: ReturnType<typeof jakartaMonthBounds>,
 ) {
-  const [rows, drafts, closingStats] = await Promise.all([
+  const [rows, drafts, closingStats, leadsResult] = await Promise.all([
     inboxRows(admin, month.startIso, month.endIso),
     approvedDrafts(admin, month.startIso, month.endIso),
     academyClosings(month.startIso, month.endIso).catch(() => null),
+    admin
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", month.startIso)
+      .lt("created_at", month.endIso),
   ]);
+  if (leadsResult.error) throw new Error(leadsResult.error.message);
+  const leads = leadsResult.count || 0;
 
   const senders = new Set(rows.map((row) => String(row.sender || "")).filter(Boolean));
   const handledSenders = new Set(
@@ -160,6 +167,7 @@ async function periodStats(
     conversations,
     messages: rows.length,
     handled,
+    leads,
     closing,
     nominal,
     handledRate: conversations > 0 ? Math.round((handled / conversations) * 1000) / 10 : 0,
@@ -196,6 +204,7 @@ export async function GET(req: NextRequest) {
         growth: {
           conversations: growth(currentStats.conversations, previousStats.conversations),
           handled: growth(currentStats.handled, previousStats.handled),
+          leads: growth(currentStats.leads, previousStats.leads),
           closing: growth(currentStats.closing, previousStats.closing),
           nominal: growth(currentStats.nominal, previousStats.nominal),
         },
