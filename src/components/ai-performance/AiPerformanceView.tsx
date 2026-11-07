@@ -200,7 +200,7 @@ export default function AiPerformanceView() {
               label="Chat ditangani AI"
               value={number(stats.aiHandled)}
               secondary={percent(stats.aiShare)}
-              hint={`Dari ${number(stats.conversations)} percakapan · ${number(stats.messages)} pesan masuk`}
+              hint={`${number(stats.conversations)} percakapan dari ${number(stats.messages)} pesan WhatsApp`}
               icon={<MessageSquare size={16} />}
             />
             <KpiCard
@@ -269,7 +269,8 @@ export default function AiPerformanceView() {
             Chat ditangani AI = percakapan unik periode ini dikurangi yang perlu bantuan admin
             (handover ke Pertanyaan AI atau sudah dibalas admin). Leads dicatat AI = lead periode
             ini yang nomornya ada di percakapan WhatsApp periode ini. Pesan grup dan draft/order
-            batal tidak dihitung.
+            batal tidak dihitung. 1 percakapan = 1 nomor customer unik; jumlah pesan WhatsApp
+            bukan jumlah lead.
           </p>
         </>
       ) : null}
