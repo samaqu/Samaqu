@@ -127,6 +127,7 @@ export default function DraftEditor({
   const [selectedSize, setSelectedSize] = useState("");
   const [addQty, setAddQty] = useState(1);
   const [addressEditing, setAddressEditing] = useState(false);
+  const [discountInput, setDiscountInput] = useState(String(Number(draft.payload?.discount) || ""));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -294,7 +295,7 @@ export default function DraftEditor({
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shippingCost = Number(draft.payload?.shipping_cost) || 0;
-  const discount = Number(draft.payload?.discount) || 0;
+  const discount = Math.min(Math.max(0, Math.round(Number(discountInput) || 0)), subtotal);
   const total = subtotal + shippingCost - discount;
   const addressLine = [
     shipping.address,
@@ -323,7 +324,7 @@ export default function DraftEditor({
         body: JSON.stringify({
           action: "draft_update",
           id: draft.id,
-          payload: { ...draft.payload, shipping, items },
+          payload: { ...draft.payload, shipping, items, discount },
         }),
       });
       const json = await res.json().catch(() => null);
@@ -625,13 +626,43 @@ export default function DraftEditor({
             </div>
           ) : null}
 
-          <div className="mb-2 mt-5 flex justify-between text-xs" style={{ color: "#8a7d83" }}>
-            <span>Subtotal</span><span>{money(subtotal)}</span>
+          <div className="mt-4 flex flex-col gap-2 rounded-2xl border px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "#e3ebf1", background: "#fbfcfd" }}>
+            <div>
+              <p className={labelClass} style={{ color: "#8a7d83" }}>Diskon</p>
+              <p className="mt-0.5 text-[11px]" style={{ color: "#9aacb8" }}>Potongan harga, maksimal subtotal.</p>
+            </div>
+            <div className="flex w-full items-center gap-2 sm:w-auto">
+              <div className="flex h-10 min-w-0 flex-1 items-center rounded-xl border bg-white px-3 sm:w-40 sm:flex-none" style={{ borderColor: "#d5e3ee" }}>
+                <span className="mr-1.5 text-xs font-bold" style={{ color: "#8a7d83" }}>Rp</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={subtotal}
+                  step={1000}
+                  value={discountInput}
+                  onChange={(event) => setDiscountInput(event.target.value)}
+                  placeholder="0"
+                  aria-label="Diskon dalam rupiah"
+                  className="min-w-0 flex-1 bg-transparent text-right text-sm font-bold tabular-nums outline-none"
+                  style={{ color: "#2a1a22" }}
+                />
+              </div>
+              {discount > 0 ? (
+                <button type="button" onClick={() => setDiscountInput("")} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] font-bold" style={{ color: "#2f6f9e", background: "#e8f3fb" }}>
+                  Hapus
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mb-2 mt-4 flex justify-between text-xs" style={{ color: "#8a7d83" }}>
+            <span>Subtotal</span><span className="tabular-nums">{money(subtotal)}</span>
           </div>
           <div className="flex justify-between text-xs" style={{ color: "#8a7d83" }}>
-            <span>Ongkir</span><span>{money(shippingCost)}</span>
+            <span>Ongkir</span><span className="tabular-nums">{money(shippingCost)}</span>
           </div>
-          {discount > 0 ? <div className="mt-1 flex justify-between text-xs" style={{ color: "#8a7d83" }}><span>Diskon</span><span>-{money(discount)}</span></div> : null}
+          {discount > 0 ? <div className="mt-1 flex justify-between text-xs" style={{ color: "#8a7d83" }}><span>Diskon</span><span className="tabular-nums">-{money(discount)}</span></div> : null}
 
           {error ? (
             <div className="mt-3 flex items-start gap-2 rounded-xl border px-3 py-2 text-xs" style={{ background: "#FCE8E8", borderColor: "#F3CFCB", color: "#9B2C2C" }}>

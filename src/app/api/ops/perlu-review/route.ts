@@ -280,6 +280,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const subtotal = normalized.reduce(
+      (sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
+      0,
+    );
     const nextPayload = {
       ...payload,
       customer_name: draft.customer_name,
@@ -292,7 +296,7 @@ export async function POST(req: NextRequest) {
         postal_code: String(shipping.postal_code).trim(),
       },
       shipping_cost: Math.max(0, Math.round(Number(payload?.shipping_cost) || 0)),
-      discount: Math.max(0, Math.round(Number(payload?.discount) || 0)),
+      discount: Math.min(Math.max(0, Math.round(Number(payload?.discount) || 0)), subtotal),
       items: normalized,
     };
     const { data, error } = await admin
