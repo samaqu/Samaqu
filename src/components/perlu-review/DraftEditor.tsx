@@ -29,6 +29,8 @@ type Variant = {
   product_name: string;
   series_name?: string;
   jenis_kain_name?: string;
+  category?: string;
+  image?: string;
   color?: string;
   price?: number;
   prices?: Record<string, number>;
@@ -43,6 +45,19 @@ type Item = {
   size: string;
   quantity: number;
   price: number;
+};
+
+type ProductGroup = {
+  key: string;
+  product_id: string;
+  name: string;
+  category: string;
+  kain: string;
+  image: string;
+  variants: Variant[];
+  series: string[];
+  warnas: string[];
+  stockTotal: number;
 };
 
 const money = (value: unknown) => "Rp" + Number(value || 0).toLocaleString("id-ID");
@@ -106,7 +121,9 @@ export default function DraftEditor({
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState("");
+  const [categoryChip, setCategoryChip] = useState("all");
+  const [selectedGroupKey, setSelectedGroupKey] = useState("");
+  const [selectedVariantId, setSelectedVariantId] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
   const [addQty, setAddQty] = useState(1);
   const [addressEditing, setAddressEditing] = useState(false);
@@ -132,23 +149,74 @@ export default function DraftEditor({
     };
   }, []);
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return variants;
-    return variants.filter((item) =>
-      `${item.product_name} ${item.series_name || ""} ${item.color || ""}`.toLowerCase().includes(term),
-    );
-  }, [variants, search]);
+  const productGroups = useMemo(() => {
+    const map = new Map<string, ProductGroup>();
+    for (const variant of variants) {
+      const category = String(variant.category || "");
+      const kain = String(variant.jenis_kain_name || "");
+      const key = `${category}|${kain}|${variant.product_name}`;
+      let group = map.get(key);
+      if (!group) {
+        group = {
+          key,
+          product_id: variant.product_id,
+          name: variant.product_name,
+          category,
+          kain,
+          image: "",
+          variants: [],
+          series: [],
+          warnas: [],
+          stockTotal: 0,
+        };
+        map.set(key, group);
+      }
+      group.variants.push(variant);
+      if (!group.image && variant.image) group.image = variant.image;
+      if (variant.series_name && !group.series.includes(variant.series_name)) group.series.push(variant.series_name);
+      const warna = variant.color && variant.color !== "default" ? variant.color : variant.product_name;
+      if (!group.warnas.includes(warna)) group.warnas.push(warna);
+      group.stockTotal += sizesOf(variant).reduce((sum, size) => sum + stockOf(variant, size), 0);
+    }
+    return [...map.values()];
+  }, [variants]);
 
-  const selectedVariant = variants.find((item) => item.id === selectedProduct);
+  const categoryOptions = useMemo(
+    () => [...new Set(productGroups.map((group) => group.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "id")),
+    [productGroups],
+  );
+
+  const visibleGroups = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return productGroups
+      .filter((group) => categoryChip === "all" || group.category === categoryChip)
+      .filter((group) => {
+        if (!term) return true;
+        return `${group.name} ${group.kain} ${group.category} ${group.warnas.join(" ")}`.toLowerCase().includes(term);
+      })
+      .sort((a, b) => a.category.localeCompare(b.category, "id") || a.kain.localeCompare(b.kain, "id") || a.name.localeCompare(b.name, "id"));
+  }, [productGroups, categoryChip, search]);
+
+  const selectedGroup = productGroups.find((group) => group.key === selectedGroupKey) || null;
+  const selectedVariant =
+    selectedGroup?.variants.find((variant) => variant.id === selectedVariantId) || selectedGroup?.variants[0];
   const availableSizes = selectedVariant
     ? sizesOf(selectedVariant).filter((size) => stockOf(selectedVariant, size) > 0)
     : [];
 
-  function selectProduct(id: string) {
-    setSelectedProduct(id);
-    const variant = variants.find((item) => item.id === id);
+  function chooseGroup(group: ProductGroup) {
+    const variant = group.variants[0];
     const first = variant ? sizesOf(variant).find((size) => stockOf(variant, size) > 0) : "";
+    setSelectedGroupKey(group.key);
+    setSelectedVariantId(variant?.id || "");
+    setSelectedSize(first || "");
+    setAddQty(1);
+    setError("");
+  }
+
+  function chooseVariant(variant: Variant) {
+    const first = sizesOf(variant).find((size) => stockOf(variant, size) > 0);
+    setSelectedVariantId(variant.id);
     setSelectedSize(first || "");
     setAddQty(1);
     setError("");
@@ -215,7 +283,8 @@ export default function DraftEditor({
       copy[index] = { ...copy[index], quantity: copy[index].quantity + quantity };
       return copy;
     });
-    setSelectedProduct("");
+    setSelectedGroupKey("");
+    setSelectedVariantId("");
     setSelectedSize("");
     setAddQty(1);
     setSearch("");
@@ -356,8 +425,12 @@ export default function DraftEditor({
               return (
                 <div key={`${item.product_id}-${item.color}-${item.size}-${index}`} className="rounded-2xl border p-3.5" style={{ borderColor: "#e3ebf1", background: "#fff" }}>
                   <div className="flex items-start gap-3">
-                    <div className="flex h-16 w-14 shrink-0 items-center justify-center rounded-xl" style={{ background: "#f5f1ee", color: "#b9a99c" }}>
-                      <Shirt size={28} strokeWidth={1.5} />
+                    <div className="flex h-16 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl" style={{ background: "#f5f1ee", color: "#b9a99c" }}>
+                      {variant?.image ? (
+                        <img src={variant.image} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <Shirt size={28} strokeWidth={1.5} />
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
@@ -414,38 +487,141 @@ export default function DraftEditor({
           </button>
 
           {addOpen ? (
-            <div className="mt-3 rounded-2xl border p-3.5" style={{ borderColor: "#e3ebf1", background: "#fbfcfd" }}>
-              <div className="flex items-center gap-2 rounded-xl border bg-white px-3" style={{ borderColor: "#e3ebf1" }}>
-                <Search size={15} style={{ color: "#9aacb8" }} />
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama / series / warna..." className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none" style={{ color: "#2a1a22" }} />
-              </div>
-              <select value={selectedProduct} onChange={(event) => selectProduct(event.target.value)} className={`${inputClass} mt-2`} style={inputStyle}>
-                <option value="">{loadingProducts ? "Memuat produk..." : "Pilih produk"}</option>
-                {filtered.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.product_name}{item.series_name ? ` · ${item.series_name}` : ""}{item.color && item.color !== "default" ? ` · ${item.color}` : ""}
-                  </option>
-                ))}
-              </select>
-              {selectedVariant ? (
-                <div className="mt-2 flex flex-wrap items-end gap-2">
-                  <div className="min-w-[120px] flex-1">
-                    <label className={labelClass} style={{ color: "#8a7d83" }}>Ukuran</label>
-                    <select value={selectedSize} onChange={(event) => setSelectedSize(event.target.value)} className={`${inputClass} mt-1`} style={inputStyle}>
-                      <option value="">Pilih ukuran</option>
-                      {availableSizes.map((size) => <option key={size} value={size}>{size} · stok {stockOf(selectedVariant, size)}</option>)}
-                    </select>
-                  </div>
-                  <div className="w-20">
-                    <label className={labelClass} style={{ color: "#8a7d83" }}>Qty</label>
-                    <input type="number" min={1} value={addQty} onChange={(event) => setAddQty(Number(event.target.value))} className={`${inputClass} mt-1`} style={inputStyle} />
-                  </div>
-                  <button type="button" onClick={addItem} disabled={!selectedSize} className="inline-flex h-10 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-white disabled:opacity-40" style={{ background: "#2f6f9e" }}>
-                    <Plus size={15} /> Tambah
-                  </button>
+            <div className="mt-3 overflow-hidden rounded-2xl border" style={{ borderColor: "#cfe1ef", background: "#fff" }}>
+              <div className="p-3.5">
+                <div className="flex items-center gap-2 rounded-xl border-2 px-3" style={{ borderColor: "#2a1a22", background: "#fff" }}>
+                  <Search size={16} style={{ color: "#2a1a22" }} />
+                  <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari produk… (mis. super, grey, b-01)" className="h-11 min-w-0 flex-1 bg-transparent text-sm font-medium outline-none" style={{ color: "#2a1a22" }} />
                 </div>
-              ) : null}
-              {selectedVariant && availableSizes.length === 0 ? <p className="mt-2 text-xs" style={{ color: "#9B2C2C" }}>Ukuran produk ini sedang habis.</p> : null}
+
+                {categoryOptions.length > 1 ? (
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {["all", ...categoryOptions].map((category) => {
+                      const active = categoryChip === category;
+                      return (
+                        <button
+                          key={category}
+                          type="button"
+                          onClick={() => setCategoryChip(category)}
+                          className="rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors"
+                          style={{
+                            background: active ? "#7fb8e5" : "#fff",
+                            borderColor: active ? "#7fb8e5" : "#d5e3ee",
+                            color: active ? "#fff" : "#5b6f7c",
+                          }}
+                        >
+                          {category === "all" ? "Semua" : category}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+
+              {!selectedGroup ? (
+                <div className="max-h-[300px] divide-y overflow-y-auto border-t" style={{ borderColor: "#edf2f6" }}>
+                  {loadingProducts ? (
+                    <p className="px-4 py-4 text-xs" style={{ color: "#8a7d83" }}>Memuat daftar produk...</p>
+                  ) : visibleGroups.length === 0 ? (
+                    <p className="px-4 py-4 text-xs" style={{ color: "#8a7d83" }}>Produk tidak ditemukan. Coba kata lain (mis. “super”, “grey”, “b-01”).</p>
+                  ) : (
+                    visibleGroups.map((group) => (
+                      <button key={group.key} type="button" onClick={() => chooseGroup(group)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[#f7fbfe]">
+                        <span className="flex h-12 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ background: "#f5f1ee" }}>
+                          {group.image ? (
+                            <img src={group.image} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <Shirt size={22} strokeWidth={1.5} style={{ color: "#b9a99c" }} />
+                          )}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-black" style={{ color: "#2a1a22" }}>{group.name}</span>
+                          <span className="mt-0.5 block truncate text-[11px] font-medium" style={{ color: "#8a7d83" }}>
+                            {[group.kain ? `Kain ${group.kain}` : "", group.category, group.series.length > 1 ? `${group.series.length} series` : ""].filter(Boolean).join(" · ")}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-[11px] font-bold" style={{ color: group.stockTotal > 0 ? "#22945b" : "#9aacb8" }}>
+                          {group.stockTotal > 0 ? `sisa ${group.stockTotal}` : "habis"}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="border-t p-3.5" style={{ borderColor: "#edf2f6" }}>
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-12 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ background: "#f5f1ee" }}>
+                      {selectedGroup.image ? <img src={selectedGroup.image} alt="" className="h-full w-full object-cover" /> : <Shirt size={22} strokeWidth={1.5} style={{ color: "#b9a99c" }} />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-black" style={{ color: "#2a1a22" }}>{selectedGroup.name}</p>
+                      <p className="text-[11px]" style={{ color: "#8a7d83" }}>{selectedGroup.kain ? `Kain ${selectedGroup.kain}` : ""}{selectedGroup.category ? ` · ${selectedGroup.category}` : ""}</p>
+                    </div>
+                    <button type="button" onClick={() => setSelectedGroupKey("")} className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold" style={{ color: "#2f6f9e" }}>Ganti</button>
+                  </div>
+
+                  {selectedGroup.variants.length > 1 ? (
+                    <div className="mt-3">
+                      <p className={labelClass} style={{ color: "#8a7d83" }}>Series / warna</p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {selectedGroup.variants.map((variant) => {
+                          const active = selectedVariant?.id === variant.id;
+                          return (
+                            <button
+                              key={variant.id}
+                              type="button"
+                              onClick={() => chooseVariant(variant)}
+                              className="rounded-full border px-2.5 py-1.5 text-[11px] font-bold"
+                              style={{
+                                background: active ? "#e8f3fb" : "#fff",
+                                borderColor: active ? "#7fb8e5" : "#d5e3ee",
+                                color: active ? "#2f6f9e" : "#5b6f7c",
+                              }}
+                            >
+                              {variant.series_name || variant.color || "Default"}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-3">
+                    <p className={labelClass} style={{ color: "#8a7d83" }}>Ukuran</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {availableSizes.map((size) => {
+                        const active = selectedSize === size;
+                        return (
+                          <button
+                            key={size}
+                            type="button"
+                            onClick={() => setSelectedSize(size)}
+                            className="h-8 min-w-9 rounded-full border px-2 text-[11px] font-bold"
+                            style={{
+                              background: active ? "#4a90c2" : "#fff",
+                              borderColor: active ? "#4a90c2" : "#d5e3ee",
+                              color: active ? "#fff" : "#5b6f7c",
+                            }}
+                          >
+                            {size}
+                          </button>
+                        );
+                      })}
+                      {availableSizes.length === 0 ? <span className="text-xs" style={{ color: "#9B2C2C" }}>Stok habis.</span> : null}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-end gap-2">
+                    <div className="w-24">
+                      <label className={labelClass} style={{ color: "#8a7d83" }}>Qty</label>
+                      <input type="number" min={1} value={addQty} onChange={(event) => setAddQty(Math.max(1, Number(event.target.value) || 1))} className={`${inputClass} mt-1`} style={inputStyle} />
+                    </div>
+                    <button type="button" onClick={addItem} disabled={!selectedSize} className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-bold text-white disabled:opacity-40" style={{ background: "#2f6f9e" }}>
+                      <Plus size={15} /> Tambah ke pesanan
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : null}
 

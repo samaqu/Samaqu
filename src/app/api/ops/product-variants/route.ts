@@ -115,6 +115,13 @@ async function syncProductSeries(admin: Admin, productId: string, seriesName?: s
   if (error) throw new Error(error.message);
 }
 
+function firstProductImage(product: any): string {
+  const list = [product?.image, ...(Array.isArray(product?.images) ? product.images : [])]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  return list.find((url) => !/\.(mp4|mov|webm|m3u8)(\?|$)/i.test(url)) || "";
+}
+
 export async function GET(req: NextRequest) {
   if (!(await isOpsAdmin(req))) return unauthorized();
 
@@ -148,7 +155,7 @@ export async function GET(req: NextRequest) {
     admin
       .from("products")
       .select(
-        "id, name, series, price, minimum_price, create_your_price_enabled, open_order_enabled, open_order_price, open_order_minimum_price, open_order_cyp_enabled, hpp, category, weight, jenis_kain(name)",
+        "id, name, series, price, minimum_price, create_your_price_enabled, open_order_enabled, open_order_price, open_order_minimum_price, open_order_cyp_enabled, hpp, category, weight, image, images, jenis_kain(name)",
       ),
     // `weight` = berat per ukuran (gram) — sumber utama yang sama dengan cek ongkir & resi.
     admin.from("product_variants").select("product_id, color, size, stock, sku, price_override, hex, display_order, base_product_id, weight, track_stock, is_sellable"),
@@ -179,6 +186,7 @@ export async function GET(req: NextRequest) {
         product_id: r.product_id,
         product_name: prod.name || r.product_id,
         series_name: prod.series || "",
+        image: firstProductImage(prod),
         category: prod.category || null,
         jenis_kain_name: prod.jenis_kain?.name || null,
         color: r.color || "default",
