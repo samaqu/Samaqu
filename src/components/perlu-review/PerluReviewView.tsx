@@ -748,17 +748,17 @@ function DraftDetail({
           <p className="text-xs" style={{ color: "#9A9892" }}>Bukti transfer tidak tersedia.</p>
         )}
 
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={onEdit} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-xs font-bold disabled:opacity-50" style={{ borderColor: "#E7E6E1", color: "#141414", background: "#fff" }}>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <button type="button" onClick={onEdit} disabled={busy} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-bold disabled:opacity-50" style={{ borderColor: "#E7E6E1", color: "#141414", background: "#fff" }}>
             <Pencil size={15} /> Edit
           </button>
-          <button type="button" onClick={onApprove} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold text-white disabled:opacity-50" style={{ background: "#1F7A4D" }}>
+          <button type="button" onClick={onApprove} disabled={busy} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl px-3 text-xs font-bold text-white disabled:opacity-50" style={{ background: "#1F7A4D" }}>
             {busy ? <Loader2 className="animate-spin" size={15} /> : <Check size={15} />} Setujui & Proses
           </button>
-          <button type="button" onClick={onReject} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-xs font-bold disabled:opacity-50" style={{ borderColor: "#F3CFCB", color: "#9B2C2C", background: "#fff" }}>
+          <button type="button" onClick={onReject} disabled={busy} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-bold disabled:opacity-50" style={{ borderColor: "#F3CFCB", color: "#9B2C2C", background: "#fff" }}>
             <X size={15} /> Tolak
           </button>
-          <button type="button" onClick={onDelete} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-xs font-bold disabled:opacity-50" style={{ borderColor: "#E7E6E1", color: "#7A4A4A", background: "#fff" }}>
+          <button type="button" onClick={onDelete} disabled={busy} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-bold disabled:opacity-50" style={{ borderColor: "#E7E6E1", color: "#7A4A4A", background: "#fff" }}>
             <Trash2 size={15} /> Hapus
           </button>
           <p className="w-full text-[11px]" style={{ color: "#6B6A64" }}>

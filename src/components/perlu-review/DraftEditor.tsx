@@ -640,19 +640,19 @@ export default function DraftEditor({
           ) : null}
         </div>
 
-        <div className="shrink-0 border-t bg-white px-6 py-4" style={{ borderColor: "#e3ebf1" }}>
-          <div className="flex items-end justify-between gap-3">
-            <div>
+        <div className="shrink-0 border-t bg-white px-4 py-3 sm:px-6 sm:py-4" style={{ borderColor: "#e3ebf1" }}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: "#8a7d83" }}>Total pesanan</p>
-              <div className="mt-0.5 flex items-center gap-2">
-                <p className="text-2xl font-black" style={{ color: "#2a1a22" }}>{money(total)}</p>
-                <span className="rounded-full px-2.5 py-1 text-[10px] font-bold" style={{ background: "#e7f5eb", color: "#2f7a4f" }}>Belum dipotong</span>
+              <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                <p className="text-2xl font-black tabular-nums" style={{ color: "#2a1a22" }}>{money(total)}</p>
+                <span className="whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold" style={{ background: "#e7f5eb", color: "#2f7a4f" }}>Belum dipotong</span>
               </div>
             </div>
-            <div className="flex shrink-0 gap-2">
-              <button type="button" onClick={onClose} disabled={saving} className="h-11 rounded-xl px-4 text-xs font-bold disabled:opacity-50" style={{ background: "#f2f4f6", color: "#62717c" }}>Batal</button>
-              <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-xs font-bold text-white disabled:opacity-50" style={{ background: "#2f6f9e" }}>
-                {saving ? <Loader2 className="animate-spin" size={15} /> : <Save size={15} />} Simpan Perubahan
+            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:shrink-0">
+              <button type="button" onClick={onClose} disabled={saving} className="h-11 min-w-0 rounded-xl px-4 text-xs font-bold transition-colors hover:bg-[#e9edf1] disabled:opacity-50" style={{ background: "#f2f4f6", color: "#62717c" }}>Batal</button>
+              <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-xl px-4 text-xs font-bold text-white transition-colors hover:bg-[#255d86] disabled:opacity-50" style={{ background: "#2f6f9e" }}>
+                {saving ? <Loader2 className="animate-spin" size={15} /> : <Save size={15} />} <span className="truncate">Simpan Perubahan</span>
               </button>
             </div>
           </div>
