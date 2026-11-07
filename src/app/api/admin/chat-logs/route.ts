@@ -30,11 +30,13 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "100", 10) || 100, 1), 300);
+  const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "100", 10) || 100, 1), 500);
 
   const { data, error } = await getSupabaseAdmin()
     .from("chat_logs")
-    .select("id, session_id, locale, question, answer, tools_used, escalated, error, created_at")
+    .select(
+      "id, session_id, locale, customer_name, customer_phone, question, question_images, answer, tools_used, escalated, error, created_at",
+    )
     .order("created_at", { ascending: false })
     .limit(limit);
 

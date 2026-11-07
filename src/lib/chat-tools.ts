@@ -11,6 +11,16 @@
 
 import { getSupabaseAdmin } from "./supabase-admin";
 import { getFonnteConfig, resolveAdminTargets, sendFonnteMessage } from "./fonnte";
+import { checkTariffSemua } from "./jnt/tariff";
+import { layananByCode } from "./jnt/layanan";
+import { getJntConfig } from "./jnt/config";
+import { getSendSiteCode, resolveTariffCodes, JNT_AREAS } from "./jnt/area-mapping";
+import {
+  FALLBACK_ITEM_WEIGHT_GRAMS,
+  productWeightMapFromRows,
+  sumWeightGramsBySize,
+  variantWeightMapFromRows,
+} from "./shipping-weight";
 
 export interface ChatProductCard {
   id: string;
@@ -58,6 +68,52 @@ export const CHAT_TOOLS = [
         properties: {
           kategori: { type: "string", description: "Kategori (opsional): Thobe, Kandora, Koko, Vest, Kabak." },
         },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "cari_area_ongkir",
+      description:
+        "Cari kecamatan/kota yang dikenali J&T. Pakai ini kalau customer hanya menyebut kecamatan (mis. Cengkareng) atau ejaannya ragu, sebelum memanggil cek_ongkir.",
+      parameters: {
+        type: "object",
+        properties: {
+          kata_kunci: {
+            type: "string",
+            description: "Potongan nama kecamatan/kota, mis. cengkareng, sukmajaya, bandung.",
+          },
+          limit: { type: "number", description: "Jumlah hasil maksimal (default 10)." },
+        },
+        required: ["kata_kunci"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "cek_ongkir",
+      description:
+        "Hitung tarif J&T dari Depok ke kota/kecamatan tujuan. Butuh kecamatan + berat_gram, ATAU product_id + ukuran + quantity. Jangan mengarang ongkir; kalau data belum lengkap, minta produk/ukuran/quantity dulu.",
+      parameters: {
+        type: "object",
+        properties: {
+          kota: { type: "string", description: "Kota/kabupaten tujuan, mis. Jakarta Barat." },
+          kecamatan: { type: "string", description: "Kecamatan tujuan, mis. Cengkareng." },
+          berat_gram: {
+            type: "number",
+            description: "Berat paket dalam gram. Isi kalau customer sudah menyebut berat.",
+          },
+          product_id: {
+            type: "string",
+            description: "ID produk dari hasil cari_produk, kalau ongkir dihitung dari produk.",
+          },
+          warna: { type: "string", description: "Warna varian (opsional)." },
+          ukuran: { type: "string", description: "Ukuran varian (opsional), mis. M." },
+          quantity: { type: "number", description: "Jumlah unit (default 1)." },
+        },
+        required: ["kecamatan"],
       },
     },
   },
@@ -210,7 +266,7 @@ async function cariProduk(args: Record<string, unknown>): Promise<ChatToolResult
       cyp,
       image: toThumbnail((p.image as string) || null),
     });
-    return `- ${p.name} [${p.category}] | kain ${kain}${jenis?.material ? ` (${jenis.material})` : ""}${p.series ? ` | series ${p.series}` : ""} | ${priceLabel} | warna: ${colors} | stok (warna → ukuran:jumlah): ${summarizeStock(byProduct.get(p.id as string) || [])}`;
+    return `- ${p.name} [${p.category}] (id: ${p.id}) | kain ${kain}${jenis?.material ? ` (${jenis.material})` : ""}${p.series ? ` | series ${p.series}` : ""} | ${priceLabel} | warna: ${colors} | stok (warna → ukuran:jumlah): ${summarizeStock(byProduct.get(p.id as string) || [])}`;
   });
 
   return {
@@ -239,6 +295,153 @@ function panduanUkuran(args: Record<string, unknown>): ChatToolResult {
     "Tips: minta pelanggan menyebut tinggi & berat badan (dan lingkar dada bila perlu), lalu sarankan ukuran. Kalau masih ragu, arahkan konsultasi ke admin lewat WhatsApp."
   );
   return { text: lines.join("\n") };
+}
+
+function cariAreaOngkir(args: Record<string, unknown>): ChatToolResult {
+  const q = sanitize(args.kata_kunci, 40).toLowerCase();
+  if (q.length < 3) {
+    return { text: "Kata kunci minimal 3 huruf, mis. cengkareng." };
+  }
+  const limit = Math.min(20, Math.max(1, Math.round(Number(args.limit) || 10)));
+  const terms = [q];
+  if (q.startsWith("kecamatan ")) terms.push(q.slice("kecamatan ".length).trim());
+  if (q.startsWith("kec. ")) terms.push(q.slice("kec. ".length).trim());
+  if (q.startsWith("ke ")) terms.push(q.slice("ke ".length).trim());
+  // "kecengkareng" = "ke Cengkareng" yang sering ditulis menyatu.
+  if (q.startsWith("ke") && q.length > 4) terms.push(q.slice(2).trim());
+
+  const seen = new Set<string>();
+  const rows: string[] = [];
+
+  for (const term of [...new Set(terms)].filter(Boolean)) {
+    for (const row of JNT_AREAS) {
+      const hay = `${row.localDistrict} ${row.localCity} ${row.localProv}`.toLowerCase();
+      if (!hay.includes(term)) continue;
+      const key = `${row.localDistrict}|${row.localCity}`.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push(`${row.localDistrict} — ${row.localCity} (${row.localProv})`);
+      if (rows.length >= limit) break;
+    }
+    if (rows.length) break;
+  }
+
+  if (!rows.length) {
+    return { text: `Tidak ada kecamatan/kota yang cocok dengan "${q}".` };
+  }
+  return { text: `Hasil pencarian area J&T:\n${rows.join("\n")}` };
+}
+
+const shippingCache = new Map<
+  string,
+  { ts: number; rows: { label: string; cost: number; etd: string }[] }
+>();
+const SHIPPING_TTL_MS = 5 * 60 * 1000;
+
+async function cekOngkir(args: Record<string, unknown>): Promise<ChatToolResult> {
+  const kota = sanitize(args.kota, 60);
+  let kecamatan = sanitize(args.kecamatan, 60);
+  if (!kecamatan) {
+    return { text: "Sebutkan kecamatan tujuan dulu ya, Ka." };
+  }
+
+  const qty = Math.min(20, Math.max(1, Math.round(Number(args.quantity) || 1)));
+  let weight = Math.round(Number(args.berat_gram) || 0);
+  const productId = sanitize(args.product_id, 120);
+
+  if (weight <= 0 && productId) {
+    const admin = getSupabaseAdmin();
+    const [{ data: product }, { data: variants }] = await Promise.all([
+      admin.from("products").select("id, weight").eq("id", productId).maybeSingle(),
+      admin
+        .from("product_variants")
+        .select("product_id, color, size, weight")
+        .eq("product_id", productId),
+    ]);
+    if (!product) {
+      return { text: "Produk tidak ditemukan. Cari produk dulu dengan cari_produk." };
+    }
+
+    const productWeights = productWeightMapFromRows([product]);
+    const variantWeights = variantWeightMapFromRows(variants);
+    const { grams, missingQty } = sumWeightGramsBySize(
+      [
+        {
+          productId,
+          color: sanitize(args.warna, 60),
+          size: sanitize(args.ukuran, 20),
+          quantity: qty,
+        },
+      ],
+      productWeights,
+      variantWeights,
+    );
+    weight = Math.max(300, grams + FALLBACK_ITEM_WEIGHT_GRAMS * missingQty);
+  }
+
+  if (weight <= 0) {
+    return {
+      text: "Butuh produk + ukuran + quantity, atau berat paket, untuk menghitung ongkir.",
+    };
+  }
+
+  const config = await getJntConfig();
+  if (!config.orderUsername) {
+    return { text: "Ongkir J&T belum dikonfigurasi. Arahkan customer ke admin." };
+  }
+
+  let resolved = resolveTariffCodes(kota, kecamatan);
+  if (!resolved.found) {
+    const alt = kecamatan
+      .replace(/^kecamatan\s+/i, "")
+      .replace(/^kec\.\s*/i, "")
+      .replace(/^ke\s+/i, "")
+      .replace(/^ke(?=[a-z])/i, "");
+    if (alt && alt !== kecamatan) {
+      kecamatan = alt;
+      resolved = resolveTariffCodes(kota, kecamatan);
+    }
+  }
+  if (!resolved.found) {
+    return {
+      text: `Kecamatan "${kecamatan}" belum dikenali J&T. Pakai cari_area_ongkir untuk cek ejaan/kota.`,
+    };
+  }
+
+  const origin = getSendSiteCode("DEPOK") || "DEPOK";
+  const cacheKey = `${origin}-${resolved.destAreaCode}-${weight}`;
+  const cached = shippingCache.get(cacheKey);
+  let rows = cached && Date.now() - cached.ts < SHIPPING_TTL_MS ? cached.rows : null;
+
+  if (!rows) {
+    const options = await checkTariffSemua({
+      weight: weight / 1000,
+      originCode: origin,
+      destAreaCode: resolved.destAreaCode,
+    });
+    rows = options
+      .map((option) => {
+        const known = layananByCode(option.serviceCode);
+        return {
+          label: known?.label || option.name || option.serviceCode,
+          cost: Math.round(option.cost),
+          etd: option.etd || known?.estimate || "",
+        };
+      })
+      .sort((a, b) => a.cost - b.cost);
+    if (rows.length) shippingCache.set(cacheKey, { ts: Date.now(), rows });
+  }
+
+  if (!rows.length) {
+    return { text: `Tidak ada layanan J&T untuk ${kecamatan}${kota ? `, ${kota}` : ""}.` };
+  }
+
+  const lines = rows.map(
+    (row) => `- ${row.label} — ${rupiah(row.cost)}${row.etd ? ` — ${row.etd}` : ""}`,
+  );
+  return {
+    text: `Ongkir J&T Depok → ${kecamatan}${kota ? `, ${kota}` : ""} · ${weight} g\n${lines.join("\n")}`,
+  };
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -384,6 +587,10 @@ export async function executeChatTool(
         return await cariProduk(args);
       case "panduan_ukuran":
         return panduanUkuran(args);
+      case "cari_area_ongkir":
+        return cariAreaOngkir(args);
+      case "cek_ongkir":
+        return await cekOngkir(args);
       case "cek_status_pesanan":
         return await cekStatusPesanan(args, ctx.sessionId);
       case "hubungi_admin":

@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { X, Send, Loader2, Image as ImageIcon } from "lucide-react";
 import { useSafeTranslations, useSafeLocale } from "@/lib/safe-i18n";
 import { waNumber } from "@/lib/whatsapp";
-import { uploadToCloudinary, validateMediaFile } from "@/lib/cloudinary";
+import { validateMediaFile } from "@/lib/cloudinary";
+import { uploadChatImage } from "@/lib/chat-upload";
 import {
   HISTORY_KEY,
   HISTORY_MAX,
@@ -47,6 +48,9 @@ export default function ChatPanel({
   const [loading, setLoading] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [identityReady, setIdentityReady] = useState(false);
+  const [identity, setIdentity] = useState({ name: "", phone: "" });
+  const [identityForm, setIdentityForm] = useState({ name: "", phone: "" });
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const sessionIdRef = useRef("");
@@ -68,6 +72,38 @@ export default function ChatPanel({
     }
   }, []);
 
+  // Identitas ringan (tanpa daftar/login). Disimpan supaya tidak ditanya lagi.
+  useEffect(() => {
+    try {
+      const name = localStorage.getItem("samaqu_chat_name") || "";
+      const phone = localStorage.getItem("samaqu_chat_phone") || "";
+      const skipped = localStorage.getItem("samaqu_chat_identity_skipped") === "1";
+      if (name || phone || skipped) {
+        setIdentity({ name, phone });
+        setIdentityForm({ name, phone });
+        setIdentityReady(true);
+      }
+    } catch {
+      setIdentityReady(true);
+    }
+  }, []);
+
+  function startIdentity(skip = false) {
+    const name = identityForm.name.trim().slice(0, 80);
+    const phone = identityForm.phone.replace(/[^\d+]/g, "").slice(0, 20);
+    setIdentity({ name, phone });
+    try {
+      if (!skip) {
+        localStorage.setItem("samaqu_chat_name", name);
+        localStorage.setItem("samaqu_chat_phone", phone);
+      }
+      localStorage.setItem("samaqu_chat_identity_skipped", skip ? "1" : "0");
+    } catch {
+      // storage diblokir — identitas tetap dipakai untuk sesi ini
+    }
+    setIdentityReady(true);
+  }
+
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
@@ -86,7 +122,7 @@ export default function ChatPanel({
     setUploading(true);
     try {
       await validateMediaFile(file);
-      const url = await uploadToCloudinary(file, { scope: "chat" });
+      const url = await uploadChatImage(file);
       setImageUrl(url);
     } catch (e) {
       console.error("[CHAT] Gagal mengunggah gambar:", e);
@@ -97,6 +133,7 @@ export default function ChatPanel({
   }
 
   async function send(textOverride?: string) {
+    if (!identityReady) return;
     const text = (textOverride ?? input).trim();
     if ((!text && !imageUrl) || loading || uploading) return;
 
@@ -116,7 +153,13 @@ export default function ChatPanel({
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history, sessionId: sessionIdRef.current, locale }),
+        body: JSON.stringify({
+          messages: history,
+          sessionId: sessionIdRef.current,
+          locale,
+          customerName: identity.name,
+          customerPhone: identity.phone,
+        }),
       });
 
       if (!res.ok || !res.body) {
@@ -197,6 +240,50 @@ export default function ChatPanel({
           <X size={18} />
         </button>
       </div>
+
+      {!identityReady && (
+        <div className="shrink-0 p-3 space-y-2 border-b" style={{ borderColor: "#ececec", background: "#fff" }}>
+          <p className="text-sm font-semibold" style={{ color: "var(--fg, #18181b)" }}>
+            Biar admin bisa bantu
+          </p>
+          <p className="text-xs" style={{ color: "var(--fg3, #71717a)" }}>
+            Isi nama & WhatsApp. Boleh dilewati.
+          </p>
+          <input
+            value={identityForm.name}
+            onChange={(e) => setIdentityForm((v) => ({ ...v, name: e.target.value }))}
+            placeholder="Nama"
+            className="w-full rounded-xl px-3 py-2 text-sm outline-none"
+            style={{ border: "1px solid #e4e4e7", background: "#fff", color: "var(--fg, #18181b)" }}
+          />
+          <input
+            value={identityForm.phone}
+            onChange={(e) => setIdentityForm((v) => ({ ...v, phone: e.target.value }))}
+            placeholder="No WhatsApp"
+            inputMode="tel"
+            className="w-full rounded-xl px-3 py-2 text-sm outline-none"
+            style={{ border: "1px solid #e4e4e7", background: "#fff", color: "var(--fg, #18181b)" }}
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => startIdentity(false)}
+              className="flex-1 rounded-xl px-3 py-2 text-sm font-semibold text-white"
+              style={{ background: "#000" }}
+            >
+              Mulai chat
+            </button>
+            <button
+              type="button"
+              onClick={() => startIdentity(true)}
+              className="rounded-xl px-3 py-2 text-sm font-semibold"
+              style={{ border: "1px solid #e4e4e7", color: "var(--fg2, #52525b)" }}
+            >
+              Lewati
+            </button>
+          </div>
+        </div>
+      )}
 
       <div ref={listRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-2" style={{ background: "var(--sub, #fafafa)" }}>
         {messages.map((m, i) => (
@@ -350,7 +437,7 @@ export default function ChatPanel({
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            disabled={uploading || loading}
+            disabled={!identityReady || uploading || loading}
             aria-label={t("attach")}
             className="w-9 h-9 rounded-xl flex items-center justify-center disabled:opacity-40"
             style={{ border: "1px solid #e4e4e7", color: "var(--fg2, #52525b)" }}
@@ -361,13 +448,14 @@ export default function ChatPanel({
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={t("placeholder")}
-            className="flex-1 rounded-xl px-3 py-2 text-sm outline-none"
+            placeholder={!identityReady ? "Isi nama & WA dulu" : t("placeholder")}
+            disabled={!identityReady}
+            className="flex-1 rounded-xl px-3 py-2 text-sm outline-none disabled:opacity-60"
             style={{ border: "1px solid #e4e4e7", background: "#fff", color: "var(--fg, #18181b)" }}
           />
           <button
             type="submit"
-            disabled={loading || uploading || (!input.trim() && !imageUrl)}
+            disabled={!identityReady || loading || uploading || (!input.trim() && !imageUrl)}
             aria-label={t("send")}
             className="w-9 h-9 rounded-xl flex items-center justify-center text-white disabled:opacity-40"
             style={{ background: "#000" }}

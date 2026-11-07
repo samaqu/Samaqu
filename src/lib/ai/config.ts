@@ -46,7 +46,7 @@ export interface AiProfile {
 const CUSTOMER_DEFAULTS = {
   temperature: 0.4,
   maxTokens: 450,
-  maxToolRounds: 3,
+  maxToolRounds: 4,
   maxMessages: 12,
   maxChars: 2000,
   timeoutMs: 60_000,
