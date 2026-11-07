@@ -6,6 +6,7 @@ import {
   Copy,
   Loader2,
   MessageSquare,
+  Pencil,
   RefreshCw,
   Send,
   ShoppingBag,
@@ -13,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import DraftEditor from "./DraftEditor";
 
 type Tab = "ai" | "transaksi";
 
@@ -132,6 +134,7 @@ export default function PerluReviewView() {
   const [rejectReason, setRejectReason] = useState("Data belum sesuai");
   const [proofOpen, setProofOpen] = useState(false);
   const [proofError, setProofError] = useState(false);
+  const [editDraft, setEditDraft] = useState<Draft | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -498,11 +501,24 @@ export default function PerluReviewView() {
                   setProofError(false);
                   setProofOpen(true);
                 }}
+                onEdit={() => setEditDraft(selectedDraft)}
               />
             )}
           </div>
         </div>
       )}
+
+      {editDraft ? (
+        <DraftEditor
+          draft={editDraft}
+          onClose={() => setEditDraft(null)}
+          onSaved={() => {
+            setEditDraft(null);
+            setNotice("Draft diperbarui. Stok belum berubah.");
+            void load();
+          }}
+        />
+      ) : null}
 
       {proofOpen && selectedDraft ? (
         <div
@@ -636,12 +652,14 @@ function DraftDetail({
   onApprove,
   onReject,
   onViewProof,
+  onEdit,
 }: {
   draft: Draft;
   busy: boolean;
   onApprove: () => void;
   onReject: () => void;
   onViewProof: () => void;
+  onEdit: () => void;
 }) {
   const payload = draft.payload || {};
   const shipping = payload.shipping || {};
@@ -710,6 +728,9 @@ function DraftDetail({
         )}
 
         <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={onEdit} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-xs font-bold disabled:opacity-50" style={{ borderColor: "#E7E6E1", color: "#141414", background: "#fff" }}>
+            <Pencil size={15} /> Edit
+          </button>
           <button type="button" onClick={onApprove} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold text-white disabled:opacity-50" style={{ background: "#1F7A4D" }}>
             {busy ? <Loader2 className="animate-spin" size={15} /> : <Check size={15} />} Setujui & Proses
           </button>

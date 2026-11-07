@@ -213,6 +213,88 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, item: data });
   }
 
+  if (action === "draft_update") {
+    const { data: draft, error: draftError } = await admin
+      .from("order_drafts")
+      .select("*")
+      .eq("id", id)
+      .eq("status", "pending")
+      .maybeSingle();
+    if (draftError) return NextResponse.json({ error: draftError.message }, { status: 500 });
+    if (!draft) return bad("Draft sudah diproses atau tidak ditemukan.", 409);
+
+    const payload = body?.payload;
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+    const shipping = payload?.shipping || {};
+    if (!items.length) return bad("Draft harus punya minimal 1 produk.");
+    for (const key of ["address", "province", "city", "kecamatan", "postal_code"]) {
+      if (!String(shipping[key] || "").trim()) return bad("Alamat draft belum lengkap.");
+    }
+
+    const productIds = [...new Set(items.map((item: any) => String(item?.product_id || "")).filter(Boolean))];
+    const [{ data: products }, { data: variants }] = await Promise.all([
+      admin.from("products").select("id, name, series, price").in("id", productIds),
+      admin.from("product_variants").select("product_id, color, size, price_override").in("product_id", productIds),
+    ]);
+    const productMap = new Map((products || []).map((item) => [String(item.id), item]));
+    const variantKey = (productId: string, color: string, size: string) =>
+      `${productId}|${color || "default"}|${size}`;
+    const variantMap = new Map(
+      (variants || []).map((item) => [
+        variantKey(String(item.product_id), String(item.color || "default"), String(item.size || "").toUpperCase()),
+        item,
+      ]),
+    );
+
+    const normalized = [];
+    for (const item of items) {
+      const productId = String(item?.product_id || "").trim();
+      const size = String(item?.size || "").trim().toUpperCase();
+      const color = String(item?.color || "default").trim() || "default";
+      const product = productMap.get(productId);
+      if (!product || !size) return bad(`Produk ${productId || "(kosong)"} tidak valid.`);
+      if (!variantMap.has(variantKey(productId, color, size))) {
+        return bad(`Ukuran ${size} untuk ${product.name} tidak tersedia.`);
+      }
+      const quantity = Math.max(1, Math.min(99, Number(item?.quantity) || 1));
+      const override = Number(variantMap.get(variantKey(productId, color, size))?.price_override);
+      normalized.push({
+        product_id: productId,
+        product_name: product.name,
+        color,
+        size,
+        quantity,
+        price: override > 0 ? override : Number(product.price) || 0,
+      });
+    }
+
+    const nextPayload = {
+      ...payload,
+      customer_name: draft.customer_name,
+      customer_whatsapp: draft.customer_whatsapp,
+      shipping: {
+        address: String(shipping.address).trim(),
+        province: String(shipping.province).trim(),
+        city: String(shipping.city).trim(),
+        kecamatan: String(shipping.kecamatan).trim(),
+        postal_code: String(shipping.postal_code).trim(),
+      },
+      shipping_cost: Math.max(0, Math.round(Number(payload?.shipping_cost) || 0)),
+      discount: Math.max(0, Math.round(Number(payload?.discount) || 0)),
+      items: normalized,
+    };
+    const { data, error } = await admin
+      .from("order_drafts")
+      .update({ payload: nextPayload, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("status", "pending")
+      .select()
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!data) return bad("Draft sudah diproses.", 409);
+    return NextResponse.json({ ok: true, item: data });
+  }
+
   if (action === "draft_reject") {
     const { error } = await admin
       .from("order_drafts")
