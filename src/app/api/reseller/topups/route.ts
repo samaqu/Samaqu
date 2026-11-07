@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resellerSession, resellerUnauthorized } from "@/lib/reseller/auth";
 import { expireOverdueTopups, topupDeadlineIso } from "@/lib/reseller/topups";
+import { validateProofKey } from "@/lib/upload-url";
+import { proofViewUrl } from "@/lib/private-media";
 
 /** Kode top up: TOP-YYYYMMDD-NNN (dibuat server, unik). */
 function generateTopupCode(): string {
@@ -19,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await getSupabaseAdmin()
     .from("reseller_topups")
-    .select("id, code, amount, proof_url, payment_method, status, reject_reason, reviewed_at, pay_deadline, created_at")
+    .select("id, code, amount, proof_url, proof_key, payment_method, status, reject_reason, reviewed_at, pay_deadline, created_at")
     .eq("reseller_id", session.reseller.id)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -29,7 +31,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Gagal memuat daftar top up" }, { status: 500 });
   }
 
-  return NextResponse.json({ data: data ?? [] });
+  const rows = (data ?? []).map((row) => {
+    const r = row as typeof row & { proof_key?: string | null };
+    return { ...r, proof_url: proofViewUrl("topup", r.id, r.proof_key, r.proof_url) };
+  });
+
+  return NextResponse.json({ data: rows });
 }
 
 /**
@@ -44,6 +51,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}) as Record<string, unknown>);
   const amount = Math.round(Number(body.amount));
   const proofUrl = typeof body.proof_url === "string" ? body.proof_url.trim() : "";
+  const proofKeyRaw = typeof body.proof_key === "string" ? body.proof_key.trim() : "";
   // Metode pembayaran yang dipilih reseller: transfer BSI (default) atau QRIS.
   const paymentMethod = body.payment_method === "qris" ? "qris" : "bsi";
 
@@ -51,9 +59,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Jumlah top up tidak valid" }, { status: 400 });
   }
 
+  let proofKey: string | null = null;
+  if (proofKeyRaw) {
+    const checked = validateProofKey(proofKeyRaw, session.reseller.id, "topup");
+    if (!checked.ok) {
+      return NextResponse.json({ error: checked.error }, { status: 400 });
+    }
+    proofKey = checked.key;
+  }
+
   // Kiriman lama (dengan bukti) tetap berperilaku `pending`; alur baru tidak
   // membawa bukti dan dibuat `menunggu_bayar` dengan batas waktu.
-  const hasProof = /^https?:\/\/\S+$/i.test(proofUrl);
+  const hasProof = Boolean(proofKey) || /^https?:\/\/\S+$/i.test(proofUrl);
   const supabase = getSupabaseAdmin();
   let lastError: string | null = null;
 
@@ -64,7 +81,8 @@ export async function POST(req: NextRequest) {
       code,
       reseller_id: session.reseller.id,
       amount,
-      proof_url: hasProof ? proofUrl : null,
+      proof_url: proofKey ? null : hasProof ? proofUrl : null,
+      proof_key: proofKey,
       payment_method: paymentMethod,
       status: hasProof ? "pending" : "menunggu_bayar",
       pay_deadline: hasProof ? null : topupDeadlineIso(),

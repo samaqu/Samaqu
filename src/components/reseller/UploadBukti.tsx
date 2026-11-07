@@ -2,20 +2,25 @@
 
 import { useRef, useState } from "react";
 import { FileImage, Loader2, X } from "lucide-react";
-import { MEDIA_LIMITS, uploadToCloudinary } from "@/lib/cloudinary";
-import { getResellerToken } from "@/lib/reseller/client";
+import { MEDIA_LIMITS } from "@/lib/cloudinary";
+import { uploadProofToPrivateR2 } from "@/lib/reseller/proof-upload";
 
 /**
- * Upload bukti transfer (gambar) ke Cloudinary via mekanisme yang sudah ada
- * (`uploadToCloudinary` + scope "reseller" yang dijaga sesi reseller).
+ * Upload bukti transfer (gambar) ke R2 private via presigned PUT.
+ * `value` adalah URL tampilan (preview lokal / signed route), sedangkan
+ * `onKeyChange` membawa object key yang disimpan server.
  */
 export default function UploadBukti({
   value,
   onChange,
+  onKeyChange,
+  kind = "topup",
   label = "Upload bukti transfer",
 }: {
   value: string | null;
   onChange: (url: string | null) => void;
+  onKeyChange?: (key: string | null) => void;
+  kind?: "topup" | "order-payment";
   label?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -35,14 +40,20 @@ export default function UploadBukti({
     }
     setBusy(true);
     try {
-      const url = await uploadToCloudinary(file, { scope: "reseller", token: getResellerToken() });
-      onChange(url);
-    } catch {
-      setError("Upload gagal. Coba lagi.");
+      const key = await uploadProofToPrivateR2(file, kind);
+      onChange(URL.createObjectURL(file));
+      onKeyChange?.(key);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload gagal. Coba lagi.");
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = "";
     }
+  };
+
+  const clear = () => {
+    onChange(null);
+    onKeyChange?.(null);
   };
 
   return (
@@ -61,7 +72,7 @@ export default function UploadBukti({
             type="button"
             className="btn ghost sm"
             style={{ marginTop: 10 }}
-            onClick={() => onChange(null)}
+            onClick={clear}
           >
             <X size={14} /> Ganti bukti
           </button>

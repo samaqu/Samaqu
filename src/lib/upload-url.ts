@@ -16,6 +16,7 @@ const IMAGE_PATH_RE = /\.(jpe?g|png|webp|avif|gif|heic|heif|pdf)$/i;
 export const MAX_PROOF_URL_LENGTH = 512;
 
 export type UploadUrlCheck = { ok: true; url: string } | { ok: false; error: string };
+export type ProofKeyCheck = { ok: true; key: string } | { ok: false; error: string };
 
 /** Terima URL bukti pembayaran hanya bila berasal dari Cloudinary dan berupa gambar. */
 export function validateProofUrl(raw: unknown): UploadUrlCheck {
@@ -36,4 +37,28 @@ export function validateProofUrl(raw: unknown): UploadUrlCheck {
   if (!IMAGE_PATH_RE.test(url.pathname)) return { ok: false, error: "Berkas bukti harus berupa gambar" };
 
   return { ok: true, url: url.toString() };
+}
+
+/**
+ * Key bukti private R2. Key dibuat server saat presign upload, jadi hanya
+ * menerima pola `private/reseller-<kind>/<resellerId>/<nama>.<ext>`.
+ */
+export function validateProofKey(
+  raw: unknown,
+  resellerId: string,
+  kind: "topup" | "order-payment",
+): ProofKeyCheck {
+  const value = String(raw ?? "").trim();
+  if (!value) return { ok: false, error: "Upload bukti pembayaran dulu" };
+  if (value.length > MAX_PROOF_URL_LENGTH) return { ok: false, error: "Key bukti terlalu panjang" };
+
+  const prefix = `private/reseller-${kind}/${resellerId}/`;
+  if (!value.startsWith(prefix)) return { ok: false, error: "Bukti tidak valid" };
+
+  const rest = value.slice(prefix.length);
+  if (!/^[a-z0-9-]+\.(jpe?g|png|webp)$/i.test(rest)) {
+    return { ok: false, error: "Bukti tidak valid" };
+  }
+
+  return { ok: true, key: value };
 }

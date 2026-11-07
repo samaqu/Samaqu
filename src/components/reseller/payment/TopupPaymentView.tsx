@@ -33,12 +33,12 @@ export default function TopupPaymentView({ code }: { code: string }) {
     load();
   }, [load]);
 
-  const submit = async (proofUrl: string, method: PaymentMethodChoice) => {
+  const submit = async (_proofUrl: string, method: PaymentMethodChoice, proofKey: string) => {
     setBusy(true);
     try {
       await resellerApi.patchTopup(code, {
         action: "submit_proof",
-        proof_url: proofUrl,
+        proof_key: proofKey,
         payment_method: method,
       });
       await load();
@@ -87,6 +87,7 @@ export default function TopupPaymentView({ code }: { code: string }) {
       status={status}
       deadlineIso={row.pay_deadline}
       proofUrl={row.proof_url}
+      proofKind="topup"
       rejectReason={row.reject_reason}
       settings={me.pengaturan}
       initialMethod={row.payment_method === "qris" ? "qris" : "bsi"}

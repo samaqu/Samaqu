@@ -37,10 +37,10 @@ export default function OrderPaymentView({ orderNumber }: { orderNumber: string 
     load();
   }, [load]);
 
-  const submit = async (proofUrl: string, method: PaymentMethodChoice) => {
+  const submit = async (_proofUrl: string, method: PaymentMethodChoice, proofKey: string) => {
     setBusy(true);
     try {
-      await resellerApi.uploadProof(orderNumber, proofUrl, method);
+      await resellerApi.uploadProof(orderNumber, proofKey, method);
       await load();
     } finally {
       setBusy(false);
@@ -88,6 +88,7 @@ export default function OrderPaymentView({ orderNumber }: { orderNumber: string 
       status={status}
       deadlineIso={shortfall.deadline}
       proofUrl={shortfall.proof_url}
+      proofKind="order-payment"
       rejectReason={order.cancel_reason}
       settings={me.pengaturan}
       initialMethod={shortfall.payment_method === "qris" ? "qris" : "bsi"}

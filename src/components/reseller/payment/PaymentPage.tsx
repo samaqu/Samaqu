@@ -27,6 +27,7 @@ export default function PaymentPage({
   status,
   deadlineIso,
   proofUrl,
+  proofKind,
   rejectReason,
   settings,
   initialMethod,
@@ -54,11 +55,12 @@ export default function PaymentPage({
   status: PaymentPageStatus;
   deadlineIso: string | null;
   proofUrl: string | null;
+  proofKind: "topup" | "order-payment";
   rejectReason?: string | null;
   settings: ResellerSettingsView;
   initialMethod: PaymentMethodChoice;
   busy: boolean;
-  onSubmit: (proofUrl: string, method: PaymentMethodChoice) => Promise<void>;
+  onSubmit: (proofUrl: string, method: PaymentMethodChoice, proofKey: string) => Promise<void>;
   onCancel?: () => Promise<void>;
   onExpire?: () => void;
   backHref: string;
@@ -79,6 +81,7 @@ export default function PaymentPage({
     hasQris && initialMethod === "qris" ? "qris" : "bsi"
   );
   const [proof, setProof] = useState<string | null>(proofUrl);
+  const [proofKey, setProofKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
   const [localError, setLocalError] = useState("");
@@ -89,6 +92,7 @@ export default function PaymentPage({
 
   useEffect(() => {
     setProof(proofUrl);
+    setProofKey(null);
   }, [proofUrl]);
 
   // Timer habis → minta wrapper memuat ulang (server yang menandai kedaluwarsa).
@@ -110,11 +114,11 @@ export default function PaymentPage({
   };
 
   const submit = async () => {
-    if (!proof || submitting || busy) return;
+    if (!proof || !proofKey || submitting || busy) return;
     setLocalError("");
     setSubmitting(true);
     try {
-      await onSubmit(proof, method);
+      await onSubmit(proof, method, proofKey);
       setJustSubmitted(true);
     } catch (e) {
       setLocalError(e instanceof Error ? e.message : "Gagal mengirim bukti. Coba lagi.");
@@ -338,12 +342,17 @@ export default function PaymentPage({
 
           <div className="field" style={{ marginBottom: 0 }}>
             <label>Bukti pembayaran</label>
-            <UploadBukti value={proof} onChange={setProof} />
+            <UploadBukti
+              value={proof}
+              onChange={setProof}
+              onKeyChange={setProofKey}
+              kind={proofKind}
+            />
           </div>
 
           {localError ? <p className="err">{localError}</p> : null}
 
-          <button className="btn blk" type="button" disabled={!proof || submitting || busy} onClick={submit}>
+          <button className="btn blk" type="button" disabled={!proof || !proofKey || submitting || busy} onClick={submit}>
             {submitting ? <Loader2 size={16} /> : null}
             Saya sudah bayar
           </button>

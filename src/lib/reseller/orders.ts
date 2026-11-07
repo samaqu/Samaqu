@@ -14,7 +14,8 @@ import { cleanErrorMessage, recordAnomalyFromError } from "@/lib/stock-guard";
 import { orderItemPhoto } from "@/lib/order-photo";
 import { loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { notifyAdminNewOrder } from "@/lib/fonnte";
-import { validateProofUrl } from "@/lib/upload-url";
+import { validateProofKey, validateProofUrl } from "@/lib/upload-url";
+import { proofViewUrl } from "@/lib/private-media";
 import { resellerBuyPrice, resellerMinSellInfo } from "./pricing";
 import { getResellerSettings } from "./settings";
 import { notifyResellerOrderCreated } from "./notify";
@@ -446,7 +447,7 @@ export async function getResellerOrderDetail(
       .order("event_time", { ascending: true }),
     supabase
       .from("reseller_order_payments")
-      .select("amount, proof_url, payment_method, status, created_at")
+      .select("id, amount, proof_url, proof_key, payment_method, status, created_at")
       .eq("order_id", order.id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -490,7 +491,12 @@ export async function getResellerOrderDetail(
       ? {
           amount: Number(payment.amount) || 0,
           status: String(payment.status),
-          proof_url: (payment.proof_url as string | null) ?? null,
+          proof_url: proofViewUrl(
+            "order-payment",
+            String(payment.id),
+            payment.proof_key as string | null,
+            payment.proof_url as string | null,
+          ),
           payment_method: (payment.payment_method as string | null) ?? null,
           deadline: shortfallDeadline,
         }
@@ -505,14 +511,21 @@ export async function getResellerOrderDetail(
 export async function uploadShortfallProof(
   resellerId: string,
   orderNumber: string,
-  proofUrl: string,
+  proof: { key?: string | null; url?: string | null },
   paymentMethod: "bsi" | "qris" = "bsi"
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
-  const checked = validateProofUrl(proofUrl);
-  if (!checked.ok) {
-    return { ok: false, error: checked.error, status: 400 };
+  const proofKeyRaw = String(proof.key || "").trim();
+  let proofPatch: { proof_key: string | null; proof_url: string | null };
+
+  if (proofKeyRaw) {
+    const checked = validateProofKey(proofKeyRaw, resellerId, "order-payment");
+    if (!checked.ok) return { ok: false, error: checked.error, status: 400 };
+    proofPatch = { proof_key: checked.key, proof_url: null };
+  } else {
+    const checked = validateProofUrl(proof.url);
+    if (!checked.ok) return { ok: false, error: checked.error, status: 400 };
+    proofPatch = { proof_key: null, proof_url: checked.url };
   }
-  const url = checked.url;
 
   const supabase = getSupabaseAdmin();
   const { data: order } = await supabase
@@ -534,7 +547,7 @@ export async function uploadShortfallProof(
 
   const { error } = await supabase
     .from("reseller_order_payments")
-    .update({ proof_url: url, payment_method: paymentMethod })
+    .update({ ...proofPatch, payment_method: paymentMethod })
     .eq("order_id", order.id)
     .eq("status", "pending");
 

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resellerSession, resellerUnauthorized } from "@/lib/reseller/auth";
 import { expireOverdueTopups, isPastDeadline } from "@/lib/reseller/topups";
-import { validateProofUrl } from "@/lib/upload-url";
+import { validateProofKey, validateProofUrl } from "@/lib/upload-url";
+import { proofViewUrl } from "@/lib/private-media";
 
 /**
  * Detail & aksi satu top up milik reseller (alur 3 langkah).
@@ -16,7 +17,7 @@ import { validateProofUrl } from "@/lib/upload-url";
  */
 
 const TOPUP_COLUMNS =
-  "id, code, amount, proof_url, payment_method, status, reject_reason, reviewed_at, pay_deadline, created_at";
+  "id, code, amount, proof_url, proof_key, payment_method, status, reject_reason, reviewed_at, pay_deadline, created_at";
 
 export async function GET(req: NextRequest, context: { params: Promise<{ code: string }> }) {
   const session = await resellerSession(req);
@@ -41,7 +42,13 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
   }
   if (!data) return NextResponse.json({ error: "Top up tidak ditemukan" }, { status: 404 });
 
-  return NextResponse.json({ data });
+  const row = data as typeof data & { proof_key?: string | null };
+  return NextResponse.json({
+    data: {
+      ...row,
+      proof_url: proofViewUrl("topup", row.id, row.proof_key, row.proof_url),
+    },
+  });
 }
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ code: string }> }) {
@@ -95,19 +102,30 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ code:
       );
     }
 
-    const checked = validateProofUrl(body.proof_url);
-    if (!checked.ok) {
-      return NextResponse.json(
-        { error: checked.error === "URL bukti harus dari Cloudinary" ? "Upload bukti pembayaran dulu" : checked.error },
-        { status: 400 }
-      );
-    }
-    const proofUrl = checked.url;
     const paymentMethod = body.payment_method === "qris" ? "qris" : "bsi";
+    const proofKeyRaw = String(body.proof_key || "").trim();
+    let proofPatch: { proof_key: string | null; proof_url: string | null };
+
+    if (proofKeyRaw) {
+      const checked = validateProofKey(proofKeyRaw, session.reseller.id, "topup");
+      if (!checked.ok) {
+        return NextResponse.json({ error: checked.error }, { status: 400 });
+      }
+      proofPatch = { proof_key: checked.key, proof_url: null };
+    } else {
+      const checked = validateProofUrl(body.proof_url);
+      if (!checked.ok) {
+        return NextResponse.json(
+          { error: checked.error === "URL bukti harus dari Cloudinary" ? "Upload bukti pembayaran dulu" : checked.error },
+          { status: 400 }
+        );
+      }
+      proofPatch = { proof_key: null, proof_url: checked.url };
+    }
 
     const { error } = await supabase
       .from("reseller_topups")
-      .update({ proof_url: proofUrl, payment_method: paymentMethod, status: "pending" })
+      .update({ ...proofPatch, payment_method: paymentMethod, status: "pending" })
       .eq("id", topup.id);
     if (error) {
       console.error("[RESELLER-TOPUP] Gagal menyimpan bukti:", error.message);

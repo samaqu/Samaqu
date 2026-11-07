@@ -334,7 +334,15 @@ export const resellerApi = {
   topupDetail: (code: string) =>
     api<{ data: TopupRow }>(`/api/reseller/topups/${encodeURIComponent(code)}`),
 
-  patchTopup: (code: string, body: { action: "submit_proof" | "cancel"; proof_url?: string; payment_method?: "bsi" | "qris" }) =>
+  patchTopup: (
+    code: string,
+    body: {
+      action: "submit_proof" | "cancel";
+      proof_url?: string;
+      proof_key?: string;
+      payment_method?: "bsi" | "qris";
+    },
+  ) =>
     api<{ ok: true; status: string }>(`/api/reseller/topups/${encodeURIComponent(code)}`, {
       method: "PATCH",
       body: JSON.stringify(body),
@@ -384,10 +392,10 @@ export const resellerApi = {
   orderDetail: (orderNumber: string) =>
     api<{ data: OrderDetail }>(`/api/reseller/orders/${encodeURIComponent(orderNumber)}`),
 
-  uploadProof: (orderNumber: string, proofUrl: string, paymentMethod: "bsi" | "qris") =>
+  uploadProof: (orderNumber: string, proofKey: string, paymentMethod: "bsi" | "qris") =>
     api<{ ok: true }>(`/api/reseller/orders/${encodeURIComponent(orderNumber)}/payment-proof`, {
       method: "POST",
-      body: JSON.stringify({ proof_url: proofUrl, payment_method: paymentMethod }),
+      body: JSON.stringify({ proof_key: proofKey, payment_method: paymentMethod }),
     }),
 
   alamatTebak: (text: string) =>
