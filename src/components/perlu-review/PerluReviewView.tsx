@@ -230,7 +230,7 @@ export default function PerluReviewView() {
   };
 
   return (
-    <section className="flex min-h-[calc(100dvh-140px)] min-h-0 flex-col gap-3">
+    <section className="flex h-[calc(100dvh-140px)] min-h-0 flex-col gap-3 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black" style={{ color: "#141414" }}>
@@ -290,13 +290,13 @@ export default function PerluReviewView() {
           <Loader2 className="animate-spin" size={18} /> Memuat antrean...
         </div>
       ) : tab === "ai" ? (
-        <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <div className="min-h-0 rounded-2xl border bg-white" style={{ borderColor: "#E7E6E1" }}>
-            <div className="border-b px-4 py-3" style={{ borderColor: "#E7E6E1" }}>
+        <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border bg-white" style={{ borderColor: "#E7E6E1" }}>
+            <div className="shrink-0 border-b px-4 py-3" style={{ borderColor: "#E7E6E1" }}>
               <p className="text-sm font-bold" style={{ color: "#141414" }}>Antrean pertanyaan</p>
               <p className="mt-0.5 text-[11px]" style={{ color: "#6B6A64" }}>{data.escalations.length} kasus</p>
             </div>
-            <div className="max-h-[calc(100dvh-300px)] overflow-y-auto p-2">
+            <div className="min-h-0 flex-1 overflow-y-auto p-2">
               {data.escalations.length === 0 ? (
                 <p className="p-4 text-center text-xs" style={{ color: "#6B6A64" }}>Belum ada pertanyaan yang perlu review.</p>
               ) : (
@@ -322,7 +322,7 @@ export default function PerluReviewView() {
             </div>
           </div>
 
-          <div className="min-h-0 overflow-y-auto rounded-2xl border bg-white" style={{ borderColor: "#E7E6E1" }}>
+          <div className="h-full min-h-0 overflow-y-auto rounded-2xl border bg-white" style={{ borderColor: "#E7E6E1" }}>
             {!selected ? (
               <div className="flex h-full min-h-[300px] items-center justify-center p-6 text-center text-sm" style={{ color: "#6B6A64" }}>
                 Pilih kasus di kiri.
@@ -406,13 +406,13 @@ export default function PerluReviewView() {
           </div>
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <div className="min-h-0 rounded-2xl border bg-white" style={{ borderColor: "#E7E6E1" }}>
-            <div className="border-b px-4 py-3" style={{ borderColor: "#E7E6E1" }}>
+        <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border bg-white" style={{ borderColor: "#E7E6E1" }}>
+            <div className="shrink-0 border-b px-4 py-3" style={{ borderColor: "#E7E6E1" }}>
               <p className="text-sm font-bold" style={{ color: "#141414" }}>Draft transaksi</p>
               <p className="mt-0.5 text-[11px]" style={{ color: "#6B6A64" }}>{data.drafts.length} menunggu review</p>
             </div>
-            <div className="max-h-[calc(100dvh-300px)] overflow-y-auto p-2">
+            <div className="min-h-0 flex-1 overflow-y-auto p-2">
               {data.drafts.length === 0 ? (
                 <p className="p-4 text-center text-xs" style={{ color: "#6B6A64" }}>Belum ada draft transaksi.</p>
               ) : (
@@ -435,7 +435,7 @@ export default function PerluReviewView() {
             </div>
           </div>
 
-          <div className="min-h-0 overflow-y-auto rounded-2xl border bg-white p-4" style={{ borderColor: "#E7E6E1" }}>
+          <div className="h-full min-h-0 overflow-y-auto rounded-2xl border bg-white p-4" style={{ borderColor: "#E7E6E1" }}>
             {!selectedDraft ? (
               <div className="flex h-full min-h-[300px] items-center justify-center text-sm" style={{ color: "#6B6A64" }}>Pilih draft di kiri.</div>
             ) : (
