@@ -47,64 +47,64 @@ export default function ChatThread({
       style={{ borderColor: "#E7E6E1" }}
     >
       <div
-        className="flex shrink-0 flex-wrap items-start gap-2.5 border-b p-4"
-        style={{ borderColor: "#E7E6E1" }}
-      >
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Kembali ke daftar sesi"
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border lg:hidden"
-          style={{ borderColor: "#E7E6E1", color: "#141414" }}
-        >
-          <ChevronLeft size={18} />
-        </button>
-
-        <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
-          style={{ background: "#EEE9DF", color: "#6B6A64" }}
-        >
-          {initialOf(session.name)}
-        </div>
-
-        <div className="min-w-0 flex-1 basis-[220px]">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-sm font-semibold" style={{ color: "#141414" }}>
-              {session.name || "Pengunjung"}
-            </p>
-            {session.phone ? (
-              <span className="text-xs" style={{ color: "#6B6A64" }}>
-                {session.phone}
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-0.5 truncate text-[11px]" style={{ color: "#6B6A64" }}>
-            {formatDateTime(session.lastAt)} · ID {session.key}
-          </p>
-        </div>
-
-        {wa ? (
-          <a
-            href={`https://wa.me/${wa}`}
-            target="_blank"
-            rel="noreferrer"
-            className="ml-auto inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold"
-            style={{ background: "#1F7A4D", color: "#fff" }}
-          >
-            <MessageCircle size={14} />
-            Chat WhatsApp
-          </a>
-        ) : null}
-      </div>
-
-      {detailsPanel ? <div className="shrink-0">{detailsPanel}</div> : null}
-
-      <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto p-4"
+        className="min-h-0 flex-1 overflow-y-auto"
         style={{ background: "#FAF9F6" }}
       >
-        <div className="space-y-5">
+        <div
+          className="flex flex-wrap items-start gap-2.5 border-b bg-white p-4"
+          style={{ borderColor: "#E7E6E1" }}
+        >
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Kembali ke daftar sesi"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border lg:hidden"
+            style={{ borderColor: "#E7E6E1", color: "#141414" }}
+          >
+            <ChevronLeft size={18} />
+          </button>
+
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
+            style={{ background: "#EEE9DF", color: "#6B6A64" }}
+          >
+            {initialOf(session.name)}
+          </div>
+
+          <div className="min-w-0 flex-1 basis-[220px]">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="truncate text-sm font-semibold" style={{ color: "#141414" }}>
+                {session.name || "Pengunjung"}
+              </p>
+              {session.phone ? (
+                <span className="text-xs" style={{ color: "#6B6A64" }}>
+                  {session.phone}
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-0.5 truncate text-[11px]" style={{ color: "#6B6A64" }}>
+              {formatDateTime(session.lastAt)} · ID {session.key}
+            </p>
+          </div>
+
+          {wa ? (
+            <a
+              href={`https://wa.me/${wa}`}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-auto inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold"
+              style={{ background: "#1F7A4D", color: "#fff" }}
+            >
+              <MessageCircle size={14} />
+              Chat WhatsApp
+            </a>
+          ) : null}
+        </div>
+
+        {detailsPanel ? <div>{detailsPanel}</div> : null}
+
+        <div className="space-y-5 p-4">
           {groups.map((group) => (
             <div key={group.label} className="space-y-3">
               <div className="flex justify-center">
