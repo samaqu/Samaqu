@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { archiveWaMedia } from "@/lib/wa-media";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -138,6 +139,17 @@ export async function POST(req: NextRequest) {
     if (error && error.code !== "23505") {
       console.error("[WA-INBOX] gagal simpan:", error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (!error && mediaUrl) {
+      const mediaKey = await archiveWaMedia({ url: mediaUrl, sender, id: dedupeKey });
+      if (mediaKey) {
+        const { error: keyError } = await getSupabaseAdmin()
+          .from("wa_inbox")
+          .update({ media_key: mediaKey })
+          .eq("dedupe_key", dedupeKey);
+        if (keyError) console.error("[WA-INBOX] gagal simpan media_key:", keyError.message);
+      }
     }
 
     return NextResponse.json({ ok: true, duplicate: error?.code === "23505" });

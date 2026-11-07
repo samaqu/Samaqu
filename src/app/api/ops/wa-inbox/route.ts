@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getFonnteConfigs, normalizeWhatsappTarget, sendFonnteMessage } from "@/lib/fonnte";
+import { waMediaSignedUrl } from "@/lib/wa-media";
 
 /**
  * Kotak masuk WhatsApp untuk balasan manual/Claude (tabel `wa_inbox`).
@@ -82,7 +83,7 @@ export async function GET(req: NextRequest) {
   for (const row of claimed) {
     const { data: history } = await admin
       .from("wa_inbox")
-      .select("created_at, message, reply_text")
+      .select("created_at, message, reply_text, media_key")
       .eq("sender", row.sender)
       .neq("id", row.id)
       .order("created_at", { ascending: false })
@@ -90,7 +91,15 @@ export async function GET(req: NextRequest) {
     const instruksi = (learnings || [])
       .filter((item) => item.scope === "global" || String(item.sender || "") === String(row.sender))
       .map((item) => ({ topic: item.topic, instruction: item.instruction, scope: item.scope }));
-    withHistory.push({ ...row, riwayat: (history || []).reverse(), instruksi });
+    withHistory.push({
+      ...row,
+      media_url: waMediaSignedUrl(row.media_key as string | null) || row.media_url,
+      riwayat: (history || []).reverse().map((item) => ({
+        ...item,
+        media_url: waMediaSignedUrl(item.media_key as string | null),
+      })),
+      instruksi,
+    });
   }
 
   return NextResponse.json({ items: withHistory, claimed: withHistory.length });

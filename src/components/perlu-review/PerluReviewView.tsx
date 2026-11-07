@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Check,
   Copy,
-  ExternalLink,
   Loader2,
   MessageSquare,
   RefreshCw,
@@ -50,6 +49,7 @@ type Draft = {
   customer_name: string | null;
   customer_whatsapp: string | null;
   proof_url: string | null;
+  proof_key: string | null;
   payload: any;
   created_at: string;
   approved_order_number: string | null;
@@ -130,6 +130,8 @@ export default function PerluReviewView() {
   const [notice, setNotice] = useState("");
   const [dialog, setDialog] = useState<{ kind: "approve" | "reject"; draft: Draft } | null>(null);
   const [rejectReason, setRejectReason] = useState("Data belum sesuai");
+  const [proofOpen, setProofOpen] = useState(false);
+  const [proofError, setProofError] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -492,11 +494,59 @@ export default function PerluReviewView() {
                 busy={Boolean(busy)}
                 onApprove={askApprove}
                 onReject={askReject}
+                onViewProof={() => {
+                  setProofError(false);
+                  setProofOpen(true);
+                }}
               />
             )}
           </div>
         </div>
       )}
+
+      {proofOpen && selectedDraft ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
+          onMouseDown={() => setProofOpen(false)}
+        >
+          <div
+            className="flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl"
+            style={{ borderColor: "#E7E6E1" }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b px-4 py-3" style={{ borderColor: "#E7E6E1" }}>
+              <div>
+                <p className="text-sm font-bold" style={{ color: "#141414" }}>Bukti transfer</p>
+                <p className="text-[11px]" style={{ color: "#6B6A64" }}>{selectedDraft.customer_name || "Customer"}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProofOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border"
+                style={{ borderColor: "#E7E6E1", color: "#6B6A64" }}
+                aria-label="Tutup bukti transfer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex min-h-[240px] items-center justify-center overflow-auto bg-[#111]" style={{ maxHeight: "70dvh" }}>
+              {!selectedDraft.proof_url || proofError ? (
+                <div className="px-6 py-10 text-center">
+                  <p className="text-sm font-bold text-white">Bukti transfer tidak tersedia</p>
+                  <p className="mt-1 text-xs text-white/60">Link lama dari Fonnte sudah kedaluwarsa. Bukti baru akan disimpan di R2.</p>
+                </div>
+              ) : (
+                <img
+                  src={selectedDraft.proof_url}
+                  alt="Bukti transfer"
+                  className="max-h-[70dvh] w-auto max-w-full object-contain"
+                  onError={() => setProofError(true)}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {dialog ? (
         <div
@@ -585,11 +635,13 @@ function DraftDetail({
   busy,
   onApprove,
   onReject,
+  onViewProof,
 }: {
   draft: Draft;
   busy: boolean;
   onApprove: () => void;
   onReject: () => void;
+  onViewProof: () => void;
 }) {
   const payload = draft.payload || {};
   const shipping = payload.shipping || {};
@@ -650,10 +702,12 @@ function DraftDetail({
         </div>
 
         {draft.proof_url ? (
-          <a href={draft.proof_url} target="_blank" rel="noreferrer" className="inline-flex w-fit items-center gap-2 text-xs font-bold" style={{ color: "#1F7A4D" }}>
-            <ExternalLink size={14} /> Lihat bukti transfer
-          </a>
-        ) : null}
+          <button type="button" onClick={onViewProof} className="inline-flex w-fit items-center gap-2 text-xs font-bold" style={{ color: "#1F7A4D" }}>
+            <span className="text-base leading-none">&#128247;</span> Lihat bukti transfer
+          </button>
+        ) : (
+          <p className="text-xs" style={{ color: "#9A9892" }}>Bukti transfer tidak tersedia.</p>
+        )}
 
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={onApprove} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold text-white disabled:opacity-50" style={{ background: "#1F7A4D" }}>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, opsActorEmail, unauthorized } from "@/lib/ops-auth";
 import { getChatConfig } from "@/lib/chat-config";
+import { waMediaSignedUrl } from "@/lib/wa-media";
 
 /**
  * Menu "Perlu Review".
@@ -24,11 +25,14 @@ const sender62 = (value: unknown) => {
 async function history(admin: ReturnType<typeof getSupabaseAdmin>, sender: string) {
   const { data } = await admin
     .from("wa_inbox")
-    .select("id, created_at, message, reply_text, status, media_url")
+    .select("id, created_at, message, reply_text, status, media_url, media_key")
     .eq("sender", sender)
     .order("created_at", { ascending: false })
     .limit(12);
-  return (data || []).reverse();
+  return (data || []).reverse().map((item) => ({
+    ...item,
+    media_url: waMediaSignedUrl(item.media_key) || item.media_url,
+  }));
 }
 
 export async function GET(req: NextRequest) {
@@ -57,13 +61,17 @@ export async function GET(req: NextRequest) {
   for (const item of escalations || []) {
     escalationItems.push({ ...item, messages: await history(admin, String(item.sender)) });
   }
+  const draftItems = (drafts || []).map((item) => ({
+    ...item,
+    proof_url: waMediaSignedUrl(item.proof_key) || item.proof_url,
+  }));
 
   return NextResponse.json({
     escalations: escalationItems,
-    drafts: drafts || [],
+    drafts: draftItems,
     counts: {
       escalations: escalationItems.filter((item) => item.status === "open" || item.status === "claimed").length,
-      drafts: (drafts || []).length,
+      drafts: draftItems.length,
     },
   });
 }
@@ -141,13 +149,24 @@ export async function POST(req: NextRequest) {
     if (!payload || typeof payload !== "object" || !Array.isArray(payload.items) || !payload.items.length) {
       return bad("payload transaksi tidak valid");
     }
+    const sourceInboxId = body?.source_inbox_id ? String(body.source_inbox_id) : null;
+    let proofKey: string | null = null;
+    if (sourceInboxId) {
+      const { data: source } = await admin
+        .from("wa_inbox")
+        .select("media_key")
+        .eq("id", sourceInboxId)
+        .maybeSingle();
+      proofKey = source?.media_key || null;
+    }
     const row = {
-      source_inbox_id: body?.source_inbox_id ? String(body.source_inbox_id) : null,
+      source_inbox_id: sourceInboxId,
       closing_id: body?.closing_id ? String(body.closing_id) : null,
       customer_name: String(payload.customer_name || body?.customer_name || "").trim() || null,
       customer_whatsapp: String(payload.customer_whatsapp || body?.customer_whatsapp || "").trim() || null,
       payload,
-      proof_url: body?.proof_url ? String(body.proof_url) : null,
+      proof_key: proofKey,
+      proof_url: proofKey ? waMediaSignedUrl(proofKey) : body?.proof_url ? String(body.proof_url) : null,
       ai_note: body?.ai_note ? String(body.ai_note) : null,
     };
     const { data, error } = await admin.from("order_drafts").insert(row).select().single();
