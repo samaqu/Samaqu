@@ -130,6 +130,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
     section: "Operasional",
     items: [
       { label: "Beranda", href: "/panel-admin", icon: "home" },
+      { label: "AI Performance", href: "/panel-admin/ai-performance", icon: "spark" },
       { label: "Perlu Review", href: "/panel-admin/perlu-review", icon: "alert" },
       { label: "Transaksi", href: "/panel-admin/transaksi", icon: "card" },
       { label: "Reseller", href: "/panel-admin/reseller", icon: "reseller", badge: "reseller" },
