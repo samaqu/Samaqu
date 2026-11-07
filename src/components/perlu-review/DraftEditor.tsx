@@ -1,7 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Loader2, Plus, Save, Search, Trash2, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Loader2,
+  MapPin,
+  Minus,
+  Pencil,
+  Plus,
+  Save,
+  Search,
+  Shirt,
+  Trash2,
+  X,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 type Draft = {
@@ -16,6 +28,7 @@ type Variant = {
   product_id: string;
   product_name: string;
   series_name?: string;
+  jenis_kain_name?: string;
   color?: string;
   price?: number;
   prices?: Record<string, number>;
@@ -33,7 +46,9 @@ type Item = {
 };
 
 const money = (value: unknown) => "Rp" + Number(value || 0).toLocaleString("id-ID");
-const labelClass = "text-[11px] font-bold uppercase tracking-wide";
+const labelClass = "text-[11px] font-bold uppercase tracking-wider";
+const inputClass = "w-full rounded-xl border px-3 py-2.5 text-sm font-medium outline-none";
+const inputStyle = { borderColor: "#dbe4eb", color: "#2a1a22", background: "#fff" };
 
 async function authHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
@@ -48,6 +63,16 @@ function stockOf(variant: Variant | undefined, size: string) {
 function priceOf(variant: Variant | undefined, size: string) {
   if (!variant) return 0;
   return Number(variant.prices?.[size] ?? variant.price ?? 0);
+}
+
+function sizesOf(variant: Variant | undefined) {
+  if (!variant) return [];
+  return Object.keys(variant.stock_efektif || variant.stock || {});
+}
+
+function phone(value: string | null) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.startsWith("62") ? `0${digits.slice(2)}` : digits;
 }
 
 export default function DraftEditor({
@@ -80,9 +105,11 @@ export default function DraftEditor({
   const [variants, setVariants] = useState<Variant[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [search, setSearch] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
   const [addQty, setAddQty] = useState(1);
+  const [addressEditing, setAddressEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -114,21 +141,44 @@ export default function DraftEditor({
   }, [variants, search]);
 
   const selectedVariant = variants.find((item) => item.id === selectedProduct);
-  const sizes = selectedVariant
-    ? Object.keys(selectedVariant.stock_efektif || selectedVariant.stock || {})
-        .filter((size) => stockOf(selectedVariant, size) > 0)
-        .sort((a, b) => a.localeCompare(b, "id", { numeric: true }))
+  const availableSizes = selectedVariant
+    ? sizesOf(selectedVariant).filter((size) => stockOf(selectedVariant, size) > 0)
     : [];
 
   function selectProduct(id: string) {
     setSelectedProduct(id);
     const variant = variants.find((item) => item.id === id);
-    const first = variant
-      ? Object.keys(variant.stock_efektif || variant.stock || {}).find((size) => stockOf(variant, size) > 0)
-      : "";
+    const first = variant ? sizesOf(variant).find((size) => stockOf(variant, size) > 0) : "";
     setSelectedSize(first || "");
     setAddQty(1);
     setError("");
+  }
+
+  function itemVariant(item: Item) {
+    return variants.find(
+      (entry) => entry.product_id === item.product_id && (entry.color || "default") === item.color,
+    );
+  }
+
+  function changeSize(index: number, size: string) {
+    const item = items[index];
+    const variant = itemVariant(item);
+    if (!variant || stockOf(variant, size) < 1) return;
+    setItems((current) =>
+      current.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, size, price: priceOf(variant, size) || row.price } : row,
+      ),
+    );
+  }
+
+  function changeQty(index: number, value: number) {
+    const item = items[index];
+    const stock = stockOf(itemVariant(item), item.size);
+    const max = stock > 0 ? stock : 99;
+    const next = Math.max(1, Math.min(Number(value) || 1, max));
+    setItems((current) =>
+      current.map((row, rowIndex) => (rowIndex === index ? { ...row, quantity: next } : row)),
+    );
   }
 
   function addItem() {
@@ -142,11 +192,11 @@ export default function DraftEditor({
           item.size === selectedSize,
       )
       .reduce((sum, item) => sum + item.quantity, 0);
-    const quantity = Math.max(1, Math.min(Number(addQty) || 1, stock - existingQty));
     if (existingQty >= stock) {
       setError(`Stok ${selectedSize} tinggal ${stock}.`);
       return;
     }
+    const quantity = Math.max(1, Math.min(Number(addQty) || 1, stock - existingQty));
     const next: Item = {
       product_id: selectedVariant.product_id,
       product_name: selectedVariant.product_name,
@@ -169,25 +219,21 @@ export default function DraftEditor({
     setSelectedSize("");
     setAddQty(1);
     setSearch("");
+    setAddOpen(false);
     setError("");
-  }
-
-  function changeQty(index: number, value: number) {
-    const item = items[index];
-    const variant = variants.find(
-      (entry) =>
-        entry.product_id === item.product_id && (entry.color || "default") === item.color,
-    );
-    const stock = stockOf(variant, item.size);
-    const max = stock > 0 ? stock : 99;
-    const next = Math.max(1, Math.min(Number(value) || 1, max));
-    setItems((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, quantity: next } : row)));
   }
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shippingCost = Number(draft.payload?.shipping_cost) || 0;
   const discount = Number(draft.payload?.discount) || 0;
   const total = subtotal + shippingCost - discount;
+  const addressLine = [
+    shipping.address,
+    shipping.kecamatan ? `Kec. ${shipping.kecamatan}` : "",
+    shipping.city,
+    shipping.province,
+    shipping.postal_code,
+  ].filter(Boolean).join(", ");
 
   async function save() {
     setError("");
@@ -197,6 +243,7 @@ export default function DraftEditor({
     }
     if (!shipping.address.trim() || !shipping.kecamatan.trim() || !shipping.city.trim() || !shipping.province.trim() || !shipping.postal_code.trim()) {
       setError("Alamat lengkap, kecamatan, kota, provinsi, dan kode pos wajib diisi.");
+      setAddressEditing(true);
       return;
     }
     setSaving(true);
@@ -207,11 +254,7 @@ export default function DraftEditor({
         body: JSON.stringify({
           action: "draft_update",
           id: draft.id,
-          payload: {
-            ...draft.payload,
-            shipping,
-            items,
-          },
+          payload: { ...draft.payload, shipping, items },
         }),
       });
       const json = await res.json().catch(() => null);
@@ -224,154 +267,220 @@ export default function DraftEditor({
     }
   }
 
-  const inputClass = "w-full rounded-xl border px-3 py-2 text-sm outline-none";
-  const inputStyle = { borderColor: "#E7E6E1", color: "#141414" };
-
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[110] flex justify-end bg-[#2a1a22]/35 backdrop-blur-[1px]" onMouseDown={onClose}>
       <div
-        className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl"
-        style={{ borderColor: "#E7E6E1" }}
+        className="flex h-full w-full max-w-[640px] flex-col overflow-hidden bg-white shadow-2xl sm:rounded-l-3xl"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b px-5 py-4" style={{ borderColor: "#E7E6E1" }}>
-          <div>
-            <h2 className="text-base font-black" style={{ color: "#141414" }}>Edit draft transaksi</h2>
-            <p className="mt-0.5 text-xs" style={{ color: "#6B6A64" }}>
-              {draft.customer_name || "Customer"} · stok baru dipotong saat Setujui
-            </p>
-          </div>
-          <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg border" style={{ borderColor: "#E7E6E1", color: "#6B6A64" }}>
-            <X size={16} />
+        <div className="relative shrink-0 px-6 pb-5 pt-6" style={{ background: "linear-gradient(130deg,#e8f3fb 0%,#fdf0f4 100%)" }}>
+          <button type="button" onClick={onClose} className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-white/80 text-[#2a1a22] shadow-sm" aria-label="Tutup">
+            <X size={19} />
           </button>
+          <p className="text-xs font-bold" style={{ color: "#4a90c2" }}>Hai Lea, mau ubah apa?</p>
+          <h2 className="mt-0.5 text-2xl font-black" style={{ color: "#2a1a22" }}>Ubah Pesanan</h2>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-white/70 px-3 py-1 text-[11px] font-bold" style={{ color: "#2f6f9e" }}>
+              DRAFT-{draft.id.slice(0, 8).toUpperCase()}
+            </span>
+            <span className="rounded-full px-3 py-1 text-[11px] font-bold" style={{ background: "#e7f5eb", color: "#2f7a4f" }}>
+              Menunggu review
+            </span>
+          </div>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
-          <div className="grid gap-3">
-            <div>
-              <label className={labelClass} style={{ color: "#8A8880" }}>Alamat lengkap</label>
-              <textarea
-                value={shipping.address}
-                onChange={(event) => setShipping({ ...shipping, address: event.target.value })}
-                rows={2}
-                className={`${inputClass} mt-1 resize-none`}
-                style={inputStyle}
-              />
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          <div className="flex items-start gap-2.5 rounded-2xl px-4 py-3 text-xs font-medium" style={{ background: "#e8f3fb", color: "#2f6f9e" }}>
+            <span className="mt-px text-sm">💡</span>
+            <span>Boleh ubah alamat, ukuran, atau tambah produk. Total pesanan ikut menyesuaikan.</span>
+          </div>
+
+          <div className="mt-4 flex items-center gap-3 rounded-2xl border px-4 py-3" style={{ borderColor: "#e3ebf1" }}>
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-black" style={{ background: "#fdf0f4", color: "#2a1a22" }}>
+              {(draft.customer_name || "C").slice(0, 1).toUpperCase()}
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass} style={{ color: "#8A8880" }}>Kecamatan</label>
-                <input value={shipping.kecamatan} onChange={(event) => setShipping({ ...shipping, kecamatan: event.target.value })} className={`${inputClass} mt-1`} style={inputStyle} />
-              </div>
-              <div>
-                <label className={labelClass} style={{ color: "#8A8880" }}>Kota / Kabupaten</label>
-                <input value={shipping.city} onChange={(event) => setShipping({ ...shipping, city: event.target.value })} className={`${inputClass} mt-1`} style={inputStyle} />
-              </div>
-              <div>
-                <label className={labelClass} style={{ color: "#8A8880" }}>Provinsi</label>
-                <input value={shipping.province} onChange={(event) => setShipping({ ...shipping, province: event.target.value })} className={`${inputClass} mt-1`} style={inputStyle} />
-              </div>
-              <div>
-                <label className={labelClass} style={{ color: "#8A8880" }}>Kode pos</label>
-                <input value={shipping.postal_code} onChange={(event) => setShipping({ ...shipping, postal_code: event.target.value })} className={`${inputClass} mt-1`} style={inputStyle} />
-              </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black" style={{ color: "#2a1a22" }}>{draft.customer_name || "Customer"}</p>
+              <p className="mt-0.5 truncate text-xs font-medium" style={{ color: "#8a7d83" }}>
+                {phone(draft.customer_whatsapp)} · {shipping.city || "-"}
+              </p>
             </div>
           </div>
 
-          <div className="rounded-xl border p-3" style={{ borderColor: "#E7E6E1" }}>
-            <p className={labelClass} style={{ color: "#8A8880" }}>Produk di draft</p>
-            <div className="mt-2 space-y-2">
-              {items.map((item, index) => {
-                const variant = variants.find(
-                  (entry) => entry.product_id === item.product_id && (entry.color || "default") === item.color,
-                );
-                const stock = stockOf(variant, item.size);
-                return (
-                  <div key={`${item.product_id}-${item.color}-${item.size}-${index}`} className="flex flex-wrap items-center gap-2 rounded-lg bg-[#FAF9F6] px-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold" style={{ color: "#141414" }}>
-                        {item.product_name}{item.color !== "default" ? ` · ${item.color}` : ""} · {item.size}
-                      </p>
-                      <p className="text-[11px]" style={{ color: stock < item.quantity ? "#9B2C2C" : "#6B6A64" }}>
-                        {money(item.price)} · stok {stock}
-                      </p>
-                    </div>
-                    <input
-                      type="number"
-                      min={1}
-                      value={item.quantity}
-                      onChange={(event) => changeQty(index, Number(event.target.value))}
-                      className="h-8 w-16 rounded-lg border px-2 text-center text-sm"
-                      style={inputStyle}
-                    />
-                    <span className="w-24 text-right text-sm font-bold" style={{ color: "#141414" }}>{money(item.price * item.quantity)}</span>
-                    <button type="button" onClick={() => setItems((current) => current.filter((_, rowIndex) => rowIndex !== index))} className="rounded-lg p-1.5" style={{ color: "#9B2C2C" }} aria-label="Hapus produk">
-                      <Trash2 size={16} />
-                    </button>
+          <div className="mt-4 rounded-2xl border px-4 py-3" style={{ borderColor: "#e3ebf1" }}>
+            <div className="flex items-start gap-3">
+              <MapPin size={17} className="mt-0.5 shrink-0" style={{ color: "#4a90c2" }} />
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: "#8a7d83" }}>Alamat pengiriman · bisa diubah</p>
+                <p className="mt-1 truncate text-sm font-semibold" style={{ color: "#2a1a22" }} title={addressLine}>{addressLine || "Alamat belum lengkap"}</p>
+              </div>
+              <button type="button" onClick={() => setAddressEditing((value) => !value)} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold" style={{ borderColor: "#d5e3ee", color: "#2f6f9e", background: "#fff" }}>
+                <Pencil size={13} /> {addressEditing ? "Tutup" : "Ubah alamat"}
+              </button>
+            </div>
+
+            {addressEditing ? (
+              <div className="mt-3 grid gap-2.5 border-t pt-3" style={{ borderColor: "#edf1f4" }}>
+                <div>
+                  <label className={labelClass} style={{ color: "#8a7d83" }}>Alamat lengkap</label>
+                  <textarea value={shipping.address} onChange={(event) => setShipping({ ...shipping, address: event.target.value })} rows={2} className={`${inputClass} mt-1 resize-none`} style={inputStyle} />
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className={labelClass} style={{ color: "#8a7d83" }}>Kecamatan</label>
+                    <input value={shipping.kecamatan} onChange={(event) => setShipping({ ...shipping, kecamatan: event.target.value })} className={`${inputClass} mt-1`} style={inputStyle} />
                   </div>
-                );
-              })}
-              {items.length === 0 ? <p className="py-2 text-xs" style={{ color: "#9A9892" }}>Belum ada produk.</p> : null}
-            </div>
-          </div>
-
-          <div className="rounded-xl border p-3" style={{ borderColor: "#E7E6E1" }}>
-            <p className={labelClass} style={{ color: "#8A8880" }}>Tambah produk</p>
-            <div className="mt-2 flex items-center gap-2 rounded-lg border px-2" style={{ borderColor: "#E7E6E1" }}>
-              <Search size={15} style={{ color: "#9A9892" }} />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama / series / warna..." className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none" style={{ color: "#141414" }} />
-            </div>
-            <select value={selectedProduct} onChange={(event) => selectProduct(event.target.value)} className={`${inputClass} mt-2`} style={inputStyle}>
-              <option value="">{loadingProducts ? "Memuat produk..." : "Pilih produk"}</option>
-              {filtered.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.product_name}{item.series_name ? ` · ${item.series_name}` : ""}{item.color && item.color !== "default" ? ` · ${item.color}` : ""}
-                </option>
-              ))}
-            </select>
-            {selectedVariant ? (
-              <div className="mt-2 flex flex-wrap items-end gap-2">
-                <div className="min-w-[120px] flex-1">
-                  <label className={labelClass} style={{ color: "#8A8880" }}>Ukuran</label>
-                  <select value={selectedSize} onChange={(event) => setSelectedSize(event.target.value)} className={`${inputClass} mt-1`} style={inputStyle}>
-                    <option value="">Pilih ukuran</option>
-                    {sizes.map((size) => <option key={size} value={size}>{size} · stok {stockOf(selectedVariant, size)}</option>)}
-                  </select>
+                  <div>
+                    <label className={labelClass} style={{ color: "#8a7d83" }}>Kota / Kabupaten</label>
+                    <input value={shipping.city} onChange={(event) => setShipping({ ...shipping, city: event.target.value })} className={`${inputClass} mt-1`} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label className={labelClass} style={{ color: "#8a7d83" }}>Provinsi</label>
+                    <input value={shipping.province} onChange={(event) => setShipping({ ...shipping, province: event.target.value })} className={`${inputClass} mt-1`} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label className={labelClass} style={{ color: "#8a7d83" }}>Kode pos</label>
+                    <input value={shipping.postal_code} onChange={(event) => setShipping({ ...shipping, postal_code: event.target.value })} className={`${inputClass} mt-1`} style={inputStyle} />
+                  </div>
                 </div>
-                <div className="w-20">
-                  <label className={labelClass} style={{ color: "#8A8880" }}>Qty</label>
-                  <input type="number" min={1} value={addQty} onChange={(event) => setAddQty(Number(event.target.value))} className={`${inputClass} mt-1`} style={inputStyle} />
-                </div>
-                <button type="button" onClick={addItem} disabled={!selectedSize} className="inline-flex h-10 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-white disabled:opacity-40" style={{ background: "#1F7A4D" }}>
-                  <Plus size={15} /> Tambah
-                </button>
               </div>
             ) : null}
-            {selectedVariant && sizes.length === 0 ? <p className="mt-2 text-xs" style={{ color: "#9B2C2C" }}>Ukuran produk ini sedang habis.</p> : null}
           </div>
 
-          <div className="rounded-xl bg-[#FAF9F6] p-3 text-sm">
-            <div className="flex justify-between" style={{ color: "#6B6A64" }}><span>Subtotal</span><span>{money(subtotal)}</span></div>
-            <div className="mt-1 flex justify-between" style={{ color: "#6B6A64" }}><span>Ongkir</span><span>{money(shippingCost)}</span></div>
-            {discount > 0 ? <div className="mt-1 flex justify-between" style={{ color: "#6B6A64" }}><span>Diskon</span><span>-{money(discount)}</span></div> : null}
-            <div className="mt-2 flex justify-between border-t pt-2 font-bold" style={{ borderColor: "#E7E6E1", color: "#1F7A4D" }}><span>Total</span><span>{money(total)}</span></div>
+          <p className="mb-2 mt-5 text-[11px] font-black uppercase tracking-wider" style={{ color: "#7c93a6" }}>Produk di pesanan</p>
+          <div className="space-y-3">
+            {items.map((item, index) => {
+              const variant = itemVariant(item);
+              const sizes = sizesOf(variant);
+              const stock = stockOf(variant, item.size);
+              return (
+                <div key={`${item.product_id}-${item.color}-${item.size}-${index}`} className="rounded-2xl border p-3.5" style={{ borderColor: "#e3ebf1", background: "#fff" }}>
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-16 w-14 shrink-0 items-center justify-center rounded-xl" style={{ background: "#f5f1ee", color: "#b9a99c" }}>
+                      <Shirt size={28} strokeWidth={1.5} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-black leading-snug" style={{ color: "#2a1a22" }}>{item.product_name}</p>
+                        <button type="button" onClick={() => setItems((current) => current.filter((_, rowIndex) => rowIndex !== index))} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: "#fdf0f4", color: "#d85b78" }} aria-label="Hapus produk">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {variant?.series_name ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "#e8f3fb", color: "#2f6f9e" }}>{variant.series_name}</span> : null}
+                        {variant?.jenis_kain_name ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "#fdf0f4", color: "#b65b78" }}>{variant.jenis_kain_name}</span> : null}
+                        {item.color && item.color !== "default" ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "#f2f4f6", color: "#62717c" }}>{item.color}</span> : null}
+                      </div>
+                      <p className="mt-1.5 text-[11px] font-medium" style={{ color: "#8a7d83" }}>Stok tersedia {stock}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <div className="flex gap-1">
+                          {sizes.map((size) => {
+                            const sizeStock = stockOf(variant, size);
+                            const active = size === item.size;
+                            return (
+                              <button
+                                key={size}
+                                type="button"
+                                disabled={sizeStock < 1 && !active}
+                                onClick={() => changeSize(index, size)}
+                                className="h-8 min-w-8 rounded-full px-2 text-[11px] font-bold disabled:opacity-35"
+                                style={{
+                                  background: active ? "#4a90c2" : "#f2f6f9",
+                                  color: active ? "#fff" : "#5b6f7c",
+                                  border: active ? "1px solid #4a90c2" : "1px solid #e3ebf1",
+                                }}
+                              >
+                                {size}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="ml-auto flex items-center gap-1 rounded-full border px-1" style={{ borderColor: "#e3ebf1" }}>
+                          <button type="button" onClick={() => changeQty(index, item.quantity - 1)} className="flex h-7 w-7 items-center justify-center" style={{ color: "#62717c" }} aria-label="Kurangi qty"><Minus size={13} /></button>
+                          <span className="min-w-5 text-center text-xs font-bold" style={{ color: "#2a1a22" }}>{item.quantity}</span>
+                          <button type="button" onClick={() => changeQty(index, item.quantity + 1)} className="flex h-7 w-7 items-center justify-center" style={{ color: "#62717c" }} aria-label="Tambah qty"><Plus size={13} /></button>
+                        </div>
+                        <span className="text-xs font-bold" style={{ color: "#2a1a22" }}>{money(item.price * item.quantity)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+
+          <button type="button" onClick={() => setAddOpen((value) => !value)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-3 text-xs font-bold" style={{ borderColor: "#bed6e7", color: "#2f6f9e", background: "#f8fbfd" }}>
+            <Plus size={15} /> {addOpen ? "Tutup pilihan produk" : "Tambah produk"}
+          </button>
+
+          {addOpen ? (
+            <div className="mt-3 rounded-2xl border p-3.5" style={{ borderColor: "#e3ebf1", background: "#fbfcfd" }}>
+              <div className="flex items-center gap-2 rounded-xl border bg-white px-3" style={{ borderColor: "#e3ebf1" }}>
+                <Search size={15} style={{ color: "#9aacb8" }} />
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama / series / warna..." className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none" style={{ color: "#2a1a22" }} />
+              </div>
+              <select value={selectedProduct} onChange={(event) => selectProduct(event.target.value)} className={`${inputClass} mt-2`} style={inputStyle}>
+                <option value="">{loadingProducts ? "Memuat produk..." : "Pilih produk"}</option>
+                {filtered.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.product_name}{item.series_name ? ` · ${item.series_name}` : ""}{item.color && item.color !== "default" ? ` · ${item.color}` : ""}
+                  </option>
+                ))}
+              </select>
+              {selectedVariant ? (
+                <div className="mt-2 flex flex-wrap items-end gap-2">
+                  <div className="min-w-[120px] flex-1">
+                    <label className={labelClass} style={{ color: "#8a7d83" }}>Ukuran</label>
+                    <select value={selectedSize} onChange={(event) => setSelectedSize(event.target.value)} className={`${inputClass} mt-1`} style={inputStyle}>
+                      <option value="">Pilih ukuran</option>
+                      {availableSizes.map((size) => <option key={size} value={size}>{size} · stok {stockOf(selectedVariant, size)}</option>)}
+                    </select>
+                  </div>
+                  <div className="w-20">
+                    <label className={labelClass} style={{ color: "#8a7d83" }}>Qty</label>
+                    <input type="number" min={1} value={addQty} onChange={(event) => setAddQty(Number(event.target.value))} className={`${inputClass} mt-1`} style={inputStyle} />
+                  </div>
+                  <button type="button" onClick={addItem} disabled={!selectedSize} className="inline-flex h-10 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-white disabled:opacity-40" style={{ background: "#2f6f9e" }}>
+                    <Plus size={15} /> Tambah
+                  </button>
+                </div>
+              ) : null}
+              {selectedVariant && availableSizes.length === 0 ? <p className="mt-2 text-xs" style={{ color: "#9B2C2C" }}>Ukuran produk ini sedang habis.</p> : null}
+            </div>
+          ) : null}
+
+          <div className="mb-2 mt-5 flex justify-between text-xs" style={{ color: "#8a7d83" }}>
+            <span>Subtotal</span><span>{money(subtotal)}</span>
+          </div>
+          <div className="flex justify-between text-xs" style={{ color: "#8a7d83" }}>
+            <span>Ongkir</span><span>{money(shippingCost)}</span>
+          </div>
+          {discount > 0 ? <div className="mt-1 flex justify-between text-xs" style={{ color: "#8a7d83" }}><span>Diskon</span><span>-{money(discount)}</span></div> : null}
 
           {error ? (
-            <div className="flex items-start gap-2 rounded-xl border px-3 py-2 text-xs" style={{ background: "#FCE8E8", borderColor: "#F3CFCB", color: "#9B2C2C" }}>
+            <div className="mt-3 flex items-start gap-2 rounded-xl border px-3 py-2 text-xs" style={{ background: "#FCE8E8", borderColor: "#F3CFCB", color: "#9B2C2C" }}>
               <AlertTriangle size={15} className="mt-0.5 shrink-0" /> {error}
             </div>
           ) : null}
         </div>
 
-        <div className="flex shrink-0 items-center justify-between gap-2 border-t px-5 py-4" style={{ borderColor: "#E7E6E1" }}>
-          <p className="text-[11px]" style={{ color: "#6B6A64" }}>Edit tidak memotong stok. Stok dipotong saat Setujui.</p>
-          <div className="flex gap-2">
-            <button type="button" onClick={onClose} disabled={saving} className="h-10 rounded-xl border px-4 text-xs font-bold disabled:opacity-50" style={{ borderColor: "#E7E6E1", color: "#6B6A64", background: "#fff" }}>Batal</button>
-            <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold text-white disabled:opacity-50" style={{ background: "#1F7A4D" }}>
-              {saving ? <Loader2 className="animate-spin" size={15} /> : <Save size={15} />} Simpan draft
-            </button>
+        <div className="shrink-0 border-t bg-white px-6 py-4" style={{ borderColor: "#e3ebf1" }}>
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: "#8a7d83" }}>Total pesanan</p>
+              <div className="mt-0.5 flex items-center gap-2">
+                <p className="text-2xl font-black" style={{ color: "#2a1a22" }}>{money(total)}</p>
+                <span className="rounded-full px-2.5 py-1 text-[10px] font-bold" style={{ background: "#e7f5eb", color: "#2f7a4f" }}>Belum dipotong</span>
+              </div>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <button type="button" onClick={onClose} disabled={saving} className="h-11 rounded-xl px-4 text-xs font-bold disabled:opacity-50" style={{ background: "#f2f4f6", color: "#62717c" }}>Batal</button>
+              <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-xs font-bold text-white disabled:opacity-50" style={{ background: "#2f6f9e" }}>
+                {saving ? <Loader2 className="animate-spin" size={15} /> : <Save size={15} />} Simpan Perubahan
+              </button>
+            </div>
           </div>
+          <p className="mt-2 text-[10px]" style={{ color: "#8a7d83" }}>Edit tidak memotong stok. Stok dipotong saat Setujui.</p>
         </div>
       </div>
     </div>
