@@ -1,78 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/AdminToast";
+import type { ChatLog } from "./chat-logs/types";
+import { extractProducts, groupSessions } from "./chat-logs/utils";
+import SessionList from "./chat-logs/SessionList";
+import ChatThread from "./chat-logs/ChatThread";
+import CustomerPanel from "./chat-logs/CustomerPanel";
 
 /**
- * Panel admin "Live Chat" — riwayat percakapan AI per sesi.
+ * Panel admin "Live Chat" — riwayat percakapan AI.
  *
- * Satu sesi = satu pengunjung (session_id). Di dalamnya ditampilkan pertanyaan
- * customer + jawaban AI secara berurutan, plus nama/WA dan gambar bila ada.
- * Data dibaca lewat `/api/admin/chat-logs` (service role; chat_logs tanpa policy RLS).
+ * Semua logic lama dipertahankan: fetch `/api/admin/chat-logs`, search, filter,
+ * reload, WhatsApp, dan Tambah ke Knowledge AI. Tampilan dipecah jadi komponen
+ * kecil di folder `chat-logs/`.
  */
 
-interface ChatLog {
-  id: string;
-  session_id: string | null;
-  locale: string | null;
-  customer_name: string | null;
-  customer_phone: string | null;
-  question: string | null;
-  question_images: string[] | null;
-  answer: string | null;
-  tools_used: string[] | null;
-  escalated: boolean | null;
-  error: string | null;
-  created_at: string;
-}
-
-interface SessionGroup {
-  key: string;
-  items: ChatLog[];
-  name: string | null;
-  phone: string | null;
-  lastAt: string;
-  escalated: boolean;
-  errors: number;
-}
-
-function formatTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
-  } catch {
-    return iso;
-  }
-}
-
-function groupSessions(logs: ChatLog[]): SessionGroup[] {
-  const map = new Map<string, ChatLog[]>();
-  for (const log of logs) {
-    const key = log.session_id || `single-${log.id}`;
-    const list = map.get(key) || [];
-    list.push(log);
-    map.set(key, list);
-  }
-
-  return [...map.entries()]
-    .map(([key, items]) => {
-      const sorted = [...items].sort((a, b) => a.created_at.localeCompare(b.created_at));
-      const latest = sorted[sorted.length - 1];
-      const name = [...sorted].reverse().find((item) => item.customer_name)?.customer_name || null;
-      const phone = [...sorted].reverse().find((item) => item.customer_phone)?.customer_phone || null;
-      return {
-        key,
-        items: sorted,
-        name,
-        phone,
-        lastAt: latest.created_at,
-        escalated: sorted.some((item) => item.escalated === true),
-        errors: sorted.filter((item) => !!item.error).length,
-      };
-    })
-    .sort((a, b) => b.lastAt.localeCompare(a.lastAt));
-}
+type FilterMode = "all" | "escalated" | "failed";
 
 export default function ChatLogsView() {
   const [logs, setLogs] = useState<ChatLog[]>([]);
@@ -80,7 +26,8 @@ export default function ChatLogsView() {
   const [onlyEscalated, setOnlyEscalated] = useState(false);
   const [onlyErrors, setOnlyErrors] = useState(false);
   const [query, setQuery] = useState("");
-  const [openKey, setOpenKey] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [mobileView, setMobileView] = useState<"list" | "chat">("list");
   const [addingId, setAddingId] = useState<string | null>(null);
   const toast = useToast();
 
@@ -155,182 +102,137 @@ export default function ChatLogsView() {
     );
   });
 
+  const filterMode: FilterMode = onlyEscalated ? "escalated" : onlyErrors ? "failed" : "all";
+  const selectedSession =
+    filteredSessions.find((session) => session.key === selectedKey) ||
+    filteredSessions[0] ||
+    null;
+  const products = selectedSession ? extractProducts(selectedSession.items) : [];
+
+  function setFilter(mode: FilterMode) {
+    setOnlyEscalated(mode === "escalated");
+    setOnlyErrors(mode === "failed");
+  }
+
+  function selectSession(key: string) {
+    setSelectedKey(key);
+    setMobileView("chat");
+  }
+
+  function filterPill(mode: FilterMode, label: string, dot?: string) {
+    const active = filterMode === mode;
+    return (
+      <button
+        key={mode}
+        type="button"
+        onClick={() => setFilter(mode)}
+        className="inline-flex h-10 items-center gap-2 rounded-full px-3.5 text-sm font-semibold transition-colors"
+        style={
+          active
+            ? { background: "#141414", color: "#fff", border: "1px solid #141414" }
+            : { background: "#fff", color: "#141414", border: "1px solid #E7E6E1" }
+        }
+      >
+        {dot ? <span className="h-2 w-2 rounded-full" style={{ background: dot }} /> : null}
+        {label}
+      </button>
+    );
+  }
+
   return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
+    <section
+      className="rounded-2xl p-3 sm:p-5"
+      style={{ background: "#F4F4F1", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}
+    >
+      <div className="mb-4 flex flex-wrap items-center gap-2.5">
+        <div className="relative min-w-[220px] flex-1">
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2"
+            style={{ color: "#6B6A64" }}
+          />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Cari pertanyaan, jawaban, nama, atau no WA..."
-            className="w-full rounded-xl px-3 py-2 text-sm outline-none"
-            style={{ background: "var(--card)", border: "1px solid var(--bd)", color: "var(--fg)" }}
+            placeholder="Cari nama, no WA, pertanyaan, atau jawaban…"
+            className="h-11 w-full rounded-xl pl-9 pr-3 text-sm outline-none"
+            style={{ background: "#fff", border: "1px solid #E7E6E1", color: "#141414" }}
           />
         </div>
 
-        <label className="flex items-center gap-2 text-sm" style={{ color: "var(--fg2)" }}>
-          <input
-            type="checkbox"
-            checked={onlyEscalated}
-            onChange={(e) => setOnlyEscalated(e.target.checked)}
-          />
-          Hanya yang diarahkan ke admin
-        </label>
-
-        <label className="flex items-center gap-2 text-sm" style={{ color: "var(--fg2)" }}>
-          <input type="checkbox" checked={onlyErrors} onChange={(e) => setOnlyErrors(e.target.checked)} />
-          Hanya yang gagal
-        </label>
+        <div className="flex flex-wrap gap-2">
+          {filterPill("all", `Semua · ${sessions.length}`)}
+          {filterPill("escalated", "Diarahkan ke admin", "#C8A45D")}
+          {filterPill("failed", "Gagal dijawab", "#9B2C2C")}
+        </div>
 
         <button
+          type="button"
           onClick={load}
           disabled={loading}
-          className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl disabled:opacity-50"
-          style={{ border: "1px solid var(--bd)", color: "var(--fg)" }}
+          title="Muat ulang"
+          aria-label="Muat ulang"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-xl border bg-white disabled:opacity-50"
+          style={{ borderColor: "#E7E6E1", color: "#141414" }}
         >
-          {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-          Muat ulang
+          {loading ? <Loader2 size={17} className="animate-spin" /> : <RefreshCw size={17} />}
         </button>
       </div>
 
-      <p className="text-xs" style={{ color: "var(--fg3)" }}>
-        {filteredSessions.length} sesi dari {sessions.length} sesi · {logs.length} pertanyaan.
-        Klik satu sesi untuk melihat riwayat lengkap.
-      </p>
-
-      {loading ? (
-        <div className="card p-6 flex items-center gap-2" style={{ color: "var(--fg3)" }}>
+      {loading && logs.length === 0 ? (
+        <div
+          className="flex h-[320px] items-center justify-center gap-2 rounded-2xl border bg-white text-sm"
+          style={{ borderColor: "#E7E6E1", color: "#6B6A64" }}
+        >
           <Loader2 size={18} className="animate-spin" /> Memuat...
         </div>
-      ) : filteredSessions.length === 0 ? (
-        <div className="card p-6 text-sm" style={{ color: "var(--fg3)" }}>
-          Belum ada percakapan yang cocok.
-        </div>
       ) : (
-        <div className="space-y-3">
-          {filteredSessions.map((session) => {
-            const isOpen = openKey === session.key;
-            const waDigits = (session.phone || "").replace(/\D/g, "").replace(/^0/, "62");
-            return (
-              <article key={session.key} className="card p-4 space-y-2">
-                <button
-                  type="button"
-                  onClick={() => setOpenKey(isOpen ? null : session.key)}
-                  className="w-full text-left"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold" style={{ color: "var(--fg)" }}>
-                        {session.name || "Anonim"}
-                        {session.phone ? (
-                          <span className="font-normal" style={{ color: "var(--fg2)" }}>
-                            {" · "}
-                            {session.phone}
-                          </span>
-                        ) : null}
-                      </p>
-                      <p className="text-[11px]" style={{ color: "var(--fg3)" }}>
-                        {formatTime(session.lastAt)} · {session.items.length} pertanyaan · sesi{" "}
-                        {session.key.slice(0, 8)}
-                      </p>
+        <div className="lg:grid lg:h-[72vh] lg:min-h-[560px] lg:grid-cols-[300px_minmax(0,1fr)_320px] lg:gap-4">
+          <div className={mobileView === "chat" ? "hidden lg:block" : "block"}>
+            <SessionList
+              sessions={filteredSessions}
+              selectedKey={selectedSession?.key || null}
+              onSelect={selectSession}
+              loading={loading}
+            />
+          </div>
+
+          <div className={mobileView === "list" ? "hidden lg:block" : "block"}>
+            <ChatThread
+              session={selectedSession}
+              onBack={() => setMobileView("list")}
+              onAddToFaq={addToFaq}
+              addingId={addingId}
+              mobileDetails={
+                selectedSession ? (
+                  <details className="lg:hidden" style={{ borderBottom: "1px solid #E7E6E1" }}>
+                    <summary
+                      className="cursor-pointer px-4 py-3 text-sm font-semibold"
+                      style={{ color: "#141414" }}
+                    >
+                      Detail pelanggan
+                    </summary>
+                    <div className="p-3" style={{ background: "#F4F4F1" }}>
+                      <CustomerPanel session={selectedSession} products={products} />
                     </div>
-                    <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                      {session.escalated && (
-                        <span
-                          className="px-2 py-0.5 rounded-full"
-                          style={{ background: "#fef3c7", color: "#92400e" }}
-                        >
-                          Diarahkan ke admin
-                        </span>
-                      )}
-                      {session.errors > 0 && (
-                        <span
-                          className="px-2 py-0.5 rounded-full"
-                          style={{ background: "#fee2e2", color: "#b91c1c" }}
-                        >
-                          {session.errors} gagal
-                        </span>
-                      )}
-                      <span style={{ color: "var(--fg2)" }}>{isOpen ? "Tutup" : "Lihat"}</span>
-                    </div>
-                  </div>
-                </button>
+                  </details>
+                ) : null
+              }
+            />
+          </div>
 
-                {isOpen && (
-                  <div className="space-y-3 pt-3 border-t" style={{ borderColor: "var(--bd)" }}>
-                    {waDigits && (
-                      <a
-                        href={`https://wa.me/${waDigits}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex text-xs font-semibold px-3 py-1.5 rounded-lg"
-                        style={{ border: "1px solid var(--bd)", color: "var(--fg)" }}
-                      >
-                        Chat WhatsApp
-                      </a>
-                    )}
-
-                    {session.items.map((log) => (
-                      <div
-                        key={log.id}
-                        className="space-y-1.5 pb-3"
-                        style={{ borderBottom: "1px solid var(--bd)" }}
-                      >
-                        <div className="flex items-center justify-between gap-2 text-[11px]" style={{ color: "var(--fg3)" }}>
-                          <span className="font-semibold">Customer</span>
-                          <span>{formatTime(log.created_at)}</span>
-                        </div>
-                        {log.question_images && log.question_images.length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {log.question_images.map((url) => (
-                              <a key={url} href={url} target="_blank" rel="noreferrer">
-                                <img
-                                  src={url}
-                                  alt="Lampiran customer"
-                                  className="w-16 h-16 rounded-lg object-cover"
-                                  style={{ border: "1px solid var(--bd)" }}
-                                />
-                              </a>
-                            ))}
-                          </div>
-                        )}
-                        <p className="text-sm font-semibold whitespace-pre-wrap break-words" style={{ color: "var(--fg)" }}>
-                          {log.question || (log.question_images?.length ? "(gambar)" : "(tanpa pertanyaan)")}
-                        </p>
-
-                        <div className="flex items-center justify-between gap-2 text-[11px]" style={{ color: "var(--fg3)" }}>
-                          <span className="font-semibold">AI</span>
-                          {log.tools_used && log.tools_used.length > 0 && (
-                            <span>{[...new Set(log.tools_used)].join(", ")}</span>
-                          )}
-                        </div>
-                        <p className="text-sm whitespace-pre-wrap break-words" style={{ color: "var(--fg2)" }}>
-                          {log.answer || "(tidak ada jawaban)"}
-                        </p>
-                        {log.error && (
-                          <p className="text-[11px] whitespace-pre-wrap break-words" style={{ color: "#b91c1c" }}>
-                            Error: {log.error}
-                          </p>
-                        )}
-
-                        {log.question && log.answer && (
-                          <button
-                            onClick={() => addToFaq(log.id)}
-                            disabled={addingId === log.id}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50"
-                            style={{ border: "1px solid var(--bd)", color: "var(--fg)" }}
-                          >
-                            {addingId === log.id && <Loader2 size={12} className="animate-spin" />}
-                            Tambah ke Knowledge AI
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </article>
-            );
-          })}
+          <div className="hidden lg:block">
+            {selectedSession ? (
+              <CustomerPanel session={selectedSession} products={products} />
+            ) : (
+              <div
+                className="flex h-full items-center justify-center rounded-2xl border bg-white p-6 text-sm"
+                style={{ borderColor: "#E7E6E1", color: "#6B6A64" }}
+              >
+                Pilih sesi untuk melihat detail pelanggan.
+              </div>
+            )}
+          </div>
         </div>
       )}
     </section>
