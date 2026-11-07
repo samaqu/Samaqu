@@ -39,6 +39,7 @@ type Escalation = {
   instruction_scope: "customer" | "global";
   draft_reply: string | null;
   reply_text: string | null;
+  replied_at: string | null;
   created_at: string;
   messages?: Message[];
 };
@@ -357,50 +358,97 @@ export default function PerluReviewView() {
                   ))}
                 </div>
 
-                <div className="mt-4 grid gap-3">
-                  <div>
-                    <p className="mb-1 text-[11px] font-bold uppercase tracking-wide" style={{ color: "#8A8880" }}>Instruksi untuk AI</p>
-                    <textarea
-                      value={instruction}
-                      onChange={(event) => setInstruction(event.target.value)}
-                      rows={3}
-                      placeholder="Contoh: Customer ini tetap dapat free cover + hanger walau pembelian kedua."
-                      className="w-full resize-y rounded-xl border px-3 py-2 text-sm outline-none"
-                      style={{ borderColor: "#E7E6E1", color: "#141414" }}
-                    />
+                {selected.status === "answered" || selected.status === "closed" ? (
+                  <div className="mt-4 grid gap-3">
+                    <div className="flex items-start gap-3 rounded-xl border p-4" style={{ background: "#E3F2E8", borderColor: "#CFE6D9" }}>
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white" style={{ color: "#1F7A4D" }}>
+                        <Check size={18} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-black" style={{ color: "#22603A" }}>
+                          {selected.status === "closed" ? "Selesai" : "Sudah dijawab & tersimpan"}
+                        </p>
+                        <p className="mt-0.5 text-xs" style={{ color: "#22603A" }}>
+                          {selected.status === "closed"
+                            ? "Kasus ini sudah ditutup."
+                            : "Balasan sudah dikirim ke customer. Instruksi tersimpan sebagai pelajaran."}
+                          {selected.replied_at ? ` · ${time(selected.replied_at)}` : ""}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="mb-1 text-[11px] font-bold uppercase tracking-wide" style={{ color: "#8A8880" }}>Balasan yang terkirim</p>
+                      <div className="max-w-[90%] rounded-xl px-3 py-2.5 text-sm" style={{ background: "#141414", color: "#fff" }}>
+                        {selected.reply_text || preview || "-"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="mb-1 text-[11px] font-bold uppercase tracking-wide" style={{ color: "#8A8880" }}>Instruksi tersimpan</p>
+                      <div className="rounded-xl border px-3 py-2.5 text-sm" style={{ borderColor: "#E7E6E1", color: "#141414", background: "#FAF9F6" }}>
+                        {selected.instruction || instruction || "-"}
+                      </div>
+                      <p className="mt-1.5 text-[11px] font-semibold" style={{ color: "#6B6A64" }}>
+                        {selected.instruction_scope === "global"
+                          ? "Berlaku untuk semua customer."
+                          : "Berlaku khusus untuk nomor ini."}
+                      </p>
+                    </div>
+
+                    {selected.status === "answered" ? (
+                      <button
+                        type="button"
+                        onClick={() => void run("escalation_close", { id: selected.id })}
+                        disabled={Boolean(busy)}
+                        className="inline-flex h-9 w-fit items-center gap-2 rounded-xl border px-3 text-xs font-bold disabled:opacity-50"
+                        style={{ borderColor: "#E7E6E1", color: "#6B6A64", background: "#fff" }}
+                      >
+                        {busy === "escalation_close" ? <Loader2 className="animate-spin" size={14} /> : <Check size={14} />} Tandai selesai
+                      </button>
+                    ) : null}
                   </div>
-                  <label className="inline-flex items-center gap-2 text-xs font-semibold" style={{ color: "#6B6A64" }}>
-                    <input type="checkbox" checked={scope === "global"} onChange={(event) => setScope(event.target.checked ? "global" : "customer")} />
-                    Berlaku untuk semua customer (bukan hanya nomor ini)
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={() => void makeDraft()} disabled={Boolean(busy) || !instruction.trim()} className="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold disabled:opacity-50" style={{ background: "#FBF6EA", color: "#6B4D12", border: "1px solid #E8D4A4" }}>
-                      {busy === "escalation_draft" ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />} Minta AI susun
-                    </button>
-                    <button type="button" onClick={() => void sendReply()} disabled={Boolean(busy) || !preview.trim() || !instruction.trim()} className="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white disabled:opacity-50" style={{ background: "#1F7A4D" }}>
-                      {busy === "escalation_send" ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} />} Kirim ke customer
-                    </button>
-                    <button type="button" onClick={() => void run("escalation_close", { id: selected.id })} disabled={Boolean(busy)} className="inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-bold disabled:opacity-50" style={{ borderColor: "#E7E6E1", color: "#6B6A64" }}>
-                      <X size={14} /> Tutup
-                    </button>
+                ) : (
+                  <div className="mt-4 grid gap-3">
+                    <div>
+                      <p className="mb-1 text-[11px] font-bold uppercase tracking-wide" style={{ color: "#8A8880" }}>Instruksi untuk AI</p>
+                      <textarea
+                        value={instruction}
+                        onChange={(event) => setInstruction(event.target.value)}
+                        rows={3}
+                        placeholder="Contoh: Customer ini tetap dapat free cover + hanger walau pembelian kedua."
+                        className="w-full resize-y rounded-xl border px-3 py-2 text-sm outline-none"
+                        style={{ borderColor: "#E7E6E1", color: "#141414" }}
+                      />
+                    </div>
+                    <label className="inline-flex items-center gap-2 text-xs font-semibold" style={{ color: "#6B6A64" }}>
+                      <input type="checkbox" checked={scope === "global"} onChange={(event) => setScope(event.target.checked ? "global" : "customer")} />
+                      Berlaku untuk semua customer (bukan hanya nomor ini)
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => void makeDraft()} disabled={Boolean(busy) || !instruction.trim()} className="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold disabled:opacity-50" style={{ background: "#FBF6EA", color: "#6B4D12", border: "1px solid #E8D4A4" }}>
+                        {busy === "escalation_draft" ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />} Minta AI susun
+                      </button>
+                      <button type="button" onClick={() => void sendReply()} disabled={Boolean(busy) || !preview.trim() || !instruction.trim()} className="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white disabled:opacity-50" style={{ background: "#1F7A4D" }}>
+                        {busy === "escalation_send" ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} />} Kirim ke customer
+                      </button>
+                      <button type="button" onClick={() => void run("escalation_close", { id: selected.id })} disabled={Boolean(busy)} className="inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-bold disabled:opacity-50" style={{ borderColor: "#E7E6E1", color: "#6B6A64" }}>
+                        <X size={14} /> Tutup
+                      </button>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-[11px] font-bold uppercase tracking-wide" style={{ color: "#8A8880" }}>Preview balasan AI</p>
+                      <textarea
+                        value={preview}
+                        onChange={(event) => setPreview(event.target.value)}
+                        rows={4}
+                        placeholder="Klik Minta AI susun, lalu edit jika perlu."
+                        className="w-full resize-y rounded-xl border px-3 py-2 text-sm outline-none"
+                        style={{ borderColor: "#E7E6E1", color: "#141414" }}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <p className="mb-1 text-[11px] font-bold uppercase tracking-wide" style={{ color: "#8A8880" }}>Preview balasan AI</p>
-                    <textarea
-                      value={preview}
-                      onChange={(event) => setPreview(event.target.value)}
-                      rows={4}
-                      placeholder="Klik Minta AI susun, lalu edit jika perlu."
-                      className="w-full resize-y rounded-xl border px-3 py-2 text-sm outline-none"
-                      style={{ borderColor: "#E7E6E1", color: "#141414" }}
-                    />
-                  </div>
-                  {selected.status === "answered" ? (
-                    <p className="text-xs font-semibold" style={{ color: "#22603A" }}>
-                      Sudah dijawab. Instruksi tersimpan untuk {scope === "global" ? "semua customer" : "nomor ini"}.
-                    </p>
-                  ) : null}
-                </div>
+                )}
               </div>
             )}
           </div>
