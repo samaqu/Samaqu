@@ -339,7 +339,7 @@ export default function DraftEditor({
   return (
     <div className="fixed inset-0 z-[110] flex justify-end bg-[#2a1a22]/35 backdrop-blur-[1px]" onMouseDown={onClose}>
       <div
-        className="flex h-full w-full max-w-[640px] flex-col overflow-hidden bg-white shadow-2xl sm:rounded-l-3xl"
+        className="flex h-full w-full max-w-[520px] flex-col overflow-hidden bg-white shadow-2xl sm:rounded-l-3xl"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="relative shrink-0 px-6 pb-5 pt-6" style={{ background: "linear-gradient(130deg,#e8f3fb 0%,#fdf0f4 100%)" }}>

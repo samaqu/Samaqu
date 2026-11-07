@@ -213,6 +213,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, item: data });
   }
 
+  if (action === "draft_delete") {
+    const { data, error } = await admin
+      .from("order_drafts")
+      .delete()
+      .eq("id", id)
+      .eq("status", "pending")
+      .select("id");
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!data?.length) return bad("Draft sudah diproses atau tidak ditemukan.", 409);
+    return NextResponse.json({ ok: true, deleted: true });
+  }
+
   if (action === "draft_update") {
     const { data: draft, error: draftError } = await admin
       .from("order_drafts")

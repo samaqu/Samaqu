@@ -11,9 +11,11 @@ import {
   Send,
   ShoppingBag,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { toast } from "@/components/ops/ui/use-toast";
 import DraftEditor from "./DraftEditor";
 
 type Tab = "ai" | "transaksi";
@@ -130,7 +132,7 @@ export default function PerluReviewView() {
   const [preview, setPreview] = useState("");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
-  const [dialog, setDialog] = useState<{ kind: "approve" | "reject"; draft: Draft } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: "approve" | "reject" | "delete"; draft: Draft } | null>(null);
   const [rejectReason, setRejectReason] = useState("Data belum sesuai");
   const [proofOpen, setProofOpen] = useState(false);
   const [proofError, setProofError] = useState(false);
@@ -172,6 +174,11 @@ export default function PerluReviewView() {
     setNotice("");
   }, [selected]);
 
+  const notify = (title: string, description?: string, variant: "success" | "destructive" | "default" = "success") => {
+    setNotice(title);
+    toast({ title, description, variant });
+  };
+
   const run = async (action: string, body: Record<string, unknown>) => {
     setBusy(action);
     setError("");
@@ -181,7 +188,9 @@ export default function PerluReviewView() {
       await load();
       return json;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Aksi gagal.");
+      const message = e instanceof Error ? e.message : "Aksi gagal.";
+      setError(message);
+      toast({ title: "Aksi gagal", description: message, variant: "destructive" });
       return null;
     } finally {
       setBusy("");
@@ -207,7 +216,7 @@ export default function PerluReviewView() {
       scope,
       topic: selected.reason || "Instruksi admin",
     });
-    setNotice("Balasan terkirim ke customer dan instruksi disimpan sebagai pelajaran.");
+    notify("Balasan terkirim", "Instruksi disimpan sebagai pelajaran untuk AI.");
   };
 
   const askApprove = () => {
@@ -221,16 +230,24 @@ export default function PerluReviewView() {
     }
   };
 
+  const askDelete = () => {
+    if (selectedDraft) setDialog({ kind: "delete", draft: selectedDraft });
+  };
+
   const confirmDialog = async () => {
     if (!dialog) return;
     if (dialog.kind === "approve") {
       const json = await run("draft_approve", { id: dialog.draft.id });
-      if (json?.order_number) setNotice(`Order ${json.order_number} berhasil dibuat.`);
+      if (json?.order_number) notify(`Order ${json.order_number} dibuat`, "Stok sudah dipotong dan transaksi masuk.");
+    } else if (dialog.kind === "delete") {
+      setSelectedDraftId("");
+      const json = await run("draft_delete", { id: dialog.draft.id });
+      if (json) notify("Draft dihapus", "Tidak ada order atau stok yang berubah.");
     } else {
       const reason = rejectReason.trim();
       if (!reason) return;
-      await run("draft_reject", { id: dialog.draft.id, reason });
-      setNotice("Draft ditolak. Tidak ada order/stok yang berubah.");
+      const json = await run("draft_reject", { id: dialog.draft.id, reason });
+      if (json) notify("Draft ditolak", "Tidak ada order atau stok yang berubah.");
     }
     setDialog(null);
   };
@@ -283,11 +300,6 @@ export default function PerluReviewView() {
       {error ? (
         <div className="rounded-xl border px-3 py-2 text-xs font-semibold" style={{ background: "#FCE8E8", borderColor: "#F3CFCB", color: "#9B2C2C" }}>
           {error}
-        </div>
-      ) : null}
-      {notice ? (
-        <div className="rounded-xl border px-3 py-2 text-xs font-semibold" style={{ background: "#E3F2E8", borderColor: "#CFE6D9", color: "#22603A" }}>
-          {notice}
         </div>
       ) : null}
 
@@ -502,6 +514,7 @@ export default function PerluReviewView() {
                   setProofOpen(true);
                 }}
                 onEdit={() => setEditDraft(selectedDraft)}
+                onDelete={askDelete}
               />
             )}
           </div>
@@ -514,7 +527,7 @@ export default function PerluReviewView() {
           onClose={() => setEditDraft(null)}
           onSaved={() => {
             setEditDraft(null);
-            setNotice("Draft diperbarui. Stok belum berubah.");
+            notify("Draft diperbarui", "Stok belum berubah. Stok dipotong saat Setujui.");
             void load();
           }}
         />
@@ -584,16 +597,18 @@ export default function PerluReviewView() {
                   color: dialog.kind === "approve" ? "#1F7A4D" : "#9B2C2C",
                 }}
               >
-                {dialog.kind === "approve" ? <Check size={20} /> : <X size={20} />}
+                {dialog.kind === "approve" ? <Check size={20} /> : dialog.kind === "delete" ? <Trash2 size={19} /> : <X size={20} />}
               </div>
               <div className="min-w-0">
                 <h2 className="text-base font-black" style={{ color: "#141414" }}>
-                  {dialog.kind === "approve" ? "Setujui draft transaksi?" : "Tolak draft transaksi?"}
+                  {dialog.kind === "approve" ? "Setujui draft transaksi?" : dialog.kind === "delete" ? "Hapus draft transaksi?" : "Tolak draft transaksi?"}
                 </h2>
                 <p className="mt-1 text-sm" style={{ color: "#6B6A64" }}>
                   {dialog.kind === "approve"
                     ? `${dialog.draft.customer_name || "Customer"} · ${money(totalDraft(dialog.draft.payload))}`
-                    : "Draft akan ditolak dan tidak membuat order."}
+                    : dialog.kind === "delete"
+                      ? "Draft akan dihapus dari antrean."
+                      : "Draft akan ditolak dan tidak membuat order."}
                 </p>
               </div>
             </div>
@@ -601,6 +616,10 @@ export default function PerluReviewView() {
             {dialog.kind === "approve" ? (
               <div className="mx-5 rounded-xl border px-3 py-2.5 text-xs" style={{ background: "#FBF6EA", borderColor: "#E8D4A4", color: "#6B4D12" }}>
                 Stok akan dipotong, order dibuat, dan status menjadi <b>Lunas</b>. Pastikan bukti transfer dan alamat sudah benar.
+              </div>
+            ) : dialog.kind === "delete" ? (
+              <div className="mx-5 rounded-xl border px-3 py-2.5 text-xs" style={{ background: "#FCE8E8", borderColor: "#F3CFCB", color: "#9B2C2C" }}>
+                Draft dihapus permanen. <b>Tidak ada order atau stok yang berubah.</b>
               </div>
             ) : (
               <div className="mx-5">
@@ -635,8 +654,8 @@ export default function PerluReviewView() {
                 className="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold text-white disabled:opacity-50"
                 style={{ background: dialog.kind === "approve" ? "#1F7A4D" : "#9B2C2C" }}
               >
-                {busy ? <Loader2 className="animate-spin" size={15} /> : dialog.kind === "approve" ? <Check size={15} /> : <X size={15} />}
-                {dialog.kind === "approve" ? "Setujui & Proses" : "Tolak draft"}
+                {busy ? <Loader2 className="animate-spin" size={15} /> : dialog.kind === "approve" ? <Check size={15} /> : dialog.kind === "delete" ? <Trash2 size={15} /> : <X size={15} />}
+                {dialog.kind === "approve" ? "Setujui & Proses" : dialog.kind === "delete" ? "Hapus draft" : "Tolak draft"}
               </button>
             </div>
           </div>
@@ -653,6 +672,7 @@ function DraftDetail({
   onReject,
   onViewProof,
   onEdit,
+  onDelete,
 }: {
   draft: Draft;
   busy: boolean;
@@ -660,6 +680,7 @@ function DraftDetail({
   onReject: () => void;
   onViewProof: () => void;
   onEdit: () => void;
+  onDelete: () => void;
 }) {
   const payload = draft.payload || {};
   const shipping = payload.shipping || {};
@@ -736,6 +757,9 @@ function DraftDetail({
           </button>
           <button type="button" onClick={onReject} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-xs font-bold disabled:opacity-50" style={{ borderColor: "#F3CFCB", color: "#9B2C2C", background: "#fff" }}>
             <X size={15} /> Tolak
+          </button>
+          <button type="button" onClick={onDelete} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-xs font-bold disabled:opacity-50" style={{ borderColor: "#E7E6E1", color: "#7A4A4A", background: "#fff" }}>
+            <Trash2 size={15} /> Hapus
           </button>
           <p className="w-full text-[11px]" style={{ color: "#6B6A64" }}>
             Stok dan order baru dibuat setelah tombol Setujui & Proses. Draft tidak mengubah stok.
