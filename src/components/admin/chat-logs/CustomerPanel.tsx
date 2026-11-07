@@ -24,7 +24,7 @@ export default function CustomerPanel({
   const wa = waDigits(session.phone);
 
   return (
-    <div className="h-full space-y-3 overflow-y-auto">
+    <div className="h-full min-h-0 space-y-3 overflow-y-auto">
       <div className="rounded-2xl border bg-white p-4" style={{ borderColor: "#E7E6E1" }}>
         <p className="text-sm font-semibold" style={{ color: "#141414" }}>
           Pelanggan

@@ -19,8 +19,8 @@ export default function LiveChatView() {
   ];
 
   return (
-    <section className="space-y-5">
-      <div className="inline-flex gap-1 p-1 rounded-xl" style={{ background: "var(--sub)", border: "1px solid var(--bd)" }}>
+    <section className="flex h-[calc(100dvh-120px)] min-h-0 flex-col gap-3 lg:h-[calc(100dvh-144px)]">
+      <div className="inline-flex shrink-0 gap-1 p-1 rounded-xl" style={{ background: "var(--sub)", border: "1px solid var(--bd)" }}>
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -37,7 +37,9 @@ export default function LiveChatView() {
         ))}
       </div>
 
-      {tab === "percakapan" ? <ChatLogsView /> : <ChatSection />}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {tab === "percakapan" ? <ChatLogsView /> : <ChatSection />}
+      </div>
     </section>
   );
 }

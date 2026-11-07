@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { ChevronLeft, MessageCircle } from "lucide-react";
 import type { SessionGroup } from "./types";
 import { formatDateTime, groupLogsByDate, initialOf, waDigits } from "./utils";
@@ -19,10 +19,18 @@ export default function ChatThread({
   addingId: string | null;
   mobileDetails?: ReactNode;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [session?.key, session?.items.length]);
+
   if (!session) {
     return (
       <div
-        className="flex h-full min-h-[520px] items-center justify-center rounded-2xl border bg-white p-6 text-sm"
+        className="flex h-full min-h-0 items-center justify-center rounded-2xl border bg-white p-6 text-sm"
         style={{ borderColor: "#E7E6E1", color: "#6B6A64" }}
       >
         Pilih sesi di kiri untuk melihat riwayat percakapan.
@@ -35,18 +43,18 @@ export default function ChatThread({
 
   return (
     <div
-      className="flex h-full min-h-[520px] flex-col overflow-hidden rounded-2xl border bg-white"
+      className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border bg-white"
       style={{ borderColor: "#E7E6E1" }}
     >
       <div
-        className="flex flex-wrap items-center gap-2.5 border-b p-4"
+        className="flex shrink-0 flex-wrap items-start gap-2.5 border-b p-4"
         style={{ borderColor: "#E7E6E1" }}
       >
         <button
           type="button"
           onClick={onBack}
           aria-label="Kembali ke daftar sesi"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border lg:hidden"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border lg:hidden"
           style={{ borderColor: "#E7E6E1", color: "#141414" }}
         >
           <ChevronLeft size={18} />
@@ -59,7 +67,7 @@ export default function ChatThread({
           {initialOf(session.name)}
         </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-[220px]">
           <div className="flex flex-wrap items-center gap-2">
             <p className="truncate text-sm font-semibold" style={{ color: "#141414" }}>
               {session.name || "Pengunjung"}
@@ -80,7 +88,7 @@ export default function ChatThread({
             href={`https://wa.me/${wa}`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold"
+            className="ml-auto inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold"
             style={{ background: "#1F7A4D", color: "#fff" }}
           >
             <MessageCircle size={14} />
@@ -89,9 +97,13 @@ export default function ChatThread({
         ) : null}
       </div>
 
-      {mobileDetails ? <div className="lg:hidden">{mobileDetails}</div> : null}
+      {mobileDetails ? <div className="shrink-0 lg:hidden">{mobileDetails}</div> : null}
 
-      <div className="flex-1 overflow-y-auto p-4" style={{ background: "#FAF9F6" }}>
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto p-4"
+        style={{ background: "#FAF9F6" }}
+      >
         <div className="space-y-5">
           {groups.map((group) => (
             <div key={group.label} className="space-y-3">

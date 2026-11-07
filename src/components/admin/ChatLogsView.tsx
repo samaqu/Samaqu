@@ -141,10 +141,10 @@ export default function ChatLogsView() {
 
   return (
     <section
-      className="rounded-2xl p-3 sm:p-5"
+      className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl p-3 sm:p-5"
       style={{ background: "#F4F4F1", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}
     >
-      <div className="mb-4 flex flex-wrap items-center gap-2.5">
+      <div className="mb-4 flex shrink-0 flex-wrap items-center gap-2.5">
         <div className="relative min-w-[220px] flex-1">
           <Search
             size={16}
@@ -181,14 +181,14 @@ export default function ChatLogsView() {
 
       {loading && logs.length === 0 ? (
         <div
-          className="flex h-[320px] items-center justify-center gap-2 rounded-2xl border bg-white text-sm"
+          className="flex min-h-0 flex-1 items-center justify-center gap-2 rounded-2xl border bg-white text-sm"
           style={{ borderColor: "#E7E6E1", color: "#6B6A64" }}
         >
           <Loader2 size={18} className="animate-spin" /> Memuat...
         </div>
       ) : (
-        <div className="lg:grid lg:h-[72vh] lg:min-h-[560px] lg:grid-cols-[300px_minmax(0,1fr)_320px] lg:gap-4">
-          <div className={mobileView === "chat" ? "hidden lg:block" : "block"}>
+        <div className="flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[300px_minmax(0,1fr)_320px] lg:gap-4">
+          <div className={`${mobileView === "chat" ? "hidden lg:block" : "block"} min-h-0 h-full`}>
             <SessionList
               sessions={filteredSessions}
               selectedKey={selectedSession?.key || null}
@@ -197,8 +197,9 @@ export default function ChatLogsView() {
             />
           </div>
 
-          <div className={mobileView === "list" ? "hidden lg:block" : "block"}>
+          <div className={`${mobileView === "list" ? "hidden lg:block" : "block"} min-h-0 h-full`}>
             <ChatThread
+              key={`${selectedSession?.key || "none"}-${mobileView}`}
               session={selectedSession}
               onBack={() => setMobileView("list")}
               onAddToFaq={addToFaq}
@@ -221,7 +222,7 @@ export default function ChatLogsView() {
             />
           </div>
 
-          <div className="hidden lg:block">
+          <div className="hidden min-h-0 h-full lg:block">
             {selectedSession ? (
               <CustomerPanel session={selectedSession} products={products} />
             ) : (
