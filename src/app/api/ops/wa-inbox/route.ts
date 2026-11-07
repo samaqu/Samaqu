@@ -45,8 +45,16 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const { data: escalations } = await admin
+    .from("wa_escalations")
+    .select("sender")
+    .in("status", ["open", "claimed"]);
+  const blockedSenders = new Set((escalations || []).map((item) => String(item.sender)));
+
   const claimed: Record<string, unknown>[] = [];
   for (const row of rows || []) {
+    // Jangan klaim nomor yang sedang di-escalate/ditangani admin.
+    if (blockedSenders.has(String(row.sender))) continue;
     const { data: updated } = await admin
       .from("wa_inbox")
       .update({
@@ -64,6 +72,12 @@ export async function GET(req: NextRequest) {
 
   // Sertakan riwayat percakapan dengan pengirim yang sama, supaya balasan
   // nyambung dengan pesan sebelumnya (mis. customer menjawab "yg ini" saja).
+  const { data: learnings } = await admin
+    .from("wa_learnings")
+    .select("scope, sender, topic, instruction")
+    .eq("status", "published")
+    .limit(1000);
+
   const withHistory: Record<string, unknown>[] = [];
   for (const row of claimed) {
     const { data: history } = await admin
@@ -73,7 +87,10 @@ export async function GET(req: NextRequest) {
       .neq("id", row.id)
       .order("created_at", { ascending: false })
       .limit(8);
-    withHistory.push({ ...row, riwayat: (history || []).reverse() });
+    const instruksi = (learnings || [])
+      .filter((item) => item.scope === "global" || String(item.sender || "") === String(row.sender))
+      .map((item) => ({ topic: item.topic, instruction: item.instruction, scope: item.scope }));
+    withHistory.push({ ...row, riwayat: (history || []).reverse(), instruksi });
   }
 
   return NextResponse.json({ items: withHistory, claimed: withHistory.length });
