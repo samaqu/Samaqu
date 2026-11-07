@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { archiveWaMedia } from "@/lib/wa-media";
 
@@ -149,6 +149,30 @@ export async function POST(req: NextRequest) {
           .update({ media_key: mediaKey })
           .eq("dedupe_key", dedupeKey);
         if (keyError) console.error("[WA-INBOX] gagal simpan media_key:", keyError.message);
+      }
+    }
+
+    // Trigger bot server langsung setelah pesan tersimpan — cron 1 menit tetap jadi fallback.
+    // Tidak ditunggu supaya webhook Fonnte tetap cepat; debounce 4 detik di wa-agent
+    // menggabungkan pesan beruntun.
+    if (!error) {
+      const academyBase = (process.env.ACADEMY_SUPABASE_URL || "").replace(/\/+$/, "");
+      const academyKey = process.env.ACADEMY_SERVICE_ROLE_KEY || "";
+      if (academyBase && academyKey) {
+        after(async () => {
+          try {
+            await fetch(`${academyBase}/functions/v1/wa-agent`, {
+              method: "POST",
+              headers: {
+                "x-wa-secret": academyKey,
+                "Content-Type": "application/json",
+              },
+              body: "{}",
+            });
+          } catch (triggerError) {
+            console.error("[WA-INBOX] trigger wa-agent gagal:", triggerError);
+          }
+        });
       }
     }
 
