@@ -1805,8 +1805,12 @@ tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` b
   tidak ada endpoint DELETE untuk `expense_items`, cukup `PATCH { aktif: false }`.
 - **UI**: `src/app/(internal)/ops/pengeluaran/page.tsx` → `src/components/ops/pengeluaran/`
   (`PengeluaranView`, `PengeluaranHeader`, `PengeluaranSummaryCards`, `PengeluaranTable`,
-  `ExpenseDrawer`, `BarangDrawer`, `fields.tsx`, `helpers.ts`, `types.ts`). Panggil API langsung
-  (bukan shim `ops-api`), React Query dengan `initialData` kosong seperti halaman ops lain.
+  `ExpenseDrawer`, `BarangDrawer`, `MetodeBayarSelect`, `fields.tsx`, `helpers.ts`, `types.ts`).
+  Panggil API langsung (bukan shim `ops-api`), React Query dengan `initialData` kosong seperti
+  halaman ops lain. **Metode Bayar** di drawer operasional memakai `MetodeBayarSelect` (dropdown
+  berikon monokrom: Transfer Bank/Cash/QRIS/E-Wallet/Lainnya, ikon dari `lucide-react.d.ts`),
+  bukan lagi `<input list>` + `<datalist>`; nilainya tetap teks bebas yang disimpan ke kolom
+  `expenses.metode_bayar`.
 - **Warna (permintaan pemilik 2026-11-08)**: biru tidak dipakai lagi di modul ini — paletnya
   monokrom hitam–grafit seperti Samaqu. Kartu header = gradien gelap `#111113 → #2d2d33` berisi
   judul, pemilih Bulan/Tahun, dan **tiga kartu statistik di dalamnya** (`PengeluaranSummaryCards`,
@@ -1817,5 +1821,18 @@ tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` b
   (`navigate()` gagal untuk route `/ops/*`): header + pemilih Bulan/Tahun, 3 kartu (0 / Rp 0), dua tab
   (aktif hitam grafit), judul "Detail Pengeluaran …", tombol Kelola Barang (hanya packing) & Tambah,
   banner migration, drawer form packing tampil (Tanggal/Barang/Qty/Harga Satuan/Total/Catatan),
-  0 error console, tanpa scroll samping. **Belum** terbukti dengan data nyata: simpan/ubah/hapus,
-  tabel detail, ringkasan, dan Kelola Barang harus diuji setelah migration dijalankan.
+  0 error console, tanpa scroll samping. **Belum** terbukti dengan data nyata: ubah (PATCH), filter
+  bulan, dan Kelola Barang.
+- **Tulis/baca/hapus nyata (dibuktikan 2026-11-08, sesi admin diputar ulang, iframe same-origin
+  1280 px)**: tab Operasional → Tambah → isi Kategori "Gaji" / Deskripsi / Jumlah 125000 / Metode
+  Bayar **QRIS lewat dropdown baru** → Simpan = toast "Pengeluaran tersimpan", baris muncul di tabel
+  (`8 Nov 2026 · Gaji · QRIS · Rp 125.000`), kartu ringkasan 0 → 1 transaksi / Rp 125.000. Barisnya
+  **ada di database**: dibaca ulang dengan service role (`expenses` → `kategori: Gaji`,
+  `jumlah: 125000`, `metode_bayar: QRIS`, `catatan: catatan uji`, `created_by:
+  officialsamaqu@gmail.com`, `request_id` unik) dan tetap tampil setelah **muat ulang penuh**
+  (`iframe src=/ops/pengeluaran?fresh=…`), bukan cuma state optimistis. Hapus lewat ikon tempat
+  sampah → dialog "Yakin ingin menghapus pengeluaran ini? · Gaji · Rp 125.000" → Hapus = toast
+  "Pengeluaran dihapus", baris & ringkasan hilang, dan `expenses` kembali **0 baris** (data uji
+  tidak tertinggal; `expense_items` 1 baris milik owner tidak disentuh). `npx tsc --noEmit` bersih.
+  Catatan tool: klik di dalam iframe lewat `MouseEvent` yang disebar **tidak** memicu handler React
+  (`drawerOpen` tetap false) — pakai `element.click()`.

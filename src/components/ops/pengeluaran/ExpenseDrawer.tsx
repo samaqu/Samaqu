@@ -5,9 +5,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Package, X } from "lucide-react";
 import { useToast } from "@/components/ops/ui/use-toast";
 import { Field, inputClass, textareaClass } from "./fields";
+import MetodeBayarSelect from "./MetodeBayarSelect";
 import {
   KATEGORI_OPERASIONAL,
-  METODE_BAYAR,
   angka,
   pesanError,
   pengeluaranFetch,
@@ -310,21 +310,12 @@ export default function ExpenseDrawer({
                     />
                   </Field>
 
-                  <Field label="Metode Bayar">
-                    <input
-                      type="text"
-                      list="pengeluaran-metode"
-                      value={metodeBayar}
-                      onChange={(event) => setMetodeBayar(event.target.value)}
-                      placeholder="Transfer Bank / Cash / …"
-                      className={inputClass}
-                    />
-                    <datalist id="pengeluaran-metode">
-                      {METODE_BAYAR.map((option) => (
-                        <option key={option} value={option} />
-                      ))}
-                    </datalist>
-                  </Field>
+                  <div>
+                    <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Metode Bayar
+                    </span>
+                    <MetodeBayarSelect value={metodeBayar} onChange={setMetodeBayar} />
+                  </div>
                 </>
               )}
 
