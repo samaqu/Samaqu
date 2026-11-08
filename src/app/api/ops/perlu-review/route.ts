@@ -201,10 +201,25 @@ export async function POST(req: NextRequest) {
     if (sourceInboxId) {
       const { data: source } = await admin
         .from("wa_inbox")
-        .select("media_key")
+        .select("media_key, sender")
         .eq("id", sourceInboxId)
         .maybeSingle();
       proofKey = source?.media_key || null;
+      // Bot kadang menunjuk pesan teks, bukan pesan foto bukti. Ambil lampiran
+      // terakhir dari nomor yang sama supaya bukti tetap masuk draft.
+      if (!proofKey && source?.sender) {
+        const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+        const { data: recent } = await admin
+          .from("wa_inbox")
+          .select("media_key")
+          .eq("sender", String(source.sender))
+          .not("media_key", "is", null)
+          .gte("created_at", since)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        proofKey = recent?.media_key || null;
+      }
     }
     const row = {
       source_inbox_id: sourceInboxId,

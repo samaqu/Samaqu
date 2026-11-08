@@ -26,13 +26,31 @@ export async function GET(req: NextRequest) {
     if (!inboxId) {
       return NextResponse.json({ error: "inbox_id atau key wajib" }, { status: 400 });
     }
-    const { data, error } = await getSupabaseAdmin()
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin
       .from("wa_inbox")
-      .select("media_key")
+      .select("media_key, sender")
       .eq("id", inboxId)
       .maybeSingle();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     mediaKey = String(data?.media_key || "");
+
+    // Bot kadang menunjuk pesan teks (mis. alamat), bukan pesan fotonya.
+    // Pakai lampiran terakhir dari nomor yang sama sebagai cadangan.
+    if (!mediaKey && data?.sender) {
+      const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+      const { data: recent } = await admin
+        .from("wa_inbox")
+        .select("media_key")
+        .eq("sender", String(data.sender))
+        .not("media_key", "is", null)
+        .gte("created_at", since)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      mediaKey = String(recent?.media_key || "");
+    }
+
     if (!mediaKey) {
       return NextResponse.json({ error: "Lampiran pesan ini tidak tersimpan di R2." }, { status: 404 });
     }
