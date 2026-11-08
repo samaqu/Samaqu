@@ -33,6 +33,7 @@ import {
 import { statusLabel, orderSourceLabel } from "@/lib/transaksi";
 import CountUp from "@/components/admin/CountUp";
 import BestSellerSection from "@/components/ops/BestSellerSection";
+import BreakdownPengeluaran, { type BreakdownData } from "@/components/ops/laporan/BreakdownPengeluaran";
 
 /**
  * Sebagian ikon lucide ada di runtime tapi belum masuk definisi tipe versi ini —
@@ -44,6 +45,7 @@ const IconWallet: any =
 const IconPackage: any = (LucideIcons as any).Package;
 const IconOmset: any = (LucideIcons as any).DollarSign ?? (LucideIcons as any).Coins ?? (LucideIcons as any).Banknote;
 const IconProfit: any = (LucideIcons as any).TrendingUp ?? (LucideIcons as any).LineChart;
+const IconLayers: any = (LucideIcons as any).Layers ?? (LucideIcons as any).Receipt;
 
 /* ───────────────────────── types ───────────────────────── */
 
@@ -134,6 +136,8 @@ type ReportData = {
   payments: PaymentBreakdownRow[];
   /** Opsional: laporan lama/response tanpa field ini tetap tampil normal. */
   sources?: SourceBreakdownRow[];
+  /** Rincian biaya per produk/kanal/pengeluaran — opsional (respons lama tanpa ini tetap tampil). */
+  breakdown?: BreakdownData;
   tables: {
     sales: any[];
     returns: any[];
@@ -860,6 +864,31 @@ export default function LaporanKeuanganPage() {
               </p>
             ) : null}
           </div>
+        </div>
+      </section>
+
+      {/* BREAKDOWN PENGELUARAN — rincian tiap komponen biaya (buka/tutup) */}
+      <section className="lpr-rise rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-slate-700 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+            <IconLayers size={18} strokeWidth={1.9} />
+          </span>
+          <div>
+            <h2 className="text-sm font-black tracking-tight text-zinc-900">Breakdown Pengeluaran</h2>
+            <p className="mt-0.5 text-xs font-medium text-zinc-500">
+              Klik kartu untuk melihat rincian tiap komponen biaya.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4">
+          <BreakdownPengeluaran
+            data={data.breakdown ?? { cogs: [], fees: [], packing: [], operasional: [] }}
+            hppTotal={s.hpp}
+            feeTotal={s.mayarFee ?? 0}
+            packingTotal={s.biayaPacking ?? 0}
+            operasionalTotal={s.biayaOperasional ?? 0}
+            hppComplete={s.hppStatus === "complete"}
+          />
         </div>
       </section>
 

@@ -1952,3 +1952,29 @@ memakai satu Area bergradasi grafit + garis monokrom (`#A1A1AA` / `#18181B` / `#
 `src/app/globals.css` dengan awalan **`lpr-`** (`lpr-rise`, `lpr-bar`) + fallback
 `prefers-reduced-motion`. Baris periode/rumus/delta di kartu atas tetap **tidak** ditampilkan
 (permintaan pemilik sebelumnya).
+
+**Breakdown Pengeluaran (kartu rincian biaya, 2026-11-09)** — section baru di `/ops/laporan`
+(setelah "Perhitungan Laba") berisi **tiga kartu akordeon**: Modal Barang Terjual (COGS) · Potongan
+Marketplace & Fee · Operating Expenses. Komponennya
+**`src/components/ops/laporan/BreakdownPengeluaran.tsx`** (`useState` satu kartu terbuka —
+akordeon, jadi klik kartu lain menutup yang sebelumnya; kartu COGS terbuka saat pertama dimuat).
+Semua angkanya dari **`GET /api/ops/laporan`** → field **`breakdown: { cogs, fees, packing,
+operasional }`** (top-level, bukan di `summary`):
+- `cogs` = agregasi `order_items` pesanan sah per `product_id` + varian (`Kain … · warna · size`;
+  `color: "default"` disembunyikan) → `{ id, name, variant, qty, hpp, unknownQty }`. `unknownQty` =
+  unit yang belum punya modal (`order_items.hpp` / `products.hpp` kosong), jadi barisnya menampilkan
+  "N unit tanpa modal" dan nominal "—" — **jangan** mengubah 0 jadi angka karangan.
+- `fees` = fee Mayar settled per `paymentChannelLabel(detail.channel)` → `{ channel, count, fee }`.
+- `packing`/`operasional` = baris `expenses` periode itu → `{ nama, qty, jumlah }`
+  (`packing` memakai `nama_barang`, `operasional` memakai `kategori`).
+Query `expenses` di route itu sekarang ikut `select` `kategori, nama_barang, qty` — kolom itu
+**hanya** untuk rincian, total `biayaPacking`/`biayaOperasional` tetap dari `jumlah`.
+Total kartu memakai angka summary yang sudah ada (`hpp`, `mayarFee`, `biayaPacking`,
+`biayaOperasional`) supaya rincian tidak bisa beda dengan kartu atas; persen dihitung di klien
+terhadap total kartunya. Palet tetap monokrom (ikon + teks zinc), **bukan** oranye/ungu/biru seperti
+referensi desain.
+Verifikasi (2026-11-09, `/ops/laporan` lewat iframe same-origin 920 px, sesi admin diputar ulang):
+`npx tsc --noEmit` bersih; API membalas 50 baris `cogs`, 1 `fees` (QRIS · 3 transaksi · Rp 24.542),
+1 `packing` (Lakban Bening 50x · Rp 250.000) dan 1 `operasional` (Tools & Software · Rp 165.410);
+ketiga kartu terbuka lewat klik dan menampilkan baris rinciannya, COGS badge "75 unit tanpa modal"
+(Total HPP memang masih Rp 0 — `products.hpp` kosong), 0 px geser samping, 0 error console.

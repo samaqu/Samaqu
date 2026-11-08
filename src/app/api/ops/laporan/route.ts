@@ -248,7 +248,12 @@ async function loadPeriod(
       .lt("price_difference_settled_at", endIso)
       .limit(1000),
     // Biaya operasional & packing (menu Pengeluaran) — basis kolom `tanggal` (date), inklusif.
-    admin.from("expenses").select("tipe, jumlah").gte("tanggal", from).lte("tanggal", to).limit(5000),
+    admin
+      .from("expenses")
+      .select("tipe, jumlah, kategori, nama_barang, qty")
+      .gte("tanggal", from)
+      .lte("tanggal", to)
+      .limit(5000),
   ]);
 
   for (const res of [ordersRes, returnsCreatedRes, refundsRes, exchangesRes]) {
@@ -265,7 +270,17 @@ async function loadPeriod(
       /could not find the table|relation .* does not exist/i.test(expensesErrorMessage)
     );
   if (expensesRes.error && expensesAvailable) throw new Error(expensesErrorMessage);
-  const expenseRows = (expensesRes.data || []) as Array<{ tipe?: string | null; jumlah?: number | null }>;
+  /**
+   * `kategori`/`nama_barang`/`qty` hanya dipakai rincian "Breakdown Pengeluaran"
+   * (detail per pengeluaran), bukan perhitungan total.
+   */
+  const expenseRows = (expensesRes.data || []) as Array<{
+    tipe?: string | null;
+    jumlah?: number | null;
+    kategori?: string | null;
+    nama_barang?: string | null;
+    qty?: number | null;
+  }>;
 
   const orders = (ordersRes.data || []) as OrderRow[];
   const returnsCreated = (returnsCreatedRes.data || []) as ReturnRow[];
@@ -447,6 +462,72 @@ async function loadPeriod(
    */
   const biayaAvailable = expensesAvailable && mayarPendingCount === 0;
 
+  /*
+   * ── Rincian "Breakdown Pengeluaran" ──
+   * Hanya untuk tampilan detail (per produk / per kanal / per pengeluaran).
+   * Totalnya tetap angka di atas (hpp, mayarFee, biayaPacking/Operasional),
+   * jadi agregasi ini tidak boleh mengubah perhitungan mana pun.
+   */
+  const cogsGroups = new Map<
+    string,
+    { id: string; name: string; variant: string; qty: number; hpp: number; unknownQty: number }
+  >();
+  for (const item of orderItems) {
+    if (!validIds.has(String(item.order_id || ""))) continue;
+    const qty = Number(item.quantity ?? item.qty) || 0;
+    if (qty <= 0) continue;
+    const lineHpp = Number(item.hpp);
+    const unitHpp = Number.isFinite(lineHpp) && lineHpp > 0 ? lineHpp : productHpp.get(String(item.product_id)) || 0;
+    const name = String(item.product_name || "Tanpa nama");
+    const variant = [
+      item.kain ? `Kain ${item.kain}` : "",
+      item.color && item.color !== "default" ? String(item.color) : "",
+      item.size ? String(item.size) : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    const key = `${item.product_id || name}|${variant}`;
+    const row = cogsGroups.get(key) || { id: key, name, variant, qty: 0, hpp: 0, unknownQty: 0 };
+    row.qty += qty;
+    row.hpp += unitHpp * qty;
+    if (unitHpp <= 0) row.unknownQty += qty;
+    cogsGroups.set(key, row);
+  }
+  const cogsDetail = [...cogsGroups.values()].sort((a, b) => b.hpp - a.hpp || b.qty - a.qty);
+
+  const feeGroups = new Map<string, { channel: string; count: number; fee: number }>();
+  for (const order of validOrders) {
+    const provider = String((order as { payment_provider?: string | null }).payment_provider || "").toLowerCase();
+    if (provider !== "mayar") continue;
+    const ref = String((order as { payment_ref?: string | null }).payment_ref || "").trim();
+    const detail = ref ? mayarFeesPeriod.get(ref) : undefined;
+    if (!detail || detail.status !== "settled" || !Number.isFinite(detail.fee)) continue;
+    const channel = paymentChannelLabel(detail.channel) || "Mayar";
+    const row = feeGroups.get(channel) || { channel, count: 0, fee: 0 };
+    row.count += 1;
+    row.fee += detail.fee;
+    feeGroups.set(channel, row);
+  }
+  const feeDetail = [...feeGroups.values()].sort((a, b) => b.fee - a.fee);
+
+  const packingDetail = expenseRows
+    .filter((row) => row.tipe === "packing")
+    .map((row) => ({
+      nama: String(row.nama_barang || row.kategori || "Packing"),
+      qty: Number(row.qty) || 0,
+      jumlah: Number(row.jumlah) || 0,
+    }))
+    .sort((a, b) => b.jumlah - a.jumlah);
+  const operasionalDetail = expenseRows
+    .filter((row) => row.tipe === "operasional")
+    .map((row) => ({
+      nama: String(row.kategori || row.nama_barang || "Operasional"),
+      qty: Number(row.qty) || 0,
+      jumlah: Number(row.jumlah) || 0,
+    }))
+    .sort((a, b) => b.jumlah - a.jumlah);
+  const breakdown = { cogs: cogsDetail, fees: feeDetail, packing: packingDetail, operasional: operasionalDetail };
+
   /**
    * Laba hanya boleh disebut final kalau modal DAN biaya lengkap.
    * - hpp missing/partial  → laba tidak dapat dihitung (jangan pakai net sebagai laba).
@@ -515,6 +596,7 @@ async function loadPeriod(
     biayaOperasional,
     expensesAvailable,
     biayaAvailable,
+    breakdown,
     hppStatus,
     hppNote,
     hppCoverage: {
@@ -832,6 +914,8 @@ export async function GET(req: NextRequest) {
       trend,
       payments,
       sources,
+      /* Rincian per produk / per kanal / per pengeluaran (kartu Breakdown Pengeluaran). */
+      breakdown: current.breakdown,
       tables: {
         sales: salesRows,
         mayarSettled,
