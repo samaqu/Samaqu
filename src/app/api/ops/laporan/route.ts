@@ -329,10 +329,15 @@ async function loadPeriod(
 
   const productIds = [...new Set(orderItems.map((item) => String(item.product_id || "")).filter(Boolean))];
   const productHpp = new Map<string, number>();
+  // Series dipakai label rincian COGS (satu baris `products` = satu warna × series).
+  const productSeries = new Map<string, string>();
   if (productIds.length > 0) {
-    const { data, error } = await admin.from("products").select("id, hpp").in("id", productIds);
+    const { data, error } = await admin.from("products").select("id, hpp, series").in("id", productIds);
     if (error) throw new Error(error.message);
-    for (const product of data || []) productHpp.set(String(product.id), Number(product.hpp) || 0);
+    for (const product of data || []) {
+      productHpp.set(String(product.id), Number(product.hpp) || 0);
+      productSeries.set(String(product.id), String((product as any).series || "").trim());
+    }
 
     // Foto item untuk drawer detail (sama seperti detail transaksi panel admin).
     const { data: imageRows } = await admin
@@ -479,8 +484,10 @@ async function loadPeriod(
     const lineHpp = Number(item.hpp);
     const unitHpp = Number.isFinite(lineHpp) && lineHpp > 0 ? lineHpp : productHpp.get(String(item.product_id)) || 0;
     const name = String(item.product_name || "Tanpa nama");
+    const series = productSeries.get(String(item.product_id)) || "";
     const variant = [
       item.kain ? `Kain ${item.kain}` : "",
+      series ? `Seri ${series}` : "",
       item.color && item.color !== "default" ? String(item.color) : "",
       item.size ? String(item.size) : "",
     ]

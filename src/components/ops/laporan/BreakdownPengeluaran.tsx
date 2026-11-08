@@ -9,10 +9,16 @@
  * menghitung ulang total.
  *
  * Palet mengikuti brand monokrom Samaqu (zinc/grafit), bukan warna-warni.
+ *
+ * Rincian COGS dipaginasi 5 baris per halaman (bisa dibuka semua lewat "Tampilkan semua")
+ * supaya daftar barang yang panjang tidak memenuhi kartu. Datanya tetap utuh dari API.
  */
 
 import { useState, type ReactNode } from "react";
-import { ChevronDown, FileText, Package, Store } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, FileText, Package, Store } from "lucide-react";
+
+/** Baris COGS yang tampil per halaman sebelum pemilik memilih "Tampilkan semua". */
+const COGS_PAGE_SIZE = 5;
 
 export type CogsRow = {
   id: string;
@@ -109,6 +115,75 @@ function Empty({ text }: { text: string }) {
  */
 const STALE_TEXT = "Rincian belum termuat. Muat ulang laporan untuk melihat detailnya.";
 
+/**
+ * Penggeser halaman rincian COGS: 5 baris per halaman, plus tombol "Tampilkan semua"
+ * supaya satu produk yang sama tidak memenuhi seluruh kartu.
+ */
+function CogsPager({
+  total,
+  page,
+  pages,
+  showAll,
+  onPage,
+  onToggleAll,
+}: {
+  total: number;
+  page: number;
+  pages: number;
+  showAll: boolean;
+  onPage: (page: number) => void;
+  onToggleAll: () => void;
+}) {
+  if (total <= COGS_PAGE_SIZE) return null;
+
+  const start = showAll ? 1 : (page - 1) * COGS_PAGE_SIZE + 1;
+  const end = showAll ? total : Math.min(total, page * COGS_PAGE_SIZE);
+  const navClass =
+    "grid h-6 w-6 place-items-center rounded-md border border-[#E4E4E7] bg-white text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-40";
+
+  return (
+    <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-[#EDEDF0] pt-2">
+      <span className="text-[10px] font-bold tabular-nums text-zinc-400">
+        {nfmt(start)}–{nfmt(end)} dari {nfmt(total)} produk
+      </span>
+      <div className="flex items-center gap-1.5">
+        {showAll ? null : (
+          <>
+            <button
+              type="button"
+              aria-label="Halaman sebelumnya"
+              onClick={() => onPage(page - 1)}
+              disabled={page <= 1}
+              className={navClass}
+            >
+              <ChevronLeft size={13} strokeWidth={2.4} />
+            </button>
+            <span className="min-w-[32px] text-center text-[10px] font-black tabular-nums text-zinc-500">
+              {page}/{pages}
+            </span>
+            <button
+              type="button"
+              aria-label="Halaman berikutnya"
+              onClick={() => onPage(page + 1)}
+              disabled={page >= pages}
+              className={navClass}
+            >
+              <ChevronRight size={13} strokeWidth={2.4} />
+            </button>
+          </>
+        )}
+        <button
+          type="button"
+          onClick={onToggleAll}
+          className="rounded-md border border-[#E4E4E7] bg-white px-2 py-1 text-[10px] font-black text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
+        >
+          {showAll ? "Ringkas" : "Tampilkan semua"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function DetailLabel({ children }: { children: ReactNode }) {
   return (
     <p className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-zinc-400">
@@ -173,6 +248,13 @@ export default function BreakdownPengeluaran({
   const [open, setOpen] = useState<"cogs" | "fees" | "expenses" | null>("cogs");
   const toggle = (key: "cogs" | "fees" | "expenses") => setOpen((prev) => (prev === key ? null : key));
 
+  const [cogsPage, setCogsPage] = useState(1);
+  const [cogsShowAll, setCogsShowAll] = useState(false);
+  const cogsPages = Math.max(1, Math.ceil(data.cogs.length / COGS_PAGE_SIZE));
+  const cogsCurrent = Math.min(cogsPage, cogsPages);
+  const cogsOffset = (cogsCurrent - 1) * COGS_PAGE_SIZE;
+  const cogsRows = cogsShowAll ? data.cogs : data.cogs.slice(cogsOffset, cogsOffset + COGS_PAGE_SIZE);
+
   const expenseTotal = packingTotal + operasionalTotal;
   const missingQty = data.cogs.reduce((sum, row) => sum + (row.unknownQty || 0), 0);
   const feeCount = data.fees.reduce((sum, row) => sum + row.count, 0);
@@ -194,7 +276,7 @@ export default function BreakdownPengeluaran({
           <>
             <DetailLabel>Detail breakdown</DetailLabel>
             <ul className="space-y-1.5">
-              {data.cogs.map((row) => (
+              {cogsRows.map((row) => (
                 <LineRow
                   key={row.id}
                   name={row.name}
@@ -206,6 +288,14 @@ export default function BreakdownPengeluaran({
                 />
               ))}
             </ul>
+            <CogsPager
+              total={data.cogs.length}
+              page={cogsCurrent}
+              pages={cogsPages}
+              showAll={cogsShowAll}
+              onPage={setCogsPage}
+              onToggleAll={() => setCogsShowAll((prev) => !prev)}
+            />
           </>
         )}
       </Card>

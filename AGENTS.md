@@ -1961,8 +1961,13 @@ memakai satu Area bergradasi grafit + garis monokrom (`#A1A1AA` / `#18181B` / `#
 akordeon, jadi klik kartu lain menutup yang sebelumnya; kartu COGS terbuka saat pertama dimuat).
 Semua angkanya dari **`GET /api/ops/laporan`** → field **`breakdown: { cogs, fees, packing,
 operasional }`** (top-level, bukan di `summary`):
-- `cogs` = agregasi `order_items` pesanan sah per `product_id` + varian (`Kain … · warna · size`;
-  `color: "default"` disembunyikan) → `{ id, name, variant, qty, hpp, unknownQty }`. `unknownQty` =
+- `cogs` = agregasi `order_items` pesanan sah per `product_id` + varian (`Kain … · Seri … · warna ·
+  size`; `color: "default"` disembunyikan) → `{ id, name, variant, qty, hpp, unknownQty }`. Nama series
+  diambil dari `products.series` (join lewat `product_id` saat route membaca `id, hpp, series`) —
+  jangan hapus kolom itu dari `select`-nya, label "Seri …" akan hilang tanpa error.
+  **Kartu COGS dipaginasi (2026-11-09)**: 5 baris per halaman dengan tombol ‹ › + `halaman/total`
+  dan tombol **Tampilkan semua / Ringkas**, plus baris "1–5 dari 50 produk" (`CogsPager`,
+  `COGS_PAGE_SIZE`). Paginasi hanya di sisi klien — daftar `cogs` dari API tidak dipotong. `unknownQty` =
   unit yang belum punya modal (`order_items.hpp` / `products.hpp` kosong), jadi barisnya menampilkan
   "N unit tanpa modal" dan nominal "—" — **jangan** mengubah 0 jadi angka karangan.
 - `fees` = fee Mayar settled per `paymentChannelLabel(detail.channel)` → `{ channel, count, fee }`.
