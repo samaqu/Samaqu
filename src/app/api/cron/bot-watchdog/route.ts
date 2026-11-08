@@ -106,12 +106,20 @@ function cooldownPassed(state: AlertState | null, cooldownMs: number): boolean {
   return Date.now() - new Date(state.last_sent_at).getTime() > cooldownMs;
 }
 
+/** Nomor penerima alert (owner). Selalu dipakai lebih dulu, tidak bergantung data admin lain. */
+function alertNumber(): string {
+  return (process.env.WA_ALERT_NUMBER || "6285603324143").trim();
+}
+
+function maskNumber(value: string): string {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.length > 4 ? `***${digits.slice(-4)}` : "***";
+}
+
 async function sendAdmin(message: string): Promise<boolean> {
   try {
     const configs = await getFonnteConfigs();
-    // Nomor alert owner. Bisa ditimpa lewat env WA_ALERT_NUMBER kalau berganti.
-    const alertNumber = (process.env.WA_ALERT_NUMBER || "6285603324143").trim();
-    const target = await resolveAdminTargets(alertNumber || configs.admin.adminNumber);
+    const target = await resolveAdminTargets(alertNumber() || configs.admin.adminNumber);
     if (!target || !configs.admin.token) return false;
     return await sendFonnteMessage(configs.admin.token, target, message);
   } catch {
@@ -207,6 +215,7 @@ export async function GET(req: NextRequest) {
     down,
     healthy,
     failures,
+    alertTarget: maskNumber(alertNumber()),
     actions: notes,
   });
 }
