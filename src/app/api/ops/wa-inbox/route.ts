@@ -121,10 +121,15 @@ export async function POST(req: NextRequest) {
 
   if (mediaUrl) {
     const base = (process.env.R2_PUBLIC_BASE_URL || "").replace(/\/+$/, "");
+    const privateHost = String(process.env.R2_PRIVATE_ACCOUNT_ID || "").trim();
     const allowed =
       /^https:\/\/res\.cloudinary\.com\//.test(mediaUrl) ||
       /^https:\/\/samaqu-media\.samaqu\.workers\.dev\//.test(mediaUrl) ||
-      (Boolean(base) && mediaUrl.startsWith(`${base}/`));
+      (Boolean(base) && mediaUrl.startsWith(`${base}/`)) ||
+      // Bukti transfer: URL R2 private yang sudah ditandatangani (ada X-Amz-Signature).
+      (Boolean(privateHost) &&
+        mediaUrl.startsWith(`https://${privateHost}.r2.cloudflarestorage.com/`) &&
+        /[?&]X-Amz-Signature=/.test(mediaUrl));
     if (!allowed) {
       return NextResponse.json(
         { error: "URL attachment harus dari R2/Cloudinary SAMAQU" },
