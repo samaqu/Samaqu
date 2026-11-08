@@ -251,7 +251,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const { addItem } = useCart();
   const toast = useToast();
   const locale = useSafeLocale();
-  const router = useRouter();
   const storeSettings = useStoreSettings();
   const { isWishlisted, toggle: toggleWishlist, isLoggedIn } = useWishlist();
   const cypMicrocopy = product?.cyp_microcopy_override || storeSettings.cyp_microcopy || "Harga Minimum boleh dipilih. Itulah alasan kami membuat Create Your Price.";
@@ -617,10 +616,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     if (seriesId === activeSeriesId) return;
     setActiveSeriesId(seriesId);
     scrollToGalleryOnMobile();
-    // Series punya halaman produk sendiri (metadata + JSON-LD per produk), jadi URL
-    // diganti ke path series — link yang dibagikan membuka series itu, dan tiap
-    // series punya halaman SEO sendiri. replace (bukan push) agar history tidak menumpuk.
-    router.replace(`/${locale}/katalog/${seriesId}`, { scroll: false });
+    // URL diganti ke path series tanpa navigasi Next: data series sudah dimuat di
+    // klien, jadi tidak ada layar loading. Link tetap bisa dibagikan, dan membuka
+    // URL itu langsung (dari luar) tetap memakai halaman + metadata produk series.
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      const parts = url.pathname.split("/");
+      parts[parts.length - 1] = seriesId;
+      url.pathname = parts.join("/");
+      window.history.replaceState(null, "", url.toString());
+    }
   }
 
   // Auto-scroll to gallery on mobile only (used saat ganti series maupun warna)
