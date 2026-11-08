@@ -5,9 +5,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Package, X } from "lucide-react";
 import { useToast } from "@/components/ops/ui/use-toast";
 import { Field, RupiahInput, inputClass, textareaClass } from "./fields";
+import KategoriPicker from "./KategoriPicker";
 import MetodeBayarSelect from "./MetodeBayarSelect";
 import {
-  KATEGORI_OPERASIONAL,
   angka,
   pesanError,
   pengeluaranFetch,
@@ -278,21 +278,15 @@ export default function ExpenseDrawer({
                 </>
               ) : (
                 <>
-                  <Field label="Kategori" hint="Boleh pilih saran atau ketik sendiri.">
-                    <input
-                      type="text"
-                      list="pengeluaran-kategori"
-                      value={kategori}
-                      onChange={(event) => setKategori(event.target.value)}
-                      placeholder="Contoh: Gaji"
-                      className={inputClass}
-                    />
-                    <datalist id="pengeluaran-kategori">
-                      {KATEGORI_OPERASIONAL.map((option) => (
-                        <option key={option} value={option} />
-                      ))}
-                    </datalist>
-                  </Field>
+                  <div>
+                    <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Kategori
+                    </span>
+                    <KategoriPicker value={kategori} onChange={setKategori} />
+                    <span className="mt-1 block text-[11px] font-medium text-slate-400">
+                      Pilih salah satu kategori operasional.
+                    </span>
+                  </div>
 
                   <Field label="Deskripsi">
                     <textarea

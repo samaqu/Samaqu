@@ -124,5 +124,10 @@ declare module "lucide-react" {
   export const Banknote: FC<IconProps>;
   export const Landmark: FC<IconProps>;
   export const QrCode: FC<IconProps>;
+  // Ikon kategori drawer Pengeluaran
+  export const Zap: FC<IconProps>;
+  export const Building2: FC<IconProps>;
+  export const Wrench: FC<IconProps>;
+  export const Laptop: FC<IconProps>;
   export type LucideIcon = FC<IconProps>;
 }

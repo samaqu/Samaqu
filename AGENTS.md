@@ -1811,6 +1811,14 @@ tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` b
   berikon monokrom: Transfer Bank/Cash/QRIS/E-Wallet/Lainnya, ikon dari `lucide-react.d.ts`),
   bukan lagi `<input list>` + `<datalist>`; nilainya tetap teks bebas yang disimpan ke kolom
   `expenses.metode_bayar`.
+- **Kategori operasional = 8 kartu berikon (permintaan pemilik 2026-11-08)**: isian bebas
+  `<input list>` + `<datalist>` diganti `KategoriPicker.tsx` (grid 2 kolom, `aria-pressed`, ikon
+  lucide monokrom per kategori). Daftarnya di `KATEGORI_OPERASIONAL` (`helpers.ts`): Iklan &
+  Promosi · Admin Marketplace · Ongkos Kirim · Gaji Karyawan · Listrik & Air · Sewa Tempat ·
+  Maintenance · Tools & Software. Nilai yang dikirim tetap nama kategori (string), jadi API tidak
+  berubah; baris lama dengan kategori di luar daftar tetap tampil sebagai kartu tambahan (ikon Tag)
+  supaya bisa dipertahankan/diganti. Ikon baru (`Zap`, `Building2`, `Wrench`, `Laptop`) sudah
+  ditambahkan ke `src/types/lucide-react.d.ts`.
 - **Form packing (permintaan pemilik 2026-11-08)**: yang diisi adalah **Total Harga** (harga
   pembelian), lalu **Harga Satuan dihitung otomatis** `Math.round(total ÷ qty)` dan ditampilkan
   read-only; server tetap menyimpan `jumlah = qty × harga_satuan` seperti sebelumnya, jadi

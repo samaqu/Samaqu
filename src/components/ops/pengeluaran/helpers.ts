@@ -17,14 +17,16 @@ export const BULAN_LABEL = [
   "Desember",
 ];
 
-/** Saran kategori pengeluaran operasional (isian tetap boleh bebas). */
+/** Kategori pengeluaran operasional (dipilih lewat kartu berikon di drawer). */
 export const KATEGORI_OPERASIONAL = [
-  "Gaji",
-  "Sewa",
-  "Listrik & Internet",
-  "Iklan",
-  "Transport",
-  "Lain-lain",
+  "Iklan & Promosi",
+  "Admin Marketplace",
+  "Ongkos Kirim",
+  "Gaji Karyawan",
+  "Listrik & Air",
+  "Sewa Tempat",
+  "Maintenance",
+  "Tools & Software",
 ];
 
 /** Saran metode bayar. */
