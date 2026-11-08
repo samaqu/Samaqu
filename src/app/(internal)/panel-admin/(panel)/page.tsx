@@ -12,6 +12,7 @@ import { statusLabel, SALE_BASIS_NOTE, SALE_STATUSES, saleCount, orderRevenue } 
 import { orderStatusKey } from "@/lib/order-flow";
 import { varianPensiun, varianKomponen } from "@/lib/ops-variants";
 import { opsGet } from "../panel-api";
+import BotSwitchCard from "./bot-switch";
 import { useWibGreeting, useWibToday, wibDateOffset, dailyIndexForDate } from "../wib-date";
 import styles from "../panel.module.css";
 
@@ -465,6 +466,8 @@ export default function PanelAdminHome() {
           )}
         </div>
       </section>
+
+      <BotSwitchCard />
     </>
   );
 }
