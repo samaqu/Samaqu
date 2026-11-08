@@ -55,6 +55,22 @@ const securityHeaders = [
  */
 const LOCALES = ["id", "en"] as const;
 
+/**
+ * Host media publik R2 (foto Instagram & katalog). Dibaca dari `R2_PUBLIC_BASE_URL`
+ * supaya host tidak ditulis dua kali; `next/image` menolak host yang tidak terdaftar
+ * (`Invalid src prop … is not configured under images`) dan mematikan seluruh halaman.
+ * Kalau variabel kosong/tidak valid, host ini tidak ditambahkan (perilaku lama).
+ */
+function r2ImageHostname(): string | null {
+  const base = process.env.R2_PUBLIC_BASE_URL;
+  if (!base) return null;
+  try {
+    return new URL(base).hostname || null;
+  } catch {
+    return null;
+  }
+}
+
 /** Pasangan path lama → tujuan (tanpa prefix locale). "/" berarti beranda. */
 const LEGACY_PATHS: { source: string; destination: string }[] = [
   { source: "/contact", destination: "/faq#hubungi" },
@@ -130,6 +146,9 @@ const nextConfig: NextConfig = {
       // `media-backup`, URL *.supabase.co) — lihat AGENTS.md. Foto Instagram
       // BUKAN di sini: diunggah ke Cloudinary (lihat InstagramPhotosManager).
       { protocol: "https", hostname: "**.supabase.co" },
+      // Foto Instagram & sebagian media katalog sekarang disajikan dari R2.
+      // Tanpa host ini `next/image` melempar "Invalid src prop" dan halaman mati.
+      ...(r2ImageHostname() ? [{ protocol: "https" as const, hostname: r2ImageHostname()! }] : []),
     ],
   },
   experimental: {
