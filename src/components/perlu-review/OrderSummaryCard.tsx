@@ -31,12 +31,17 @@ export default function OrderSummaryCard({ draft }: { draft: Draft }) {
           const variant = color && color.toLowerCase() !== "default" ? color : "";
           const image = String(item?.image || "").trim();
           const showImage = image && !/\.(mp4|webm|mov|m4v)(\?|$)/i.test(image);
-          // Series tidak perlu diulang di judul kalau sudah jadi chip.
+          // Series & warna tidak perlu jadi chip: series sudah chip, warna masuk ke judul
+          // kalau belum tercantum di nama produk (mis. "Cover & Hanger - Cover Thobe + Hanger").
           const rawName = productName(item);
-          const title =
+          const withoutSeries =
             series && rawName.toLowerCase().endsWith(series.toLowerCase())
               ? rawName.slice(0, rawName.length - series.length).replace(/[\s—–-]+$/, "").trim() || rawName
               : rawName;
+          const title =
+            variant && !withoutSeries.toLowerCase().includes(variant.toLowerCase())
+              ? `${withoutSeries} - ${variant}`
+              : withoutSeries;
           return (
             <div
               key={`${item?.product_id || "item"}-${index}`}
@@ -63,9 +68,6 @@ export default function OrderSummaryCard({ draft }: { draft: Draft }) {
                     ) : null}
                     {series ? (
                       <span className={chip} style={{ background: "#eef1f4", color: "#5b6f7c" }}>{series}</span>
-                    ) : null}
-                    {variant ? (
-                      <span className={chip} style={{ background: "#e8f3fb", color: "#2f6f9e" }}>{variant}</span>
                     ) : null}
                     <span className={chip} style={{ background: "#f2f4f6", color: "#62717c" }}>
                       {[size, `${qty} pcs`].filter(Boolean).join(" · ")}

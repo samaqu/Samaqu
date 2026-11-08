@@ -442,13 +442,16 @@ export default function DraftEditor({
                       .trim() || baseName
                   : baseName;
               const paketVariant = isPaketItem({ size: item.size }) ? variantName(item.color) : "";
+              const colorLabel = item.color && item.color !== "default" ? String(item.color).trim() : "";
               const itemTitle = paketVariant
                 ? paketVariant.toLowerCase().startsWith(cleanBase.toLowerCase())
                   ? paketVariant
                   : cleanBase.toLowerCase().includes(paketVariant.toLowerCase())
                     ? cleanBase
                     : `${cleanBase} - ${paketVariant}`
-                : cleanBase;
+                : colorLabel && !cleanBase.toLowerCase().includes(colorLabel.toLowerCase())
+                  ? `${cleanBase} - ${colorLabel}`
+                  : cleanBase;
               return (
                 <div key={`${item.product_id}-${item.color}-${item.size}-${index}`} className="rounded-2xl border p-3.5" style={{ borderColor: "#e3ebf1", background: "#fff" }}>
                   <div className="flex items-start gap-3">
@@ -469,7 +472,6 @@ export default function DraftEditor({
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         {variant?.series_name ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "#e8f3fb", color: "#2f6f9e" }}>{variant.series_name}</span> : null}
                         {variant?.jenis_kain_name ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "#fdf0f4", color: "#b65b78" }}>{variant.jenis_kain_name}</span> : null}
-                        {!paketVariant && item.color && item.color !== "default" ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "#f2f4f6", color: "#62717c" }}>{item.color}</span> : null}
                       </div>
                       <p className="mt-1.5 text-[11px] font-medium" style={{ color: "#8a7d83" }}>Stok tersedia {stock}</p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
