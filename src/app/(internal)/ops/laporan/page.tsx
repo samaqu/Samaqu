@@ -302,7 +302,7 @@ function MayarSummaryCard({
       <span className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">{label}</span>
       <span className={`mt-1 text-xl font-black tabular-nums ${palette.text}`}>{value}</span>
       {typeof bar === "number" ? (
-        <span className="mt-2 block h-1.5 w-full overflow-hidden rounded-full bg-[#F3F4F6]">
+        <span className="mt-2 block h-1.5 w-full overflow-hidden rounded-full bg-[#E4E4E7]">
           <span
             className={`block h-full rounded-full ${palette.barBg}`}
             style={{ width: `${Math.max(2, Math.min(100, bar))}%` }}
@@ -338,7 +338,7 @@ function ReportMetric({
 }) {
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border border-zinc-200/80 bg-gradient-to-b from-white to-zinc-50/60 p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] ${
+      className={`relative flex flex-col rounded-2xl border border-[#E4E4E7] bg-[#FAFAFA] p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] ${
         muted ? "opacity-95" : ""
       }`}
       title={title}
@@ -483,9 +483,9 @@ export default function LaporanKeuanganPage() {
   ];
 
   return (
-    <div className="space-y-5 bg-[#F9FAFB]">
+    <div className="-m-4 space-y-5 bg-white p-4 md:-m-6 md:p-6 lg:-m-8 lg:p-8">
       {/* HEADER + KPI — satu kartu laporan ala referensi, palet monokrom SAMAQU */}
-      <section className="overflow-hidden rounded-3xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_24px_48px_-40px_rgba(16,24,40,0.45)] md:p-7">
+      <section className="overflow-hidden rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_24px_48px_-40px_rgba(16,24,40,0.45)] md:p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3.5">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-zinc-900 text-white shadow-[0_6px_16px_-8px_rgba(0,0,0,0.6)]">
@@ -641,7 +641,7 @@ export default function LaporanKeuanganPage() {
       </section>
 
       {/* PERHITUNGAN LABA */}
-      <section className="rounded-3xl border border-[#E5E7EB] bg-white p-5 shadow-sm md:p-6">
+      <section className="rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
           <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Perhitungan Laba</p>
           <p className="mt-0.5 text-sm font-medium text-slate-500">Dari penjualan sampai estimasi laba.</p>
           <div className="mt-3 divide-y divide-[#E5E7EB]">
@@ -721,7 +721,7 @@ export default function LaporanKeuanganPage() {
       </section>
 
       {/* PENDING */}
-      <section className="rounded-3xl border border-[#E5E7EB] bg-white p-5 shadow-sm md:p-6">
+      <section className="rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Perlu Diselesaikan</p>
@@ -768,7 +768,7 @@ export default function LaporanKeuanganPage() {
       </section>
 
       {/* CHART */}
-      <section className="rounded-3xl border border-[#E5E7EB] bg-white p-5 shadow-sm md:p-6">
+      <section className="rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-black tracking-tight text-[#374151]">Tren Keuangan</h2>
@@ -797,7 +797,7 @@ export default function LaporanKeuanganPage() {
 
         <div className="mt-4 h-72 w-full">
           {data.trend.points.every((point) => !point.gross && !point.net && !point.profit) ? (
-            <div className="grid h-full place-items-center rounded-2xl bg-[#F9FAFB] text-center">
+            <div className="grid h-full place-items-center rounded-2xl bg-white text-center">
               <div>
                 <p className="text-sm font-bold text-slate-700">Belum ada data di periode ini</p>
                 <p className="mt-1 text-xs text-slate-500">Coba rentang tanggal lain.</p>
@@ -839,10 +839,10 @@ export default function LaporanKeuanganPage() {
 
       {/* SUMBER PESANAN — memisahkan Reseller dari penjualan lain */}
       {sources.length > 0 ? (
-        <section className="rounded-3xl border border-[#E5E7EB] bg-white p-5 shadow-sm md:p-6">
+        <section className="rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#F3F4F6] text-slate-700">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-slate-700">
                 <Store size={18} strokeWidth={1.9} />
               </span>
               <div>
@@ -865,7 +865,7 @@ export default function LaporanKeuanganPage() {
                     {row.count} trx · {row.share.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%
                   </p>
                 </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#F3F4F6]">
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#E4E4E7]">
                   <div
                     className={`h-full rounded-full ${PAYMENT_BAR[index] || "bg-slate-300"}`}
                     style={{ width: `${Math.max(2, row.share)}%` }}
@@ -879,10 +879,10 @@ export default function LaporanKeuanganPage() {
       ) : null}
 
       {/* METODE PEMBAYARAN */}
-      <section className="rounded-3xl border border-[#E5E7EB] bg-white p-5 shadow-sm md:p-6">
+      <section className="rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#F3F4F6] text-slate-700">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-slate-700">
                 <CreditCard size={18} strokeWidth={1.9} />
               </span>
               <div>
@@ -896,7 +896,7 @@ export default function LaporanKeuanganPage() {
           </div>
 
           {payments.length === 0 ? (
-            <div className="mt-5 grid place-items-center rounded-2xl bg-[#F9FAFB] px-4 py-8 text-center">
+            <div className="mt-5 grid place-items-center rounded-2xl bg-white px-4 py-8 text-center">
               <p className="text-sm font-bold text-slate-700">Belum ada transaksi di periode ini</p>
               <p className="mt-1 text-xs text-slate-500">Coba rentang tanggal lain.</p>
             </div>
@@ -912,7 +912,7 @@ export default function LaporanKeuanganPage() {
                       {row.count} trx · {row.share.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%
                     </p>
                   </div>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#F3F4F6]">
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#E4E4E7]">
                     <div
                       className={`h-full rounded-full ${PAYMENT_BAR[index] || "bg-slate-300"}`}
                       style={{ width: `${Math.max(2, row.share)}%` }}
@@ -926,7 +926,7 @@ export default function LaporanKeuanganPage() {
       </section>
 
       {/* TABLES */}
-      <section ref={tableRef} id="report-tables" className="rounded-3xl border border-[#E5E7EB] bg-white p-5 shadow-sm md:p-6">
+      <section ref={tableRef} id="report-tables" className="rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
         {/*
           ── Ringkasan Biaya Transaksi Mayar ──
           Dua kartu (cair / belum cair) + satu kartu total transaksi bulan ini.
@@ -981,7 +981,7 @@ export default function LaporanKeuanganPage() {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
+          <div className="flex flex-wrap gap-1 rounded-xl bg-white p-1">
             {[
               { key: "returns", label: "Retur", count: data.tables.returns.length },
               { key: "exchanges", label: "Tukar Size", count: data.tables.exchanges.length },
@@ -995,7 +995,7 @@ export default function LaporanKeuanganPage() {
                 type="button"
                 onClick={() => setTab(item.key as Tab)}
                 className={`rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
-                  tab === item.key ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-white"
+                  tab === item.key ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-[#EFEFF1]"
                 }`}
               >
                 {item.label}
@@ -1224,7 +1224,7 @@ function TableBody({
 
   if (filtered.length === 0) {
     return (
-      <div className="mt-4 rounded-2xl bg-[#F9FAFB] py-12 text-center">
+      <div className="mt-4 rounded-2xl bg-white py-12 text-center">
         <p className="text-sm font-bold text-slate-700">Tidak ada data</p>
         <p className="mt-1 text-xs text-slate-500">Coba ubah periode, pencarian, atau filter status.</p>
       </div>
@@ -1233,7 +1233,7 @@ function TableBody({
 
   return (
     <>
-      <div className="mt-4 overflow-x-auto rounded-2xl border border-[#E5E7EB]">
+      <div className="mt-4 overflow-x-auto rounded-2xl border border-[#E5E7EB] bg-white">
         <table className="w-full min-w-[820px] border-collapse text-sm">
           <thead className="bg-[#F9FAFB]">
             <tr>
@@ -1573,13 +1573,13 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
 function ReportSkeleton() {
   return (
     <div className="space-y-5">
-      <div className="h-40 animate-pulse rounded-3xl border border-[#E5E7EB] bg-white" />
+      <div className="h-40 animate-pulse rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1]" />
       <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr]">
-        <div className="h-64 animate-pulse rounded-3xl border border-[#E5E7EB] bg-white" />
-        <div className="h-64 animate-pulse rounded-3xl border border-[#E5E7EB] bg-white" />
+        <div className="h-64 animate-pulse rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1]" />
+        <div className="h-64 animate-pulse rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1]" />
       </div>
-      <div className="h-44 animate-pulse rounded-3xl border border-[#E5E7EB] bg-white" />
-      <div className="h-80 animate-pulse rounded-3xl border border-[#E5E7EB] bg-white" />
+      <div className="h-44 animate-pulse rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1]" />
+      <div className="h-80 animate-pulse rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1]" />
     </div>
   );
 }

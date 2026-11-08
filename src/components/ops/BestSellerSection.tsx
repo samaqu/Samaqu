@@ -204,10 +204,10 @@ export default function BestSellerSection() {
   const compareVisible = compareOn && !!comparison?.hasData;
 
   return (
-    <section className="rounded-3xl border border-[#E5E7EB] bg-white p-5 shadow-sm md:p-6">
+    <section className="rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#F3F4F6] text-slate-700">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-slate-700">
             <ArrowUpRight size={18} strokeWidth={1.9} />
           </span>
           <div>
@@ -265,7 +265,7 @@ export default function BestSellerSection() {
 
         <span className="mx-1 hidden h-4 w-px bg-[#E5E7EB] sm:block" />
 
-        <div className="flex items-center gap-1 rounded-full bg-[#F3F4F6] p-1">
+        <div className="flex items-center gap-1 rounded-full bg-white p-1">
           {[
             { key: "units" as const, label: "Unit terbanyak" },
             { key: "revenue" as const, label: "Omzet terbesar" },
@@ -275,7 +275,7 @@ export default function BestSellerSection() {
               type="button"
               onClick={() => setSortMode(item.key)}
               className={`rounded-full px-3 py-1 text-[11px] font-bold transition-colors ${
-                sortMode === item.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                sortMode === item.key ? "bg-[#EFEFF1] text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}
             >
               {item.label}
@@ -283,7 +283,7 @@ export default function BestSellerSection() {
           ))}
         </div>
 
-        <div className="flex items-center gap-1 rounded-full bg-[#F3F4F6] p-1">
+        <div className="flex items-center gap-1 rounded-full bg-white p-1">
           {[
             { key: "series" as const, label: "Per Series" },
             { key: "product" as const, label: "Per Produk" },
@@ -293,7 +293,7 @@ export default function BestSellerSection() {
               type="button"
               onClick={() => setGroupMode(item.key)}
               className={`rounded-full px-3 py-1 text-[11px] font-bold transition-colors ${
-                groupMode === item.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                groupMode === item.key ? "bg-[#EFEFF1] text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}
             >
               {item.label}
@@ -442,7 +442,7 @@ export default function BestSellerSection() {
                       <div className="flex items-center gap-3">
                         <span
                           className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[11px] font-black tabular-nums ${
-                            index === 0 ? "bg-slate-900 text-white" : "bg-[#F3F4F6] text-slate-600"
+                            index === 0 ? "bg-slate-900 text-white" : "bg-white text-slate-600"
                           }`}
                         >
                           {index + 1}
@@ -505,7 +505,7 @@ export default function BestSellerSection() {
                       </div>
 
                       <div className="mt-2 flex items-center gap-3 pl-9">
-                        <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#F1F3F5]">
+                        <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#E4E4E7]">
                           <span
                             className="block h-full rounded-full"
                             style={{

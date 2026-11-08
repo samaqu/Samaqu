@@ -1850,11 +1850,24 @@ tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` b
   nilai `zinc-900`, keterangan, ikon bulat di kanan) — semuanya membaca `summary` API yang sama,
   jangan menghitung ulang di klien. **Revisi 2026-11-08 (pemilik: "kalo full item gini jelek, cari
   kombinasi warna yg bagus, riset dulu")**: latar grafit `#111113 → #2d2d33` yang dulu menutupi
-  seluruh kartu diganti pola dashboard standar — konten off-white, permukaan putih, dan **satu
+  seluruh kartu diganti pola dashboard standar — permukaan terang netral (pola persisnya diganti
+  revisi "kontras dibalik" di bawah), dan **satu
   aksen gelap kecil** (`bg-zinc-900` hanya di tile ikon judul, tombol Export PDF, dan pill bulan
   aktif). Teks kartu `text-zinc-*` (bukan lagi `text-white/*`), tile metrik memakai
   `from-white to-zinc-50/60` + border `zinc-200/80` supaya terpisah dari kartu induknya. Jangan
-  mengembalikan blok grafit selebar kartu atau memakai ulang `text-white/*`/`border-white/*` di sini. `Total Biaya`
+  mengembalikan blok grafit selebar kartu atau memakai ulang `text-white/*`/`border-white/*` di sini.
+  **Revisi 2026-11-08 (pemilik: "background globalnya putih terus card-nya jangan terlalu putih,
+  riset dulu perpaduan warnanya")**: kontrasnya DIBALIK dari pola umum dashboard — kanvas halaman
+  **putih murni** (`#FFFFFF`), kartu **abu netral lembut** `#EFEFF1` + border `#E4E4E7`, dan panel
+  di dalam kartu (tile metrik, wadah tabel, empty state) `#FAFAFA`/`#FFFFFF` sebagai lapisan ketiga.
+  Jadi tidak ada satu pun permukaan kartu yang putih murni; putih hanya milik kanvas. Kanvas putih
+  dibuat menutup gutter `main` lewat `-m-4 p-4 md:-m-6 md:p-6 lg:-m-8 lg:p-8` di pembungkus halaman
+  (padding-nya dikembalikan, jadi posisi kartu tidak bergeser). Track progress bar ikut dinaikkan ke
+  `#E4E4E7` dan tile ikon/badge peringkat jadi `bg-white` supaya tidak hilang di atas kartu abu.
+  `BestSellerSection.tsx` ikut palet ini (kartu `#EFEFF1`, segmented control `bg-white` + item aktif
+  `#EFEFF1`). Saat mengubah warna di halaman ini ukur lewat `getComputedStyle` (kanvas
+  `rgb(255,255,255)`, kartu `rgb(239,239,241)`, tile `rgb(250,250,250)`) — tangkapan layar preview
+  tidak bisa diandalkan untuk selisih 5% ini. `Total Biaya`
   = operasional + packing + Mayar; baris "Biaya Operasional & Packing" di rincian memakai
   `biayaOperasional + biayaPacking` (dulu `biaya` yang sudah termasuk Mayar → dobel dengan baris
   Mayar). **`products.hpp` masih 0 untuk semua 120 produk** (dicek 2026-11-08), jadi `hppStatus`
