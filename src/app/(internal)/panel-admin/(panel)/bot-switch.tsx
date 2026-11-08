@@ -50,6 +50,10 @@ export default function BotSwitchCard() {
 
   useEffect(() => {
     void load();
+    // Selaraskan dengan server tiap 15 detik: kalau mode diubah dari tab lain
+    // atau penyimpanan gagal, tampilan tidak "menipu".
+    const timer = window.setInterval(() => void load(), 15000);
+    return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -68,6 +72,15 @@ export default function BotSwitchCard() {
       if (!res.ok) throw new Error(json?.error || "Gagal menyimpan mode bot.");
       setMode(String(json?.mode || next));
       setHeartbeat(json?.heartbeat || heartbeat);
+      // Baca ulang dari server: yang ditampilkan harus sama dengan yang tersimpan.
+      await load();
+      const check = await fetch("/api/admin/wa-bot-mode", {
+        cache: "no-store",
+        headers: t ? { Authorization: `Bearer ${t}` } : {},
+      }).then((r) => r.json()).catch(() => null);
+      if (check?.mode && check.mode !== next) {
+        setError(`Mode tersimpan sebagai "${check.mode}", bukan "${next}". Coba lagi.`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal menyimpan mode bot.");
     } finally {

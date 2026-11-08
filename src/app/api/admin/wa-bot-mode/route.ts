@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Mode bot WhatsApp: "server" (MiMo di cloud) atau "local" (Claude di laptop).
  *
@@ -39,10 +41,13 @@ export async function GET(req: NextRequest) {
   }
   const rows = (await res.json().catch(() => [])) as { mode?: string; heartbeat?: string | null }[];
   const row = Array.isArray(rows) ? rows[0] : null;
-  return NextResponse.json({
-    mode: row?.mode || "auto",
-    heartbeat: row?.heartbeat || null,
-  });
+  return NextResponse.json(
+    {
+      mode: row?.mode || "auto",
+      heartbeat: row?.heartbeat || null,
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export async function POST(req: NextRequest) {
