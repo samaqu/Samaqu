@@ -1339,6 +1339,13 @@ Satu modul agregasi: **`src/lib/best-sellers.ts`**
 - produk induk = `products.category::products.name` (fallback: nama dibersihkan dari kain/size/cover);
 - unit & omzet dari SEMUA item pesanan sah `SALE_STATUSES` (bukan top-N), jadi `totals.units` harus
   sama dengan jumlah `quantity` mentah di periode itu — itu cara termudah memeriksanya;
+- **omzet = SETELAH diskon** (2026-11-09, permintaan pemilik "omsetnya harusnya sama kayak card di
+  atas"): `revenue` tiap baris = `harga × qty − porsi diskon pesanan` (`discount_share` yang sama
+  yang ditampilkan sebagai "setelah diskon Rp …"), sehingga `totals.revenue` **sama persis** dengan
+  kartu `Total Omset` di `/ops/laporan` (`summary.gross` = `orderRevenue` = total − ongkir). Dulu
+  `revenue` bruto, jadi Produk Terlaris (Rp 21.184.000) beda Rp 219.000 dari kartu atas — selisih itu
+  memang total diskon periode, bukan pesanan batal (batal/belum bayar tidak pernah ikut). Jangan
+  mengembalikan `price * qty` tanpa potongan diskon;
 - breakdown per ukuran dan per kain/opsi disimpan untuk baris yang di-expand.
 
 Batas periode **WIB** (`jakartaMonthBounds`/`jakartaDayBounds`). Pembanding apple-to-apple: bulan
