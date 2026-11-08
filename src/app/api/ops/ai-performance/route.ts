@@ -114,6 +114,32 @@ async function academyClosings(startIso: string, endIso: string): Promise<Closin
   };
 }
 
+/**
+ * Total biaya AI CS (feature `wa`) pada periode, dalam USD.
+ * Dicatat `wa-agent` ke `ai_usage_logs` memakai harga di `ai_settings.pricing`.
+ */
+async function aiUsageCost(startIso: string, endIso: string): Promise<number | null> {
+  const base = (process.env.ACADEMY_SUPABASE_URL || "").replace(/\/+$/, "");
+  const key = process.env.ACADEMY_SERVICE_ROLE_KEY || "";
+  if (!base || !key) return null;
+
+  const url = new URL(`${base}/rest/v1/ai_usage_logs`);
+  url.searchParams.set("select", "estimated_cost");
+  url.searchParams.set("feature", "eq.wa");
+  url.searchParams.set("created_at", `gte.${startIso}`);
+  url.searchParams.append("created_at", `lt.${endIso}`);
+  url.searchParams.set("limit", "50000");
+
+  const res = await fetch(url, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const rows = (await res.json().catch(() => [])) as { estimated_cost?: number | string | null }[];
+  if (!Array.isArray(rows)) return 0;
+  return rows.reduce((sum, row) => sum + (Number(row.estimated_cost) || 0), 0);
+}
+
 async function approvedDrafts(
   admin: ReturnType<typeof getSupabaseAdmin>,
   startIso: string,
@@ -151,7 +177,7 @@ async function periodStats(
   admin: ReturnType<typeof getSupabaseAdmin>,
   month: ReturnType<typeof jakartaMonthBounds>,
 ) {
-  const [rows, drafts, closingStats, leadsResult, escalations] = await Promise.all([
+  const [rows, drafts, closingStats, leadsResult, escalations, costUsd] = await Promise.all([
     inboxRows(admin, month.startIso, month.endIso),
     approvedDrafts(admin, month.startIso, month.endIso),
     academyClosings(month.startIso, month.endIso).catch(() => null),
@@ -164,6 +190,7 @@ async function periodStats(
       .lte("tanggal", `${month.value}-${String(month.daysInMonth).padStart(2, "0")}`)
       .limit(5000),
     escalationRows(admin, month.startIso, month.endIso),
+    aiUsageCost(month.startIso, month.endIso).catch(() => null),
   ]);
   if (leadsResult.error) throw new Error(leadsResult.error.message);
   const leads = leadsResult.count || 0;
@@ -220,6 +247,7 @@ async function periodStats(
     leadsFromChatShare: metrics.leadsFromChatShare,
     closing,
     nominal,
+    aiCostUsd: costUsd,
     handledRate: conversations > 0 ? Math.round((handled / conversations) * 1000) / 10 : 0,
     closingRate: conversations > 0 ? Math.round((closing / conversations) * 1000) / 10 : 0,
     closingSource,
@@ -246,11 +274,24 @@ export async function GET(req: NextRequest) {
       periodStats(admin, previous),
     ]);
 
+    // Kurs USD → Rp bisa diubah lewat env tanpa deploy kode.
+    const usdIdr = Number(process.env.USD_IDR_RATE) || 18108.5;
+    const aiCostIdr = currentStats.aiCostUsd == null
+      ? null
+      : Math.round(currentStats.aiCostUsd * usdIdr);
+    const costPerClosing =
+      aiCostIdr != null && currentStats.closing > 0
+        ? Math.round(aiCostIdr / currentStats.closing)
+        : null;
+
     return NextResponse.json({
       period: { value: month.value, label: month.label },
       previousPeriod: { value: previous.value, label: previous.label },
       stats: {
         ...currentStats,
+        aiCostIdr,
+        costPerClosing,
+        usdIdr,
         growth: {
           conversations: growth(currentStats.conversations, previousStats.conversations),
           handled: growth(currentStats.handled, previousStats.handled),

@@ -26,6 +26,10 @@ type Stats = {
   leadsFromChatShare: number;
   closing: number;
   nominal: number;
+  aiCostUsd?: number | null;
+  aiCostIdr?: number | null;
+  costPerClosing?: number | null;
+  usdIdr?: number;
   handledRate: number;
   closingRate: number;
   closingSource?: "wa_closings" | "drafts";
@@ -91,12 +95,13 @@ function KpiCard({
 }: {
   label: string;
   value: string;
-  hint?: string;
+  hint?: React.ReactNode;
   secondary?: string;
   delta?: number | null;
   tone?: string;
   icon: React.ReactNode;
 }) {
+  const hasDelta = delta !== undefined && delta !== null;
   return (
     <div className="rounded-2xl border bg-white p-4 shadow-sm" style={{ borderColor: "#e3ebf1" }}>
       <div className="flex items-center justify-between gap-2">
@@ -108,9 +113,9 @@ function KpiCard({
         <p className="mt-0.5 text-sm font-black tabular-nums" style={{ color: tone }}>{secondary}</p>
       ) : null}
       <p className="mt-1 text-[11px] font-semibold" style={{ color: "#8a7d83" }}>
-        {delta !== undefined ? <Delta value={delta} /> : hint}
+        {hasDelta ? <Delta value={delta as number} /> : hint}
       </p>
-      {delta !== undefined && hint ? <p className="mt-0.5 text-[10px]" style={{ color: "#9aacb8" }}>{hint}</p> : null}
+      {hasDelta && hint ? <p className="mt-0.5 text-[10px]" style={{ color: "#9aacb8" }}>{hint}</p> : null}
     </div>
   );
 }
@@ -200,7 +205,13 @@ export default function AiPerformanceView() {
               label="Chat ditangani AI"
               value={number(stats.aiHandled)}
               secondary={percent(stats.aiShare)}
-              hint={`${number(stats.conversations)} percakapan dari ${number(stats.messages)} pesan WhatsApp`}
+              hint={
+                <>
+                  dari {number(stats.conversations)} percakapan
+                  <br />
+                  {number(stats.messages)} pesan WhatsApp
+                </>
+              }
               icon={<MessageSquare size={16} />}
             />
             <KpiCard
@@ -215,7 +226,15 @@ export default function AiPerformanceView() {
               label="Berhasil closing"
               value={number(stats.closing)}
               delta={stats.growth.closing}
-              hint={`${percent(stats.closingRate)} dari total chat`}
+              hint={
+                stats.leadsFromChat > 0
+                  ? `${number(stats.closing)} dari ${number(stats.leadsFromChat)} lead AI (${percent(
+                      stats.leadsFromChat > 0
+                        ? Math.round((stats.closing / stats.leadsFromChat) * 1000) / 10
+                        : 0,
+                    )})`
+                  : `${percent(stats.closingRate)} dari total chat`
+              }
               icon={<Check size={16} />}
               tone="#8a5a12"
             />
@@ -223,10 +242,39 @@ export default function AiPerformanceView() {
               label="Nominal closing"
               value={money(stats.nominal)}
               delta={stats.growth.nominal}
-              hint="Nilai transaksi"
+              hint={
+                stats.closing > 0
+                  ? `Rata-rata ${money(stats.nominal / stats.closing)} per closing`
+                  : "Belum ada closing bulan ini"
+              }
               icon={<Wallet size={16} />}
               tone="#7a4a8a"
             />
+          </div>
+
+          <div className="rounded-2xl border bg-white p-4 shadow-sm" style={{ borderColor: "#e3ebf1" }}>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#7c93a6" }}>Biaya AI bulan ini</p>
+                <p className="mt-1 text-2xl font-black tabular-nums" style={{ color: "#2a1a22" }}>
+                  {stats.aiCostIdr == null ? "Belum tersedia" : money(stats.aiCostIdr)}
+                </p>
+                <p className="mt-0.5 text-[11px]" style={{ color: "#8a7d83" }}>
+                  {stats.aiCostUsd == null
+                    ? "Pencatatan biaya belum aktif."
+                    : `$${Number(stats.aiCostUsd).toFixed(2)} · kurs Rp${number(stats.usdIdr ?? 0)}`}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#7c93a6" }}>Biaya per closing</p>
+                <p className="mt-1 text-2xl font-black tabular-nums" style={{ color: "#1f8a58" }}>
+                  {stats.costPerClosing == null ? "Belum ada closing" : money(stats.costPerClosing)}
+                </p>
+                <p className="mt-0.5 text-[11px]" style={{ color: "#8a7d83" }}>
+                  dari {number(stats.closing)} closing bulan ini
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="rounded-2xl border bg-white p-4 shadow-sm sm:p-5" style={{ borderColor: "#e3ebf1" }}>
