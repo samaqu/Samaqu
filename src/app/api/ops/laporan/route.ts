@@ -219,7 +219,7 @@ async function loadPeriod(
   const [ordersRes, returnsCreatedRes, refundsRes, exchangesRes] = await Promise.all([
     admin
       .from("orders")
-      .select("id, order_number, customer_name, customer_whatsapp, created_at, total, discount, shipping_cost, status, source, payment_method, payment_provider, payment_channel, payment_ref, paid_at")
+      .select("id, order_number, customer_name, customer_whatsapp, created_at, total, discount, subtotal, shipping_cost, shipping_address, shipping_city, shipping_kecamatan, shipping_province, shipping_postal_code, shipping_method, awb_no, weight, status, shipping_status, tracking_status_text, tracking_city, tracking_updated_at, source, payment_method, payment_provider, payment_channel, payment_ref, paid_at")
       .gte("created_at", startIso)
       .lt("created_at", endIso)
       .order("created_at", { ascending: false })
@@ -277,6 +277,24 @@ async function loadPeriod(
     const { data, error } = await admin.from("products").select("id, hpp").in("id", productIds);
     if (error) throw new Error(error.message);
     for (const product of data || []) productHpp.set(String(product.id), Number(product.hpp) || 0);
+
+    // Foto item untuk drawer detail (sama seperti detail transaksi panel admin).
+    const { data: imageRows } = await admin
+      .from("product_images")
+      .select("product_id, url, is_video, display_order")
+      .in("product_id", productIds)
+      .order("display_order", { ascending: true });
+    const photoByProduct = new Map<string, string>();
+    for (const row of imageRows || []) {
+      const url = String((row as any).url || "");
+      if ((row as any).is_video || /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url)) continue;
+      if (!photoByProduct.has(String((row as any).product_id))) {
+        photoByProduct.set(String((row as any).product_id), url);
+      }
+    }
+    for (const item of orderItems) {
+      item.image = photoByProduct.get(String(item.product_id || "")) || "";
+    }
   }
 
   const hppByOrder = new Map<string, number>();

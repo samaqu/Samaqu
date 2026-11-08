@@ -4,6 +4,10 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import * as LucideIcons from "lucide-react";
+import PanelDetailPesanan from "@/components/ops/transaksi/PanelDetailPesanan";
+
+/** Gambar kosong 1x1 untuk item tanpa foto (drawer butuh atribut src). */
+const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 import {
   AlertTriangle,
   CheckCircle,
@@ -1348,6 +1352,88 @@ function exchangeSizes(row: any) {
 
 function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }; onClose: () => void }) {
   const row = selected.row;
+  const kind: string = selected.kind;
+
+  // Penjualan & biaya Mayar memakai drawer detail pesanan yang sama dengan panel admin
+  // (stepper, info kirim, alamat, produk). Tanpa tombol aksi — halaman ini read-only.
+  if (kind === "sales" || kind === "mayar-settled" || kind === "mayar-pending") {
+    const tahap =
+      row.status === "pending"
+        ? "belum_bayar"
+        : row.status === "dikirim"
+          ? "dikirim"
+          : row.status === "selesai"
+            ? "selesai"
+            : row.status === "dibatalkan"
+              ? "dibatalkan"
+              : row.awb_no
+                ? "sudah_dipacking"
+                : "belum_dipacking";
+    const itemList = (Array.isArray(row.items) ? row.items : []).map((item: any, index: number) => ({
+      key: String(item.id || index),
+      nama: item.product_name || "-",
+      chips: [
+        item.kain ? { teks: `Kain ${item.kain}`, jenis: "kain" as const } : null,
+        item.series ? { teks: String(item.series), jenis: "netral" as const } : null,
+        item.color && item.color !== "default" ? { teks: String(item.color), jenis: "netral" as const } : null,
+        item.size || item.replacement_size
+          ? {
+              teks: [item.size, item.replacement_size ? `→ ${item.replacement_size}` : null].filter(Boolean).join(" "),
+              jenis: "netral" as const,
+            }
+          : null,
+      ].filter(Boolean) as { teks: string; jenis: "kain" | "netral" }[],
+      harga: rp((Number(item.price) || 0) * (Number(item.quantity) || 1)),
+      foto: item.image || BLANK_PIXEL,
+    }));
+    const alamat = [
+      row.shipping_address,
+      row.shipping_kecamatan ? `Kec. ${row.shipping_kecamatan}` : "",
+      row.shipping_city,
+      row.shipping_province,
+      row.shipping_postal_code,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    return (
+      <PanelDetailPesanan
+        tema="warna"
+        sumber={row.source || "Website"}
+        tahap={tahap}
+        createdAt={row.created_at}
+        nama={row.customer_name || "-"}
+        telepon={row.customer_whatsapp || "-"}
+        alamat={alamat || "-"}
+        kurir="J&T"
+        layanan={row.shipping_method || "-"}
+        resi={row.awb_no || ""}
+        resiKosong="Resi belum dibuat"
+        onLacak={() => undefined}
+        onSalinResi={() => undefined}
+        resiTersalin={false}
+        berat={row.weight ? `${Number(row.weight).toLocaleString("id-ID")} g` : "-"}
+        statusKirim={row.tracking_status_text || (row.shipping_status ? String(row.shipping_status) : "")}
+        statusKirimMeta={[row.tracking_city, row.tracking_updated_at ? dateTime(row.tracking_updated_at) : ""]
+          .filter(Boolean)
+          .join(" · ")}
+        items={itemList}
+        subtotal={Number(row.subtotal) || 0}
+        ongkir={Number(row.shipping_cost) || 0}
+        diskon={Number(row.discount) || 0}
+        total={Number(row.total) || 0}
+        metodeBayar={row.payment_method || row.channel || "-"}
+        waktuPesan={dateTime(row.created_at)}
+        waktuBayar={row.paid_at ? dateTime(row.paid_at) : null}
+        nomorPesanan={row.order_number || "-"}
+        onSalinNomor={() => undefined}
+        nomorTersalin={false}
+        onChat={() => undefined}
+        onClose={onClose}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <button type="button" className="absolute inset-0 bg-slate-900/30" onClick={onClose} aria-label="Tutup detail" />
@@ -1356,9 +1442,9 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Detail</p>
             <p className="mt-1 text-lg font-black text-slate-900">
-              {selected.kind === "mayar-settled" || selected.kind === "mayar-pending"
+              {kind === "mayar-settled" || kind === "mayar-pending"
                 ? row.order_number
-                : selected.kind === "sales"
+                : kind === "sales"
                   ? row.order_number
                   : row.return_number}
             </p>
@@ -1375,7 +1461,7 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
             <p className="text-xs text-slate-500">{row.customer_whatsapp || "-"}</p>
           </div>
 
-          {selected.kind === "sales" ? (
+          {kind === "sales" ? (
             <div className="rounded-2xl border border-[#E5E7EB] p-3.5">
               <div className="flex justify-between"><span className="text-slate-500">Penjualan</span><span className="font-black tabular-nums">{rp(row.total)}</span></div>
               <div className="mt-1 flex justify-between"><span className="text-slate-500">Metode Mayar</span><span className="text-xs font-semibold">{row.channel || "-"}</span></div>
@@ -1383,7 +1469,7 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
               <div className="mt-1 flex justify-between"><span className="text-slate-500">Diterima bersih</span><span className="font-black tabular-nums">{rp(row.net)}</span></div>
               <div className="mt-1 flex justify-between"><span className="text-slate-500">Tanggal</span><span className="text-xs font-semibold">{dateTime(row.created_at)}</span></div>
             </div>
-          ) : selected.kind === "mayar-pending" ? (
+          ) : kind === "mayar-pending" ? (
             <div className="rounded-2xl border border-[#E5E7EB] p-3.5">
               <div className="flex justify-between"><span className="text-slate-500">Dibayar</span><span className="font-black tabular-nums">{rp(row.total)}</span></div>
               <div className="mt-1 flex justify-between"><span className="text-slate-500">Metode Mayar</span><span className="text-xs font-semibold">{row.channel || "-"}</span></div>
