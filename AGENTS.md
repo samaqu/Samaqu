@@ -1839,9 +1839,16 @@ tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` b
   `biaya = packing + operasional + mayarFee`. Sebelumnya `EXPENSES_AVAILABLE = false` membuat
   "Biaya" hanya berisi fee Mayar, jadi laba terlalu besar. Kalau tabel `expenses` belum ada,
   balasannya `expensesAvailable:false` → biaya TIDAK dianggap Rp0 (kartu "—" dan laba "belum final").
-  Kartu atas `/ops/laporan` sekarang satu kontainer grafit (`#111113 → #2d2d33`) berisi 4 tile
-  **Total Omset / Total HPP / Total Biaya / Laba Bersih** (label, nilai, keterangan, ikon bulat di
-  kanan) — semuanya membaca `summary` API yang sama, jangan menghitung ulang di klien. `Total Biaya`
+  Kartu atas `/ops/laporan` = **satu kontainer kartu terang** (putih, border `zinc-200/80`, radius
+  24) berisi 4 tile **Total Omset / Total HPP / Total Biaya / Laba Bersih** (label uppercase abu,
+  nilai `zinc-900`, keterangan, ikon bulat di kanan) — semuanya membaca `summary` API yang sama,
+  jangan menghitung ulang di klien. **Revisi 2026-11-08 (pemilik: "kalo full item gini jelek, cari
+  kombinasi warna yg bagus, riset dulu")**: latar grafit `#111113 → #2d2d33` yang dulu menutupi
+  seluruh kartu diganti pola dashboard standar — konten off-white, permukaan putih, dan **satu
+  aksen gelap kecil** (`bg-zinc-900` hanya di tile ikon judul, tombol Export PDF, dan pill bulan
+  aktif). Teks kartu `text-zinc-*` (bukan lagi `text-white/*`), tile metrik memakai
+  `from-white to-zinc-50/60` + border `zinc-200/80` supaya terpisah dari kartu induknya. Jangan
+  mengembalikan blok grafit selebar kartu atau memakai ulang `text-white/*`/`border-white/*` di sini. `Total Biaya`
   = operasional + packing + Mayar; baris "Biaya Operasional & Packing" di rincian memakai
   `biayaOperasional + biayaPacking` (dulu `biaya` yang sudah termasuk Mayar → dobel dengan baris
   Mayar). **`products.hpp` masih 0 untuk semua 120 produk** (dicek 2026-11-08), jadi `hppStatus`

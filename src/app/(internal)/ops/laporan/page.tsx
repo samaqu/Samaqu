@@ -338,13 +338,15 @@ function ReportMetric({
 }) {
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border border-white/10 bg-white/[0.06] p-4 ${muted ? "opacity-75" : ""}`}
+      className={`relative flex flex-col rounded-2xl border border-zinc-200/80 bg-gradient-to-b from-white to-zinc-50/60 p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] ${
+        muted ? "opacity-95" : ""
+      }`}
       title={title}
     >
-      <span className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-white/50">{label}</span>
+      <span className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-zinc-400">{label}</span>
       <p
         className={`mt-2 whitespace-nowrap text-[clamp(1.05rem,1.6vw,1.45rem)] font-black leading-tight tabular-nums ${
-          muted ? "text-white/45" : "text-white"
+          muted ? "text-zinc-400" : "text-zinc-900"
         }`}
       >
         {value}
@@ -355,9 +357,9 @@ function ReportMetric({
             {badge.label}
           </span>
         ) : null}
-        <span className="text-[11px] font-semibold leading-snug text-white/45">{caption}</span>
+        <span className="text-[11px] font-semibold leading-snug text-zinc-500">{caption}</span>
       </div>
-      <span className="absolute bottom-4 right-4 grid h-8 w-8 place-items-center rounded-full border border-white/20 text-white/60">
+      <span className="absolute bottom-4 right-4 grid h-8 w-8 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-400">
         <Icon size={15} strokeWidth={1.8} />
       </span>
     </div>
@@ -483,33 +485,33 @@ export default function LaporanKeuanganPage() {
   return (
     <div className="space-y-5 bg-[#F9FAFB]">
       {/* HEADER + KPI — satu kartu laporan ala referensi, palet monokrom SAMAQU */}
-      <section className="overflow-hidden rounded-3xl border border-black/10 bg-gradient-to-br from-[#111113] to-[#2d2d33] p-5 shadow-sm md:p-7">
+      <section className="overflow-hidden rounded-3xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_24px_48px_-40px_rgba(16,24,40,0.45)] md:p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3.5">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/[0.06] text-white">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-zinc-900 text-white shadow-[0_6px_16px_-8px_rgba(0,0,0,0.6)]">
               <IconReport size={24} />
             </span>
             <div>
-              <h1 className="text-2xl font-black tracking-tight text-white md:text-[28px]">Laporan Keuangan</h1>
-              <p className="mt-1 text-sm font-medium text-white/55">Analisis performa bisnis secara mendalam</p>
+              <h1 className="text-2xl font-black tracking-tight text-zinc-900 md:text-[28px]">Laporan Keuangan</h1>
+              <p className="mt-1 text-sm font-medium text-zinc-500">Analisis performa bisnis secara mendalam</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {isFetching ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[11px] font-bold text-white/60">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-[11px] font-bold text-zinc-500">
                 <RefreshCw size={12} className="animate-spin" /> Memperbarui…
               </span>
             ) : null}
             <Link
               href="/ops"
-              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3.5 py-2 text-xs font-bold text-white/80 transition-colors hover:bg-white/10"
+              className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-xs font-bold text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
             >
               <ChevronLeft size={15} /> Dashboard
             </Link>
             <button
               type="button"
               onClick={() => window.print()}
-              className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-[#111113] transition-colors hover:bg-white/90"
+              className="inline-flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-black"
             >
               <Download size={14} /> Export PDF
             </button>
@@ -517,7 +519,7 @@ export default function LaporanKeuanganPage() {
               value={month}
               onChange={(event) => setMonth(event.target.value)}
               aria-label="Pilih bulan laporan"
-              className="rounded-full border border-white/15 bg-white/[0.08] px-3.5 py-2 text-xs font-bold text-white outline-none [&>option]:text-slate-900"
+              className="rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-xs font-bold text-zinc-700 outline-none transition-colors hover:bg-zinc-50"
             >
               {monthOptions.map((value) => (
                 <option key={value} value={value}>
@@ -528,7 +530,7 @@ export default function LaporanKeuanganPage() {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[11px] font-semibold text-white/45">
+        <div className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[11px] font-semibold text-zinc-500">
           {[
             { key: thisMonth, label: "Bulan Ini" },
             { key: shiftMonth(thisMonth, -1), label: "Bulan Lalu" },
@@ -539,14 +541,14 @@ export default function LaporanKeuanganPage() {
               onClick={() => setMonth(item.key)}
               className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
                 month === item.key
-                  ? "border-white bg-white text-[#111113]"
-                  : "border-white/15 bg-white/[0.06] text-white/65 hover:bg-white/10"
+                  ? "border-zinc-900 bg-zinc-900 text-white"
+                  : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
               }`}
             >
               {item.label}
             </button>
           ))}
-          <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-white/70">{data.period.label}</span>
+          <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-zinc-600">{data.period.label}</span>
           <span>·</span>
           <span>{data.period.days} hari</span>
           <span>·</span>
@@ -610,8 +612,8 @@ export default function LaporanKeuanganPage() {
           <p
             className={`mt-3 flex items-start gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-semibold ${
               s.profitStatus === "partial"
-                ? "border-amber-400/25 bg-amber-400/10 text-amber-200"
-                : "border-white/10 bg-white/[0.06] text-white/60"
+                ? "border-amber-200 bg-amber-50 text-amber-700"
+                : "border-zinc-200 bg-zinc-50 text-zinc-600"
             }`}
           >
             <AlertTriangle size={13} className="mt-px shrink-0" />
@@ -619,20 +621,20 @@ export default function LaporanKeuanganPage() {
           </p>
         ) : null}
 
-        <p className="mt-3 text-[11px] font-medium leading-relaxed text-white/45">
-          Omset = nilai transaksi diakui (tanpa ongkir) · Penjualan bersih <b className="text-white/75">{rp(s.net)}</b>{" "}
+        <p className="mt-3 text-[11px] font-medium leading-relaxed text-zinc-500">
+          Omset = nilai transaksi diakui (tanpa ongkir) · Penjualan bersih <b className="text-zinc-800">{rp(s.net)}</b>{" "}
           setelah retur {rp(s.refunds)} & tukar size {rpSigned(s.exchange)} · Biaya = operasional + packing + biaya Mayar
           · Laba bersih = penjualan bersih − HPP − biaya.
         </p>
 
-        <p className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold text-white/40">
+        <p className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold text-zinc-400">
           <span className="inline-flex items-center gap-1">
-            <span className={data.deltas.net !== null && data.deltas.net < 0 ? "text-red-300" : "text-emerald-300"}>
+            <span className={data.deltas.net !== null && data.deltas.net < 0 ? "text-red-600" : "text-emerald-600"}>
               {data.deltas.net === null
                 ? "Baru"
                 : `${data.deltas.net >= 0 ? "+" : "−"}${Math.abs(data.deltas.net).toLocaleString("id-ID", { maximumFractionDigits: 1 })}%`}
             </span>
-            <span className="text-white/40">penjualan bersih vs periode sebelumnya</span>
+            <span className="text-zinc-400">penjualan bersih vs periode sebelumnya</span>
           </span>
           <span>· margin {s.margin !== null ? `${s.margin}%` : "—"}</span>
         </p>
