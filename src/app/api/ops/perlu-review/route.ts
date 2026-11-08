@@ -191,7 +191,7 @@ export async function GET(req: NextRequest) {
       : payload.items;
     return {
       ...item,
-      payload: { ...payload, items: rows },
+      payload: applyCoverDiscount({ ...payload, items: rows }),
       // Tanda tangani ulang tiap kali dibaca: URL R2 private kedaluwarsa, jangan
       // mengandalkan proof_url yang tersimpan saat draft dibuat.
       proof_url: waMediaSignedUrl(item.proof_key) || item.proof_url,
@@ -206,6 +206,32 @@ export async function GET(req: NextRequest) {
       drafts: draftItems.length,
     },
   });
+}
+
+/** Diskon promo gratis cover: satu item "Cover Thobe + Hanger" = Rp35.000. */
+const COVER_DISCOUNT = 35000;
+
+/**
+ * Samakan diskon draft dengan promo cover hanger. Dipakai saat draft dibuat, dibaca,
+ * diedit, dan disetujui supaya angka di layar = angka yang dibukukan.
+ * Diskon yang lebih besar dari promo (diisi admin) tidak diturunkan.
+ */
+function applyCoverDiscount(payload: any) {
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  const subtotal = items.reduce(
+    (sum: number, item: any) => sum + (Number(item?.price) || 0) * (Number(item?.quantity) || 0),
+    0,
+  );
+  const current = Math.max(0, Math.round(Number(payload?.discount) || 0));
+  const coverQty = items
+    .filter(
+      (item: any) =>
+        String(item?.product_id || "") === "cover-hanger" &&
+        /cover\s*thobe/i.test(String(item?.color || "")),
+    )
+    .reduce((sum: number, item: any) => sum + Math.max(1, Number(item?.quantity) || 1), 0);
+  const target = coverQty ? Math.min(COVER_DISCOUNT * coverQty, subtotal) : 0;
+  return { ...payload, discount: Math.min(Math.max(current, target), subtotal) };
 }
 
 async function makeAiReply(input: {
@@ -311,7 +337,7 @@ export async function POST(req: NextRequest) {
       closing_id: body?.closing_id ? String(body.closing_id) : null,
       customer_name: String(payload.customer_name || body?.customer_name || "").trim() || null,
       customer_whatsapp: String(payload.customer_whatsapp || body?.customer_whatsapp || "").trim() || null,
-      payload: await withFreeCoverHanger(admin, payload),
+      payload: applyCoverDiscount(await withFreeCoverHanger(admin, payload)),
       proof_key: proofKey,
       proof_url: proofKey ? waMediaSignedUrl(proofKey) : body?.proof_url ? String(body.proof_url) : null,
       ai_note: body?.ai_note ? String(body.ai_note) : null,
@@ -462,7 +488,7 @@ export async function POST(req: NextRequest) {
     };
     const { data, error } = await admin
       .from("order_drafts")
-      .update({ payload: nextPayload, updated_at: new Date().toISOString() })
+      .update({ payload: applyCoverDiscount(nextPayload), updated_at: new Date().toISOString() })
       .eq("id", id)
       .eq("status", "pending")
       .select()
@@ -501,7 +527,7 @@ export async function POST(req: NextRequest) {
     const txRes = await fetch(new URL("/api/ops/transaksi", req.url), {
       method: "POST",
       headers: { Authorization: token, "Content-Type": "application/json" },
-      body: JSON.stringify(draft.payload),
+      body: JSON.stringify(applyCoverDiscount(draft.payload)),
     });
     const txJson = await txRes.json().catch(() => null);
     if (!txRes.ok) return bad(txJson?.error || `Gagal membuat transaksi (${txRes.status})`);
