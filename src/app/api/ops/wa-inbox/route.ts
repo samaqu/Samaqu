@@ -46,15 +46,19 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // Nomor yang baru di-escalate ditahan 5 menit supaya admin sempat ambil alih.
+  // Lewat 5 menit bot mengambil alih lagi agar balasan tidak menggantung; nomor
+  // lain tidak terpengaruh sama sekali.
+  const holdSince = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
   const { data: escalations } = await admin
     .from("wa_escalations")
     .select("sender")
-    .in("status", ["open", "claimed"]);
+    .in("status", ["open", "claimed"])
+    .gte("created_at", holdSince);
   const blockedSenders = new Set((escalations || []).map((item) => String(item.sender)));
 
   const claimed: Record<string, unknown>[] = [];
   for (const row of rows || []) {
-    // Jangan klaim nomor yang sedang di-escalate/ditangani admin.
     if (blockedSenders.has(String(row.sender))) continue;
     const { data: updated } = await admin
       .from("wa_inbox")
