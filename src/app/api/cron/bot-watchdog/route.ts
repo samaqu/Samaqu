@@ -144,6 +144,12 @@ export async function GET(req: NextRequest) {
   const mode = String(control?.[0]?.mode || "auto");
   const heartbeat = control?.[0]?.heartbeat || null;
 
+  // Mode off = bot sengaja dimatikan (mis. shift admin). Jangan kirim alert "mati".
+  if (mode === "off") {
+    console.log("[WATCHDOG] mode off — tidak ada alert");
+    return NextResponse.json({ ok: true, mode, skipped: "mode off" });
+  }
+
   const runs = await academy<{ created_at: string }[]>(
     "wa_agent_runs?select=created_at&order=created_at.desc&limit=1",
   );

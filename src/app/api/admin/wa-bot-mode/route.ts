@@ -7,11 +7,12 @@ import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
  * - auto   : server minggir selama heartbeat lokal masih segar (< 3 menit).
  * - local  : paksa lokal; server tidak membalas.
  * - server : paksa server; lokal berhenti.
+ * - off    : kill switch; local & server sama-sama tidak membalas (pesan tetap masuk).
  *
  * Datanya di tabel Academy `wa_bot_control` (satu baris, id = 1).
  */
 
-const MODES = ["auto", "local", "server"] as const;
+const MODES = ["auto", "local", "server", "off"] as const;
 
 function academy() {
   const base = (process.env.ACADEMY_SUPABASE_URL || "").replace(/\/+$/, "");
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const mode = String(body?.mode || "");
   if (!MODES.includes(mode as (typeof MODES)[number])) {
-    return NextResponse.json({ error: "mode harus auto, local, atau server." }, { status: 400 });
+    return NextResponse.json({ error: "mode harus auto, local, server, atau off." }, { status: 400 });
   }
 
   const res = await fetch(`${cfg.base}/rest/v1/wa_bot_control?id=eq.1`, {

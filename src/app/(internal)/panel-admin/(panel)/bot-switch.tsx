@@ -15,6 +15,7 @@ const MODES = [
   { value: "auto", label: "Otomatis", desc: "Local selama aktif, server kalau local mati" },
   { value: "local", label: "Local saja", desc: "Server tidak membalas" },
   { value: "server", label: "Server saja", desc: "Bot local berhenti" },
+  { value: "off", label: "Mati total", desc: "Local & server berhenti membalas" },
 ] as const;
 
 export default function BotSwitchCard() {
@@ -77,13 +78,15 @@ export default function BotSwitchCard() {
   const heartbeatMs = heartbeat ? Date.parse(heartbeat) : 0;
   const localAlive = Number.isFinite(heartbeatMs) && Date.now() - heartbeatMs < 3 * 60 * 1000;
   const effective =
-    mode === "server"
-      ? "Server (MiMo)"
-      : mode === "local"
-        ? "Local (dipaksa)"
-        : localAlive
-          ? "Local (otomatis)"
-          : "Server (local tidak terdeteksi)";
+    mode === "off"
+      ? "Mati total"
+      : mode === "server"
+        ? "Server (MiMo)"
+        : mode === "local"
+          ? "Local (dipaksa)"
+          : localAlive
+            ? "Local (otomatis)"
+            : "Server (local tidak terdeteksi)";
   const heartbeatLabel = heartbeat
     ? `${Math.max(0, Math.round((Date.now() - heartbeatMs) / 1000))} detik lalu`
     : "belum pernah";
@@ -144,7 +147,9 @@ export default function BotSwitchCard() {
           <div style={{ padding: "0 18px 16px", fontSize: 12, color: error ? "#b3261e" : "#6b7785" }}>
             {error
               ? error
-              : `Heartbeat bot local: ${heartbeatLabel} · ${localAlive ? "terdeteksi aktif" : "tidak aktif"}`}
+              : mode === "off"
+                ? "Bot dimatikan. Pesan tetap masuk ke inbox, tapi tidak dibalas otomatis."
+                : `Heartbeat bot local: ${heartbeatLabel} · ${localAlive ? "terdeteksi aktif" : "tidak aktif"}`}
           </div>
         </>
       )}
