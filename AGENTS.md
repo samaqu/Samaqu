@@ -1785,3 +1785,27 @@ hari ini"). Jangan menulis ulang kalimatnya literal di satu layar — impor kons
 captionnya tidak lagi memuat periode/jumlah, `periodeKartu` + `formatTanggalID` di halaman
 Transaksi dihapus (tidak terpakai; `orders.length` tetap dipakai tab tahap, dan jumlah hariannya
 tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` bersih.
+
+## Modul Pengeluaran (menu Keuangan > Pengeluaran, `/ops/pengeluaran`)
+
+- **Migration `supabase/migrations/20261109_pengeluaran.sql`** membuat tabel baru `expense_items`
+  (master barang packing) + `expenses` (packing/operasional, `request_id` unik, total packing = qty ×
+  harga satuan). RLS aktif **tanpa policy** (hanya service role), index pada `tanggal` & `tipe`.
+  **Belum dijalankan** — jalankan manual di SQL Editor Supabase. Selama belum ada, halaman
+  menampilkan banner "Tabel pengeluaran belum dibuat…" (bukan tabel kosong) dan semua tulis gagal.
+- **API**: `src/app/api/ops/pengeluaran/route.ts` (GET daftar + ringkasan per tipe, POST, PATCH,
+  DELETE) dan `src/app/api/ops/pengeluaran/barang/route.ts` (GET/POST/PATCH master barang). Guard
+  `isOpsAdmin`, DB via `getSupabaseAdmin`, pesan error bahasa Indonesia. Helper bersama di
+  `src/lib/pengeluaran.ts` (`asText`/`asInt`/`asDateKey`, `readPengeluaranPeriod` = batas bulan WIB
+  dari `BIZ_OFFSET_MS`, `buildPengeluaranSummary`). Barang yang sudah dipakai **tidak** dihapus —
+  tidak ada endpoint DELETE untuk `expense_items`, cukup `PATCH { aktif: false }`.
+- **UI**: `src/app/(internal)/ops/pengeluaran/page.tsx` → `src/components/ops/pengeluaran/`
+  (`PengeluaranView`, `PengeluaranHeader`, `PengeluaranSummaryCards`, `PengeluaranTable`,
+  `ExpenseDrawer`, `BarangDrawer`, `fields.tsx`, `helpers.ts`, `types.ts`). Panggil API langsung
+  (bukan shim `ops-api`), React Query dengan `initialData` kosong seperti halaman ops lain.
+- Verifikasi (2026-11-08): `/ops/pengeluaran` = 200; dirender lewat **iframe same-origin** di preview
+  (`navigate()` gagal untuk route `/ops/*`): header + pemilih Bulan/Tahun, 3 kartu (0 / Rp 0), dua tab
+  (aktif biru solid), judul "Detail Pengeluaran …", tombol Kelola Barang (hanya packing) & Tambah,
+  banner migration, drawer form packing tampil (Tanggal/Barang/Qty/Harga Satuan/Total/Catatan),
+  0 error console, tanpa scroll samping. **Belum** terbukti dengan data nyata: simpan/ubah/hapus,
+  tabel detail, ringkasan, dan Kelola Barang harus diuji setelah migration dijalankan.
