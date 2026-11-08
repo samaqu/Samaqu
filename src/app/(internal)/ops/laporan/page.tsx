@@ -173,15 +173,25 @@ const dateTime = (value?: string | null) => {
   return d.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" });
 };
 
-/** Diskon gratis cover hanger pada satu pesanan (item Cover Thobe + Hanger). */
+/** Nilai gratis cover hanger pada satu pesanan: cover berharga 0 atau diskon yang menempel. */
 const fchDiscountOf = (row: any): number => {
   const items = Array.isArray(row?.items) ? row.items : [];
-  const hasCover = items.some(
+  const coverLines = items.filter(
     (item: any) =>
       String(item?.product_id || "") === "cover-hanger" &&
       /cover\s*thobe/i.test(String(item?.color || "")),
   );
-  return hasCover ? Number(row?.discount) || 0 : 0;
+  if (!coverLines.length) return 0;
+  const coverValue = coverLines.reduce(
+    (sum: number, item: any) =>
+      sum + Math.max(0, 35000 - (Number(item?.price) || 0)) * (Number(item?.quantity) || 1),
+    0,
+  );
+  const coverPrice = coverLines.reduce(
+    (sum: number, item: any) => sum + (Number(item?.price) || 0) * (Number(item?.quantity) || 1),
+    0,
+  );
+  return coverValue + Math.min(Number(row?.discount) || 0, coverPrice);
 };
 
 const dateOnly = (value?: string | null) => {
@@ -1400,13 +1410,24 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
             <div className="mt-2 space-y-2">
               {(row.items || []).map((item: any, index: number) => (
                 <div key={`${item.id || index}`} className="flex items-start justify-between gap-3 text-xs">
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-bold text-slate-800">{item.product_name}</p>
-                    <p className="text-slate-500">
-                      {[item.color && item.color !== "default" ? item.color : null, item.size, item.replacement_size ? `→ ${item.replacement_size}` : null]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {item.kain ? (
+                        <span className="rounded-full bg-[#e8f3fb] px-2 py-0.5 text-[10px] font-bold text-[#2f6f9e]">Kain {item.kain}</span>
+                      ) : null}
+                      {item.series ? (
+                        <span className="rounded-full bg-[#eef1f4] px-2 py-0.5 text-[10px] font-bold text-[#5b6f7c]">{item.series}</span>
+                      ) : null}
+                      {item.color && item.color !== "default" ? (
+                        <span className="rounded-full bg-[#e8f3fb] px-2 py-0.5 text-[10px] font-bold text-[#2f6f9e]">{item.color}</span>
+                      ) : null}
+                      {item.size || item.replacement_size ? (
+                        <span className="rounded-full bg-[#f2f4f6] px-2 py-0.5 text-[10px] font-bold text-[#62717c]">
+                          {[item.size, item.replacement_size ? `→ ${item.replacement_size}` : null].filter(Boolean).join(" ")}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                   <span className="shrink-0 font-bold text-slate-700">×{item.quantity ?? item.qty}</span>
                 </div>
