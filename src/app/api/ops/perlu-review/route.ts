@@ -136,21 +136,27 @@ export async function GET(req: NextRequest) {
       }),
     ),
   ];
-  // Draft dari AI tidak menyimpan `series`, padahal admin butuh series saat mereview.
-  // Lengkapi dari master produk saat dibaca supaya draft lama ikut tampil benar.
+  // Draft dari AI tidak menyimpan `series`/foto/kain, padahal admin butuh itu saat mereview.
+  // Lengkapi dari master produk saat dibaca supaya draft lama ikut tampil lengkap.
   const { data: draftProducts } = draftProductIds.length
-    ? await admin.from("products").select("id, series").in("id", draftProductIds)
-    : { data: [] as { id: string; series: string | null }[] };
-  const seriesById = new Map(
-    (draftProducts || []).map((row) => [String(row.id), row.series ?? null]),
-  );
+    ? await admin
+        .from("products")
+        .select("id, series, image, jenis_kain(name)")
+        .in("id", draftProductIds)
+    : { data: [] as any[] };
+  const productById = new Map((draftProducts || []).map((row: any) => [String(row.id), row]));
   const draftItems = (drafts || []).map((item) => {
     const payload = item.payload && typeof item.payload === "object" ? item.payload : {};
     const rows = Array.isArray(payload.items)
-      ? payload.items.map((row: any) => ({
-          ...row,
-          series: row?.series ?? seriesById.get(String(row?.product_id || "")) ?? null,
-        }))
+      ? payload.items.map((row: any) => {
+          const product = productById.get(String(row?.product_id || ""));
+          return {
+            ...row,
+            series: row?.series ?? product?.series ?? null,
+            image: row?.image ?? product?.image ?? null,
+            kain: row?.kain ?? product?.jenis_kain?.name ?? null,
+          };
+        })
       : payload.items;
     return {
       ...item,
