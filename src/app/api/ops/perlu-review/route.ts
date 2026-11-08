@@ -341,16 +341,29 @@ export async function POST(req: NextRequest) {
         item,
       ]),
     );
+    // Produk yang warnanya menempel di nama ("Thobe Mint Karim") hanya punya varian
+    // "default". Warna kiriman draft AI ("Mint") dipetakan ke "default" supaya tidak
+    // ditolak saat draft disimpan/disetujui.
+    const variantColors = new Map<string, Set<string>>();
+    for (const item of variants || []) {
+      const pid = String(item.product_id);
+      if (!variantColors.has(pid)) variantColors.set(pid, new Set());
+      variantColors.get(pid)!.add(String(item.color || "default"));
+    }
 
     const normalized = [];
     for (const item of items) {
       const productId = String(item?.product_id || "").trim();
       const size = String(item?.size || "").trim().toUpperCase();
-      const color = String(item?.color || "default").trim() || "default";
+      let color = String(item?.color || "default").trim() || "default";
       const product = productMap.get(productId);
       if (!product || !size) return bad(`Produk ${productId || "(kosong)"} tidak valid.`);
       if (!variantMap.has(variantKey(productId, color, size))) {
-        return bad(`Ukuran ${size} untuk ${product.name} tidak tersedia.`);
+        const colors = variantColors.get(productId);
+        if (colors?.size === 1 && colors.has("default")) color = "default";
+        if (!variantMap.has(variantKey(productId, color, size))) {
+          return bad(`Ukuran ${size} untuk ${product.name} tidak tersedia.`);
+        }
       }
       const quantity = Math.max(1, Math.min(99, Number(item?.quantity) || 1));
       const override = Number(variantMap.get(variantKey(productId, color, size))?.price_override);

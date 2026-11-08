@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isPaketItem, variantName } from "@/lib/item-label";
 
 type Draft = {
   id: string;
@@ -224,8 +225,14 @@ export default function DraftEditor({
   }
 
   function itemVariant(item: Item) {
-    return variants.find(
+    const exact = variants.find(
       (entry) => entry.product_id === item.product_id && (entry.color || "default") === item.color,
+    );
+    if (exact) return exact;
+    // Warna produk bisa menempel di nama ("Thobe Mint Karim") sementara baris variannya
+    // berwarna "default". Pakai varian default supaya stok & ukuran tetap terbaca.
+    return variants.find(
+      (entry) => entry.product_id === item.product_id && (entry.color || "default") === "default",
     );
   }
 
@@ -423,6 +430,16 @@ export default function DraftEditor({
               const variant = itemVariant(item);
               const sizes = sizesOf(variant);
               const stock = stockOf(variant, item.size);
+              // Kategori paket (Cover & Hanger / Kabak): nama produk generik, jadi nama
+              // varian yang dipilih ikut tampil di judul (mis. "Cover & Hanger - Cover Thobe + Hanger").
+              const paketVariant = isPaketItem({ size: item.size }) ? variantName(item.color) : "";
+              const itemTitle = paketVariant
+                ? paketVariant.toLowerCase().startsWith(item.product_name.toLowerCase())
+                  ? paketVariant
+                  : item.product_name.toLowerCase().includes(paketVariant.toLowerCase())
+                    ? item.product_name
+                    : `${item.product_name} - ${paketVariant}`
+                : item.product_name;
               return (
                 <div key={`${item.product_id}-${item.color}-${item.size}-${index}`} className="rounded-2xl border p-3.5" style={{ borderColor: "#e3ebf1", background: "#fff" }}>
                   <div className="flex items-start gap-3">

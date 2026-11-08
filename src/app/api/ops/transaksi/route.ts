@@ -209,13 +209,28 @@ async function buildSnapshot(admin: Admin, input: ItemInput[]): Promise<{ items?
 
   const productById = new Map<string, any>((products || []).map((p: any) => [p.id, p]));
   const variantSet = new Set((variants || []).map((v: any) => `${v.product_id}||${v.color}||${String(v.size).toUpperCase()}`));
+  // Produk yang menyebut warnanya di NAMA (mis. "Thobe Mint Karim") hanya punya satu baris
+  // varian berwarna "default". Draft AI kadang mengirim warna dari nama produk ("Mint"),
+  // jadi warna itu dipetakan ke "default" alih-alih ditolak. Produk yang benar-benar punya
+  // beberapa warna tidak ikut dipetakan.
+  const variantColors = new Map<string, Set<string>>();
+  for (const v of variants || []) {
+    const id = String((v as any).product_id);
+    if (!variantColors.has(id)) variantColors.set(id, new Set());
+    variantColors.get(id)!.add(String((v as any).color || "default"));
+  }
 
   const items: Snapshot[] = [];
   for (const row of cleaned) {
     const product = productById.get(row.product_id);
     if (!product) return { error: `Produk tidak ditemukan (${row.product_id})` };
     if (!variantSet.has(`${row.product_id}||${row.color}||${row.size}`)) {
-      return { error: `Ukuran ${row.size} tidak tersedia untuk ${product.name}` };
+      const colors = variantColors.get(row.product_id);
+      if (colors?.size === 1 && colors.has("default") && variantSet.has(`${row.product_id}||default||${row.size}`)) {
+        row.color = "default";
+      } else {
+        return { error: `Ukuran ${row.size} tidak tersedia untuk ${product.name}` };
+      }
     }
 
     // Harga katalog dari database sebagai default; harga manual hanya dipakai kalau dikirim
