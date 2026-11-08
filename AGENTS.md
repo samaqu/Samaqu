@@ -1826,6 +1826,20 @@ tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` b
   tile `border-white/15 bg-white/[0.06]`); tab aktif (dengan ikon), tombol Tambah, dan tombol simpan
   di kedua drawer memakai `#18181b` (hover `black`); header tabel juga `#18181b`. Jangan
   mengembalikan `bg-blue-600`/`text-blue-*` di folder `src/components/ops/pengeluaran/`.
+- **Laporan Keuangan membaca modul ini (2026-11-08)**: `/api/ops/laporan` menjumlah `expenses`
+  periode itu (kolom `tanggal`, inklusif) → `biayaPacking` + `biayaOperasional`, lalu
+  `biaya = packing + operasional + mayarFee`. Sebelumnya `EXPENSES_AVAILABLE = false` membuat
+  "Biaya" hanya berisi fee Mayar, jadi laba terlalu besar. Kalau tabel `expenses` belum ada,
+  balasannya `expensesAvailable:false` → biaya TIDAK dianggap Rp0 (kartu "—" dan laba "belum final").
+  Kartu atas `/ops/laporan` sekarang satu kontainer grafit (`#111113 → #2d2d33`) berisi 4 tile
+  **Total Omset / Total HPP / Total Biaya / Laba Bersih** (label, nilai, keterangan, ikon bulat di
+  kanan) — semuanya membaca `summary` API yang sama, jangan menghitung ulang di klien. `Total Biaya`
+  = operasional + packing + Mayar; baris "Biaya Operasional & Packing" di rincian memakai
+  `biayaOperasional + biayaPacking` (dulu `biaya` yang sudah termasuk Mayar → dobel dengan baris
+  Mayar). **`products.hpp` masih 0 untuk semua 120 produk** (dicek 2026-11-08), jadi `hppStatus`
+  = `missing` dan Total HPP / Laba tampil "—" sampai kolom HPP diisi di katalog — itu disengaja,
+  jangan mengganti 0 jadi "modal diketahui". Tombol **Export PDF** memakai `window.print()`
+  (dialog print browser → Save as PDF), bukan generator PDF baru.
 - Verifikasi (2026-11-08): `/ops/pengeluaran` = 200; dirender lewat **iframe same-origin** di preview
   (`navigate()` gagal untuk route `/ops/*`): header + pemilih Bulan/Tahun, 3 kartu (0 / Rp 0), dua tab
   (aktif hitam grafit), judul "Detail Pengeluaran …", tombol Kelola Barang (hanya packing) & Tambah,

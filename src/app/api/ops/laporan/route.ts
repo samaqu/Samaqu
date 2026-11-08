@@ -27,11 +27,11 @@ import { loadMayarFees } from "@/lib/mayar-fees";
 const DAY_MS = 86_400_000;
 
 /**
- * Modul Pengeluaran (biaya operasional) belum ada di aplikasi — sidebar masih "SOON".
- * Selama belum ada sumber datanya, biaya TIDAK boleh dianggap Rp0; laporan harus
- * menandainya "belum tersedia" supaya laba tidak terlihat lebih besar dari kenyataan.
+ * Biaya operasional & packing dibaca dari tabel `expenses` (menu Keuangan > Pengeluaran).
+ * Kalau migration belum dijalankan tabelnya belum ada, dan biaya TIDAK boleh dianggap Rp0:
+ * laporan menandainya "belum tersedia" supaya laba tidak terlihat lebih besar dari kenyataan.
  */
-const EXPENSES_AVAILABLE = false;
+const EXPENSES_MISSING_CODES = ["42P01", "PGRST205"];
 
 function todayWibKey() {
   return new Date(Date.now() + BIZ_OFFSET_MS).toISOString().slice(0, 10);
@@ -216,7 +216,7 @@ async function loadPeriod(
   const startIso = startOfDayIso(from);
   const endIso = startOfDayIso(addDaysKey(to, 1));
 
-  const [ordersRes, returnsCreatedRes, refundsRes, exchangesRes] = await Promise.all([
+  const [ordersRes, returnsCreatedRes, refundsRes, exchangesRes, expensesRes] = await Promise.all([
     admin
       .from("orders")
       .select("id, order_number, customer_name, customer_whatsapp, created_at, total, discount, subtotal, shipping_cost, shipping_address, shipping_city, shipping_kecamatan, shipping_province, shipping_postal_code, shipping_method, awb_no, weight, status, shipping_status, tracking_status_text, tracking_city, tracking_updated_at, source, payment_method, payment_provider, payment_channel, payment_ref, paid_at")
@@ -247,11 +247,25 @@ async function loadPeriod(
       .gte("price_difference_settled_at", startIso)
       .lt("price_difference_settled_at", endIso)
       .limit(1000),
+    // Biaya operasional & packing (menu Pengeluaran) — basis kolom `tanggal` (date), inklusif.
+    admin.from("expenses").select("tipe, jumlah").gte("tanggal", from).lte("tanggal", to).limit(5000),
   ]);
 
   for (const res of [ordersRes, returnsCreatedRes, refundsRes, exchangesRes]) {
     if (res.error) throw new Error(res.error.message);
   }
+
+  // Tabel `expenses` belum ada (migration belum dijalankan) → biaya tidak boleh dianggap Rp0.
+  const expensesErrorCode = String((expensesRes.error as { code?: string } | null)?.code || "");
+  const expensesErrorMessage = String((expensesRes.error as { message?: string } | null)?.message || "");
+  const expensesAvailable =
+    !expensesRes.error ||
+    !(
+      EXPENSES_MISSING_CODES.includes(expensesErrorCode) ||
+      /could not find the table|relation .* does not exist/i.test(expensesErrorMessage)
+    );
+  if (expensesRes.error && expensesAvailable) throw new Error(expensesErrorMessage);
+  const expenseRows = (expensesRes.data || []) as Array<{ tipe?: string | null; jumlah?: number | null }>;
 
   const orders = (ordersRes.data || []) as OrderRow[];
   const returnsCreated = (returnsCreatedRes.data || []) as ReturnRow[];
@@ -415,13 +429,23 @@ async function loadPeriod(
     }
   }
 
-  const biayaOperasional = 0;
-  const biaya = biayaOperasional + mayarFee;
-  /**
-   * Biaya dianggap lengkap hanya bila data operasional tersedia DAN seluruh transaksi Mayar
-   * periode ini sudah cair. Kalau tidak, laba masih bisa bertambah turun setelah dana cair.
+  /*
+   * ── Biaya operasional & packing dari menu Pengeluaran ──
+   * Basis `expenses.tanggal` (tanggal pengeluaran), sama dengan halaman Pengeluaran.
+   * Mayar tetap dipisah sebagai biaya transaksi; Total Biaya = packing + operasional + Mayar.
    */
-  const biayaAvailable = EXPENSES_AVAILABLE && mayarPendingCount === 0;
+  const biayaPacking = expenseRows
+    .filter((row) => row.tipe === "packing")
+    .reduce((sum, row) => sum + (Number(row.jumlah) || 0), 0);
+  const biayaOperasional = expenseRows
+    .filter((row) => row.tipe === "operasional")
+    .reduce((sum, row) => sum + (Number(row.jumlah) || 0), 0);
+  const biaya = biayaPacking + biayaOperasional + mayarFee;
+  /**
+   * Biaya dianggap lengkap hanya bila tabel pengeluaran terbaca DAN seluruh transaksi Mayar
+   * periode ini sudah cair. Kalau tidak, laba masih bisa turun setelah biaya menyusul.
+   */
+  const biayaAvailable = expensesAvailable && mayarPendingCount === 0;
 
   /**
    * Laba hanya boleh disebut final kalau modal DAN biaya lengkap.
@@ -447,7 +471,7 @@ async function loadPeriod(
         ? `${hppNote} Estimasi laba belum dapat dihitung.`
         : mayarPendingCount > 0
           ? `${mayarPendingCount} transaksi Mayar belum cair — biayanya belum dipotong, jadi laba masih bisa turun setelah dana masuk.`
-          : "Data biaya operasional belum tersedia; estimasi laba belum final.";
+          : "Tabel pengeluaran belum tersedia; biaya operasional & packing belum ikut dihitung, jadi laba belum final.";
 
   const pendingReturns = returnsCreated.filter(
     (row) =>
@@ -484,10 +508,12 @@ async function loadPeriod(
     exchangeTotal,
     net,
     biaya,
-    /** Rincian biaya: Mayar dipisah dari operasional supaya sumbernya jelas. */
+    /** Rincian biaya: packing/operasional/Mayar dipisah supaya sumbernya jelas. */
     mayarFee,
     mayarPendingCount,
+    biayaPacking,
     biayaOperasional,
+    expensesAvailable,
     biayaAvailable,
     hppStatus,
     hppNote,
@@ -777,13 +803,15 @@ export async function GET(req: NextRequest) {
         /* Rincian biaya — WAJIB ikut dikirim; tanpa ini kartu "Biaya Mayar" selalu Rp 0. */
         mayarFee: current.mayarFee,
         mayarPendingCount: current.mayarPendingCount,
+        biayaPacking: current.biayaPacking,
         biayaOperasional: current.biayaOperasional,
+        expensesAvailable: current.expensesAvailable,
         profitStatus: current.profitStatus,
         profitNote: current.profitNote,
         transactions: current.transactions,
         aov: current.aov,
         hppReversal: false,
-        biayaNote: "Modul Pengeluaran belum tersedia",
+        biayaNote: current.expensesAvailable ? "" : "Tabel pengeluaran belum tersedia",
       },
       previous: {
         gross: previous.gross,

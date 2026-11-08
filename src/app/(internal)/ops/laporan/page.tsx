@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
+  Download,
   RefreshCw,
   Search,
   Store,
@@ -29,7 +30,6 @@ import {
   YAxis,
 } from "recharts";
 import { statusLabel, orderSourceLabel } from "@/lib/transaksi";
-import GlassCard from "@/components/ops/GlassCard";
 import BestSellerSection from "@/components/ops/BestSellerSection";
 
 /**
@@ -40,8 +40,7 @@ const IconReport: any = (LucideIcons as any).BarChart3 ?? (LucideIcons as any).C
 const IconWallet: any =
   (LucideIcons as any).Wallet ?? (LucideIcons as any).WalletMinimal ?? (LucideIcons as any).Banknote;
 const IconPackage: any = (LucideIcons as any).Package;
-const IconReceipt: any = (LucideIcons as any).Receipt ?? (LucideIcons as any).FileText;
-const IconReturn: any = (LucideIcons as any).Undo2 ?? (LucideIcons as any).RotateCcw ?? (LucideIcons as any).Receipt;
+const IconOmset: any = (LucideIcons as any).DollarSign ?? (LucideIcons as any).Coins ?? (LucideIcons as any).Banknote;
 const IconProfit: any = (LucideIcons as any).TrendingUp ?? (LucideIcons as any).LineChart;
 
 /* ───────────────────────── types ───────────────────────── */
@@ -85,6 +84,9 @@ type Summary = {
   /** Jumlah transaksi Mayar yang sudah dibayar tapi belum cair (biayanya belum terpotong). */
   mayarPendingCount?: number;
   biayaOperasional?: number;
+  biayaPacking?: number;
+  /** false = tabel pengeluaran belum ada / belum terbaca. */
+  expensesAvailable?: boolean;
   profitStatus: ProfitStatus;
   profitNote: string;
 };
@@ -312,6 +314,56 @@ function MayarSummaryCard({
   );
 }
 
+/**
+ * Tile metrik kartu Laporan Keuangan — mengikuti referensi desain (label, nilai besar,
+ * keterangan, ikon bulat di kanan) dengan palet monokrom SAMAQU: kontainer grafit gelap,
+ * tile lebih terang, teks putih. Angka tetap dari API laporan (satu sumber hitungan).
+ */
+function ReportMetric({
+  icon: Icon,
+  label,
+  value,
+  caption,
+  title,
+  badge,
+  muted,
+}: {
+  icon: any;
+  label: string;
+  value: string;
+  caption: string;
+  title?: string;
+  badge?: { label: string; cls: string };
+  muted?: boolean;
+}) {
+  return (
+    <div
+      className={`relative flex flex-col rounded-2xl border border-white/10 bg-white/[0.06] p-4 ${muted ? "opacity-75" : ""}`}
+      title={title}
+    >
+      <span className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-white/50">{label}</span>
+      <p
+        className={`mt-2 whitespace-nowrap text-[clamp(1.05rem,1.6vw,1.45rem)] font-black leading-tight tabular-nums ${
+          muted ? "text-white/45" : "text-white"
+        }`}
+      >
+        {value}
+      </p>
+      <div className="mt-1 flex min-h-[30px] flex-wrap items-center gap-1.5 pr-9">
+        {badge ? (
+          <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black tracking-wider ${badge.cls}`}>
+            {badge.label}
+          </span>
+        ) : null}
+        <span className="text-[11px] font-semibold leading-snug text-white/45">{caption}</span>
+      </div>
+      <span className="absolute bottom-4 right-4 grid h-8 w-8 place-items-center rounded-full border border-white/20 text-white/60">
+        <Icon size={15} strokeWidth={1.8} />
+      </span>
+    </div>
+  );
+}
+
 async function fetchReport(month: string): Promise<ReportData> {
   const { supabase } = await import("@/lib/supabase");
   const { data } = await supabase.auth.getSession();
@@ -422,8 +474,6 @@ export default function LaporanKeuanganPage() {
       : s.profitStatus === "partial"
         ? { label: "BELUM FINAL", cls: "bg-amber-50 text-amber-700 border-amber-100" }
         : { label: "BELUM TERSEDIA", cls: "bg-slate-50 text-slate-500 border-slate-200" };
-  const profitTone =
-    s.profitStatus === "valid" ? (profitPositive ? "text-emerald-600" : "text-red-600") : "text-slate-400";
   const seriesOptions = [
     { key: "gross", label: "Penjualan", color: "#94A3B8" },
     { key: "net", label: "Setelah Retur", color: "#2563EB" },
@@ -432,36 +482,53 @@ export default function LaporanKeuanganPage() {
 
   return (
     <div className="space-y-5 bg-[#F9FAFB]">
-      {/* HEADER + KPI */}
-      <section className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8">
+      {/* HEADER + KPI — satu kartu laporan ala referensi, palet monokrom SAMAQU */}
+      <section className="overflow-hidden rounded-3xl border border-black/10 bg-gradient-to-br from-[#111113] to-[#2d2d33] p-5 shadow-sm md:p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center border border-slate-200 shrink-0">
-              <IconReport size={26} className="text-slate-900" />
-            </div>
+          <div className="flex items-start gap-3.5">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/[0.06] text-white">
+              <IconReport size={24} />
+            </span>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900">Laporan Keuangan</h1>
-              <p className="text-slate-500 font-medium mt-1">
-                Pantau penjualan, retur, biaya, dan estimasi laba SAMAQU.
-              </p>
+              <h1 className="text-2xl font-black tracking-tight text-white md:text-[28px]">Laporan Keuangan</h1>
+              <p className="mt-1 text-sm font-medium text-white/55">Analisis performa bisnis secara mendalam</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {isFetching ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 border border-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-500">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[11px] font-bold text-white/60">
                 <RefreshCw size={12} className="animate-spin" /> Memperbarui…
               </span>
             ) : null}
             <Link
               href="/ops"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
+              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3.5 py-2 text-xs font-bold text-white/80 transition-colors hover:bg-white/10"
             >
-              <ChevronLeft size={16} /> Dashboard
+              <ChevronLeft size={15} /> Dashboard
             </Link>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-[#111113] transition-colors hover:bg-white/90"
+            >
+              <Download size={14} /> Export PDF
+            </button>
+            <select
+              value={month}
+              onChange={(event) => setMonth(event.target.value)}
+              aria-label="Pilih bulan laporan"
+              className="rounded-full border border-white/15 bg-white/[0.08] px-3.5 py-2 text-xs font-bold text-white outline-none [&>option]:text-slate-900"
+            >
+              {monthOptions.map((value) => (
+                <option key={value} value={value}>
+                  {monthLabel(value)}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[11px] font-semibold text-white/45">
           {[
             { key: thisMonth, label: "Bulan Ini" },
             { key: shiftMonth(thisMonth, -1), label: "Bulan Lalu" },
@@ -470,107 +537,81 @@ export default function LaporanKeuanganPage() {
               key={item.key}
               type="button"
               onClick={() => setMonth(item.key)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-bold transition-colors ${
+              className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
                 month === item.key
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  ? "border-white bg-white text-[#111113]"
+                  : "border-white/15 bg-white/[0.06] text-white/65 hover:bg-white/10"
               }`}
             >
               {item.label}
             </button>
           ))}
-          <select
-            value={month}
-            onChange={(event) => setMonth(event.target.value)}
-            aria-label="Pilih bulan laporan"
-            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 outline-none"
-          >
-            {monthOptions.map((value) => (
-              <option key={value} value={value}>
-                {monthLabel(value)}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
-          <span className="rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-1.5 text-slate-700">{data.period.label}</span>
+          <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-white/70">{data.period.label}</span>
           <span>·</span>
           <span>{data.period.days} hari</span>
           <span>·</span>
           <span>dibanding {data.period.previous.label}</span>
+          <span>·</span>
+          <span>{s.transactions} transaksi</span>
+          <span>·</span>
+          <span>rata-rata {rp(s.aov)}/transaksi</span>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <GlassCard
-            icon={IconWallet}
-            label="Total Penjualan"
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <ReportMetric
+            icon={IconOmset}
+            label="Total Omset"
             value={rp(s.gross)}
-            caption="Nilai transaksi diakui, bukan uang masuk."
+            caption="Pendapatan kotor · tanpa ongkir"
+            title="Nilai transaksi yang diakui (diproses/dikirim/selesai) di luar ongkir."
           />
-          <GlassCard
-            icon={IconReturn}
-            label="Retur"
-            value={`− ${rp(s.refunds)}`}
-            tone="negative"
-            caption="Retur/refund yang sudah diselesaikan."
-          />
-          <GlassCard
-            icon={IconReport}
-            label="Penjualan Setelah Retur"
-            value={rp(s.net)}
-            caption="Setelah retur & penyesuaian tukar size."
-          />
-          <GlassCard
+          <ReportMetric
             icon={IconPackage}
-            label="Modal Barang Terjual"
-            value={s.hppStatus === "complete" ? rp(s.hpp) : "—"}
-            tone={s.hppStatus === "complete" ? "default" : "muted"}
-            caption={s.hppStatus === "complete" ? "Modal dari barang yang terjual." : s.hppNote}
+            label="Total HPP"
+            value={s.hppStatus === "missing" ? "—" : rp(s.hpp)}
+            caption={s.hppStatus === "complete" ? "Modal produk terjual" : s.hppNote || "Modal belum lengkap"}
+            muted={s.hppStatus !== "complete"}
+            title={s.hppNote || undefined}
           />
-          <GlassCard
-            icon={IconReceipt}
-            label="Biaya Mayar"
-            value={rp(s.mayarFee || 0)}
-            tone={s.mayarFee ? "default" : "muted"}
+          <ReportMetric
+            icon={IconWallet}
+            label="Total Biaya"
+            value={s.expensesAvailable === false ? "—" : rp(s.biaya)}
             caption={
-              s.mayarPendingCount
-                ? `${s.mayarPendingCount} transaksi belum cair — biaya belum terpotong.`
-                : "Potongan transaksi Mayar yang sudah cair."
+              s.expensesAvailable === false
+                ? "Tabel pengeluaran belum tersedia"
+                : s.mayarPendingCount
+                  ? "Operasional, packing & Mayar (sebagian)"
+                  : "Operasional, packing & Mayar"
             }
+            muted={!s.biayaAvailable}
+            title={`Operasional ${rp(s.biayaOperasional || 0)} · Packing ${rp(
+              s.biayaPacking || 0,
+            )} · Mayar ${rp(s.mayarFee || 0)}`}
           />
-          <div
-            className="relative bg-white border border-slate-200 rounded-2xl p-5 flex flex-col"
-            title={s.profitNote || undefined}
-          >
-            <span
-              className={`absolute top-3 right-3 px-2 py-0.5 rounded-md text-[10px] font-black tracking-wider border ${profitBadge.cls}`}
-            >
-              {profitBadge.label}
-            </span>
-            <div className="flex items-center gap-2 text-slate-500 min-h-[20px] pr-24">
-              <IconProfit size={16} className="shrink-0" />
-              <span className="text-[11px] font-bold uppercase tracking-wider truncate">Estimasi Laba</span>
-            </div>
-            <p
-              className={`font-black mt-3 whitespace-nowrap leading-tight text-[clamp(1.05rem,1.5vw,1.75rem)] ${profitTone}`}
-            >
-              {s.profit !== null ? rp(s.profit) : "—"}
-            </p>
-            <p className="text-slate-500 text-xs mt-auto pt-1.5">
-              {s.profitStatus === "valid"
-                ? "Penjualan setelah retur − modal − biaya."
+          <ReportMetric
+            icon={IconProfit}
+            label="Laba Bersih"
+            value={s.profit !== null ? rp(s.profit) : "—"}
+            caption={
+              s.profitStatus === "valid"
+                ? "Keuntungan bersih"
                 : s.profitStatus === "partial"
-                  ? "Belum termasuk biaya operasional."
-                  : "Belum dapat dihitung."}
-            </p>
-          </div>
+                  ? "Belum termasuk seluruh biaya"
+                  : "Belum dapat dihitung"
+            }
+            badge={profitBadge}
+            muted={s.profitStatus !== "valid"}
+            title={s.profitNote || undefined}
+          />
         </div>
 
         {s.profitStatus !== "valid" ? (
           <p
-            className={`mt-3 flex items-start gap-1.5 rounded-xl px-3 py-2 text-[11px] font-semibold ${
-              s.profitStatus === "partial" ? "bg-amber-50 text-amber-700" : "bg-slate-50 text-slate-600"
+            className={`mt-3 flex items-start gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-semibold ${
+              s.profitStatus === "partial"
+                ? "border-amber-400/25 bg-amber-400/10 text-amber-200"
+                : "border-white/10 bg-white/[0.06] text-white/60"
             }`}
           >
             <AlertTriangle size={13} className="mt-px shrink-0" />
@@ -578,25 +619,21 @@ export default function LaporanKeuanganPage() {
           </p>
         ) : null}
 
-        <p className="mt-2 text-[11px] font-semibold text-slate-400">
-          Angka penjualan adalah nilai transaksi yang diakui (diproses/dikirim/selesai), bukan uang yang sudah
-          diterima. Pesanan COD atau yang belum dibayar tetap tercatat sebagai penjualan.
+        <p className="mt-3 text-[11px] font-medium leading-relaxed text-white/45">
+          Omset = nilai transaksi diakui (tanpa ongkir) · Penjualan bersih <b className="text-white/75">{rp(s.net)}</b>{" "}
+          setelah retur {rp(s.refunds)} & tukar size {rpSigned(s.exchange)} · Biaya = operasional + packing + biaya Mayar
+          · Laba bersih = penjualan bersih − HPP − biaya.
         </p>
 
-        <p className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold text-slate-400">
-          <span>
-            Penjualan Setelah Retur <b className="text-slate-700">{rp(s.net)}</b>
-          </span>
+        <p className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold text-white/40">
           <span className="inline-flex items-center gap-1">
-            <span className={data.deltas.net !== null && data.deltas.net < 0 ? "text-red-600" : "text-emerald-600"}>
+            <span className={data.deltas.net !== null && data.deltas.net < 0 ? "text-red-300" : "text-emerald-300"}>
               {data.deltas.net === null
                 ? "Baru"
                 : `${data.deltas.net >= 0 ? "+" : "−"}${Math.abs(data.deltas.net).toLocaleString("id-ID", { maximumFractionDigits: 1 })}%`}
             </span>
-            <span className="text-slate-400">vs periode sebelumnya</span>
+            <span className="text-white/40">penjualan bersih vs periode sebelumnya</span>
           </span>
-          <span>· {s.transactions} transaksi</span>
-          <span>· rata-rata {rp(s.aov)}/transaksi</span>
           <span>· margin {s.margin !== null ? `${s.margin}%` : "—"}</span>
         </p>
       </section>
@@ -640,11 +677,13 @@ export default function LaporanKeuanganPage() {
               caption={s.hppStatus === "complete" ? undefined : s.hppNote}
             />
             <BreakdownRow
-              label="Biaya Operasional"
-              value={s.biayaAvailable ? `− ${rp(s.biaya)}` : "Belum tersedia"}
-              tone={s.biayaAvailable ? "red" : "muted"}
-              hint="Biaya operasional yang tercatat di sistem."
-              caption={s.biayaAvailable ? undefined : "Data biaya operasional belum tersedia."}
+              label="Biaya Operasional & Packing"
+              value={s.expensesAvailable === false ? "Belum tersedia" : `− ${rp((s.biayaOperasional || 0) + (s.biayaPacking || 0))}`}
+              tone={s.expensesAvailable === false ? "muted" : "red"}
+              hint={`Pengeluaran operasional ${rp(s.biayaOperasional || 0)} dan packing ${rp(
+                s.biayaPacking || 0,
+              )} yang tercatat di menu Pengeluaran.`}
+              caption={s.expensesAvailable === false ? "Tabel pengeluaran belum tersedia." : undefined}
             />
             {/* Biaya Mayar dipisah: ini biaya transaksi nyata dari penyedia pembayaran. */}
             <BreakdownRow
