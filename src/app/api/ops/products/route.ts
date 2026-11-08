@@ -162,7 +162,12 @@ async function withTotals(admin: ReturnType<typeof getSupabaseAdmin>, products: 
         photoMap.get(p.id) ||
         (typeof p.image === "string" && p.image && !isVideoUrl(p.image) ? p.image : null),
       // Video pertama produk (untuk kirim video lewat WA); null kalau tidak ada.
-      video: videoMap.get(p.id) || (typeof p.image === "string" && isVideoUrl(p.image) ? p.image : null),
+      video:
+        videoMap.get(p.id) ||
+        (Array.isArray(p.images)
+          ? (p.images as string[]).find((url) => isVideoUrl(String(url))) || null
+          : null) ||
+        (typeof p.image === "string" && isVideoUrl(p.image) ? p.image : null),
       // Penanda "tampil di website" (kolom `products.is_published`, default true).
       is_published: p.is_published !== false,
     };
