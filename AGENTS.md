@@ -1337,6 +1337,10 @@ Cover & Hanger)", jadi satu produk pecah jadi beberapa baris dan totalnya cuma j
 
 Satu modul agregasi: **`src/lib/best-sellers.ts`**
 - produk induk = `products.category::products.name` (fallback: nama dibersihkan dari kain/size/cover);
+- mode **series** mengirim `products.name` apa adanya + kolom `series` terpisah; UI
+  (`BestSellerSection`) merendernya sebagai **badge series** di samping nama. Jangan menempelkan
+  series ke `name` lagi ("Thobe — Imalah") seperti sebelumnya — kolom nama di 920 px memotong
+  ujung baris, jadi seri seperti Imron/Jiharkah tidak terbaca;
 - unit & omzet dari SEMUA item pesanan sah `SALE_STATUSES` (bukan top-N), jadi `totals.units` harus
   sama dengan jumlah `quantity` mentah di periode itu — itu cara termudah memeriksanya;
 - breakdown per ukuran dan per kain/opsi disimpan untuk baris yang di-expand.
