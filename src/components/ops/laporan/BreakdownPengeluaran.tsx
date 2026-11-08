@@ -23,6 +23,8 @@ const COGS_PAGE_SIZE = 5;
 export type CogsRow = {
   id: string;
   name: string;
+  /** Series produk (`order_items.series`); kosong untuk produk tanpa series. */
+  series?: string;
   /** Varian (kain · warna · ukuran) — pengganti kode SKU yang tidak ada di order_items. */
   variant: string;
   qty: number;
@@ -195,6 +197,7 @@ function DetailLabel({ children }: { children: ReactNode }) {
 
 function LineRow({
   name,
+  series,
   variant,
   qty,
   amount,
@@ -202,6 +205,8 @@ function LineRow({
   note,
 }: {
   name: string;
+  /** Nama series produk — ditampilkan sebagai badge tersendiri, bukan di dalam varian. */
+  series?: string | null;
   variant?: string | null;
   qty?: number | null;
   amount: string;
@@ -213,6 +218,11 @@ function LineRow({
       <span className="h-1 w-1 shrink-0 rounded-full bg-zinc-400" />
       <span className="min-w-0 flex-1 break-words font-semibold text-zinc-800">
         {name}
+        {series ? (
+          <span className="ml-1.5 inline-flex shrink-0 rounded-full border border-[#E4E4E7] bg-white px-1.5 py-0.5 align-middle text-[9.5px] font-bold text-zinc-600">
+            {series}
+          </span>
+        ) : null}
         {variant ? <span className="ml-1 font-medium text-zinc-400">({variant})</span> : null}
         {note ? <span className="ml-1 font-medium text-zinc-400">· {note}</span> : null}
       </span>
@@ -280,6 +290,7 @@ export default function BreakdownPengeluaran({
                 <LineRow
                   key={row.id}
                   name={row.name}
+                  series={row.series}
                   variant={row.variant || "tanpa varian"}
                   qty={row.qty}
                   amount={row.hpp > 0 ? rp(row.hpp) : "—"}

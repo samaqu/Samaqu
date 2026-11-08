@@ -452,11 +452,6 @@ export default function BestSellerSection() {
                             <span className="truncate text-sm font-bold text-[#374151]" title={row.name}>
                               {row.name}
                             </span>
-                            {row.series ? (
-                              <span className="shrink-0 rounded-full border border-[#E4E4E7] bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600">
-                                {row.series}
-                              </span>
-                            ) : null}
                             {row.fallback ? (
                               <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700">
                                 Fallback

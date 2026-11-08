@@ -1337,10 +1337,6 @@ Cover & Hanger)", jadi satu produk pecah jadi beberapa baris dan totalnya cuma j
 
 Satu modul agregasi: **`src/lib/best-sellers.ts`**
 - produk induk = `products.category::products.name` (fallback: nama dibersihkan dari kain/size/cover);
-- mode **series** mengirim `products.name` apa adanya + kolom `series` terpisah; UI
-  (`BestSellerSection`) merendernya sebagai **badge series** di samping nama. Jangan menempelkan
-  series ke `name` lagi ("Thobe — Imalah") seperti sebelumnya — kolom nama di 920 px memotong
-  ujung baris, jadi seri seperti Imron/Jiharkah tidak terbaca;
 - unit & omzet dari SEMUA item pesanan sah `SALE_STATUSES` (bukan top-N), jadi `totals.units` harus
   sama dengan jumlah `quantity` mentah di periode itu — itu cara termudah memeriksanya;
 - breakdown per ukuran dan per kain/opsi disimpan untuk baris yang di-expand.
@@ -1965,10 +1961,14 @@ memakai satu Area bergradasi grafit + garis monokrom (`#A1A1AA` / `#18181B` / `#
 akordeon, jadi klik kartu lain menutup yang sebelumnya; kartu COGS terbuka saat pertama dimuat).
 Semua angkanya dari **`GET /api/ops/laporan`** → field **`breakdown: { cogs, fees, packing,
 operasional }`** (top-level, bukan di `summary`):
-- `cogs` = agregasi `order_items` pesanan sah per `product_id` + varian (`Kain … · Seri … · warna ·
-  size`; `color: "default"` disembunyikan) → `{ id, name, variant, qty, hpp, unknownQty }`. Nama series
-  diambil dari `products.series` (join lewat `product_id` saat route membaca `id, hpp, series`) —
-  jangan hapus kolom itu dari `select`-nya, label "Seri …" akan hilang tanpa error.
+- `cogs` = agregasi `order_items` pesanan sah per `product_id` + series + varian (`Kain … · warna ·
+  size`; `color: "default"` disembunyikan) → `{ id, name, series, variant, qty, hpp, unknownQty }`.
+  **Series diambil dari `order_items.series`** (`products.series` kosong di semua 96 baris katalog,
+  jadi membaca katalog tidak pernah menampilkan apa pun), dengan fallback `seriesFromName(name)`
+  dari `src/lib/best-sellers.ts` untuk item lama yang menaruh series di nama
+  ("Thobe Imron Series …" / "Thobe Superblack — Jiharkah"). UI merendernya sebagai **badge**
+  di samping nama produk (`LineRow` prop `series`), bukan lagi di dalam teks varian — dan series
+  ikut jadi bagian key agregasi supaya dua series produk yang sama tidak tergabung.
   **Kartu COGS dipaginasi (2026-11-09)**: 5 baris per halaman dengan tombol ‹ › + `halaman/total`
   dan tombol **Tampilkan semua / Ringkas**, plus baris "1–5 dari 50 produk" (`CogsPager`,
   `COGS_PAGE_SIZE`). Paginasi hanya di sisi klien — daftar `cogs` dari API tidak dipotong. `unknownQty` =

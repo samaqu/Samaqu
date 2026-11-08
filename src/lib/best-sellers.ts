@@ -58,7 +58,7 @@ export interface BestSellerSeriesBreakdown extends BestSellerBreakdown {
 interface BestSellerRowBase {
   /** Kunci stabil antar periode. */
   key: string;
-  /** Nama produk (series dikirim terpisah di kolom `series`). */
+  /** Nama tampil baris pertama (produk, dengan "— Series" pada mode series). */
   name: string;
   /** Baris kedua kecil, mis. "Kain B-01". */
   subname: string;
@@ -124,7 +124,7 @@ export function normalizeSize(raw?: string | null, fallbackName?: string | null)
 }
 
 /** Series dari teks nama — hanya dipakai kalau item tidak punya relasi master. */
-function seriesFromName(rawName?: string | null): string {
+export function seriesFromName(rawName?: string | null): string {
   const name = String(rawName || "");
   const phrase = name.match(SERIES_PHRASE_IN_NAME_RE);
   if (phrase) return phrase[1];
@@ -166,6 +166,9 @@ function catalogKain(row?: BestSellerCatalogRow): string {
 
 const productKeyOf = (category: string, name: string, kain: string) =>
   ["p", category, name, kain].map(normalizeKeyPart).join("::");
+
+const seriesDisplayName = (name: string, series: string) =>
+  series ? `${name} — ${series}` : name;
 
 const subnameOf = (kain: string) => (kain ? `Kain ${kain}` : "");
 
@@ -300,7 +303,7 @@ export function aggregateBestSellers(
       seriesGroups.get(seriesKey) ||
       ({
         key: seriesKey,
-        name,
+        name: seriesDisplayName(name, seriesName),
         subname: subnameOf(kain),
         series: seriesName,
         kain,

@@ -5,6 +5,7 @@ import { BIZ_OFFSET_MS } from "@/lib/ops-followup";
 import { SALE_STATUSES, ORDER_SOURCE_LABEL, orderRevenue, orderSourceKey } from "@/lib/transaksi";
 import { paymentChannelLabel } from "@/lib/payment-channel";
 import { loadMayarFees } from "@/lib/mayar-fees";
+import { seriesFromName } from "@/lib/best-sellers";
 
 /**
  * Laporan keuangan owner.
@@ -329,14 +330,11 @@ async function loadPeriod(
 
   const productIds = [...new Set(orderItems.map((item) => String(item.product_id || "")).filter(Boolean))];
   const productHpp = new Map<string, number>();
-  // Series dipakai label rincian COGS (satu baris `products` = satu warna × series).
-  const productSeries = new Map<string, string>();
   if (productIds.length > 0) {
-    const { data, error } = await admin.from("products").select("id, hpp, series").in("id", productIds);
+    const { data, error } = await admin.from("products").select("id, hpp").in("id", productIds);
     if (error) throw new Error(error.message);
     for (const product of data || []) {
       productHpp.set(String(product.id), Number(product.hpp) || 0);
-      productSeries.set(String(product.id), String((product as any).series || "").trim());
     }
 
     // Foto item untuk drawer detail (sama seperti detail transaksi panel admin).
@@ -475,7 +473,7 @@ async function loadPeriod(
    */
   const cogsGroups = new Map<
     string,
-    { id: string; name: string; variant: string; qty: number; hpp: number; unknownQty: number }
+    { id: string; name: string; series: string; variant: string; qty: number; hpp: number; unknownQty: number }
   >();
   for (const item of orderItems) {
     if (!validIds.has(String(item.order_id || ""))) continue;
@@ -484,17 +482,19 @@ async function loadPeriod(
     const lineHpp = Number(item.hpp);
     const unitHpp = Number.isFinite(lineHpp) && lineHpp > 0 ? lineHpp : productHpp.get(String(item.product_id)) || 0;
     const name = String(item.product_name || "Tanpa nama");
-    const series = productSeries.get(String(item.product_id)) || "";
+    // Series disimpan di baris pesanan (`order_items.series`); `products.series` kosong di
+    // database ini, jadi jangan dibaca dari katalog. Nama item lama bisa memuat series
+    // ("Thobe Imron Series …" / "Thobe Superblack — Jiharkah") → ambil dari situ.
+    const series = String(item.series || "").trim() || seriesFromName(name);
     const variant = [
       item.kain ? `Kain ${item.kain}` : "",
-      series ? `Seri ${series}` : "",
       item.color && item.color !== "default" ? String(item.color) : "",
       item.size ? String(item.size) : "",
     ]
       .filter(Boolean)
       .join(" · ");
-    const key = `${item.product_id || name}|${variant}`;
-    const row = cogsGroups.get(key) || { id: key, name, variant, qty: 0, hpp: 0, unknownQty: 0 };
+    const key = `${item.product_id || name}|${series}|${variant}`;
+    const row = cogsGroups.get(key) || { id: key, name, series, variant, qty: 0, hpp: 0, unknownQty: 0 };
     row.qty += qty;
     row.hpp += unitHpp * qty;
     if (unitHpp <= 0) row.unknownQty += qty;
