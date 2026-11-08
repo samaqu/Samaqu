@@ -85,6 +85,8 @@ type ItemInput = {
   size?: unknown;
   quantity?: unknown;
   price?: unknown;
+  /** Baris bonus (mis. Free Cover Hanger): harga dipaksa Rp0, tanpa validasi harga manual. */
+  bonus?: unknown;
   /** id baris lama saat mode Ubah — dipakai menyalin harga/CYP dari baris yang diganti. */
   source_item_id?: unknown;
 };
@@ -192,6 +194,7 @@ async function buildSnapshot(admin: Admin, input: ItemInput[]): Promise<{ items?
       quantity: Math.round(Number(row?.quantity) || 0),
       /** Harga manual ketikan admin; `undefined`/kosong = pakai harga katalog. */
       price: row?.price,
+      bonus: row?.bonus === true,
     }))
     .filter((row) => row.product_id);
 
@@ -222,7 +225,11 @@ async function buildSnapshot(admin: Admin, input: ItemInput[]): Promise<{ items?
     // DAN lolos validasi batas. Yang dikirim klien tidak pernah masuk tanpa diperiksa.
     let price = Number(product.price) || 0;
     let manual = false;
-    if (hasManualPrice(row.price)) {
+    if (row.bonus) {
+      // Baris bonus (mis. Free Cover Hanger) selalu Rp0 dan tidak lewat batas harga
+      // manual — bukan harga ketikan admin, jadi tidak boleh divalidasi sebagai manual.
+      price = 0;
+    } else if (hasManualPrice(row.price)) {
       const typed = manualPrice(row.price);
       if (typed === null) {
         return {

@@ -22,6 +22,52 @@ const sender62 = (value: unknown) => {
   return digits.startsWith("0") ? `62${digits.slice(1)}` : digits;
 };
 
+const FREE_COVER_SKU = "CVH-SHC";
+const FREE_COVER_COLOR = "Cover Thobe + Hanger";
+
+/**
+ * Baris bonus Free Cover Hanger untuk draft transaksi.
+ *
+ * Hanya ditambahkan kalau `payload.free_cover_hanger === true` — agent yang memutuskan
+ * setelah `cek_pesanan` (customer belum pernah order). Harganya Rp0 dan ditandai
+ * `bonus: true` supaya `/api/ops/transaksi` tidak memakai harga katalog.
+ */
+async function withFreeCoverHanger(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  payload: any,
+) {
+  if (payload?.free_cover_hanger !== true) return payload;
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  const exists = items.some(
+    (item: any) =>
+      String(item?.color || "").trim().toLowerCase() === FREE_COVER_COLOR.toLowerCase(),
+  );
+  if (exists) return payload;
+
+  const { data: product } = await admin
+    .from("products")
+    .select("id, name, sku")
+    .ilike("sku", FREE_COVER_SKU)
+    .maybeSingle();
+  if (!product) return payload;
+
+  return {
+    ...payload,
+    items: [
+      ...items,
+      {
+        product_id: String(product.id),
+        product_name: String(product.name || "Cover & Hanger"),
+        color: FREE_COVER_COLOR,
+        size: "ALL SIZE",
+        quantity: 1,
+        price: 0,
+        bonus: true,
+      },
+    ],
+  };
+}
+
 async function history(admin: ReturnType<typeof getSupabaseAdmin>, sender: string) {
   const { data } = await admin
     .from("wa_inbox")
@@ -166,7 +212,7 @@ export async function POST(req: NextRequest) {
       closing_id: body?.closing_id ? String(body.closing_id) : null,
       customer_name: String(payload.customer_name || body?.customer_name || "").trim() || null,
       customer_whatsapp: String(payload.customer_whatsapp || body?.customer_whatsapp || "").trim() || null,
-      payload,
+      payload: await withFreeCoverHanger(admin, payload),
       proof_key: proofKey,
       proof_url: proofKey ? waMediaSignedUrl(proofKey) : body?.proof_url ? String(body.proof_url) : null,
       ai_note: body?.ai_note ? String(body.ai_note) : null,
@@ -271,6 +317,7 @@ export async function POST(req: NextRequest) {
         return bad(`Ukuran ${size} untuk ${product.name} tidak tersedia.`);
       }
       const quantity = Math.max(1, Math.min(99, Number(item?.quantity) || 1));
+      const bonus = item?.bonus === true;
       const override = Number(variantMap.get(variantKey(productId, color, size))?.price_override);
       normalized.push({
         product_id: productId,
@@ -278,7 +325,9 @@ export async function POST(req: NextRequest) {
         color,
         size,
         quantity,
-        price: override > 0 ? override : Number(product.price) || 0,
+        // Baris bonus (Free Cover Hanger) tetap Rp0 walau draft diedit admin.
+        price: bonus ? 0 : override > 0 ? override : Number(product.price) || 0,
+        ...(bonus ? { bonus: true } : {}),
       });
     }
 
