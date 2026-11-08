@@ -109,7 +109,9 @@ function cooldownPassed(state: AlertState | null, cooldownMs: number): boolean {
 async function sendAdmin(message: string): Promise<boolean> {
   try {
     const configs = await getFonnteConfigs();
-    const target = await resolveAdminTargets(configs.admin.adminNumber);
+    // Nomor alert owner. Bisa ditimpa lewat env WA_ALERT_NUMBER kalau berganti.
+    const alertNumber = (process.env.WA_ALERT_NUMBER || "6285603324143").trim();
+    const target = await resolveAdminTargets(alertNumber || configs.admin.adminNumber);
     if (!target || !configs.admin.token) return false;
     return await sendFonnteMessage(configs.admin.token, target, message);
   } catch {
