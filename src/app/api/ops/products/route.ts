@@ -88,7 +88,6 @@ async function withTotals(admin: ReturnType<typeof getSupabaseAdmin>, products: 
     .order("display_order");
 
   const photoMap = new Map<string, string>();
-  const videoMap = new Map<string, string>();
   for (const row of (imageRows ?? []) as {
     product_id?: string | null;
     url?: string | null;
@@ -96,11 +95,7 @@ async function withTotals(admin: ReturnType<typeof getSupabaseAdmin>, products: 
   }[]) {
     const productId = String(row.product_id ?? "");
     const url = String(row.url ?? "");
-    if (!productId || !url) continue;
-    if (row.is_video || isVideoUrl(url)) {
-      if (!videoMap.has(productId)) videoMap.set(productId, url);
-      continue;
-    }
+    if (!productId || !url || row.is_video || isVideoUrl(url)) continue;
     if (!photoMap.has(productId)) photoMap.set(productId, url);
   }
 
@@ -161,13 +156,6 @@ async function withTotals(admin: ReturnType<typeof getSupabaseAdmin>, products: 
       photo:
         photoMap.get(p.id) ||
         (typeof p.image === "string" && p.image && !isVideoUrl(p.image) ? p.image : null),
-      // Video pertama produk (untuk kirim video lewat WA); null kalau tidak ada.
-      video:
-        videoMap.get(p.id) ||
-        (Array.isArray(p.images)
-          ? (p.images as string[]).find((url) => isVideoUrl(String(url))) || null
-          : null) ||
-        (typeof p.image === "string" && isVideoUrl(p.image) ? p.image : null),
       // Penanda "tampil di website" (kolom `products.is_published`, default true).
       is_published: p.is_published !== false,
     };
