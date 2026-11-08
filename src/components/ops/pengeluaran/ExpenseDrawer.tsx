@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Package, X } from "lucide-react";
 import { useToast } from "@/components/ops/ui/use-toast";
-import { Field, inputClass, textareaClass } from "./fields";
+import { Field, RupiahInput, inputClass, textareaClass } from "./fields";
 import MetodeBayarSelect from "./MetodeBayarSelect";
 import {
   KATEGORI_OPERASIONAL,
@@ -18,7 +18,8 @@ import type { ExpenseItem, ExpenseRow, PengeluaranTipe } from "./types";
 
 /**
  * Drawer tambah/ubah pengeluaran.
- * Packing: pilih barang dari master, qty × harga satuan → total dihitung server.
+ * Packing: pilih barang dari master, isi total harga pembelian → harga satuan dihitung
+ * otomatis (total ÷ qty); server tetap menyimpan total = qty × harga satuan.
  * Operasional: kategori + jumlah rupiah.
  */
 export default function ExpenseDrawer({
@@ -42,7 +43,7 @@ export default function ExpenseDrawer({
   const [tanggal, setTanggal] = useState("");
   const [itemId, setItemId] = useState("");
   const [qty, setQty] = useState("");
-  const [hargaSatuan, setHargaSatuan] = useState("");
+  const [totalHarga, setTotalHarga] = useState("");
   const [kategori, setKategori] = useState("");
   const [deskripsi, setDeskripsi] = useState("");
   const [jumlah, setJumlah] = useState("");
@@ -57,7 +58,7 @@ export default function ExpenseDrawer({
     setTanggal(row?.tanggal ? String(row.tanggal).slice(0, 10) : todayWibKey());
     setItemId(row?.item_id || "");
     setQty(row?.qty ? String(row.qty) : "");
-    setHargaSatuan(row?.harga_satuan ? String(row.harga_satuan) : "");
+    setTotalHarga(row?.qty && row?.harga_satuan ? String(row.qty * row.harga_satuan) : "");
     setKategori(row?.kategori || "");
     setDeskripsi(row?.deskripsi || "");
     setJumlah(tipe === "operasional" && row?.jumlah ? String(row.jumlah) : "");
@@ -68,10 +69,14 @@ export default function ExpenseDrawer({
     setRequestId(`exp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
   }, [open, row?.id, tipe]);
 
-  const totalPacking = useMemo(
-    () => (Number(qty) || 0) * (Number(hargaSatuan) || 0),
-    [qty, hargaSatuan],
+  // Total harga yang diketik jadi acuan; harga satuan dihitung otomatis dari total ÷ qty.
+  const qtyNumber = Number(qty) || 0;
+  const totalHargaNumber = Number(totalHarga) || 0;
+  const hargaSatuan = useMemo(
+    () => (qtyNumber > 0 ? Math.round(totalHargaNumber / qtyNumber) : 0),
+    [qtyNumber, totalHargaNumber],
   );
+  const totalPacking = qtyNumber * hargaSatuan;
 
   const pilihanBarang = useMemo(
     () => items.filter((item) => item.aktif || item.id === itemId),
@@ -98,19 +103,19 @@ export default function ExpenseDrawer({
         setError("Qty harus lebih dari 0.");
         return;
       }
-      if (hargaSatuan === "" || Number(hargaSatuan) < 0) {
-        setError("Harga satuan wajib diisi.");
+      if (totalHargaNumber <= 0) {
+        setError("Total harga wajib diisi.");
         return;
       }
       if (totalPacking <= 0) {
-        setError("Total pengeluaran harus lebih dari 0.");
+        setError("Total harga terlalu kecil untuk qty ini.");
         return;
       }
       payload = {
         tanggal,
         item_id: itemId,
         qty: Number(qty),
-        harga_satuan: Number(hargaSatuan),
+        harga_satuan: hargaSatuan,
         catatan: catatan.trim() || null,
       };
     } else {
@@ -249,17 +254,16 @@ export default function ExpenseDrawer({
                         className={inputClass}
                       />
                     </Field>
-                    <Field label="Harga Satuan">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={hargaSatuan}
-                        onChange={(event) => setHargaSatuan(event.target.value.replace(/[^\d]/g, ""))}
-                        placeholder="0"
-                        className={inputClass}
-                      />
+                    <Field label="Total Harga">
+                      <RupiahInput value={totalHarga} onChange={setTotalHarga} />
                     </Field>
                   </div>
+
+                  <Field label="Harga Satuan" hint="Dihitung otomatis dari total ÷ qty.">
+                    <div className={`${inputClass} flex items-center bg-slate-50 text-slate-600`}>
+                      {hargaSatuan > 0 ? rupiah(hargaSatuan) : "—"}
+                    </div>
+                  </Field>
 
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
@@ -267,7 +271,8 @@ export default function ExpenseDrawer({
                       <span className="text-lg font-black tabular-nums text-slate-900">{rupiah(totalPacking)}</span>
                     </div>
                     <p className="mt-1 text-[11px] font-medium text-slate-400">
-                      {angka(Number(qty) || 0)} × {rupiah(Number(hargaSatuan) || 0)} · dihitung otomatis
+                      {angka(qtyNumber)} × {rupiah(hargaSatuan)} ·{" "}
+                      {totalPacking !== totalHargaNumber ? "harga satuan dibulatkan" : "dihitung otomatis"}
                     </p>
                   </div>
                 </>
@@ -300,14 +305,7 @@ export default function ExpenseDrawer({
                   </Field>
 
                   <Field label="Jumlah">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={jumlah}
-                      onChange={(event) => setJumlah(event.target.value.replace(/[^\d]/g, ""))}
-                      placeholder="0"
-                      className={inputClass}
-                    />
+                    <RupiahInput value={jumlah} onChange={setJumlah} />
                   </Field>
 
                   <div>

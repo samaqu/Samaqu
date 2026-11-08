@@ -1811,6 +1811,15 @@ tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` b
   berikon monokrom: Transfer Bank/Cash/QRIS/E-Wallet/Lainnya, ikon dari `lucide-react.d.ts`),
   bukan lagi `<input list>` + `<datalist>`; nilainya tetap teks bebas yang disimpan ke kolom
   `expenses.metode_bayar`.
+- **Form packing (permintaan pemilik 2026-11-08)**: yang diisi adalah **Total Harga** (harga
+  pembelian), lalu **Harga Satuan dihitung otomatis** `Math.round(total ÷ qty)` dan ditampilkan
+  read-only; server tetap menyimpan `jumlah = qty × harga_satuan` seperti sebelumnya, jadi
+  `harga_satuan` (bukan total) yang dikirim di payload. Kalau total tidak habis dibagi qty,
+  ringkasan menulis "harga satuan dibulatkan" dan angka Total di kartu = hasil pembulatan itu
+  (angka yang benar-benar tersimpan). Saat mengubah baris, Total diisi `qty × harga_satuan` dari
+  DB. Kedua kolom uang (Total Harga packing & Jumlah operasional) memakai `RupiahInput` di
+  `fields.tsx` — state menyimpan digit polos, pemisah ribuan hanya untuk tampilan, jangan pernah
+  menyimpan nilai berformat.
 - **Warna (permintaan pemilik 2026-11-08)**: biru tidak dipakai lagi di modul ini — paletnya
   monokrom hitam–grafit seperti Samaqu. Kartu header = gradien gelap `#111113 → #2d2d33` berisi
   judul, pemilih Bulan/Tahun, dan **tiga kartu statistik di dalamnya** (`PengeluaranSummaryCards`,
