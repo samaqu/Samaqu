@@ -172,6 +172,10 @@ export async function POST(req: NextRequest) {
     const allowed =
       /^https:\/\/res\.cloudinary\.com\//.test(mediaUrl) ||
       /^https:\/\/samaqu-media\.samaqu\.workers\.dev\//.test(mediaUrl) ||
+      // Media Product Knowledge Academy (bucket series-videos) — sumber foto/video bot WA.
+      /^https:\/\/rbjxjdgqtcwwbvuwtlpg\.supabase\.co\/storage\/v1\/object\/public\/series-videos\//.test(
+        mediaUrl,
+      ) ||
       (Boolean(base) && mediaUrl.startsWith(`${base}/`)) ||
       // Bukti transfer: URL R2 private yang sudah ditandatangani (ada X-Amz-Signature).
       (Boolean(privateHost) &&
