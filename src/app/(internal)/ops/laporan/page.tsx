@@ -197,8 +197,9 @@ const dateTime = (value?: string | null) => {
  * Nilai gratis cover hanger pada satu pesanan: cover berharga 0 atau diskon yang menempel.
  *
  * Semua varian cover dihitung (Cover Thobe + Hanger, Cover Koko + Hanger, dan varian lama
- * "Set Hanger + Cover"), dan hasilnya dibatasi nilai kotor baris cover — sama dengan
- * `promoValueOf()` di `/api/ops/laporan`, supaya kolom tabel dan kartu Promosi tidak bisa beda.
+ * "Set Hanger + Cover"); cover Rp0 (promo website) dihitung penuh, diskon pesanan dibatasi nilai
+ * kotor baris cover — sama dengan `promoValueOf()` di `/api/ops/laporan`, supaya kolom tabel dan
+ * kartu Promosi tidak bisa beda.
  */
 const fchDiscountOf = (row: any): number => {
   const items = Array.isArray(row?.items) ? row.items : [];
@@ -207,6 +208,8 @@ const fchDiscountOf = (row: any): number => {
     return id === "cover-hanger" || id === "addon-cover-hanger";
   });
   if (!coverLines.length) return 0;
+  // `coverGross` = nilai cover yang benar-benar dibayar; hanya bagian itu yang boleh ditutup
+  // diskon pesanan. Cover Rp0 (promo website) tetap bernilai penuh walau nilai kotornya nol.
   const coverGross = coverLines.reduce(
     (sum: number, item: any) => sum + (Number(item?.price) || 0) * (Number(item?.quantity) || 1),
     0,
@@ -216,7 +219,7 @@ const fchDiscountOf = (row: any): number => {
       sum + Math.max(0, 35000 - (Number(item?.price) || 0)) * (Number(item?.quantity) || 1),
     0,
   );
-  return Math.min(coverGross, coverValue + Math.min(Number(row?.discount) || 0, coverGross));
+  return coverValue + Math.min(Number(row?.discount) || 0, coverGross);
 };
 
 const dateOnly = (value?: string | null) => {

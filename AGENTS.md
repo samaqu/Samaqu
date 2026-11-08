@@ -2016,10 +2016,15 @@ Sekarang nilainya direkap sebagai baris **informasi** di tahap 01 kartu "Perhitu
 (`Promosi Cover Hanger (N cover)`), **bukan pengurang**: omzet sudah memakai `total` setelah
 diskon, jadi mengurangi lagi akan dobel. Angkanya dari `summary.promoTotal` / `promoOrders` /
 `promoCoverQty` (`GET /api/ops/laporan`, dihitung `promoValueOf()`): untuk tiap pesanan sah, nilai =
-`min(nilai kotor baris cover, cover gratis + min(diskon, nilai kotor))` — pola kedua yang dikenali
-adalah promo website (baris cover Rp0). `fchDiscountOf()` di halaman (kolom "Diskon FCH" tabel
-Penjualan) memakai aturan yang sama dan **semua varian** cover (Thobe/Koko/lama), dulu hanya
-"Cover Thobe". Verifikasi (2026-11-09, `/ops/laporan` lewat iframe same-origin 920 px, sesi admin
-diputar ulang): `npx tsc --noEmit` bersih; baris berbunyi `Promosi Cover Hanger (6 cover) ·
-Rp 210.000` — cocok dengan data (5 pesanan WA Nov 2026: 35+70+35+35+35 rb); `0` px geser samping;
-0 error console.
+`cover gratis + min(diskon, nilai kotor baris cover)` — **tanpa** membatasi hasilnya dengan nilai
+kotor baris cover. Dua pola yang dikenali: (a) diskon pesanan menutup cover berharga penuh (form
+Tambah Transaksi WA), dan (b) **cover Rp0 dari promo website** yang dihitung penuh Rp35.000/cover —
+batas `min(nilai kotor, …)` yang lama membuat pola (b) selalu Rp0 sehingga bonus promo website tidak
+pernah terekap (pemilik 2026-11-09: "Promosi Cover Hanger (6 cover) salah, ikutkan promo website").
+`fchDiscountOf()` di halaman (kolom "Diskon FCH" tabel Penjualan) memakai aturan yang sama dan
+**semua varian** cover (Thobe/Koko/lama), dulu hanya "Cover Thobe". Verifikasi (2026-11-09,
+`/ops/laporan` lewat iframe same-origin 920 px, sesi admin diputar ulang): `npx tsc --noEmit`
+bersih; baris berbunyi `Promosi Cover Hanger (8 cover) · Rp 280.000` — cocok dengan data (5 pesanan
+WA Nov 2026: 35+70+35+35+35 rb = Rp210.000 / 6 cover, plus 2 pesanan promo website FCH
+(`FCH-20261107-359`, `FCH-20261104-177`) dengan cover Rp0 = Rp70.000 / 2 cover); `0` px geser
+samping; 0 error console.

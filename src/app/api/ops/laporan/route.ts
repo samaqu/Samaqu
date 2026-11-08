@@ -130,8 +130,9 @@ const COVER_HANGER_VALUE = 35_000;
  *  - **Promo website (Free Cover Hanger):** baris `cover-hanger` berharga Rp0.
  *
  * Nilainya TIDAK mengurangi omzet lagi (omzet sudah memakai `total` setelah diskon); ini hanya
- * rekap "berapa nilai yang digratiskan", jadi hasilnya dibatasi nilai kotor baris cover supaya
- * diskon untuk hal lain tidak ikut terhitung sebagai promo cover.
+ * rekap "berapa nilai yang digratiskan". Cover berharga Rp0 dihitung penuh (itulah bonus promo
+ * website), sedangkan diskon pesanan dibatasi nilai kotor baris cover yang dibayar supaya diskon
+ * untuk hal lain tidak ikut terhitung sebagai promo cover.
  */
 function promoValueOf(order: any, items: any[]): { value: number; covers: number } {
   const coverLines = (items || []).filter((item) => {
@@ -151,7 +152,9 @@ function promoValueOf(order: any, items: any[]): { value: number; covers: number
     0,
   );
   const appliedDiscount = Math.min(Math.max(0, Number(order?.discount) || 0), gross);
-  return { value: Math.min(gross, freeFromPrice + appliedDiscount), covers };
+  // Cover berharga Rp0 (promo website) tidak punya nilai kotor, jadi TIDAK boleh dibatasi
+  // `gross` — kalau dibatasi, bonus promo website selalu terbaca Rp0 dan tidak ikut terekap.
+  return { value: freeFromPrice + appliedDiscount, covers };
 }
 
 function paymentLabelFor(raw: string, methodById: Map<string, string>): string {
