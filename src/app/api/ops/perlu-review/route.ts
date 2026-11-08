@@ -63,6 +63,8 @@ export async function GET(req: NextRequest) {
   }
   const draftItems = (drafts || []).map((item) => ({
     ...item,
+    // Tanda tangani ulang tiap kali dibaca: URL R2 private kedaluwarsa, jangan
+    // mengandalkan proof_url yang tersimpan saat draft dibuat.
     proof_url: waMediaSignedUrl(item.proof_key) || item.proof_url,
   }));
 
