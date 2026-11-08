@@ -74,6 +74,14 @@ type Summary = {
   margin: number | null;
   transactions: number;
   aov: number;
+  /**
+   * Rekap promosi cover hanger pada periode ini (nilai yang digratiskan).
+   * Bukan pengurang omzet — omzet sudah memakai `total` setelah diskon.
+   * Opsional: respons lama tanpa field ini tetap tampil normal.
+   */
+  promoTotal?: number;
+  promoOrders?: number;
+  promoCoverQty?: number;
   hppReversal: boolean;
   biayaNote: string;
   hppStatus: HppStatus;
@@ -185,25 +193,30 @@ const dateTime = (value?: string | null) => {
   return d.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" });
 };
 
-/** Nilai gratis cover hanger pada satu pesanan: cover berharga 0 atau diskon yang menempel. */
+/**
+ * Nilai gratis cover hanger pada satu pesanan: cover berharga 0 atau diskon yang menempel.
+ *
+ * Semua varian cover dihitung (Cover Thobe + Hanger, Cover Koko + Hanger, dan varian lama
+ * "Set Hanger + Cover"), dan hasilnya dibatasi nilai kotor baris cover — sama dengan
+ * `promoValueOf()` di `/api/ops/laporan`, supaya kolom tabel dan kartu Promosi tidak bisa beda.
+ */
 const fchDiscountOf = (row: any): number => {
   const items = Array.isArray(row?.items) ? row.items : [];
-  const coverLines = items.filter(
-    (item: any) =>
-      String(item?.product_id || "") === "cover-hanger" &&
-      /cover\s*thobe/i.test(String(item?.color || "")),
-  );
+  const coverLines = items.filter((item: any) => {
+    const id = String(item?.product_id || "");
+    return id === "cover-hanger" || id === "addon-cover-hanger";
+  });
   if (!coverLines.length) return 0;
+  const coverGross = coverLines.reduce(
+    (sum: number, item: any) => sum + (Number(item?.price) || 0) * (Number(item?.quantity) || 1),
+    0,
+  );
   const coverValue = coverLines.reduce(
     (sum: number, item: any) =>
       sum + Math.max(0, 35000 - (Number(item?.price) || 0)) * (Number(item?.quantity) || 1),
     0,
   );
-  const coverPrice = coverLines.reduce(
-    (sum: number, item: any) => sum + (Number(item?.price) || 0) * (Number(item?.quantity) || 1),
-    0,
-  );
-  return coverValue + Math.min(Number(row?.discount) || 0, coverPrice);
+  return Math.min(coverGross, coverValue + Math.min(Number(row?.discount) || 0, coverGross));
 };
 
 const dateOnly = (value?: string | null) => {
@@ -707,6 +720,17 @@ export default function LaporanKeuanganPage() {
                 hint="Nilai transaksi yang diakui pada periode ini — bukan uang yang sudah diterima."
                 onClick={() => goToTab("sales")}
               />
+              {/* Rekap promosi cover hanger: INFO, bukan pengurang — omzet di atas sudah
+                  memakai `total` setelah diskon. Nilainya dari diskon 35rb per cover di form
+                  Tambah Transaksi (dan cover berharga Rp0 dari promo website). */}
+              {s.promoTotal ? (
+                <BreakdownRow
+                  label={`Promosi Cover Hanger (${nfmt(s.promoCoverQty)} cover)`}
+                  value={rp(s.promoTotal)}
+                  tone="muted"
+                  hint="Nilai cover hanger yang digratiskan pada periode ini (diskon Rp35.000 per cover di form Tambah Transaksi, atau cover berharga Rp0 dari promo website). Sudah termasuk di Total Penjualan, jadi tidak mengurangi omzet atau laba lagi."
+                />
+              ) : null}
               <BreakdownRow
                 label="Retur"
                 value={`− ${rp(s.refunds)}`}

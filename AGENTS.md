@@ -2008,3 +2008,18 @@ sinkron dengan selnya (6 header vs 7 sel). Verifikasi (2026-11-09, iframe same-o
 diputar ulang): `npx tsc --noEmit` bersih; tabel Cair 7 header = 7 sel; drawer berisi produk
 (Thobe Grey Indigo — Imron + Extra Cover & Hanger), Subtotal Rp359.000, Ongkir Rp93.000, Total
 Rp452.000; tab Penjualan tetap 8 kolom; 0 error console.
+
+**Rekap "Promosi Cover Hanger" (2026-11-09)** — di panel Order Management, pesanan dari WA sering
+ditambah baris `cover-hanger` harga penuh lalu diberi **diskon Rp35.000** di level pesanan
+(`orders.discount`), jadi uang masuk tetap harga produk dan diskon itu tidak muncul di laporan.
+Sekarang nilainya direkap sebagai baris **informasi** di tahap 01 kartu "Perhitungan Laba"
+(`Promosi Cover Hanger (N cover)`), **bukan pengurang**: omzet sudah memakai `total` setelah
+diskon, jadi mengurangi lagi akan dobel. Angkanya dari `summary.promoTotal` / `promoOrders` /
+`promoCoverQty` (`GET /api/ops/laporan`, dihitung `promoValueOf()`): untuk tiap pesanan sah, nilai =
+`min(nilai kotor baris cover, cover gratis + min(diskon, nilai kotor))` — pola kedua yang dikenali
+adalah promo website (baris cover Rp0). `fchDiscountOf()` di halaman (kolom "Diskon FCH" tabel
+Penjualan) memakai aturan yang sama dan **semua varian** cover (Thobe/Koko/lama), dulu hanya
+"Cover Thobe". Verifikasi (2026-11-09, `/ops/laporan` lewat iframe same-origin 920 px, sesi admin
+diputar ulang): `npx tsc --noEmit` bersih; baris berbunyi `Promosi Cover Hanger (6 cover) ·
+Rp 210.000` — cocok dengan data (5 pesanan WA Nov 2026: 35+70+35+35+35 rb); `0` px geser samping;
+0 error console.

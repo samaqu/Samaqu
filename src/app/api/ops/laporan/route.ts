@@ -118,6 +118,42 @@ const LEGACY_PAYMENT_LABELS: Record<string, string> = {
 
 const UNKNOWN_PAYMENT_LABEL = "Belum tercatat";
 
+/** Harga normal Cover & Hanger (satu paket) di katalog — dasar nilai promo. */
+const COVER_HANGER_VALUE = 35_000;
+
+/**
+ * Nilai promo cover hanger pada SATU pesanan.
+ *
+ * Ada dua cara promo ini tercatat:
+ *  - **Tambah Transaksi (WA):** baris `cover-hanger` masuk harga penuh (Rp35.000), lalu admin
+ *    menempel diskon Rp35.000 di level pesanan → uang masuk tetap harga produk.
+ *  - **Promo website (Free Cover Hanger):** baris `cover-hanger` berharga Rp0.
+ *
+ * Nilainya TIDAK mengurangi omzet lagi (omzet sudah memakai `total` setelah diskon); ini hanya
+ * rekap "berapa nilai yang digratiskan", jadi hasilnya dibatasi nilai kotor baris cover supaya
+ * diskon untuk hal lain tidak ikut terhitung sebagai promo cover.
+ */
+function promoValueOf(order: any, items: any[]): { value: number; covers: number } {
+  const coverLines = (items || []).filter((item) => {
+    const id = String(item?.product_id || "");
+    return id === "cover-hanger" || id === "addon-cover-hanger";
+  });
+  if (!coverLines.length) return { value: 0, covers: 0 };
+
+  const covers = coverLines.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0);
+  const gross = coverLines.reduce(
+    (sum, item) => sum + (Number(item?.price) || 0) * (Number(item?.quantity) || 0),
+    0,
+  );
+  const freeFromPrice = coverLines.reduce(
+    (sum, item) =>
+      sum + Math.max(0, COVER_HANGER_VALUE - (Number(item?.price) || 0)) * (Number(item?.quantity) || 0),
+    0,
+  );
+  const appliedDiscount = Math.min(Math.max(0, Number(order?.discount) || 0), gross);
+  return { value: Math.min(gross, freeFromPrice + appliedDiscount), covers };
+}
+
 function paymentLabelFor(raw: string, methodById: Map<string, string>): string {
   const key = String(raw || "").trim();
   if (!key) return UNKNOWN_PAYMENT_LABEL;
@@ -798,6 +834,26 @@ export async function GET(req: NextRequest) {
     // dilihat & dipisahkan dari penjualan lain tanpa mengubah angka omzet total.
     const sources = buildSourceBreakdown(current.validOrders);
 
+    /*
+     * ── Rekap promosi cover hanger ──
+     * Pesanan WA dari form "Tambah Transaksi" sering menambahkan baris Cover Thobe + Hanger
+     * lalu memberi diskon Rp35.000, jadi uang masuk tetap harga produk. Diskon itu tidak
+     * dikirim ke mana pun sebelumnya; di sini dijumlah per periode supaya nilai promosi
+     * terlihat terpisah dari omzet (omzet sudah memakai `total` setelah diskon).
+     */
+    const promo = current.validOrders.reduce(
+      (acc, order) => {
+        const { value, covers } = promoValueOf(order, current.itemsByOrder[String(order.id)] || []);
+        acc.total += value;
+        if (value > 0) {
+          acc.orders += 1;
+          acc.covers += covers;
+        }
+        return acc;
+      },
+      { total: 0, orders: 0, covers: 0 },
+    );
+
     const trend = buildTrend(
       from,
       to,
@@ -902,6 +958,10 @@ export async function GET(req: NextRequest) {
         profitNote: current.profitNote,
         transactions: current.transactions,
         aov: current.aov,
+        /* Rekap promosi cover hanger (nilai yang digratiskan, bukan pengurang omzet). */
+        promoTotal: promo.total,
+        promoOrders: promo.orders,
+        promoCoverQty: promo.covers,
         hppReversal: false,
         biayaNote: current.expensesAvailable ? "" : "Tabel pengeluaran belum tersedia",
       },
