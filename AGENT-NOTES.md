@@ -93,9 +93,10 @@ dan setiap fitur **harus benar-benar berfungsi** (jangan tombol pajangan, jangan
    tunggu di foreground dengan timeout pendek.
 5. **Deploy Vercel**: cek statusnya via REST API (lihat `.agent-secrets.local.md`). Kadang
    `git_info_fail` → cukup redeploy.
-6. **Region**: function Vercel dipatok `bom1` (`vercel.json` + setting project) supaya dekat dengan
-   database Supabase (`ap-south-1`/Mumbai). Sebelum ini function di `iad1` (Washington) dan tiap
-   request API 1,4–2,7 detik. **Jangan ubah region tanpa mengukur latency** (script pola pengukuran
+6. **Region**: function Vercel dipatok `icn1` (Seoul) (`vercel.json` + setting project) supaya dekat
+   dengan database Supabase (`ap-northeast-2`/Seoul). Sebelumnya `bom1` (Mumbai) selama database
+   masih di `ap-south-1`, dan sebelum itu `iad1` (Washington) yang bikin tiap request API
+   1,4–2,7 detik. **Jangan ubah region tanpa mengukur latency** (script pola pengukuran
    ada di riwayat kerja: ukur `npx`/Invoke-RestMethod ke `/api/ops/*` 3x, ambil rata-rata).
 7. **Menguji API /ops**: butuh token admin Supabase (dibuat sementara, lalu dihapus) — caranya ada di
    `.agent-secrets.local.md`. Setelah uji, **pulihkan data produksi** dan laporkan kondisi akhir.
