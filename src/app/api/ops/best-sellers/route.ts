@@ -95,7 +95,9 @@ async function loadSales(admin: Admin, startIso: string, endIso: string): Promis
     const chunk = validIds.slice(i, i + CHUNK);
     const { data, error: itemError } = await admin
       .from("order_items")
-      .select("order_id, product_id, product_name, size, kain, series, quantity, price, customer_price")
+      // `color` wajib ikut: untuk Cover & Hanger / Kabak, nama varian tersimpan di kolom
+      // ini (mis. "Cover Thobe + Hanger"), dan rincian per ukuran memakainya.
+      .select("order_id, product_id, product_name, color, size, kain, series, quantity, price, customer_price")
       .in("order_id", chunk);
     if (itemError) throw new Error(itemError.message);
     items.push(...((data || []) as BestSellerItem[]));
