@@ -108,7 +108,6 @@ export default function PengeluaranView() {
     : undefined;
 
   const tipeAktif = editing?.tipe ?? tab;
-  const judulDetail = tab === "packing" ? "Detail Pengeluaran Packing" : "Detail Pengeluaran Operasional";
 
   return (
     <div className="space-y-5 bg-[#F9FAFB]">
@@ -160,14 +159,7 @@ export default function PengeluaranView() {
           })}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-bold text-slate-900">{judulDetail}</h2>
-            <p className="text-xs font-semibold text-slate-500">
-              {tabRows.length} transaksi · total {rupiah(summary.total_biaya)}
-            </p>
-          </div>
-
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <div className="flex flex-wrap items-center gap-2">
             {tab === "packing" ? (
               <button

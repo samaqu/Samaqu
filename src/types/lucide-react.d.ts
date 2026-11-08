@@ -120,5 +120,9 @@ declare module "lucide-react" {
   export const Wand2: FC<IconProps>;
   export const Store: FC<IconProps>;
   export const Maximize2: FC<IconProps>;
+  // Pemilih metode bayar drawer Pengeluaran
+  export const Banknote: FC<IconProps>;
+  export const Landmark: FC<IconProps>;
+  export const QrCode: FC<IconProps>;
   export type LucideIcon = FC<IconProps>;
 }
