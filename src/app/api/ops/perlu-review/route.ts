@@ -84,6 +84,28 @@ export async function GET(req: NextRequest) {
   if (!(await isOpsAdmin(req))) return unauthorized();
   const admin = getSupabaseAdmin();
 
+  // Badge menu: cukup angka, tanpa mengambil daftar/transkrip.
+  const countsOnly = new URL(req.url).searchParams.get("counts_only") === "1";
+
+  if (countsOnly) {
+    const [drafts, escalations] = await Promise.all([
+      admin
+        .from("order_drafts")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending"),
+      admin
+        .from("wa_escalations")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["open", "claimed"]),
+    ]);
+    return NextResponse.json({
+      counts: {
+        drafts: drafts.count || 0,
+        escalations: escalations.count || 0,
+      },
+    });
+  }
+
   const [{ data: escalations, error: escalationError }, { data: drafts, error: draftError }] =
     await Promise.all([
       admin

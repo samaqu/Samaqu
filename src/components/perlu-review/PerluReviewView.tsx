@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { PERLU_REVIEW_EVENT } from "@/lib/use-pending-drafts";
 import { toast } from "@/components/ops/ui/use-toast";
 import DraftEditor from "./DraftEditor";
 import DraftList from "./DraftList";
@@ -252,6 +253,8 @@ export default function PerluReviewView() {
       const json = await run("draft_reject", { id: dialog.draft.id, reason });
       if (json) notify("Draft ditolak", "Tidak ada order atau stok yang berubah.");
     }
+    // Badge menu "Perlu Review" langsung menyesuaikan setelah aksi.
+    window.dispatchEvent(new Event(PERLU_REVIEW_EVENT));
     setDialog(null);
   };
 
