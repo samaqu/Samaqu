@@ -1807,9 +1807,15 @@ tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` b
   (`PengeluaranView`, `PengeluaranHeader`, `PengeluaranSummaryCards`, `PengeluaranTable`,
   `ExpenseDrawer`, `BarangDrawer`, `fields.tsx`, `helpers.ts`, `types.ts`). Panggil API langsung
   (bukan shim `ops-api`), React Query dengan `initialData` kosong seperti halaman ops lain.
+- **Warna (permintaan pemilik 2026-11-08)**: biru tidak dipakai lagi di modul ini — paletnya
+  monokrom hitam–grafit seperti Samaqu. Kartu header = gradien gelap `#111113 → #2d2d33` berisi
+  judul, pemilih Bulan/Tahun, dan **tiga kartu statistik di dalamnya** (`PengeluaranSummaryCards`,
+  tile `border-white/15 bg-white/[0.06]`); tab aktif (dengan ikon), tombol Tambah, dan tombol simpan
+  di kedua drawer memakai `#18181b` (hover `black`); header tabel juga `#18181b`. Jangan
+  mengembalikan `bg-blue-600`/`text-blue-*` di folder `src/components/ops/pengeluaran/`.
 - Verifikasi (2026-11-08): `/ops/pengeluaran` = 200; dirender lewat **iframe same-origin** di preview
   (`navigate()` gagal untuk route `/ops/*`): header + pemilih Bulan/Tahun, 3 kartu (0 / Rp 0), dua tab
-  (aktif biru solid), judul "Detail Pengeluaran …", tombol Kelola Barang (hanya packing) & Tambah,
+  (aktif hitam grafit), judul "Detail Pengeluaran …", tombol Kelola Barang (hanya packing) & Tambah,
   banner migration, drawer form packing tampil (Tanggal/Barang/Qty/Harga Satuan/Total/Catatan),
   0 error console, tanpa scroll samping. **Belum** terbukti dengan data nyata: simpan/ubah/hapus,
   tabel detail, ringkasan, dan Kelola Barang harus diuji setelah migration dijalankan.

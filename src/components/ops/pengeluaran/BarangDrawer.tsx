@@ -175,7 +175,7 @@ export default function BarangDrawer({
                     type="button"
                     onClick={tambah}
                     disabled={saving}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#18181b] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-black disabled:opacity-50"
                   >
                     {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
                     Tambah Barang
@@ -246,7 +246,7 @@ export default function BarangDrawer({
                                 type="button"
                                 onClick={() => simpanEdit(item)}
                                 disabled={savingId === item.id}
-                                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-[#18181b] px-3.5 py-2 text-xs font-bold text-white hover:bg-black disabled:opacity-50"
                               >
                                 {savingId === item.id ? <Loader2 size={13} className="animate-spin" /> : null}
                                 Simpan

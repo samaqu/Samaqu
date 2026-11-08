@@ -233,7 +233,7 @@ export default function ExpenseDrawer({
                   <button
                     type="button"
                     onClick={onManageItems}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-900 underline underline-offset-2 hover:text-black"
                   >
                     <Package size={14} /> Barang belum ada? Kelola Barang
                   </button>
@@ -366,7 +366,7 @@ export default function ExpenseDrawer({
                 type="button"
                 onClick={submit}
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#18181b] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-black disabled:opacity-50"
               >
                 {saving ? <Loader2 size={15} className="animate-spin" /> : null}
                 {row ? "Simpan Perubahan" : "Simpan"}

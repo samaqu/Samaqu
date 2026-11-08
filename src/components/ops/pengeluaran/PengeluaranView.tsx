@@ -2,20 +2,19 @@
 
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Package, Plus, RefreshCw } from "lucide-react";
+import { AlertTriangle, Package, Plus, Receipt, RefreshCw } from "lucide-react";
 import ConfirmDeleteModal from "@/components/ops/ConfirmDeleteModal";
 import { useToast } from "@/components/ops/ui/use-toast";
 import PengeluaranHeader from "./PengeluaranHeader";
-import PengeluaranSummaryCards from "./PengeluaranSummaryCards";
 import PengeluaranTable from "./PengeluaranTable";
 import ExpenseDrawer from "./ExpenseDrawer";
 import BarangDrawer from "./BarangDrawer";
 import { currentWibPeriod, pesanError, pengeluaranFetch, rupiah } from "./helpers";
 import { EMPTY_SUMMARY, type ExpenseItem, type ExpenseRow, type PengeluaranResponse, type PengeluaranTipe } from "./types";
 
-const TABS: { key: PengeluaranTipe; label: string }[] = [
-  { key: "packing", label: "Pengeluaran Packing" },
-  { key: "operasional", label: "Pengeluaran Operasional" },
+const TABS: { key: PengeluaranTipe; label: string; icon: typeof Package }[] = [
+  { key: "packing", label: "Pengeluaran Packing", icon: Package },
+  { key: "operasional", label: "Pengeluaran Operasional", icon: Receipt },
 ];
 
 /** Data awal kosong (pola halaman ops lain) — query tetap jalan karena `initialDataUpdatedAt: 0`. */
@@ -116,6 +115,9 @@ export default function PengeluaranView() {
       <PengeluaranHeader
         bulan={periode.bulan}
         tahun={periode.tahun}
+        tipe={tab}
+        summary={summary}
+        loading={loading}
         isFetching={query.isFetching && !loading}
         onChange={(bulan, tahun) => setPeriode({ bulan, tahun })}
       />
@@ -136,22 +138,22 @@ export default function PengeluaranView() {
         </div>
       ) : null}
 
-      <PengeluaranSummaryCards tipe={tab} summary={summary} loading={loading} />
-
       <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 md:p-5">
-        <div className="flex w-fit flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
+        <div className="flex w-fit max-w-full flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
           {TABS.map((item) => {
             const aktif = tab === item.key;
+            const Icon = item.icon;
             return (
               <button
                 key={item.key}
                 type="button"
                 onClick={() => setTab(item.key)}
                 aria-pressed={aktif}
-                className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-colors ${
-                  aktif ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-white"
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-colors ${
+                  aktif ? "bg-[#18181b] text-white shadow-sm" : "text-slate-600 hover:bg-white"
                 }`}
               >
+                <Icon size={14} className="shrink-0" />
                 {item.label}
               </button>
             );
@@ -179,7 +181,7 @@ export default function PengeluaranView() {
             <button
               type="button"
               onClick={bukaTambah}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#18181b] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-black"
             >
               <Plus size={15} /> Tambah
             </button>

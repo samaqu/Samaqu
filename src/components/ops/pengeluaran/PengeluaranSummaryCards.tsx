@@ -1,7 +1,6 @@
 "use client";
 
 import { Layers, Package, Receipt, Wallet } from "lucide-react";
-import GlassCard from "@/components/ops/GlassCard";
 import { angka, rupiah } from "./helpers";
 import type { PengeluaranSummary, PengeluaranTipe } from "./types";
 
@@ -68,7 +67,7 @@ function kartuUntuk(tipe: PengeluaranTipe, summary: PengeluaranSummary): Card[] 
   ];
 }
 
-/** Tiga kartu ringkasan yang mengikuti tab aktif. */
+/** Tiga kartu ringkasan yang mengikuti tab aktif — dirender di dalam kartu gelap header. */
 export default function PengeluaranSummaryCards({
   tipe,
   summary,
@@ -80,12 +79,12 @@ export default function PengeluaranSummaryCards({
 }) {
   if (loading) {
     return (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {[0, 1, 2].map((index) => (
-          <div key={index} className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="h-4 w-28 animate-pulse rounded-md bg-slate-100" />
-            <div className="mt-4 h-7 w-32 animate-pulse rounded-md bg-slate-100" />
-            <div className="mt-3 h-3 w-24 animate-pulse rounded-md bg-slate-100" />
+          <div key={index} className="rounded-2xl border border-white/15 bg-white/[0.06] p-4">
+            <div className="h-3 w-28 animate-pulse rounded-md bg-white/15" />
+            <div className="mt-4 h-7 w-32 animate-pulse rounded-md bg-white/15" />
+            <div className="mt-3 h-3 w-24 animate-pulse rounded-md bg-white/10" />
           </div>
         ))}
       </div>
@@ -93,17 +92,31 @@ export default function PengeluaranSummaryCards({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-      {kartuUntuk(tipe, summary).map((card) => (
-        <GlassCard
-          key={card.key}
-          icon={card.icon}
-          label={card.label}
-          value={card.value}
-          caption={card.caption}
-          tone={card.tone}
-        />
-      ))}
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      {kartuUntuk(tipe, summary).map((card) => {
+        const Icon = card.icon;
+        return (
+          <div
+            key={card.key}
+            className="flex flex-col rounded-2xl border border-white/15 bg-white/[0.06] p-4"
+          >
+            <div className="flex min-h-[20px] items-center gap-2 text-white/55">
+              <Icon size={15} className="shrink-0" />
+              <span className="truncate text-[10px] font-black uppercase tracking-[0.14em]">
+                {card.label}
+              </span>
+            </div>
+            <p
+              className={`mt-3 whitespace-nowrap text-[clamp(1.1rem,1.6vw,1.6rem)] font-black leading-tight tabular-nums ${
+                card.tone === "muted" ? "text-white/40" : "text-white"
+              }`}
+            >
+              {card.value}
+            </p>
+            <p className="mt-auto pt-1.5 text-xs font-semibold text-white/45">{card.caption}</p>
+          </div>
+        );
+      })}
     </div>
   );
 }

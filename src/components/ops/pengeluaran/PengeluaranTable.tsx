@@ -4,7 +4,7 @@ import { Pencil, Receipt, Trash2 } from "lucide-react";
 import { angka, rupiah, tanggalLabel } from "./helpers";
 import type { ExpenseItem, ExpenseRow, PengeluaranTipe } from "./types";
 
-const headClass = "px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-slate-400";
+const headClass = "px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-white/60";
 
 function Aksi({
   row,
@@ -63,7 +63,7 @@ export default function PengeluaranTable({
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200">
       <table className="w-full min-w-[680px] border-collapse text-sm">
-        <thead className="bg-[#F9FAFB]">
+        <thead className="bg-[#18181b]">
           <tr>
             <th className={`${headClass} whitespace-nowrap`}>Tanggal</th>
             {tipe === "packing" ? (
@@ -142,7 +142,7 @@ export default function PengeluaranTable({
                 ) : (
                   <>
                     <td className="px-3 py-3">
-                      <span className="inline-flex rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-700">
+                      <span className="inline-flex rounded-lg border border-slate-200 bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700">
                         {row.kategori || "-"}
                       </span>
                     </td>
