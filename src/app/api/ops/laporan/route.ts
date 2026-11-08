@@ -259,6 +259,33 @@ async function loadPeriod(
   const exchanges = (exchangesRes.data || []) as ReturnRow[];
   const validOrders = orders.filter((o) => SALE_STATUSES.includes(String(o.status || "").toLowerCase()));
 
+  // `orders.payment_method` menyimpan ID metode (UUID). Ambil labelnya sekaligus supaya
+  // drawer detail tidak menampilkan id mentah.
+  const methodIds = [
+    ...new Set(
+      orders
+        .map((order) => String(order.payment_method || ""))
+        .filter((id) => /^[0-9a-f-]{36}$/i.test(id)),
+    ),
+  ];
+  const methodLabels = new Map<string, string>();
+  if (methodIds.length > 0) {
+    const { data } = await admin
+      .from("payment_methods")
+      .select("id, label, bank_name, method_type")
+      .in("id", methodIds);
+    for (const method of data || []) {
+      methodLabels.set(
+        String((method as any).id),
+        String((method as any).label || (method as any).bank_name || (method as any).method_type || ""),
+      );
+    }
+  }
+  // Tempel label ke pesanan supaya ikut terkirim ke drawer detail.
+  for (const order of orders) {
+    (order as any).payment_method_label = methodLabels.get(String(order.payment_method || "")) || null;
+  }
+
   // Item diambil untuk semua pesanan (termasuk pending/batal) supaya drawer detail tetap
   // bisa ditelusuri; HPP hanya dijumlahkan untuk pesanan sah (`validOrders`).
   const orderIds = orders.map((o) => String(o.id));

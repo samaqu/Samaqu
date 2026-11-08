@@ -1423,7 +1423,7 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
         ongkir={Number(row.shipping_cost) || 0}
         diskon={Number(row.discount) || 0}
         total={Number(row.total) || 0}
-        metodeBayar={row.payment_method || row.channel || "-"}
+        metodeBayar={row.payment_method_label || row.channel || "-"}
         waktuPesan={dateTime(row.created_at)}
         waktuBayar={row.paid_at ? dateTime(row.paid_at) : null}
         nomorPesanan={row.order_number || "-"}
