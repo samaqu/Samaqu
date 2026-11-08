@@ -1918,3 +1918,37 @@ tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` b
   tidak tertinggal; `expense_items` 1 baris milik owner tidak disentuh). `npx tsc --noEmit` bersih.
   Catatan tool: klik di dalam iframe lewat `MouseEvent` yang disebar **tidak** memicu handler React
   (`drawerOpen` tetap false) — pakai `element.click()`.
+
+## Animasi counter kartu laporan (`CountUp`)
+
+Permintaan pemilik 2026-11-09: kartu `/ops/laporan` ("kurang modern, kalo bisa di card nya ada
+animasi counter") memakai **`src/components/admin/CountUp.tsx`** yang sama dengan dashboard admin —
+kartu metrik `ReportMetric`, kartu Mayar, kartu pending, dan angka "Estimasi Laba" menerima **angka
+mentah + `format`**, bukan string rupiah jadi, supaya tiap frame animasi diformat sama.
+
+Dua bug di komponen itu yang harus tetap diperbaiki (ditemukan saat memverifikasi halaman ini,
+sebelumnya tidak terlihat di dashboard karena nilainya baru masuk SETELAH mount):
+
+- **Strict Mode menahan kartu di Rp 0.** React dev menjalankan effect dua kali
+  (mount → cleanup → mount). Cleanup lama menulis target akhir ke ref titik-awal, jadi mount kedua
+  menganggap animasi sudah selesai dan angka tampil 0 selamanya. Sekarang posisi animasi disimpan di
+  `displayedRef` yang **hanya** berubah saat sebuah frame benar-benar tampil, dan cleanup hanya
+  membatalkan rAF. Jangan kembalikan `fromRef.current = to` di cleanup.
+- **Frame pertama bisa negatif** (`Rp -1.643.556`): timestamp rAF bisa lebih awal daripada
+  `performance.now()` di effect, jadi progres dijepit `Math.max(0, …)`.
+
+Verifikasi (2026-11-09, `/ops/laporan` lewat iframe same-origin, sesi admin diputar ulang):
+`npx tsc --noEmit` bersih; 37 nilai berbeda pada kartu Total Omset (`Rp 0` → … →
+`Rp 20.965.000`), tanpa nilai negatif; kartu Mayar (Rp 24.542 / Rp 0 / 3) dan panel "Perhitungan
+Laba" ikut beranimasi; permukaan kartu tetap `#EFEFF1` (kanvas putih); 0 px geser samping di 1280 px
+dan 390 px; 0 error console.
+
+**Tampilan modern (halaman yang sama, 2026-11-09)** — semua tetap di palet monokrom terang yang
+diwajibkan (kartu `#EFEFF1`, tile `#FAFAFA`, kanvas putih; **jangan** mengembalikan header grafit):
+kartu metrik naik halus saat hover + tile ikon membalik jadi hitam, tiap section punya tile ikon
+konsisten (Perhitungan Laba & Tren Keuangan), bar porsi tumbuh dari kiri, dan grafik Tren Keuangan
+memakai satu Area bergradasi grafit + garis monokrom (`#A1A1AA` / `#18181B` / `#52525B`) — biru
+`#2563EB` dan hijau `#10B981` lama di grafik sudah dicabut. Animasi masuk/stagger ada di
+`src/app/globals.css` dengan awalan **`lpr-`** (`lpr-rise`, `lpr-bar`) + fallback
+`prefers-reduced-motion`. Baris periode/rumus/delta di kartu atas tetap **tidak** ditampilkan
+(permintaan pemilik sebelumnya).

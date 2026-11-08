@@ -21,15 +21,17 @@ import {
   X,
 } from "lucide-react";
 import {
+  Area,
   CartesianGrid,
+  ComposedChart,
   Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip as ChartTooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { statusLabel, orderSourceLabel } from "@/lib/transaksi";
+import CountUp from "@/components/admin/CountUp";
 import BestSellerSection from "@/components/ops/BestSellerSection";
 
 /**
@@ -269,6 +271,7 @@ function Badge({ tone = "gray", children }: { tone?: string; children: ReactNode
 function MayarSummaryCard({
   label,
   value,
+  format = (n) => String(Math.round(n)),
   caption,
   bar,
   tone,
@@ -276,7 +279,9 @@ function MayarSummaryCard({
   onClick,
 }: {
   label: string;
-  value: string;
+  /** Angka mentah — dihitung naik oleh `CountUp`. */
+  value: number;
+  format?: (n: number) => string;
   caption: string;
   /** 0–100; kosong = tanpa bar (kartu informasi). */
   bar?: number;
@@ -295,16 +300,22 @@ function MayarSummaryCard({
   return (
     <Wrapper
       {...(onClick ? { type: "button" as const, onClick } : {})}
-      className={`flex w-full flex-col rounded-2xl border p-4 text-left transition-colors ${
+      className={`flex w-full flex-col rounded-2xl border p-4 text-left transition-all duration-300 ${
         active ? `${palette.ring} bg-white ring-2 ring-slate-900/5` : "border-[#E5E7EB] bg-white"
-      } ${onClick ? "cursor-pointer hover:border-slate-300 hover:bg-slate-50" : ""}`}
+      } ${
+        onClick
+          ? "cursor-pointer hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_26px_-22px_rgba(16,24,40,0.55)]"
+          : "hover:shadow-[0_14px_26px_-24px_rgba(16,24,40,0.45)]"
+      }`}
     >
       <span className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">{label}</span>
-      <span className={`mt-1 text-xl font-black tabular-nums ${palette.text}`}>{value}</span>
+      <span className={`mt-1 text-xl font-black tabular-nums ${palette.text}`}>
+        <CountUp value={value} format={format} />
+      </span>
       {typeof bar === "number" ? (
         <span className="mt-2 block h-1.5 w-full overflow-hidden rounded-full bg-[#E4E4E7]">
           <span
-            className={`block h-full rounded-full ${palette.barBg}`}
+            className={`lpr-bar block h-full rounded-full ${palette.barBg}`}
             style={{ width: `${Math.max(2, Math.min(100, bar))}%` }}
           />
         </span>
@@ -323,33 +334,45 @@ function ReportMetric({
   icon: Icon,
   label,
   value,
+  format,
   caption,
   title,
   badge,
   muted,
+  delay = 0,
 }: {
   icon: any;
   label: string;
-  value: string;
+  /** Angka mentah kartu — dihitung naik oleh `CountUp`, bukan string jadi. */
+  value: number | null;
+  /** Pemformat angka per frame animasi (rupiah / jumlah). */
+  format: (n: number) => string;
   caption: string;
   title?: string;
   badge?: { label: string; cls: string };
   muted?: boolean;
+  /** Jeda animasi masuk (ms) supaya keempat tile muncul berurutan. */
+  delay?: number;
 }) {
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border border-[#E4E4E7] bg-[#FAFAFA] p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] ${
+      className={`lpr-rise group relative flex flex-col overflow-hidden rounded-2xl border border-[#E4E4E7] bg-[#FAFAFA] p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-300 hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-[0_16px_30px_-24px_rgba(16,24,40,0.5)] ${
         muted ? "opacity-95" : ""
       }`}
+      style={{ animationDelay: `${delay}ms` }}
       title={title}
     >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent"
+      />
       <span className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-zinc-400">{label}</span>
       <p
         className={`mt-2 whitespace-nowrap text-[clamp(1.05rem,1.6vw,1.45rem)] font-black leading-tight tabular-nums ${
           muted ? "text-zinc-400" : "text-zinc-900"
         }`}
       >
-        {value}
+        {value === null ? "—" : <CountUp value={value} format={format} />}
       </p>
       <div className="mt-1 flex min-h-[30px] flex-wrap items-center gap-1.5 pr-9">
         {badge ? (
@@ -359,7 +382,7 @@ function ReportMetric({
         ) : null}
         <span className="text-[11px] font-semibold leading-snug text-zinc-500">{caption}</span>
       </div>
-      <span className="absolute bottom-4 right-4 grid h-8 w-8 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-400">
+      <span className="absolute bottom-4 right-4 grid h-8 w-8 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-400 transition-colors duration-300 group-hover:border-zinc-900 group-hover:bg-zinc-900 group-hover:text-white">
         <Icon size={15} strokeWidth={1.8} />
       </span>
     </div>
@@ -477,15 +500,19 @@ export default function LaporanKeuanganPage() {
         ? { label: "BELUM FINAL", cls: "bg-amber-50 text-amber-700 border-amber-100" }
         : { label: "BELUM TERSEDIA", cls: "bg-slate-50 text-slate-500 border-slate-200" };
   const seriesOptions = [
-    { key: "gross", label: "Penjualan", color: "#94A3B8" },
-    { key: "net", label: "Setelah Retur", color: "#2563EB" },
-    ...(s.profitStatus === "valid" ? [{ key: "profit", label: "Estimasi Laba", color: "#10B981" }] : []),
+    { key: "gross", label: "Penjualan", color: "#A1A1AA" },
+    { key: "net", label: "Setelah Retur", color: "#18181B" },
+    ...(s.profitStatus === "valid" ? [{ key: "profit", label: "Estimasi Laba", color: "#52525B" }] : []),
   ];
 
   return (
     <div className="-m-4 space-y-5 bg-white p-4 md:-m-6 md:p-6 lg:-m-8 lg:p-8">
       {/* HEADER + KPI — satu kartu laporan, palet monokrom SAMAQU */}
-      <section className="overflow-hidden rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_24px_48px_-40px_rgba(16,24,40,0.45)] md:p-7">
+      <section className="lpr-rise relative overflow-hidden rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_24px_48px_-40px_rgba(16,24,40,0.45)] md:p-7">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent"
+        />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3.5">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-zinc-900 text-white shadow-[0_6px_16px_-8px_rgba(0,0,0,0.6)]">
@@ -554,22 +581,26 @@ export default function LaporanKeuanganPage() {
           <ReportMetric
             icon={IconOmset}
             label="Total Omset"
-            value={rp(s.gross)}
+            value={s.gross}
+            format={rp}
             caption="Pendapatan kotor · tanpa ongkir"
             title="Nilai transaksi yang diakui (diproses/dikirim/selesai) di luar ongkir."
           />
           <ReportMetric
             icon={IconPackage}
             label="Total HPP"
-            value={s.hppStatus === "missing" ? "—" : rp(s.hpp)}
+            value={s.hppStatus === "missing" ? null : s.hpp}
+            format={rp}
             caption={s.hppStatus === "complete" ? "Modal produk terjual" : s.hppNote || "Modal belum lengkap"}
             muted={s.hppStatus !== "complete"}
             title={s.hppNote || undefined}
+            delay={70}
           />
           <ReportMetric
             icon={IconWallet}
             label="Total Biaya"
-            value={s.expensesAvailable === false ? "—" : rp(s.biaya)}
+            value={s.expensesAvailable === false ? null : s.biaya}
+            format={rp}
             caption={
               s.expensesAvailable === false
                 ? "Tabel pengeluaran belum tersedia"
@@ -581,11 +612,13 @@ export default function LaporanKeuanganPage() {
             title={`Operasional ${rp(s.biayaOperasional || 0)} · Packing ${rp(
               s.biayaPacking || 0,
             )} · Mayar ${rp(s.mayarFee || 0)}`}
+            delay={140}
           />
           <ReportMetric
             icon={IconProfit}
             label="Laba Bersih"
-            value={s.profit !== null ? rp(s.profit) : "—"}
+            value={s.profit}
+            format={rp}
             caption={
               s.profitStatus === "valid"
                 ? "Keuntungan bersih"
@@ -596,6 +629,7 @@ export default function LaporanKeuanganPage() {
             badge={profitBadge}
             muted={s.profitStatus !== "valid"}
             title={s.profitNote || undefined}
+            delay={210}
           />
         </div>
 
@@ -614,11 +648,16 @@ export default function LaporanKeuanganPage() {
       </section>
 
       {/* PERHITUNGAN LABA */}
-      <section className="overflow-hidden rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] shadow-sm">
+      <section className="lpr-rise overflow-hidden rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] shadow-sm">
         <div className="flex items-start justify-between gap-3 px-5 pb-4 pt-5 md:px-6">
-          <div>
-            <h2 className="text-sm font-black tracking-tight text-zinc-900">Perhitungan Laba</h2>
-            <p className="mt-0.5 text-xs font-medium text-zinc-500">Dari penjualan sampai estimasi laba.</p>
+          <div className="flex items-start gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-slate-700">
+              <IconProfit size={18} strokeWidth={1.9} />
+            </span>
+            <div>
+              <h2 className="text-sm font-black tracking-tight text-zinc-900">Perhitungan Laba</h2>
+              <p className="mt-0.5 text-xs font-medium text-zinc-500">Dari penjualan sampai estimasi laba.</p>
+            </div>
           </div>
           <span className="shrink-0 rounded-full border border-[#E4E4E7] bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
             {s.profitStatus === "valid" ? "Lengkap" : s.profitStatus === "partial" ? "Sebagian" : "Belum lengkap"}
@@ -710,7 +749,7 @@ export default function LaporanKeuanganPage() {
                   s.profitStatus === "valid" ? (profitPositive ? "text-emerald-600" : "text-red-600") : "text-zinc-400"
                 }`}
               >
-                {s.profit !== null ? rp(s.profit) : "Belum dapat dihitung"}
+                {s.profit !== null ? <CountUp value={s.profit} format={rp} duration={900} /> : "Belum dapat dihitung"}
               </p>
             </div>
             {s.profitStatus !== "valid" ? (
@@ -730,7 +769,7 @@ export default function LaporanKeuanganPage() {
       </section>
 
       {/* PENDING */}
-      <section className="rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
+      <section className="lpr-rise rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Perlu Diselesaikan</p>
@@ -751,7 +790,9 @@ export default function LaporanKeuanganPage() {
           >
             <div>
               <p className="text-xs font-bold text-slate-500">Retur pending</p>
-              <p className="mt-1 text-xl font-black text-[#374151] tabular-nums">{rp(s.refundsPending)}</p>
+              <p className="mt-1 text-xl font-black text-[#374151] tabular-nums">
+                <CountUp value={s.refundsPending} format={rp} />
+              </p>
               <p className="text-[11px] font-semibold text-slate-400">{s.refundsPendingCount} kasus · belum mengurangi neto</p>
             </div>
             <ChevronRight size={18} className="text-slate-400" />
@@ -765,7 +806,7 @@ export default function LaporanKeuanganPage() {
             <div>
               <p className="text-xs font-bold text-slate-500">Selisih Tukar Size pending</p>
               <p className={`mt-1 text-xl font-black tabular-nums ${s.exchangePending >= 0 ? "text-amber-600" : "text-blue-600"}`}>
-                {rpSigned(s.exchangePending)}
+                <CountUp value={s.exchangePending} format={rpSigned} />
               </p>
               <p className="text-[11px] font-semibold text-slate-400">
                 {s.exchangePendingCount} kasus · {s.exchangePending >= 0 ? "customer bayar" : "refund"}
@@ -777,13 +818,18 @@ export default function LaporanKeuanganPage() {
       </section>
 
       {/* CHART */}
-      <section className="rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
+      <section className="lpr-rise rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-black tracking-tight text-[#374151]">Tren Keuangan</h2>
-            <p className="text-xs font-medium text-slate-500">
-              Penjualan, penjualan setelah retur, dan estimasi laba mengikuti periode.
-            </p>
+          <div className="flex items-start gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-slate-700">
+              <IconReport size={18} strokeWidth={1.9} />
+            </span>
+            <div>
+              <h2 className="text-lg font-black tracking-tight text-[#374151]">Tren Keuangan</h2>
+              <p className="text-xs font-medium text-slate-500">
+                Penjualan, penjualan setelah retur, dan estimasi laba mengikuti periode.
+              </p>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             {seriesOptions.map((item) => (
@@ -804,7 +850,7 @@ export default function LaporanKeuanganPage() {
           </div>
         </div>
 
-        <div className="mt-4 h-72 w-full">
+        <div className="mt-4 h-72 w-full rounded-2xl border border-[#E4E4E7] bg-white p-2 md:p-3">
           {data.trend.points.every((point) => !point.gross && !point.net && !point.profit) ? (
             <div className="grid h-full place-items-center rounded-2xl bg-white text-center">
               <div>
@@ -814,25 +860,45 @@ export default function LaporanKeuanganPage() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.trend.points} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-                <CartesianGrid stroke="#E5E7EB" strokeDasharray="3 3" vertical={false} />
+              <ComposedChart data={data.trend.points} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="laporan-net-fill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#18181B" stopOpacity={0.16} />
+                    <stop offset="100%" stopColor="#18181B" stopOpacity={0.01} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="#EDEDF0" strokeDasharray="4 4" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#9CA3AF" }} tickLine={false} axisLine={false} minTickGap={18} />
                 <YAxis tickFormatter={compact} tick={{ fontSize: 11, fill: "#9CA3AF" }} tickLine={false} axisLine={false} width={54} />
-                <ChartTooltip content={<TrendTooltip />} />
-                {series.gross ? <Line type="monotone" dataKey="gross" name="Penjualan" stroke="#94A3B8" strokeWidth={2} dot={false} /> : null}
-                {series.net ? <Line type="monotone" dataKey="net" name="Penjualan Setelah Retur" stroke="#2563EB" strokeWidth={2.5} dot={false} /> : null}
+                <ChartTooltip content={<TrendTooltip />} cursor={{ stroke: "#D4D4D8", strokeDasharray: "4 4" }} />
+                {series.gross ? (
+                  <Line type="monotone" dataKey="gross" name="Penjualan" stroke="#A1A1AA" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                ) : null}
+                {series.net ? (
+                  <Area
+                    type="monotone"
+                    dataKey="net"
+                    name="Penjualan Setelah Retur"
+                    stroke="#18181B"
+                    strokeWidth={2.5}
+                    fill="url(#laporan-net-fill)"
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                ) : null}
                 {s.profitStatus === "valid" && series.profit ? (
                   <Line
                     type="monotone"
                     dataKey="profit"
                     name="Estimasi Laba"
-                    stroke="#10B981"
+                    stroke="#52525B"
                     strokeWidth={2}
                     strokeDasharray="5 4"
                     dot={false}
+                    activeDot={{ r: 4 }}
                   />
                 ) : null}
-              </LineChart>
+              </ComposedChart>
             </ResponsiveContainer>
           )}
         </div>
@@ -848,7 +914,7 @@ export default function LaporanKeuanganPage() {
 
       {/* SUMBER PESANAN — memisahkan Reseller dari penjualan lain */}
       {sources.length > 0 ? (
-        <section className="rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
+        <section className="lpr-rise rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-slate-700">
@@ -876,8 +942,8 @@ export default function LaporanKeuanganPage() {
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#E4E4E7]">
                   <div
-                    className={`h-full rounded-full ${PAYMENT_BAR[index] || "bg-slate-300"}`}
-                    style={{ width: `${Math.max(2, row.share)}%` }}
+                    className={`lpr-bar h-full rounded-full ${PAYMENT_BAR[index] || "bg-slate-300"}`}
+                    style={{ width: `${Math.max(2, row.share)}%`, animationDelay: `${index * 70}ms` }}
                   />
                 </div>
                 <p className="mt-1.5 whitespace-nowrap text-xs font-black text-slate-700 tabular-nums">{rp(row.amount)}</p>
@@ -888,7 +954,7 @@ export default function LaporanKeuanganPage() {
       ) : null}
 
       {/* METODE PEMBAYARAN */}
-      <section className="rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
+      <section className="lpr-rise rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-slate-700">
@@ -923,8 +989,8 @@ export default function LaporanKeuanganPage() {
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#E4E4E7]">
                     <div
-                      className={`h-full rounded-full ${PAYMENT_BAR[index] || "bg-slate-300"}`}
-                      style={{ width: `${Math.max(2, row.share)}%` }}
+                      className={`lpr-bar h-full rounded-full ${PAYMENT_BAR[index] || "bg-slate-300"}`}
+                      style={{ width: `${Math.max(2, row.share)}%`, animationDelay: `${index * 70}ms` }}
                     />
                   </div>
                   <p className="mt-1.5 whitespace-nowrap text-xs font-black text-slate-700 tabular-nums">{rp(row.amount)}</p>
@@ -935,7 +1001,7 @@ export default function LaporanKeuanganPage() {
       </section>
 
       {/* TABLES */}
-      <section ref={tableRef} id="report-tables" className="rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
+      <section ref={tableRef} id="report-tables" className="lpr-rise rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
         {/*
           ── Ringkasan Biaya Transaksi Mayar ──
           Dua kartu (cair / belum cair) + satu kartu total transaksi bulan ini.
@@ -953,7 +1019,8 @@ export default function LaporanKeuanganPage() {
               active={tab === "mayar-settled"}
               onClick={() => setTab("mayar-settled")}
               label="Sudah Cair"
-              value={rp(mayarSettledTotal)}
+              value={mayarSettledTotal}
+              format={rp}
               caption={
                 mayarSettledRows.length > 0
                   ? `${mayarSettledRows.length} transaksi · biaya final`
@@ -966,7 +1033,8 @@ export default function LaporanKeuanganPage() {
               active={tab === "mayar-pending"}
               onClick={() => setTab("mayar-pending")}
               label="Belum Cair"
-              value={rp(mayarPendingTotal)}
+              value={mayarPendingTotal}
+              format={rp}
               caption={
                 mayarPendingRows.length > 0
                   ? `${mayarPendingRows.length} transaksi menunggu cair`
@@ -978,7 +1046,7 @@ export default function LaporanKeuanganPage() {
             <MayarSummaryCard
               active={false}
               label="Total Transaksi"
-              value={String(mayarAllCount)}
+              value={mayarAllCount}
               caption={`${
                 mayarSettledRows.length + mayarPendingRows.length > 0
                   ? `${mayarSettledRows.length} cair · ${mayarPendingRows.length} belum`
