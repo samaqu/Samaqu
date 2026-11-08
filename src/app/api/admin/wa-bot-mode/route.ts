@@ -57,6 +57,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "mode harus auto, local, server, atau off." }, { status: 400 });
   }
 
+  // Baca mode sebelumnya untuk catatan log pergantian.
+  let previous = "";
+  try {
+    const current = await fetch(`${cfg.base}/rest/v1/wa_bot_control?select=mode&id=eq.1`, {
+      headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` },
+      cache: "no-store",
+    });
+    const rows = (await current.json().catch(() => [])) as { mode?: string }[];
+    previous = String(rows?.[0]?.mode || "");
+  } catch {
+    previous = "";
+  }
+
   const res = await fetch(`${cfg.base}/rest/v1/wa_bot_control?id=eq.1`, {
     method: "PATCH",
     headers: {
@@ -72,5 +85,33 @@ export async function POST(req: NextRequest) {
   }
   const rows = (await res.json().catch(() => [])) as { mode?: string; heartbeat?: string | null }[];
   const row = Array.isArray(rows) ? rows[0] : null;
+
+  // Catat pergantian mode ke log bot (`wa_agent_runs`), supaya terlihat di tab Log Bot.
+  if (previous !== mode) {
+    try {
+      await fetch(`${cfg.base}/rest/v1/wa_agent_runs`, {
+        method: "POST",
+        headers: {
+          apikey: cfg.key,
+          Authorization: `Bearer ${cfg.key}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          mode: "switch",
+          note: `mode: ${previous || "?"} → ${mode}`,
+          handled: 0,
+          replied: 0,
+          held: 0,
+          leftover: 0,
+          rounds: 0,
+          duration_ms: 0,
+        }),
+      });
+    } catch {
+      // log gagal tidak boleh membatalkan pergantian mode
+    }
+  }
+
   return NextResponse.json({ ok: true, mode: row?.mode || mode, heartbeat: row?.heartbeat || null });
 }
