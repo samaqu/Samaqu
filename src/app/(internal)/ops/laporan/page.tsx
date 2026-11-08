@@ -614,83 +614,119 @@ export default function LaporanKeuanganPage() {
       </section>
 
       {/* PERHITUNGAN LABA */}
-      <section className="rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
-          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Perhitungan Laba</p>
-          <p className="mt-0.5 text-sm font-medium text-slate-500">Dari penjualan sampai estimasi laba.</p>
-          <div className="mt-3 divide-y divide-[#E5E7EB]">
-            <BreakdownRow
-              label="Total Penjualan"
-              value={rp(s.gross)}
-              hint="Nilai transaksi yang diakui pada periode ini — bukan uang yang sudah diterima."
-              onClick={() => goToTab("sales")}
-            />
-            <BreakdownRow
-              label="Retur"
-              value={`− ${rp(s.refunds)}`}
-              tone="red"
-              hint="Retur/refund yang sudah diselesaikan (uang benar-benar keluar)."
-              onClick={() => goToTab("returns")}
-            />
-            <BreakdownRow
-              label="Penyesuaian Tukar Size"
-              value={rpSigned(s.exchange)}
-              tone={s.exchange >= 0 ? "green" : "blue"}
-              hint="Selisih harga Tukar Size yang sudah settled (+ customer bayar, − refund)."
-              onClick={() => goToTab("exchanges")}
-            />
+      <section className="overflow-hidden rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] shadow-sm">
+        <div className="flex items-start justify-between gap-3 px-5 pb-4 pt-5 md:px-6">
+          <div>
+            <h2 className="text-sm font-black tracking-tight text-zinc-900">Perhitungan Laba</h2>
+            <p className="mt-0.5 text-xs font-medium text-zinc-500">Dari penjualan sampai estimasi laba.</p>
+          </div>
+          <span className="shrink-0 rounded-full border border-[#E4E4E7] bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
+            {s.profitStatus === "valid" ? "Lengkap" : s.profitStatus === "partial" ? "Sebagian" : "Belum lengkap"}
+          </span>
+        </div>
+
+        <div className="space-y-2.5 px-5 pb-5 md:px-6">
+          <div className="overflow-hidden rounded-2xl border border-[#E4E4E7] bg-white">
+            <p className="border-b border-[#F1F1F3] px-4 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-zinc-400">
+              Penjualan
+            </p>
+            <div className="divide-y divide-[#F4F4F5] px-4">
+              <BreakdownRow
+                label="Total Penjualan"
+                value={rp(s.gross)}
+                hint="Nilai transaksi yang diakui pada periode ini — bukan uang yang sudah diterima."
+                onClick={() => goToTab("sales")}
+              />
+              <BreakdownRow
+                label="Retur"
+                value={`− ${rp(s.refunds)}`}
+                tone="red"
+                hint="Retur/refund yang sudah diselesaikan (uang benar-benar keluar)."
+                onClick={() => goToTab("returns")}
+              />
+              <BreakdownRow
+                label="Penyesuaian Tukar Size"
+                value={rpSigned(s.exchange)}
+                tone={s.exchange >= 0 ? "green" : "red"}
+                hint="Selisih harga Tukar Size yang sudah settled (+ customer bayar, − refund)."
+                onClick={() => goToTab("exchanges")}
+              />
+            </div>
             <BreakdownRow
               label="Penjualan Setelah Retur"
               value={rp(s.net)}
               emphasis
               hint="Total Penjualan − Retur + Penyesuaian Tukar Size."
             />
-            <BreakdownRow
-              label="Modal Barang Terjual"
-              value={s.hppStatus === "complete" || s.hppStatus === "partial" ? `− ${rp(s.hpp)}` : "Belum tersedia"}
-              tone={s.hppStatus === "complete" ? "red" : "muted"}
-              hint="Harga pokok (HPP) barang yang masuk perhitungan penjualan."
-              caption={s.hppStatus === "complete" ? undefined : s.hppNote}
-            />
-            <BreakdownRow
-              label="Biaya Operasional & Packing"
-              value={s.expensesAvailable === false ? "Belum tersedia" : `− ${rp((s.biayaOperasional || 0) + (s.biayaPacking || 0))}`}
-              tone={s.expensesAvailable === false ? "muted" : "red"}
-              hint={`Pengeluaran operasional ${rp(s.biayaOperasional || 0)} dan packing ${rp(
-                s.biayaPacking || 0,
-              )} yang tercatat di menu Pengeluaran.`}
-              caption={s.expensesAvailable === false ? "Tabel pengeluaran belum tersedia." : undefined}
-            />
-            {/* Biaya Mayar dipisah: ini biaya transaksi nyata dari penyedia pembayaran. */}
-            <BreakdownRow
-              label="Biaya Transaksi Mayar"
-              value={s.mayarFee ? `− ${rp(s.mayarFee)}` : "Rp 0"}
-              tone={s.mayarFee ? "red" : "muted"}
-              hint="Potongan Mayar (biaya gateway + layanan) dari transaksi yang sudah cair."
-              caption={
-                s.mayarPendingCount
-                  ? `${s.mayarPendingCount} transaksi belum cair — biayanya belum ikut terpotong.`
-                  : undefined
-              }
-            />
-            <BreakdownRow
-              label="Estimasi Laba"
-              value={s.profit !== null ? rp(s.profit) : "Belum dapat dihitung"}
-              tone={s.profitStatus === "valid" ? (profitPositive ? "green" : "red") : "muted"}
-              emphasis
-              hint="Penjualan Setelah Retur − Modal Barang Terjual − Biaya Operasional − Biaya Mayar."
-              caption={s.profitStatus === "valid" ? undefined : s.profitNote}
-            />
           </div>
-          <p
-            className={`mt-3 flex items-start gap-1.5 rounded-xl px-3 py-2 text-[11px] font-semibold ${
-              s.profitStatus === "partial" ? "bg-amber-50 text-amber-700" : "bg-slate-50 text-slate-600"
-            }`}
-          >
-            <AlertTriangle size={13} className="mt-px shrink-0" />
-            {s.profitStatus === "valid"
-              ? "Laba adalah estimasi dari penjualan setelah retur − modal − biaya; komponen di luar pencatatan sistem belum termasuk."
-              : s.profitNote}
-          </p>
+
+          <div className="overflow-hidden rounded-2xl border border-[#E4E4E7] bg-white">
+            <p className="border-b border-[#F1F1F3] px-4 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-zinc-400">
+              Pengurang
+            </p>
+            <div className="divide-y divide-[#F4F4F5] px-4">
+              <BreakdownRow
+                label="Modal Barang Terjual"
+                value={s.hppStatus === "complete" || s.hppStatus === "partial" ? `− ${rp(s.hpp)}` : "Belum tersedia"}
+                tone={s.hppStatus === "complete" ? "red" : "muted"}
+                hint="Harga pokok (HPP) barang yang masuk perhitungan penjualan."
+                caption={s.hppStatus === "complete" ? undefined : s.hppNote}
+              />
+              <BreakdownRow
+                label="Biaya Operasional & Packing"
+                value={s.expensesAvailable === false ? "Belum tersedia" : `− ${rp((s.biayaOperasional || 0) + (s.biayaPacking || 0))}`}
+                tone={s.expensesAvailable === false ? "muted" : "red"}
+                hint={`Pengeluaran operasional ${rp(s.biayaOperasional || 0)} dan packing ${rp(
+                  s.biayaPacking || 0,
+                )} yang tercatat di menu Pengeluaran.`}
+                caption={s.expensesAvailable === false ? "Tabel pengeluaran belum tersedia." : undefined}
+              />
+              {/* Biaya Mayar dipisah: ini biaya transaksi nyata dari penyedia pembayaran. */}
+              <BreakdownRow
+                label="Biaya Transaksi Mayar"
+                value={s.mayarFee ? `− ${rp(s.mayarFee)}` : "Rp 0"}
+                tone={s.mayarFee ? "red" : "muted"}
+                hint="Potongan Mayar (biaya gateway + layanan) dari transaksi yang sudah cair."
+                caption={
+                  s.mayarPendingCount
+                    ? `${s.mayarPendingCount} transaksi belum cair — biayanya belum ikut terpotong.`
+                    : undefined
+                }
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-[#E4E4E7] bg-white px-4 py-3.5">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-zinc-400">Hasil</p>
+            <div className="mt-1 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-zinc-700">Estimasi Laba</p>
+                <p className="mt-0.5 text-[11px] font-medium text-zinc-400">
+                  Penjualan setelah retur − modal − biaya.
+                </p>
+              </div>
+              <p
+                className={`shrink-0 text-right text-xl font-black leading-tight tabular-nums ${
+                  s.profitStatus === "valid" ? (profitPositive ? "text-emerald-600" : "text-red-600") : "text-zinc-400"
+                }`}
+              >
+                {s.profit !== null ? rp(s.profit) : "Belum dapat dihitung"}
+              </p>
+            </div>
+            {s.profitStatus !== "valid" ? (
+              <p
+                className={`mt-2.5 flex items-start gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-semibold leading-relaxed ${
+                  s.profitStatus === "partial"
+                    ? "border-amber-200 bg-amber-50 text-amber-700"
+                    : "border-[#E4E4E7] bg-[#FAFAFA] text-zinc-600"
+                }`}
+              >
+                <AlertTriangle size={13} className="mt-px shrink-0" />
+                {s.profitNote}
+              </p>
+            ) : null}
+          </div>
+        </div>
       </section>
 
       {/* PENDING */}
@@ -1079,23 +1115,36 @@ function BreakdownRow({
       : tone === "green"
         ? "text-emerald-600"
         : tone === "blue"
-          ? "text-blue-600"
+          ? "text-zinc-700"
           : tone === "muted"
-            ? "text-slate-400"
-            : "text-slate-800";
+            ? "text-zinc-400"
+            : "text-zinc-900";
   const Wrapper = onClick ? "button" : "div";
   return (
     <Wrapper
       {...(onClick ? { type: "button", onClick } : {})}
-      className={`flex w-full items-start justify-between gap-3 py-2.5 text-left ${onClick ? "hover:opacity-80" : ""}`}
+      className={`flex w-full items-start justify-between gap-3 text-left transition-colors ${
+        emphasis
+          ? "border-t border-[#E4E4E7] bg-[#FAFAFA] px-4 py-3"
+          : `px-0 py-2.5 ${onClick ? "hover:text-zinc-900" : ""}`
+      }`}
     >
       <span>
-        <span className={`block text-xs font-bold ${emphasis ? "text-slate-900" : "text-slate-500"}`} title={hint}>
+        <span
+          className={`block ${emphasis ? "text-xs font-black text-zinc-900" : "text-xs font-semibold text-zinc-500"}`}
+          title={hint}
+        >
           {label}
         </span>
-        {caption ? <span className="mt-0.5 block text-[10px] font-semibold text-amber-600">{caption}</span> : null}
+        {caption ? (
+          <span className="mt-0.5 block text-[10px] font-semibold leading-relaxed text-amber-600">{caption}</span>
+        ) : null}
       </span>
-      <span className={`shrink-0 font-black tabular-nums ${emphasis ? "text-base" : "text-sm"} ${emphasis ? toneClass : toneClass}`}>
+      <span
+        className={`shrink-0 text-right font-black tabular-nums ${
+          emphasis ? "text-[15px] text-zinc-900" : `text-[13px] ${toneClass}`
+        }`}
+      >
         {value}
       </span>
     </Wrapper>
