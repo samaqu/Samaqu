@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import * as LucideIcons from "lucide-react";
-import PanelDetailPesanan from "@/components/ops/transaksi/PanelDetailPesanan";
+import PanelDetailPesanan, { PanelDetailShell } from "@/components/ops/transaksi/PanelDetailPesanan";
 
 /** Gambar kosong 1x1 untuk item tanpa foto (drawer butuh atribut src). */
 const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
@@ -1397,10 +1397,8 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
       .join(", ");
 
     return (
-      <div className="fixed inset-0 z-50 flex justify-end">
-        <button type="button" className="absolute inset-0 bg-slate-900/30" onClick={onClose} aria-label="Tutup detail" />
-        <aside className="relative flex h-full w-full max-w-md flex-col overflow-hidden bg-white shadow-2xl">
-          <PanelDetailPesanan
+      <PanelDetailShell open onClose={onClose} tema="warna">
+        <PanelDetailPesanan
         tema="warna"
         sumber={row.source || "Website"}
         tahap={tahap}
@@ -1434,8 +1432,7 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
         onChat={() => undefined}
         onClose={onClose}
       />
-        </aside>
-      </div>
+      </PanelDetailShell>
     );
   }
 
