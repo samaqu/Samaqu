@@ -1791,8 +1791,12 @@ tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` b
 - **Migration `supabase/migrations/20261109_pengeluaran.sql`** membuat tabel baru `expense_items`
   (master barang packing) + `expenses` (packing/operasional, `request_id` unik, total packing = qty ×
   harga satuan). RLS aktif **tanpa policy** (hanya service role), index pada `tanggal` & `tipe`.
-  **Belum dijalankan** — jalankan manual di SQL Editor Supabase. Selama belum ada, halaman
-  menampilkan banner "Tabel pengeluaran belum dibuat…" (bukan tabel kosong) dan semua tulis gagal.
+  **Sudah dijalankan 2026-11-08** ke project hosted (`bzoitgivmozhwpuomuhj`) lewat Supabase
+  Management API (`POST /v1/projects/<ref>/database/query`, header `Authorization: Bearer
+  $SUPABASE_ACCESS_TOKEN`) — jadi jalur DDL dari sandbox kini ada; catatan "sandbox tidak punya
+  jalur DDL" di bagian lain hanya berlaku kalau secret itu tidak diisi. Sebelum migration, halaman
+  menampilkan banner "Tabel pengeluaran belum dibuat…" dan `/api/ops/pengeluaran*` membalas 500
+  (tabel belum ada); sesudahnya REST service-role = 200 dan tulis/baca jalan.
 - **API**: `src/app/api/ops/pengeluaran/route.ts` (GET daftar + ringkasan per tipe, POST, PATCH,
   DELETE) dan `src/app/api/ops/pengeluaran/barang/route.ts` (GET/POST/PATCH master barang). Guard
   `isOpsAdmin`, DB via `getSupabaseAdmin`, pesan error bahasa Indonesia. Helper bersama di
