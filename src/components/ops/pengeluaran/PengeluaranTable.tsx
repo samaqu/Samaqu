@@ -58,7 +58,7 @@ export default function PengeluaranTable({
     return item?.satuan || "";
   };
 
-  const kolom = 6;
+  const kolom = tipe === "packing" ? 6 : 5;
 
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200">
@@ -76,7 +76,6 @@ export default function PengeluaranTable({
             ) : (
               <>
                 <th className={headClass}>Kategori</th>
-                <th className={headClass}>Deskripsi</th>
                 <th className={`${headClass} hidden lg:table-cell`}>Metode Bayar</th>
                 <th className={`${headClass} text-right`}>Jumlah</th>
               </>
@@ -144,11 +143,6 @@ export default function PengeluaranTable({
                     <td className="px-3 py-3">
                       <span className="inline-flex rounded-lg border border-slate-200 bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700">
                         {row.kategori || "-"}
-                      </span>
-                    </td>
-                    <td className="max-w-[240px] px-3 py-3 text-xs text-slate-600">
-                      <span className="block truncate" title={row.deskripsi || undefined}>
-                        {row.deskripsi || "-"}
                       </span>
                     </td>
                     <td className="hidden whitespace-nowrap px-3 py-3 text-xs font-semibold text-slate-500 lg:table-cell">

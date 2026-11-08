@@ -45,7 +45,6 @@ export default function ExpenseDrawer({
   const [qty, setQty] = useState("");
   const [totalHarga, setTotalHarga] = useState("");
   const [kategori, setKategori] = useState("");
-  const [deskripsi, setDeskripsi] = useState("");
   const [jumlah, setJumlah] = useState("");
   const [metodeBayar, setMetodeBayar] = useState("");
   const [catatan, setCatatan] = useState("");
@@ -60,7 +59,6 @@ export default function ExpenseDrawer({
     setQty(row?.qty ? String(row.qty) : "");
     setTotalHarga(row?.qty && row?.harga_satuan ? String(row.qty * row.harga_satuan) : "");
     setKategori(row?.kategori || "");
-    setDeskripsi(row?.deskripsi || "");
     setJumlah(tipe === "operasional" && row?.jumlah ? String(row.jumlah) : "");
     setMetodeBayar(row?.metode_bayar || "");
     setCatatan(row?.catatan || "");
@@ -130,7 +128,6 @@ export default function ExpenseDrawer({
       payload = {
         tanggal,
         kategori: kategori.trim(),
-        deskripsi: deskripsi.trim() || null,
         jumlah: Number(jumlah),
         metode_bayar: metodeBayar.trim() || null,
         catatan: catatan.trim() || null,
@@ -287,16 +284,6 @@ export default function ExpenseDrawer({
                       Pilih salah satu kategori operasional.
                     </span>
                   </div>
-
-                  <Field label="Deskripsi">
-                    <textarea
-                      rows={2}
-                      value={deskripsi}
-                      onChange={(event) => setDeskripsi(event.target.value)}
-                      placeholder="Contoh: Gaji packing November"
-                      className={textareaClass}
-                    />
-                  </Field>
 
                   <Field label="Jumlah">
                     <RupiahInput value={jumlah} onChange={setJumlah} />

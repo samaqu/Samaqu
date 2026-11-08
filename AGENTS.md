@@ -1819,6 +1819,12 @@ tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` b
   berubah; baris lama dengan kategori di luar daftar tetap tampil sebagai kartu tambahan (ikon Tag)
   supaya bisa dipertahankan/diganti. Ikon baru (`Zap`, `Building2`, `Wrench`, `Laptop`) sudah
   ditambahkan ke `src/types/lucide-react.d.ts`.
+- **Field Deskripsi dihapus dari form operasional (permintaan pemilik 2026-11-08)**: drawer hanya
+  berisi Tanggal · Kategori · Jumlah · Metode Bayar · Catatan (Catatan yang dipakai untuk keterangan),
+  dan kolom "Deskripsi" ikut dihapus dari tabel operasional (`kolom` di `PengeluaranTable` jadi
+  dinamis: 6 packing / 5 operasional). Payload klien tidak lagi mengirim `deskripsi`; kolom
+  `expenses.deskripsi` **tetap ada** di DB/API supaya baris lama tidak hilang — PATCH memakai nilai
+  tersimpan (`merged` di route) saat field itu tidak dikirim, jadi jangan hapus kolomnya.
 - **Form packing (permintaan pemilik 2026-11-08)**: yang diisi adalah **Total Harga** (harga
   pembelian), lalu **Harga Satuan dihitung otomatis** `Math.round(total ÷ qty)` dan ditampilkan
   read-only; server tetap menyimpan `jumlah = qty × harga_satuan` seperti sebelumnya, jadi
