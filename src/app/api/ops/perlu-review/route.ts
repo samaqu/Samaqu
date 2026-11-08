@@ -46,7 +46,7 @@ async function withFreeCoverHanger(
 
   const { data: product } = await admin
     .from("products")
-    .select("id, name, sku")
+    .select("id, name, sku, price")
     .ilike("sku", FREE_COVER_SKU)
     .maybeSingle();
   if (!product) return payload;
@@ -61,6 +61,7 @@ async function withFreeCoverHanger(
         color: FREE_COVER_COLOR,
         size: "ALL SIZE",
         quantity: 1,
+        price: Number(product.price) || 0,
       },
     ],
   };
