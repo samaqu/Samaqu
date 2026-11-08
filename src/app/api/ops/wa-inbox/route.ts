@@ -222,26 +222,19 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Pengaman anti-banned: batasi kecepatan & volume kirim. Dihitung dari database
-  // (bukan memori) supaya tetap berlaku walau request dilayani instance berbeda.
+  // Pengaman anti-banned: hanya jeda antar pesan. Batas per jam/per hari dihapus
+  // supaya balasan tidak tertahan saat chat ramai; jeda tetap dipakai agar nomor
+  // tidak dianggap spam oleh WhatsApp.
   const gapSeconds = Number(process.env.WA_SEND_MIN_GAP_SEC || 8);
-  const maxPerHour = Number(process.env.WA_SEND_MAX_PER_HOUR || 20);
-  const maxPerDay = Number(process.env.WA_SEND_MAX_PER_DAY || 80);
   const nowMs = Date.now();
-  const hourAgo = new Date(nowMs - 60 * 60 * 1000).toISOString();
-  const dayAgo = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString();
 
-  const [{ data: lastSent }, { count: hourCount }, { count: dayCount }] = await Promise.all([
-    admin
-      .from("wa_inbox")
-      .select("replied_at")
-      .not("replied_at", "is", null)
-      .order("replied_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    admin.from("wa_inbox").select("id", { count: "exact", head: true }).gte("replied_at", hourAgo),
-    admin.from("wa_inbox").select("id", { count: "exact", head: true }).gte("replied_at", dayAgo),
-  ]);
+  const { data: lastSent } = await admin
+    .from("wa_inbox")
+    .select("replied_at")
+    .not("replied_at", "is", null)
+    .order("replied_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   const sinceLast = lastSent?.replied_at
     ? nowMs - new Date(lastSent.replied_at).getTime()
@@ -260,20 +253,6 @@ export async function POST(req: NextRequest) {
     const wait = Math.ceil((gapSeconds * 1000 - sinceLast) / 1000);
     return NextResponse.json(
       { error: `Terlalu cepat. Tunggu ${wait} detik sebelum kirim pesan berikutnya.`, retry_after: wait },
-      { status: 429 },
-    );
-  }
-  if ((hourCount || 0) >= maxPerHour) {
-    await releaseClaim();
-    return NextResponse.json(
-      { error: `Batas ${maxPerHour} pesan/jam tercapai. Pesan dikembalikan ke antrean.`, retry_after: 3600 },
-      { status: 429 },
-    );
-  }
-  if ((dayCount || 0) >= maxPerDay) {
-    await releaseClaim();
-    return NextResponse.json(
-      { error: `Batas ${maxPerDay} pesan/24 jam tercapai. Pesan dikembalikan ke antrean.`, retry_after: 3600 },
       { status: 429 },
     );
   }
