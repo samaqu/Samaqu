@@ -993,10 +993,11 @@ export default function TambahProdukPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editProductId]);
 
-  // Auto-generate slug from name
+  // Auto-generate slug from name — HANYA untuk produk baru. Saat edit, id produk harus
+  // tetap supaya ganti nama tidak membuat baris baru (dulu bikin 409 "SKU sudah dipakai").
   function handleNameChange(val: string) {
     setName(val);
-    if (!slug || slug === generateSlug(name)) {
+    if (!isEdit && (!slug || slug === generateSlug(name))) {
       setSlug(generateSlug(val));
     }
   }

@@ -30,12 +30,28 @@ export async function archiveWaMedia(input: {
 }): Promise<string | null> {
   if (!input.url || !r2PrivateConfigured()) return null;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
-  try {
-    const res = await fetch(input.url, { signal: controller.signal });
-    if (!res.ok) return null;
+  // Fonnte kadang belum siap saat webhook masuk, dan URL-nya cepat kedaluwarsa.
+  // Coba dua kali sebelum menyerah supaya bukti transfer tidak hilang.
+  let res: Response | null = null;
+  for (let attempt = 0; attempt < 2 && !res; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const attemptRes = await fetch(input.url, { signal: controller.signal });
+      if (attemptRes.ok) res = attemptRes;
+    } catch {
+      // coba lagi di putaran berikutnya
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!res) await new Promise((resolve) => setTimeout(resolve, 800));
+  }
+  if (!res) {
+    console.error("[WA-MEDIA] unduh lampiran gagal:", input.url);
+    return null;
+  }
 
+  try {
     const type = (res.headers.get("content-type") || "image/jpeg").split(";")[0].trim().toLowerCase();
     if (!type.startsWith("image/")) return null;
     const bytes = Buffer.from(await res.arrayBuffer());
@@ -59,7 +75,5 @@ export async function archiveWaMedia(input: {
   } catch (error) {
     console.error("[WA-MEDIA] arsip gagal:", error);
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
