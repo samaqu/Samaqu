@@ -75,6 +75,15 @@ export async function GET(req: NextRequest) {
     if (updated) claimed.push(updated);
   }
 
+  // Trace: satu ID per pesan (`wa_inbox.id`) dipakai dari webhook sampai balasan.
+  if (claimed.length) {
+    console.log(
+      `[WA-TRACE] claim ${claimed
+        .map((row) => String(row.id))
+        .join(",")}`,
+    );
+  }
+
   // Sertakan riwayat percakapan dengan pengirim yang sama, supaya balasan
   // nyambung dengan pesan sebelumnya (mis. customer menjawab "yg ini" saja).
   const { data: learnings } = await admin

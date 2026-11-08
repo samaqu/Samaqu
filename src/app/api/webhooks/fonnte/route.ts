@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
       .update(`${inboxid}|${device}|${sender}|${timestamp}|${message}`)
       .digest("hex");
 
-    const { error } = await getSupabaseAdmin()
+    const { data: inserted, error } = await getSupabaseAdmin()
       .from("wa_inbox")
       .insert({
         dedupe_key: dedupeKey,
@@ -134,7 +134,17 @@ export async function POST(req: NextRequest) {
         is_group: false,
         inboxid: inboxid || null,
         fonnte_timestamp: timestamp || null,
-      });
+      })
+      .select("id")
+      .maybeSingle();
+
+    // `wa_inbox.id` dipakai sebagai trace id satu pesan dari webhook sampai balasan.
+    const inboxId = (inserted as { id?: string } | null)?.id ?? null;
+    if (inboxId) {
+      console.log(
+        `[WA-TRACE] inbox=${inboxId} sender=${sender} media=${mediaUrl ? "yes" : "no"}`,
+      );
+    }
 
     if (error && error.code !== "23505") {
       console.error("[WA-INBOX] gagal simpan:", error.message);
@@ -176,7 +186,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ok: true, duplicate: error?.code === "23505" });
+    return NextResponse.json({ ok: true, duplicate: error?.code === "23505", inbox_id: inboxId });
   } catch (e) {
     console.error("[WA-INBOX] webhook error:", e);
     return NextResponse.json({ ok: false }, { status: 200 });
