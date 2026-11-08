@@ -1874,6 +1874,21 @@ tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` b
   = `missing` dan Total HPP / Laba tampil "—" sampai kolom HPP diisi di katalog — itu disengaja,
   jangan mengganti 0 jadi "modal diketahui". Tombol **Export PDF** memakai `window.print()`
   (dialog print browser → Save as PDF), bukan generator PDF baru.
+- **Kartu atas = pola "Rekap Pengeluaran" (permintaan pemilik 2026-11-08: "card di laporan mending
+  samain aja deh kaya yg di rekap pengeluaran")**: kartu header `/ops/laporan` kembali memakai
+  gradien grafit yang sama dengan `PengeluaranHeader` (`#111113 → #2d2d33`, radius 24, judul 14 px
+  ikon di kotak `border-white/15 bg-white/10`, pemilih bulan `#1d1d21`), dan 4 tile metrik memakai
+  susunan `PengeluaranSummaryCards` (ikon + label sebaris, nilai besar, keterangan di bawah, kelas
+  `border-white/15 bg-white/[0.06]`, teks `text-white/*`) — jadi `ReportMetric` sekarang setara
+  tile di modul Pengeluaran (ikon bulat di kanan sudah dihapus). Ini **menimpa** catatan "jangan
+  mengembalikan blok grafit selebar kartu" di atas; kartu-kartu lain di halaman (Perhitungan Laba,
+  Pending, Chart, Sumber Pesanan, Metode Pembayaran, tabel) tetap permukaan terang `#EFEFF1`.
+  Tiga baris teks di kartu itu **dihapus atas permintaan pemilik**: baris periode ("1 Nov 2026 – 8
+  Nov 2026 · 8 hari · dibanding … · 54 transaksi · rata-rata …", hanya chip **Bulan Ini/Bulan Lalu**
+  yang tinggal), paragraf penjelasan rumus ("Omset = nilai transaksi diakui … Laba bersih = …"), dan
+  baris delta/margin ("+20,4% penjualan bersih vs periode sebelumnya · margin —"). Datanya
+  (`period`, `aov`, `deltas`, `margin`) masih ada di respons API — jangan hapus dari route, hanya
+  tidak ditampilkan lagi di kartu ini.
 - Verifikasi (2026-11-08): `/ops/pengeluaran` = 200; dirender lewat **iframe same-origin** di preview
   (`navigate()` gagal untuk route `/ops/*`): header + pemilih Bulan/Tahun, 3 kartu (0 / Rp 0), dua tab
   (aktif hitam grafit), judul "Detail Pengeluaran …", tombol Kelola Barang (hanya packing) & Tambah,
