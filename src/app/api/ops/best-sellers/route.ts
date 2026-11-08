@@ -104,23 +104,46 @@ async function loadSales(admin: Admin, startIso: string, endIso: string): Promis
     items.push(...((data || []) as BestSellerItem[]));
   }
 
-  // Diskon pesanan dibagi ke baris item sesuai porsi harganya, supaya laporan bisa
-  // menampilkan diskon per produk (termasuk gratis cover hanger / order FCH).
-  const totalByOrder = new Map<string, number>();
   const lineTotal = (item: BestSellerItem) => {
     const price = Number(item.price) > 0 ? Number(item.price) : Number(item.customer_price) || 0;
     return price * (Number(item.quantity ?? item.qty) || 0);
   };
+
+  // Diskon pesanan ditempel ke baris yang menjadi penyebabnya lebih dulu: item cover
+  // (gratis cover hanger / FCH) menerima diskon penuh sampai sebesar harga barisnya.
+  // Sisa diskon baru dibagi proporsional ke baris lain.
+  const itemsByOrder = new Map<string, BestSellerItem[]>();
   for (const item of items) {
     const key = String(item.order_id || "");
-    totalByOrder.set(key, (totalByOrder.get(key) || 0) + lineTotal(item));
+    if (!itemsByOrder.has(key)) itemsByOrder.set(key, []);
+    itemsByOrder.get(key)!.push(item);
   }
-  for (const item of items) {
-    const key = String(item.order_id || "");
-    const discount = discountByOrder.get(key) || 0;
-    const orderTotal = totalByOrder.get(key) || 0;
-    item.discount_share =
-      discount > 0 && orderTotal > 0 ? Math.round((discount * lineTotal(item)) / orderTotal) : 0;
+  const isCoverThobe = (item: BestSellerItem) =>
+    String(item.product_id || "") === "cover-hanger" &&
+    /cover\s*thobe/i.test(String(item.color || ""));
+
+  for (const [orderId, orderItems] of itemsByOrder) {
+    const discount = discountByOrder.get(orderId) || 0;
+    if (discount <= 0) continue;
+    const coverLines = orderItems.filter(isCoverThobe);
+    const otherLines = orderItems.filter((item) => !isCoverThobe(item));
+    let remaining = discount;
+
+    for (const line of coverLines) {
+      if (remaining <= 0) break;
+      const give = Math.min(remaining, lineTotal(line));
+      line.discount_share = (Number(line.discount_share) || 0) + give;
+      remaining -= give;
+    }
+
+    const otherTotal = otherLines.reduce((sum, line) => sum + lineTotal(line), 0);
+    if (remaining > 0 && otherTotal > 0) {
+      for (const line of otherLines) {
+        line.discount_share =
+          (Number(line.discount_share) || 0) +
+          Math.round((remaining * lineTotal(line)) / otherTotal);
+      }
+    }
   }
 
   return { orders: rows.length, validOrders: validIds.length, items };
