@@ -81,14 +81,15 @@ interface PeriodSales {
 async function loadSales(admin: Admin, startIso: string, endIso: string): Promise<PeriodSales> {
   const { data: orders, error } = await admin
     .from("orders")
-    .select("id, status")
+    .select("id, status, discount")
     .gte("created_at", startIso)
     .lt("created_at", endIso)
     .limit(5000);
   if (error) throw new Error(error.message);
 
-  const rows = (orders || []) as { id?: string; status?: string | null }[];
+  const rows = (orders || []) as { id?: string; status?: string | null; discount?: number | null }[];
   const validIds = rows.filter((order) => isValidSaleOrder(order.status)).map((order) => String(order.id));
+  const discountByOrder = new Map(rows.map((order) => [String(order.id), Number(order.discount) || 0]));
 
   const items: BestSellerItem[] = [];
   for (let i = 0; i < validIds.length; i += CHUNK) {
@@ -101,6 +102,25 @@ async function loadSales(admin: Admin, startIso: string, endIso: string): Promis
       .in("order_id", chunk);
     if (itemError) throw new Error(itemError.message);
     items.push(...((data || []) as BestSellerItem[]));
+  }
+
+  // Diskon pesanan dibagi ke baris item sesuai porsi harganya, supaya laporan bisa
+  // menampilkan diskon per produk (termasuk gratis cover hanger / order FCH).
+  const totalByOrder = new Map<string, number>();
+  const lineTotal = (item: BestSellerItem) => {
+    const price = Number(item.price) > 0 ? Number(item.price) : Number(item.customer_price) || 0;
+    return price * (Number(item.quantity ?? item.qty) || 0);
+  };
+  for (const item of items) {
+    const key = String(item.order_id || "");
+    totalByOrder.set(key, (totalByOrder.get(key) || 0) + lineTotal(item));
+  }
+  for (const item of items) {
+    const key = String(item.order_id || "");
+    const discount = discountByOrder.get(key) || 0;
+    const orderTotal = totalByOrder.get(key) || 0;
+    item.discount_share =
+      discount > 0 && orderTotal > 0 ? Math.round((discount * lineTotal(item)) / orderTotal) : 0;
   }
 
   return { orders: rows.length, validOrders: validIds.length, items };
@@ -133,6 +153,7 @@ type MergeableRow = {
   name: string;
   units: number;
   revenue: number;
+  discount?: number;
   sizes: BestSellerBreakdown[];
   seriesBreakdown?: BestSellerSeriesBreakdown[];
 };
@@ -229,14 +250,14 @@ export async function GET(req: NextRequest) {
       previousAgg.series.rows,
       currentAgg.series.totals,
       previousAgg.series.totals,
-      (row) => ({ ...row, units: 0, revenue: 0, addonUnits: 0, sizes: [] }),
+      (row) => ({ ...row, units: 0, revenue: 0, discount: 0, addonUnits: 0, sizes: [] }),
     );
     const productMode = mergeMode<BestSellerProductRow>(
       currentAgg.product.rows,
       previousAgg.product.rows,
       currentAgg.product.totals,
       previousAgg.product.totals,
-      (row) => ({ ...row, units: 0, revenue: 0, addonUnits: 0, sizes: [], seriesBreakdown: [] }),
+      (row) => ({ ...row, units: 0, revenue: 0, discount: 0, addonUnits: 0, sizes: [], seriesBreakdown: [] }),
     );
 
     const orderCounts = { validOrders: currentSales.validOrders, orders: currentSales.orders };

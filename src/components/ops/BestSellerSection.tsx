@@ -24,6 +24,8 @@ type BestSellerRow = {
   kain?: string;
   units: number;
   revenue: number;
+  /** Diskon pesanan yang menempel pada baris (termasuk gratis cover hanger). */
+  discount?: number;
   share: number;
   prevUnits: number;
   deltaUnits: number;
@@ -465,6 +467,11 @@ export default function BestSellerSection() {
                           {row.addonUnits ? (
                             <span className="mt-0.5 block text-[10px] font-bold text-amber-600">
                               termasuk {nfmt(row.addonUnits)} add-on Open Order
+                            </span>
+                          ) : null}
+                          {Number(row.discount) > 0 ? (
+                            <span className="mt-0.5 block text-[10px] font-bold text-emerald-600">
+                              termasuk diskon {rp(row.discount)}
                             </span>
                           ) : null}
                           <span className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[11px] font-semibold text-slate-500 sm:hidden">

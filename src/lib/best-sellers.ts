@@ -18,6 +18,7 @@ import { OPEN_ORDER_ADDON, OPEN_ORDER_ADDON_TARGET_ID } from "@/lib/open-order-c
 
 /** Baris `order_items` yang dipakai agregasi. */
 export interface BestSellerItem {
+  order_id?: string | null;
   product_id?: string | null;
   product_name?: string | null;
   color?: string | null;
@@ -28,6 +29,8 @@ export interface BestSellerItem {
   qty?: number | null;
   price?: number | null;
   customer_price?: number | null;
+  /** Bagian diskon pesanan yang dialokasikan ke baris ini (porsi harga baris). */
+  discount_share?: number | null;
 }
 
 /** Baris katalog minimal untuk identitas produk (series + kain + nama). */
@@ -63,6 +66,8 @@ interface BestSellerRowBase {
   category: string;
   units: number;
   revenue: number;
+  /** Diskon pesanan yang menempel pada baris ini (porsi harga baris). */
+  discount: number;
   sizes: BestSellerBreakdown[];
   /** true = item lama tanpa relasi master; sengaja tidak digabung. */
   fallback: boolean;
@@ -167,9 +172,17 @@ const seriesDisplayName = (name: string, series: string) =>
 
 const subnameOf = (kain: string) => (kain ? `Kain ${kain}` : "");
 
+/** Varian cover lama ("Set Hanger + Cover") digabung ke label varian aktif. */
+const RETIRED_COVER_VARIANT_RE = /^set\s*hanger\s*\+\s*cover$/i;
+function paketVariantLabel(raw: string): string {
+  const value = raw.trim();
+  return RETIRED_COVER_VARIANT_RE.test(value) ? "Cover Thobe + Hanger" : value;
+}
+
 interface Acc {
   units: number;
   revenue: number;
+  discount: number;
   sizes: Map<string, number>;
   /** Unit dari add-on Open Order yang digabung ke baris ini. */
   addonUnits: number;
@@ -277,13 +290,14 @@ export function aggregateBestSellers(
 
     // Cover & Hanger / Kabak memakai `size = "ALL SIZE"` hanya sebagai placeholder;
     // varian sebenarnya ada di `color` (mis. "Set Hanger + Cover", "Kabak 12").
-    const paketVariant = text(item.color) || text(item.series);
+    const paketVariant = paketVariantLabel(text(item.color) || text(item.series));
     const isPaket =
       category === "Cover & Hanger" ||
       category === "Kabak" ||
       productId === OPEN_ORDER_ADDON.id ||
       rawSize === "ALL SIZE";
     const sizeLabel = isPaket ? paketVariant || "Paket" : rawSize || "Tanpa ukuran";
+    const lineDiscount = Number(item.discount_share) || 0;
 
     const seriesEntry =
       seriesGroups.get(seriesKey) ||
@@ -297,11 +311,13 @@ export function aggregateBestSellers(
         fallback,
         units: 0,
         revenue: 0,
+        discount: 0,
         sizes: new Map(),
         addonUnits: 0,
       } as SeriesAcc);
     seriesEntry.units += qty;
     seriesEntry.revenue += price * qty;
+    seriesEntry.discount += lineDiscount;
     if (isAddon) seriesEntry.addonUnits += qty;
     bump(seriesEntry.sizes, sizeLabel, qty);
     seriesGroups.set(seriesKey, seriesEntry);
@@ -317,12 +333,14 @@ export function aggregateBestSellers(
         fallback,
         units: 0,
         revenue: 0,
+        discount: 0,
         sizes: new Map(),
         addonUnits: 0,
         series: new Map(),
       } as ProductAcc);
     productEntry.units += qty;
     productEntry.revenue += price * qty;
+    productEntry.discount += lineDiscount;
     if (isAddon) productEntry.addonUnits += qty;
     bump(productEntry.sizes, sizeLabel, qty);
 
@@ -348,6 +366,7 @@ export function aggregateBestSellers(
       fallback: entry.fallback,
       units: entry.units,
       revenue: entry.revenue,
+      discount: entry.discount,
       addonUnits: entry.addonUnits,
       sizes: toBreakdown(entry.sizes),
     }))
@@ -363,6 +382,7 @@ export function aggregateBestSellers(
       fallback: entry.fallback,
       units: entry.units,
       revenue: entry.revenue,
+      discount: entry.discount,
       addonUnits: entry.addonUnits,
       sizes: toBreakdown(entry.sizes),
       seriesBreakdown: [...entry.series.entries()]
