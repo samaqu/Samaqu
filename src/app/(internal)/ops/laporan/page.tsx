@@ -1397,7 +1397,10 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
       .join(", ");
 
     return (
-      <PanelDetailPesanan
+      <div className="fixed inset-0 z-50 flex justify-end">
+        <button type="button" className="absolute inset-0 bg-slate-900/30" onClick={onClose} aria-label="Tutup detail" />
+        <aside className="relative flex h-full w-full max-w-md flex-col overflow-hidden bg-white shadow-2xl">
+          <PanelDetailPesanan
         tema="warna"
         sumber={row.source || "Website"}
         tahap={tahap}
@@ -1431,6 +1434,8 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
         onChat={() => undefined}
         onClose={onClose}
       />
+        </aside>
+      </div>
     );
   }
 
