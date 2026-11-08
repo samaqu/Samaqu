@@ -430,16 +430,25 @@ export default function DraftEditor({
               const variant = itemVariant(item);
               const sizes = sizesOf(variant);
               const stock = stockOf(variant, item.size);
-              // Kategori paket (Cover & Hanger / Kabak): nama produk generik, jadi nama
-              // varian yang dipilih ikut tampil di judul (mis. "Cover & Hanger - Cover Thobe + Hanger").
+              // Nama dari master produk; series tidak diulang lagi di judul karena sudah
+              // tampil sebagai chip. Kategori paket menampilkan nama variannya.
+              const baseName = String(variant?.product_name || item.product_name || "");
+              const seriesName = String(variant?.series_name || "").trim();
+              const cleanBase =
+                seriesName && baseName.toLowerCase().endsWith(seriesName.toLowerCase())
+                  ? baseName
+                      .slice(0, baseName.length - seriesName.length)
+                      .replace(/[\s—–-]+$/, "")
+                      .trim() || baseName
+                  : baseName;
               const paketVariant = isPaketItem({ size: item.size }) ? variantName(item.color) : "";
               const itemTitle = paketVariant
-                ? paketVariant.toLowerCase().startsWith(item.product_name.toLowerCase())
+                ? paketVariant.toLowerCase().startsWith(cleanBase.toLowerCase())
                   ? paketVariant
-                  : item.product_name.toLowerCase().includes(paketVariant.toLowerCase())
-                    ? item.product_name
-                    : `${item.product_name} - ${paketVariant}`
-                : item.product_name;
+                  : cleanBase.toLowerCase().includes(paketVariant.toLowerCase())
+                    ? cleanBase
+                    : `${cleanBase} - ${paketVariant}`
+                : cleanBase;
               return (
                 <div key={`${item.product_id}-${item.color}-${item.size}-${index}`} className="rounded-2xl border p-3.5" style={{ borderColor: "#e3ebf1", background: "#fff" }}>
                   <div className="flex items-start gap-3">
@@ -452,7 +461,7 @@ export default function DraftEditor({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-black leading-snug" style={{ color: "#2a1a22" }}>{item.product_name}</p>
+                        <p className="text-sm font-black leading-snug" style={{ color: "#2a1a22" }}>{itemTitle}</p>
                         <button type="button" onClick={() => setItems((current) => current.filter((_, rowIndex) => rowIndex !== index))} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: "#fdf0f4", color: "#d85b78" }} aria-label="Hapus produk">
                           <Trash2 size={15} />
                         </button>
@@ -460,7 +469,7 @@ export default function DraftEditor({
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         {variant?.series_name ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "#e8f3fb", color: "#2f6f9e" }}>{variant.series_name}</span> : null}
                         {variant?.jenis_kain_name ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "#fdf0f4", color: "#b65b78" }}>{variant.jenis_kain_name}</span> : null}
-                        {item.color && item.color !== "default" ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "#f2f4f6", color: "#62717c" }}>{item.color}</span> : null}
+                        {!paketVariant && item.color && item.color !== "default" ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "#f2f4f6", color: "#62717c" }}>{item.color}</span> : null}
                       </div>
                       <p className="mt-1.5 text-[11px] font-medium" style={{ color: "#8a7d83" }}>Stok tersedia {stock}</p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">

@@ -141,7 +141,7 @@ export async function GET(req: NextRequest) {
   const { data: draftProducts } = draftProductIds.length
     ? await admin
         .from("products")
-        .select("id, series, image, jenis_kain(name)")
+        .select("id, name, series, image, jenis_kain(name)")
         .in("id", draftProductIds)
     : { data: [] as any[] };
   const productById = new Map((draftProducts || []).map((row: any) => [String(row.id), row]));
@@ -152,6 +152,9 @@ export async function GET(req: NextRequest) {
           const product = productById.get(String(row?.product_id || ""));
           return {
             ...row,
+            // Nama dari master produk: payload AI kadang menempelkan series di nama
+            // ("Thobe Grey Indigo Jiharkah") sehingga tampil dobel dengan chip series.
+            product_name: product?.name ?? row?.product_name,
             series: row?.series ?? product?.series ?? null,
             image: row?.image ?? product?.image ?? null,
             kain: row?.kain ?? product?.jenis_kain?.name ?? null,

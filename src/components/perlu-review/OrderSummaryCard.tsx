@@ -26,6 +26,17 @@ export default function OrderSummaryCard({ draft }: { draft: Draft }) {
           const size = String(item?.size || "").trim();
           const series = String(item?.series || "").trim();
           const kain = String(item?.kain || "").trim();
+          // Varian paket (Cover & Hanger / Kabak) memakai nama varian, bukan warna.
+          const color = String(item?.color || "").trim();
+          const variant = color && color.toLowerCase() !== "default" ? color : "";
+          const image = String(item?.image || "").trim();
+          const showImage = image && !/\.(mp4|webm|mov|m4v)(\?|$)/i.test(image);
+          // Series tidak perlu diulang di judul kalau sudah jadi chip.
+          const rawName = productName(item);
+          const title =
+            series && rawName.toLowerCase().endsWith(series.toLowerCase())
+              ? rawName.slice(0, rawName.length - series.length).replace(/[\s—–-]+$/, "").trim() || rawName
+              : rawName;
           return (
             <div
               key={`${item?.product_id || "item"}-${index}`}
@@ -36,22 +47,25 @@ export default function OrderSummaryCard({ draft }: { draft: Draft }) {
                   className="flex h-12 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg"
                   style={{ background: "#f5f1ee", color: "#b9a99c" }}
                 >
-                  {item?.image ? (
-                    <img src={String(item.image)} alt="" className="h-full w-full object-cover" />
+                  {showImage ? (
+                    <img src={image} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <Shirt size={20} strokeWidth={1.5} />
                   )}
                 </div>
                 <div className="min-w-0">
                   <p className="text-[13px] font-bold leading-snug" style={{ color: "#141414" }}>
-                    {productName(item)}
+                    {title}
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-1">
                     {kain ? (
-                      <span className={chip} style={{ background: "#e8f3fb", color: "#2f6f9e" }}>{kain}</span>
+                      <span className={chip} style={{ background: "#e8f3fb", color: "#2f6f9e" }}>Kain {kain}</span>
                     ) : null}
                     {series ? (
                       <span className={chip} style={{ background: "#eef1f4", color: "#5b6f7c" }}>{series}</span>
+                    ) : null}
+                    {variant ? (
+                      <span className={chip} style={{ background: "#e8f3fb", color: "#2f6f9e" }}>{variant}</span>
                     ) : null}
                     <span className={chip} style={{ background: "#f2f4f6", color: "#62717c" }}>
                       {[size, `${qty} pcs`].filter(Boolean).join(" · ")}
