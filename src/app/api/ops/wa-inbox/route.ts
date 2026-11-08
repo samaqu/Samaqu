@@ -18,8 +18,36 @@ import { waMediaSignedUrl } from "@/lib/wa-media";
 const MAX_ATTEMPTS = 3;
 const STALE_MS = 10 * 60 * 1000;
 
+const ACADEMY_URL = (process.env.ACADEMY_SUPABASE_URL || "").replace(/\/+$/, "");
+const ACADEMY_KEY = process.env.ACADEMY_SERVICE_ROLE_KEY || "";
+
+/**
+ * Catat bot mana yang mengklaim pesan (`local`/`server`) ke tabel `wa_handled`
+ * di Academy. Best-effort: kalau gagal, klaim pesan tetap jalan.
+ */
+async function recordHandled(ids: string[], source: string) {
+  if (!ACADEMY_URL || !ACADEMY_KEY || !ids.length) return;
+  try {
+    await fetch(`${ACADEMY_URL}/rest/v1/wa_handled?on_conflict=inbox_id`, {
+      method: "POST",
+      headers: {
+        apikey: ACADEMY_KEY,
+        Authorization: `Bearer ${ACADEMY_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify(ids.map((id) => ({ inbox_id: id, source }))),
+    });
+  } catch (error) {
+    console.error("[WA-HANDLED] gagal mencatat sumber klaim:", error);
+  }
+}
+
 export async function GET(req: NextRequest) {
   if (!(await isOpsAdmin(req))) return unauthorized();
+
+  const sourceHeader = (req.headers.get("x-bot-source") || "").toLowerCase();
+  const source = sourceHeader === "local" || sourceHeader === "server" ? sourceHeader : "";
 
   const limit = Math.min(
     Math.max(parseInt(new URL(req.url).searchParams.get("limit") || "5", 10) || 5, 1),
@@ -82,6 +110,12 @@ export async function GET(req: NextRequest) {
         .map((row) => String(row.id))
         .join(",")}`,
     );
+    if (source) {
+      await recordHandled(
+        claimed.map((row) => String(row.id)),
+        source,
+      );
+    }
   }
 
   // Sertakan riwayat percakapan dengan pengirim yang sama, supaya balasan
