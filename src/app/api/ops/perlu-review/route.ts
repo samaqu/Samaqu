@@ -144,19 +144,47 @@ export async function GET(req: NextRequest) {
         .select("id, name, series, image, jenis_kain(name)")
         .in("id", draftProductIds)
     : { data: [] as any[] };
+  // `products.image` sering berupa video. Foto asli ada di `product_images`, jadi
+  // ambil foto pertama yang bukan video (utamakan yang warnanya cocok).
+  const { data: draftImageRows } = draftProductIds.length
+    ? await admin
+        .from("product_images")
+        .select("product_id, url, is_video, color, display_order")
+        .in("product_id", draftProductIds)
+        .order("display_order", { ascending: true })
+    : { data: [] as any[] };
+  const photosByProduct = new Map<string, { color: string; url: string }[]>();
+  for (const row of draftImageRows || []) {
+    const url = String((row as any)?.url || "").trim();
+    if (!url || (row as any)?.is_video) continue;
+    if (/\.(mp4|webm|mov|m4v)(\?|$)/i.test(url)) continue;
+    const id = String((row as any).product_id);
+    if (!photosByProduct.has(id)) photosByProduct.set(id, []);
+    photosByProduct.get(id)!.push({ color: String((row as any).color || "").trim(), url });
+  }
+  const photoFor = (productId: string, color: string) => {
+    const list = photosByProduct.get(productId) || [];
+    if (!list.length) return "";
+    const wanted = color.trim().toLowerCase();
+    const match = wanted ? list.find((photo) => photo.color.toLowerCase() === wanted) : null;
+    return (match || list[0]).url;
+  };
   const productById = new Map((draftProducts || []).map((row: any) => [String(row.id), row]));
   const draftItems = (drafts || []).map((item) => {
     const payload = item.payload && typeof item.payload === "object" ? item.payload : {};
     const rows = Array.isArray(payload.items)
       ? payload.items.map((row: any) => {
           const product = productById.get(String(row?.product_id || ""));
+          const fallbackImage = String(product?.image || "").trim();
+          const galleryPhoto = photoFor(String(row?.product_id || ""), String(row?.color || ""));
+          const safeFallback = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(fallbackImage) ? "" : fallbackImage;
           return {
             ...row,
             // Nama dari master produk: payload AI kadang menempelkan series di nama
             // ("Thobe Grey Indigo Jiharkah") sehingga tampil dobel dengan chip series.
             product_name: product?.name ?? row?.product_name,
             series: row?.series ?? product?.series ?? null,
-            image: row?.image ?? product?.image ?? null,
+            image: row?.image ?? (galleryPhoto || safeFallback || null),
             kain: row?.kain ?? product?.jenis_kain?.name ?? null,
           };
         })
