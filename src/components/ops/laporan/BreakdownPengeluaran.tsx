@@ -102,6 +102,13 @@ function Empty({ text }: { text: string }) {
   return <p className="py-2 text-[11px] font-semibold text-zinc-400">{text}</p>;
 }
 
+/**
+ * Total kartu datang dari `summary`, rinciannya dari `breakdown`. Kalau keduanya tidak sinkron
+ * (respons lama yang belum membawa `breakdown`), jangan tulis "0 transaksi" di bawah angka yang
+ * bukan 0 — itu terbaca seperti angkanya salah.
+ */
+const STALE_TEXT = "Rincian belum termuat. Muat ulang laporan untuk melihat detailnya.";
+
 function DetailLabel({ children }: { children: ReactNode }) {
   return (
     <p className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-zinc-400">
@@ -213,7 +220,7 @@ export default function BreakdownPengeluaran({
         onToggle={() => toggle("fees")}
       >
         {data.fees.length === 0 ? (
-          <Empty text="Belum ada transaksi Mayar yang cair di periode ini." />
+          <Empty text={feeTotal > 0 ? STALE_TEXT : "Belum ada transaksi Mayar yang cair di periode ini."} />
         ) : (
           <>
             <DetailLabel>Detail breakdown</DetailLabel>
@@ -236,13 +243,19 @@ export default function BreakdownPengeluaran({
       <Card
         icon={<FileText size={16} strokeWidth={1.9} />}
         title="Operating Expenses"
-        badge={`${nfmt(data.packing.length + data.operasional.length)} pengeluaran`}
+        badge={`${
+          data.packing.length + data.operasional.length > 0
+            ? `${nfmt(data.packing.length + data.operasional.length)} pengeluaran`
+            : expenseTotal > 0
+              ? "rincian belum termuat"
+              : "0 pengeluaran"
+        }`}
         amount={rp(expenseTotal)}
         open={open === "expenses"}
         onToggle={() => toggle("expenses")}
       >
         {data.packing.length === 0 && data.operasional.length === 0 ? (
-          <Empty text="Belum ada pengeluaran tercatat di periode ini." />
+          <Empty text={expenseTotal > 0 ? STALE_TEXT : "Belum ada pengeluaran tercatat di periode ini."} />
         ) : (
           <>
             <DetailLabel>Detail breakdown</DetailLabel>
