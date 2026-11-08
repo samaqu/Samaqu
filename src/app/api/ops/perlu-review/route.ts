@@ -29,8 +29,8 @@ const FREE_COVER_COLOR = "Cover Thobe + Hanger";
  * Baris bonus Free Cover Hanger untuk draft transaksi.
  *
  * Hanya ditambahkan kalau `payload.free_cover_hanger === true` — agent yang memutuskan
- * setelah `cek_pesanan` (customer belum pernah order). Harganya Rp0 dan ditandai
- * `bonus: true` supaya `/api/ops/transaksi` tidak memakai harga katalog.
+ * setelah `cek_pesanan` (customer belum pernah order). Barisnya memakai HARGA KATALOG
+ * supaya stok cover & hanger tetap terpotong; gratisnya diberikan admin sebagai diskon.
  */
 async function withFreeCoverHanger(
   admin: ReturnType<typeof getSupabaseAdmin>,
@@ -61,8 +61,6 @@ async function withFreeCoverHanger(
         color: FREE_COVER_COLOR,
         size: "ALL SIZE",
         quantity: 1,
-        price: 0,
-        bonus: true,
       },
     ],
   };
@@ -317,7 +315,6 @@ export async function POST(req: NextRequest) {
         return bad(`Ukuran ${size} untuk ${product.name} tidak tersedia.`);
       }
       const quantity = Math.max(1, Math.min(99, Number(item?.quantity) || 1));
-      const bonus = item?.bonus === true;
       const override = Number(variantMap.get(variantKey(productId, color, size))?.price_override);
       normalized.push({
         product_id: productId,
@@ -325,9 +322,7 @@ export async function POST(req: NextRequest) {
         color,
         size,
         quantity,
-        // Baris bonus (Free Cover Hanger) tetap Rp0 walau draft diedit admin.
-        price: bonus ? 0 : override > 0 ? override : Number(product.price) || 0,
-        ...(bonus ? { bonus: true } : {}),
+        price: override > 0 ? override : Number(product.price) || 0,
       });
     }
 
