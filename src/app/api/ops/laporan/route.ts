@@ -837,11 +837,14 @@ export async function GET(req: NextRequest) {
       const detail = ref ? mayarFees.get(ref) : undefined;
       const settled = detail?.status === "settled" && Number.isFinite(detail?.fee);
 
+      /*
+       * Baris tabel biaya Mayar dibuka di drawer detail pesanan, jadi WAJIB membawa
+       * seluruh data pesanan (items, subtotal, ongkir, diskon, alamat, resi, …).
+       * Dulu hanya 5 field yang disalin → drawer menampilkan "Tidak ada produk tercatat"
+       * dengan Subtotal/Ongkir Rp 0 padahal totalnya ratusan ribu.
+       */
       const base = {
-        order_number: row.order_number,
-        customer_name: row.customer_name,
-        created_at: row.created_at,
-        total: row.total,
+        ...row,
         channel: detail?.channel ?? null,
       };
 

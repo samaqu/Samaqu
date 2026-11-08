@@ -1476,7 +1476,8 @@ function TableBody({
                   {header("customer_name", "Pelanggan", "hidden md:table-cell")}
                   {header("created_at", "Tanggal", "hidden sm:table-cell")}
                   {header("total", "Penjualan", "text-right")}
-                  {header("discount", "Diskon FCH", "text-right")}
+                  {/* Diskon FCH hanya relevan untuk tabel Penjualan; baris biaya Mayar tidak membawanya. */}
+                  {tab === "sales" ? header("discount", "Diskon FCH", "text-right") : null}
                   {header("channel", "Metode Mayar", "hidden md:table-cell")}
                   {header("fee", "Biaya", "text-right")}
                   {header("net", "Diterima Bersih", "text-right")}
@@ -1524,9 +1525,11 @@ function TableBody({
                     <td className="hidden px-3 py-3 text-xs font-semibold text-slate-600 md:table-cell">{row.customer_name || "-"}</td>
                     <td className="hidden px-3 py-3 text-xs text-slate-500 sm:table-cell">{dateOnly(row.created_at)}</td>
                     <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-800">{rp(row.total)}</td>
-                    <td className="px-3 py-3 text-right font-bold tabular-nums text-emerald-600">
-                      {fchDiscountOf(row) > 0 ? `-${rp(fchDiscountOf(row))}` : "-"}
-                    </td>
+                    {tab === "sales" ? (
+                      <td className="px-3 py-3 text-right font-bold tabular-nums text-emerald-600">
+                        {fchDiscountOf(row) > 0 ? `-${rp(fchDiscountOf(row))}` : "-"}
+                      </td>
+                    ) : null}
                     <td className="hidden px-3 py-3 text-xs text-slate-500 md:table-cell">{row.channel || "-"}</td>
                     <td className="px-3 py-3 text-right font-bold tabular-nums text-red-600">{rp(row.fee)}</td>
                     <td className="px-3 py-3 text-right font-black tabular-nums text-slate-900">{rp(row.net)}</td>
@@ -1537,9 +1540,6 @@ function TableBody({
                     <td className="hidden px-3 py-3 text-xs font-semibold text-slate-600 md:table-cell">{row.customer_name || "-"}</td>
                     <td className="hidden px-3 py-3 text-xs text-slate-500 sm:table-cell">{dateOnly(row.created_at)}</td>
                     <td className="px-3 py-3 text-right font-bold tabular-nums text-slate-800">{rp(row.total)}</td>
-                    <td className="px-3 py-3 text-right font-bold tabular-nums text-emerald-600">
-                      {fchDiscountOf(row) > 0 ? `-${rp(fchDiscountOf(row))}` : "-"}
-                    </td>
                     <td className="hidden px-3 py-3 text-xs text-slate-500 md:table-cell">{row.channel || "-"}</td>
                     <td className="px-3 py-3">
                       <Badge tone={row.mayar_status === "paid" ? "amber" : "gray"}>

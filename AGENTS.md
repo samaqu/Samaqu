@@ -1988,3 +1988,16 @@ Verifikasi (2026-11-09, `/ops/laporan` lewat iframe same-origin 920 px, sesi adm
 1 `packing` (Lakban Bening 50x · Rp 250.000) dan 1 `operasional` (Tools & Software · Rp 165.410);
 ketiga kartu terbuka lewat klik dan menampilkan baris rinciannya, COGS badge "75 unit tanpa modal"
 (Total HPP memang masih Rp 0 — `products.hpp` kosong), 0 px geser samping, 0 error console.
+
+**Tabel "Biaya Mayar · Cair / Belum Cair" (perbaikan 2026-11-09)** — baris kedua tabel itu membuka
+drawer **detail pesanan** yang sama dengan tab Penjualan (`DetailDrawer` → `PanelDetailPesanan`),
+jadi `mayarSettled`/`mayarPending` di `/api/ops/laporan` disusun dari **seluruh baris pesanan**
+(`{ ...row, channel }`), bukan lagi 5 field pilihan. Sebelumnya drawer menampilkan "Tidak ada produk
+tercatat" dengan Subtotal/Ongkir Rp 0 padahal totalnya ratusan ribu (pemilik: "masa detailnya aneh").
+Jangan menyalin sebagian field lagi ke `base` — drawer butuh `items`, `subtotal`, `shipping_cost`,
+`discount`, alamat, dan resi. Kolom **Diskon FCH hanya dirender di tab Penjualan**: di tabel biaya
+Mayar kolomnya selalu "-" (tidak ada baris `cover-hanger`), dan header `mayar-pending` dulu tidak
+sinkron dengan selnya (6 header vs 7 sel). Verifikasi (2026-11-09, iframe same-origin, sesi admin
+diputar ulang): `npx tsc --noEmit` bersih; tabel Cair 7 header = 7 sel; drawer berisi produk
+(Thobe Grey Indigo — Imron + Extra Cover & Hanger), Subtotal Rp359.000, Ongkir Rp93.000, Total
+Rp452.000; tab Penjualan tetap 8 kolom; 0 error console.
