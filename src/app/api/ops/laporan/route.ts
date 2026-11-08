@@ -219,7 +219,7 @@ async function loadPeriod(
   const [ordersRes, returnsCreatedRes, refundsRes, exchangesRes] = await Promise.all([
     admin
       .from("orders")
-      .select("id, order_number, customer_name, customer_whatsapp, created_at, total, shipping_cost, status, source, payment_method, payment_provider, payment_channel, payment_ref, paid_at")
+      .select("id, order_number, customer_name, customer_whatsapp, created_at, total, discount, shipping_cost, status, source, payment_method, payment_provider, payment_channel, payment_ref, paid_at")
       .gte("created_at", startIso)
       .lt("created_at", endIso)
       .order("created_at", { ascending: false })
