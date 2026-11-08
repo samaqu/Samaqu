@@ -315,9 +315,8 @@ function MayarSummaryCard({
 }
 
 /**
- * Tile metrik di dalam kartu gelap Laporan Keuangan — susunan & gaya sama dengan
- * `PengeluaranSummaryCards` (ikon + label sebaris, nilai besar, keterangan di bawah),
- * jadi kedua halaman Keuangan memakai bahasa visual yang sama. Angka tetap dari API laporan
+ * Tile metrik kartu Laporan Keuangan — label uppercase, nilai besar, keterangan, ikon bulat
+ * di kanan; permukaan terang di dalam kartu abu `#EFEFF1`. Angka tetap dari API laporan
  * (satu sumber hitungan).
  */
 function ReportMetric({
@@ -338,26 +337,31 @@ function ReportMetric({
   muted?: boolean;
 }) {
   return (
-    <div className="flex flex-col rounded-2xl border border-white/15 bg-white/[0.06] p-4" title={title}>
-      <div className="flex min-h-[20px] items-center gap-2 text-white/55">
-        <Icon size={15} className="shrink-0" />
-        <span className="truncate text-[10px] font-black uppercase tracking-[0.14em]">{label}</span>
-      </div>
+    <div
+      className={`relative flex flex-col rounded-2xl border border-[#E4E4E7] bg-[#FAFAFA] p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] ${
+        muted ? "opacity-95" : ""
+      }`}
+      title={title}
+    >
+      <span className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-zinc-400">{label}</span>
       <p
-        className={`mt-3 whitespace-nowrap text-[clamp(1.1rem,1.6vw,1.6rem)] font-black leading-tight tabular-nums ${
-          muted ? "text-white/40" : "text-white"
+        className={`mt-2 whitespace-nowrap text-[clamp(1.05rem,1.6vw,1.45rem)] font-black leading-tight tabular-nums ${
+          muted ? "text-zinc-400" : "text-zinc-900"
         }`}
       >
         {value}
       </p>
-      <div className="mt-auto flex min-h-[20px] flex-wrap items-center gap-1.5 pt-1.5">
+      <div className="mt-1 flex min-h-[30px] flex-wrap items-center gap-1.5 pr-9">
         {badge ? (
           <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black tracking-wider ${badge.cls}`}>
             {badge.label}
           </span>
         ) : null}
-        <span className="text-xs font-semibold leading-snug text-white/45">{caption}</span>
+        <span className="text-[11px] font-semibold leading-snug text-zinc-500">{caption}</span>
       </div>
+      <span className="absolute bottom-4 right-4 grid h-8 w-8 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-400">
+        <Icon size={15} strokeWidth={1.8} />
+      </span>
     </div>
   );
 }
@@ -467,11 +471,11 @@ export default function LaporanKeuanganPage() {
   const profitBadge =
     s.profitStatus === "valid"
       ? profitPositive
-        ? { label: "PROFIT", cls: "bg-emerald-400/15 text-emerald-300 border-emerald-400/30" }
-        : { label: "RUGI", cls: "bg-red-400/15 text-red-300 border-red-400/30" }
+        ? { label: "PROFIT", cls: "bg-emerald-50 text-emerald-700 border-emerald-100" }
+        : { label: "RUGI", cls: "bg-red-50 text-red-700 border-red-100" }
       : s.profitStatus === "partial"
-        ? { label: "BELUM FINAL", cls: "bg-amber-400/15 text-amber-200 border-amber-400/30" }
-        : { label: "BELUM TERSEDIA", cls: "bg-white/10 text-white/60 border-white/15" };
+        ? { label: "BELUM FINAL", cls: "bg-amber-50 text-amber-700 border-amber-100" }
+        : { label: "BELUM TERSEDIA", cls: "bg-slate-50 text-slate-500 border-slate-200" };
   const seriesOptions = [
     { key: "gross", label: "Penjualan", color: "#94A3B8" },
     { key: "net", label: "Setelah Retur", color: "#2563EB" },
@@ -480,39 +484,34 @@ export default function LaporanKeuanganPage() {
 
   return (
     <div className="-m-4 space-y-5 bg-white p-4 md:-m-6 md:p-6 lg:-m-8 lg:p-8">
-      {/* HEADER + KPI — pola kartu gelap yang sama dengan "Rekap Pengeluaran" */}
-      <section className="relative overflow-hidden rounded-3xl bg-[linear-gradient(135deg,#111113_0%,#1c1c20_52%,#2d2d33_100%)] p-5 text-white shadow-sm md:p-6">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-24 -top-28 h-64 w-64 rounded-full bg-white/[0.07] blur-3xl"
-        />
-
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10">
-              <IconReport size={26} className="text-white" />
-            </div>
+      {/* HEADER + KPI — satu kartu laporan, palet monokrom SAMAQU */}
+      <section className="overflow-hidden rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_24px_48px_-40px_rgba(16,24,40,0.45)] md:p-7">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-zinc-900 text-white shadow-[0_6px_16px_-8px_rgba(0,0,0,0.6)]">
+              <IconReport size={24} />
+            </span>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-white md:text-3xl">Laporan Keuangan</h1>
-              <p className="mt-1 text-sm font-medium text-white/55">Analisis performa bisnis secara mendalam</p>
+              <h1 className="text-2xl font-black tracking-tight text-zinc-900 md:text-[28px]">Laporan Keuangan</h1>
+              <p className="mt-1 text-sm font-medium text-zinc-500">Analisis performa bisnis secara mendalam</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {isFetching ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/70">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-[11px] font-bold text-zinc-500">
                 <RefreshCw size={12} className="animate-spin" /> Memperbarui…
               </span>
             ) : null}
             <Link
               href="/ops"
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3.5 text-sm font-bold text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-xs font-bold text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
             >
               <ChevronLeft size={15} /> Dashboard
             </Link>
             <button
               type="button"
               onClick={() => window.print()}
-              className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-zinc-900 transition-colors hover:bg-white/90"
+              className="inline-flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-black"
             >
               <Download size={14} /> Export PDF
             </button>
@@ -520,7 +519,7 @@ export default function LaporanKeuanganPage() {
               value={month}
               onChange={(event) => setMonth(event.target.value)}
               aria-label="Pilih bulan laporan"
-              className="h-10 rounded-xl border border-white/15 bg-[#1d1d21] px-3 text-sm font-bold text-white outline-none transition-colors hover:border-white/30 focus:border-white/40 focus:ring-2 focus:ring-white/15"
+              className="rounded-full border border-zinc-200 bg-white px-3.5 py-2 text-xs font-bold text-zinc-700 outline-none transition-colors hover:bg-zinc-50"
             >
               {monthOptions.map((value) => (
                 <option key={value} value={value}>
@@ -531,7 +530,7 @@ export default function LaporanKeuanganPage() {
           </div>
         </div>
 
-        <div className="relative mt-4 flex flex-wrap items-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           {[
             { key: thisMonth, label: "Bulan Ini" },
             { key: shiftMonth(thisMonth, -1), label: "Bulan Lalu" },
@@ -540,10 +539,10 @@ export default function LaporanKeuanganPage() {
               key={item.key}
               type="button"
               onClick={() => setMonth(item.key)}
-              className={`rounded-full border px-3 py-1 text-[11px] font-bold transition-colors ${
+              className={`rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
                 month === item.key
-                  ? "border-white bg-white text-zinc-900"
-                  : "border-white/15 bg-white/10 text-white/70 hover:bg-white/15 hover:text-white"
+                  ? "border-zinc-900 bg-zinc-900 text-white"
+                  : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
               }`}
             >
               {item.label}
@@ -551,7 +550,7 @@ export default function LaporanKeuanganPage() {
           ))}
         </div>
 
-        <div className="relative mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <ReportMetric
             icon={IconOmset}
             label="Total Omset"
@@ -602,10 +601,10 @@ export default function LaporanKeuanganPage() {
 
         {s.profitStatus !== "valid" ? (
           <p
-            className={`relative mt-3 flex items-start gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-semibold ${
+            className={`mt-3 flex items-start gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-semibold ${
               s.profitStatus === "partial"
-                ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
-                : "border-white/15 bg-white/[0.06] text-white/70"
+                ? "border-amber-200 bg-amber-50 text-amber-700"
+                : "border-zinc-200 bg-white text-zinc-600"
             }`}
           >
             <AlertTriangle size={13} className="mt-px shrink-0" />

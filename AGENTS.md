@@ -1889,6 +1889,16 @@ tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` b
   baris delta/margin ("+20,4% penjualan bersih vs periode sebelumnya · margin —"). Datanya
   (`period`, `aov`, `deltas`, `margin`) masih ada di respons API — jangan hapus dari route, hanya
   tidak ditampilkan lagi di kartu ini.
+- **Revisi 2026-11-08 (pemilik: "bagusan warna yg sebelumnya")**: gradien grafit di kartu atas
+  `/ops/laporan` **dicabut lagi** — kartu header kembali permukaan terang `#EFEFF1` + border
+  `#E4E4E7`, judul `text-zinc-900` dengan tile ikon `bg-zinc-900`, tombol Dashboard/Export PDF &
+  pemilih bulan kembali pil putih + satu tombol `bg-zinc-900`, dan 4 tile `ReportMetric` kembali
+  `bg-[#FAFAFA]` dengan label abu, nilai `text-zinc-900`, dan ikon bulat di kanan (badge
+  PROFIT/RUGI/BELUM FINAL kembali versi terang `bg-emerald-50`/`bg-red-50`/`bg-amber-50`). Catatan
+  "kartu atas harus grafit seperti Rekap Pengeluaran" di atas **tidak berlaku**; halaman
+  Pengeluaran sendiri tidak diubah. Tiga baris teks yang dihapus (periode, rumus, delta) tetap
+  tidak ditampilkan. Verifikasi: `getComputedStyle` kartu header = `rgb(239, 239, 241)` dengan teks
+  `rgb(10, 10, 10)`, 0 error console.
 - Verifikasi (2026-11-08): `/ops/pengeluaran` = 200; dirender lewat **iframe same-origin** di preview
   (`navigate()` gagal untuk route `/ops/*`): header + pemilih Bulan/Tahun, 3 kartu (0 / Rp 0), dua tab
   (aktif hitam grafit), judul "Detail Pengeluaran …", tombol Kelola Barang (hanya packing) & Tambah,
