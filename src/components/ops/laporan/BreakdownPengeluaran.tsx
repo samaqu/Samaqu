@@ -3,8 +3,8 @@
 /**
  * Breakdown Pengeluaran — kartu rincian biaya yang bisa dibuka/tutup.
  *
- * Tiga komponen biaya laporan keuangan: modal barang terjual (COGS), potongan
- * marketplace (fee Mayar), dan biaya operasional + packing. Semua angka datang
+ * Tiga komponen biaya laporan keuangan: modal barang terjual (COGS), biaya
+ * Mayar (gateway + layanan), dan biaya operasional + packing. Semua angka datang
  * dari API laporan (`/api/ops/laporan`) — komponen ini hanya menampilkan, tidak
  * menghitung ulang total.
  *
@@ -203,10 +203,10 @@ export default function BreakdownPengeluaran({
         )}
       </Card>
 
-      {/* 02 — POTONGAN MARKETPLACE & FEE */}
+      {/* 02 — BIAYA MAYAR */}
       <Card
         icon={<Store size={16} strokeWidth={1.9} />}
-        title="Potongan Marketplace & Fee"
+        title="Biaya Mayar"
         badge={feeCount > 0 ? `${nfmt(feeCount)} transaksi cair` : null}
         amount={rp(feeTotal)}
         open={open === "fees"}

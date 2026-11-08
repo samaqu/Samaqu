@@ -1954,8 +1954,9 @@ memakai satu Area bergradasi grafit + garis monokrom (`#A1A1AA` / `#18181B` / `#
 (permintaan pemilik sebelumnya).
 
 **Breakdown Pengeluaran (kartu rincian biaya, 2026-11-09)** — section baru di `/ops/laporan`
-(setelah "Perhitungan Laba") berisi **tiga kartu akordeon**: Modal Barang Terjual (COGS) · Potongan
-Marketplace & Fee · Operating Expenses. Komponennya
+(setelah "Perhitungan Laba") berisi **tiga kartu akordeon**: Modal Barang Terjual (COGS) · **Biaya Mayar** · Operating Expenses
+(kartu kedua dulu berjudul "Potongan Marketplace & Fee" — diganti atas permintaan pemilik
+2026-11-09; angkanya tetap fee Mayar per channel). Komponennya
 **`src/components/ops/laporan/BreakdownPengeluaran.tsx`** (`useState` satu kartu terbuka —
 akordeon, jadi klik kartu lain menutup yang sebelumnya; kartu COGS terbuka saat pertama dimuat).
 Semua angkanya dari **`GET /api/ops/laporan`** → field **`breakdown: { cogs, fees, packing,
