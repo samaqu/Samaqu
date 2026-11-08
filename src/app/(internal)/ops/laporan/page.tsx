@@ -505,6 +505,33 @@ export default function LaporanKeuanganPage() {
     ...(s.profitStatus === "valid" ? [{ key: "profit", label: "Estimasi Laba", color: "#52525B" }] : []),
   ];
 
+  /* ── Komposisi "uang pergi ke mana" — porsi dari Penjualan Setelah Retur ── */
+  const statusDot =
+    s.profitStatus === "valid" ? "bg-emerald-500" : s.profitStatus === "partial" ? "bg-amber-400" : "bg-zinc-300";
+  const compositionBase = Math.max(0, s.net);
+  const compositionParts: { key: string; label: string; value: number; color: string }[] = [];
+  if (s.hppStatus !== "missing") {
+    compositionParts.push({ key: "hpp", label: "Modal", value: Math.max(0, s.hpp), color: "#18181B" });
+  }
+  if (s.expensesAvailable !== false) {
+    compositionParts.push({
+      key: "biaya",
+      label: "Operasional",
+      value: Math.max(0, (s.biayaOperasional || 0) + (s.biayaPacking || 0)),
+      color: "#6B6B75",
+    });
+  }
+  compositionParts.push({ key: "mayar", label: "Mayar", value: Math.max(0, s.mayarFee || 0), color: "#A1A1AA" });
+  if (s.profit !== null && s.profit > 0) {
+    compositionParts.push({ key: "laba", label: "Laba", value: s.profit, color: "#34D399" });
+  }
+  const compositionVisible = compositionParts.filter((part) => part.value > 0);
+  const compositionKnown = compositionVisible.reduce((sum, part) => sum + part.value, 0);
+  const compositionUnknown = Math.max(0, compositionBase - compositionKnown);
+  const compositionPct = (value: number) =>
+    compositionBase > 0 ? Math.round((value / compositionBase) * 1000) / 10 : 0;
+  const showComposition = compositionBase > 0 && (s.profit === null || s.profit >= 0);
+
   return (
     <div className="-m-4 space-y-5 bg-white p-4 md:-m-6 md:p-6 lg:-m-8 lg:p-8">
       {/* HEADER + KPI — satu kartu laporan, palet monokrom SAMAQU */}
@@ -651,7 +678,7 @@ export default function LaporanKeuanganPage() {
       <section className="lpr-rise overflow-hidden rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] shadow-sm">
         <div className="flex items-start justify-between gap-3 px-5 pb-4 pt-5 md:px-6">
           <div className="flex items-start gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-slate-700">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-slate-700 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
               <IconProfit size={18} strokeWidth={1.9} />
             </span>
             <div>
@@ -659,17 +686,17 @@ export default function LaporanKeuanganPage() {
               <p className="mt-0.5 text-xs font-medium text-zinc-500">Dari penjualan sampai estimasi laba.</p>
             </div>
           </div>
-          <span className="shrink-0 rounded-full border border-[#E4E4E7] bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
+          <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#E4E4E7] bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
+            <span className={`h-1.5 w-1.5 rounded-full ${statusDot}`} />
             {s.profitStatus === "valid" ? "Lengkap" : s.profitStatus === "partial" ? "Sebagian" : "Belum lengkap"}
           </span>
         </div>
 
         <div className="space-y-2.5 px-5 pb-5 md:px-6">
-          <div className="overflow-hidden rounded-2xl border border-[#E4E4E7] bg-white">
-            <p className="border-b border-[#F1F1F3] px-4 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-zinc-400">
-              Penjualan
-            </p>
-            <div className="divide-y divide-[#F4F4F5] px-4">
+          {/* 01 — PENJUALAN */}
+          <div className="overflow-hidden rounded-2xl border border-[#E4E4E7] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+            <StageHeader index="01" title="Penjualan" caption={`${nfmt(s.transactions)} transaksi`} />
+            <div className="px-2 py-1">
               <BreakdownRow
                 label="Total Penjualan"
                 value={rp(s.gross)}
@@ -691,19 +718,20 @@ export default function LaporanKeuanganPage() {
                 onClick={() => goToTab("exchanges")}
               />
             </div>
-            <BreakdownRow
-              label="Penjualan Setelah Retur"
-              value={rp(s.net)}
-              emphasis
-              hint="Total Penjualan − Retur + Penyesuaian Tukar Size."
-            />
+            <div className="flex items-center justify-between gap-3 border-t border-dashed border-[#E4E4E7] bg-[#FAFAFA] px-4 py-3">
+              <span className="text-xs font-black tracking-tight text-zinc-900">Penjualan Setelah Retur</span>
+              <span className="text-[15px] font-black tabular-nums text-zinc-900">{rp(s.net)}</span>
+            </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-[#E4E4E7] bg-white">
-            <p className="border-b border-[#F1F1F3] px-4 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-zinc-400">
-              Pengurang
-            </p>
-            <div className="divide-y divide-[#F4F4F5] px-4">
+          <div aria-hidden className="flex justify-center">
+            <span className="h-2.5 w-px bg-gradient-to-b from-[#C9C9CE] to-[#E4E4E7]" />
+          </div>
+
+          {/* 02 — PENGURANG */}
+          <div className="overflow-hidden rounded-2xl border border-[#E4E4E7] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
+            <StageHeader index="02" title="Pengurang" caption="Modal & biaya" />
+            <div className="px-2 py-1">
               <BreakdownRow
                 label="Modal Barang Terjual"
                 value={s.hppStatus === "complete" || s.hppStatus === "partial" ? `− ${rp(s.hpp)}` : "Belum tersedia"}
@@ -713,7 +741,11 @@ export default function LaporanKeuanganPage() {
               />
               <BreakdownRow
                 label="Biaya Operasional & Packing"
-                value={s.expensesAvailable === false ? "Belum tersedia" : `− ${rp((s.biayaOperasional || 0) + (s.biayaPacking || 0))}`}
+                value={
+                  s.expensesAvailable === false
+                    ? "Belum tersedia"
+                    : `− ${rp((s.biayaOperasional || 0) + (s.biayaPacking || 0))}`
+                }
                 tone={s.expensesAvailable === false ? "muted" : "red"}
                 hint={`Pengeluaran operasional ${rp(s.biayaOperasional || 0)} dan packing ${rp(
                   s.biayaPacking || 0,
@@ -735,29 +767,92 @@ export default function LaporanKeuanganPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#E4E4E7] bg-white px-4 py-3.5">
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-zinc-400">Hasil</p>
-            <div className="mt-1 flex items-start justify-between gap-3">
+          <div aria-hidden className="flex justify-center">
+            <span className="h-2.5 w-px bg-gradient-to-b from-[#C9C9CE] to-[#E4E4E7]" />
+          </div>
+
+          {/* 03 — HASIL */}
+          <div className="relative overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#111113_0%,#1B1B20_55%,#2D2D33_100%)] px-4 pb-4 pt-3.5 text-white shadow-[0_18px_38px_-26px_rgba(0,0,0,0.85)]">
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-white/[0.07] blur-2xl"
+            />
+            <div className="relative flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="grid h-5 w-5 place-items-center rounded-md bg-white/15 text-[9px] font-black tabular-nums text-white">
+                  03
+                </span>
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/60">Hasil</p>
+              </div>
+              {s.margin !== null ? (
+                <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-black tabular-nums tracking-[0.06em] text-white/80">
+                  Margin {s.margin}%
+                </span>
+              ) : null}
+            </div>
+
+            <div className="relative mt-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-zinc-700">Estimasi Laba</p>
-                <p className="mt-0.5 text-[11px] font-medium text-zinc-400">
-                  Penjualan setelah retur − modal − biaya.
+                <p className="text-[11px] font-semibold text-white/55">Estimasi Laba</p>
+                <p
+                  className={`mt-1 text-[26px] font-black leading-none tracking-tight tabular-nums md:text-[30px] ${
+                    s.profitStatus === "valid"
+                      ? profitPositive
+                        ? "text-white"
+                        : "text-red-300"
+                      : "text-white/45"
+                  }`}
+                >
+                  {s.profit !== null ? (
+                    <CountUp value={s.profit} format={rp} duration={900} />
+                  ) : (
+                    <span className="text-base font-bold">Belum dapat dihitung</span>
+                  )}
                 </p>
               </div>
-              <p
-                className={`shrink-0 text-right text-xl font-black leading-tight tabular-nums ${
-                  s.profitStatus === "valid" ? (profitPositive ? "text-emerald-600" : "text-red-600") : "text-zinc-400"
-                }`}
-              >
-                {s.profit !== null ? <CountUp value={s.profit} format={rp} duration={900} /> : "Belum dapat dihitung"}
+              <p className="text-[10px] font-semibold leading-snug text-white/45">
+                Penjualan setelah retur
+                <br />− modal − biaya
               </p>
             </div>
+
+            {showComposition ? (
+              <div className="relative mt-4">
+                <div className="flex h-2 gap-[2px] overflow-hidden rounded-full">
+                  {compositionVisible.map((part) => (
+                    <span
+                      key={part.key}
+                      className="h-full min-w-[3px] rounded-full"
+                      style={{ flexGrow: part.value, flexBasis: 0, backgroundColor: part.color }}
+                    />
+                  ))}
+                  {compositionUnknown > 0 ? <span className="h-full flex-1 rounded-full bg-white/15" /> : null}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  {compositionVisible.map((part) => (
+                    <span key={part.key} className="flex items-center gap-1.5 text-[10px] font-semibold text-white/50">
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: part.color }} />
+                      {part.label}
+                      <span className="tabular-nums text-white/80">{compositionPct(part.value)}%</span>
+                    </span>
+                  ))}
+                  {compositionUnknown > 0 ? (
+                    <span className="flex items-center gap-1.5 text-[10px] font-semibold text-white/45">
+                      <span className="h-1.5 w-1.5 rounded-full bg-white/25" />
+                      Belum terhitung
+                      <span className="tabular-nums text-white/70">{compositionPct(compositionUnknown)}%</span>
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
             {s.profitStatus !== "valid" ? (
               <p
-                className={`mt-2.5 flex items-start gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-semibold leading-relaxed ${
+                className={`relative mt-3 flex items-start gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-semibold leading-relaxed ${
                   s.profitStatus === "partial"
-                    ? "border-amber-200 bg-amber-50 text-amber-700"
-                    : "border-[#E4E4E7] bg-[#FAFAFA] text-zinc-600"
+                    ? "border-amber-300/25 bg-amber-300/10 text-amber-200"
+                    : "border-white/10 bg-white/[0.06] text-white/65"
                 }`}
               >
                 <AlertTriangle size={13} className="mt-px shrink-0" />
@@ -1160,12 +1255,28 @@ export default function LaporanKeuanganPage() {
 
 /* ───────────────────────── pieces ───────────────────────── */
 
+/** Judul tahap di kartu alur laba (01 Penjualan → 02 Pengurang → 03 Hasil). */
+function StageHeader({ index, title, caption }: { index: string; title: string; caption?: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-[#F1F1F3] px-4 py-2.5">
+      <div className="flex items-center gap-2">
+        <span className="grid h-5 w-5 place-items-center rounded-md bg-zinc-900 text-[9px] font-black tabular-nums text-white">
+          {index}
+        </span>
+        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-zinc-500">{title}</p>
+      </div>
+      {caption ? (
+        <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400">{caption}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function BreakdownRow({
   label,
   value,
   caption,
   tone,
-  emphasis,
   hint,
   onClick,
 }: {
@@ -1173,7 +1284,6 @@ function BreakdownRow({
   value: string;
   caption?: string;
   tone?: "red" | "green" | "blue" | "muted";
-  emphasis?: boolean;
   hint?: string;
   onClick?: () => void;
 }) {
@@ -1191,29 +1301,33 @@ function BreakdownRow({
   return (
     <Wrapper
       {...(onClick ? { type: "button", onClick } : {})}
-      className={`flex w-full items-start justify-between gap-3 text-left transition-colors ${
-        emphasis
-          ? "border-t border-[#E4E4E7] bg-[#FAFAFA] px-4 py-3"
-          : `px-0 py-2.5 ${onClick ? "hover:text-zinc-900" : ""}`
+      className={`group flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2.5 text-left transition-colors ${
+        onClick ? "hover:bg-[#F7F7F8]" : ""
       }`}
     >
-      <span>
+      <span className="flex min-w-0 items-start gap-2">
         <span
-          className={`block ${emphasis ? "text-xs font-black text-zinc-900" : "text-xs font-semibold text-zinc-500"}`}
-          title={hint}
-        >
-          {label}
+          className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full transition-colors ${
+            onClick ? "bg-zinc-300 group-hover:bg-zinc-500" : "bg-zinc-200"
+          }`}
+        />
+        <span className="min-w-0">
+          <span className="block text-xs font-semibold text-zinc-600" title={hint}>
+            {label}
+          </span>
+          {caption ? (
+            <span className="mt-0.5 block text-[10px] font-semibold leading-relaxed text-amber-600">{caption}</span>
+          ) : null}
         </span>
-        {caption ? (
-          <span className="mt-0.5 block text-[10px] font-semibold leading-relaxed text-amber-600">{caption}</span>
-        ) : null}
       </span>
-      <span
-        className={`shrink-0 text-right font-black tabular-nums ${
-          emphasis ? "text-[15px] text-zinc-900" : `text-[13px] ${toneClass}`
-        }`}
-      >
-        {value}
+      <span className="flex shrink-0 items-center gap-1">
+        <span className={`text-[13px] font-black tabular-nums ${toneClass}`}>{value}</span>
+        {onClick ? (
+          <ChevronRight
+            size={13}
+            className="text-zinc-300 transition-all group-hover:translate-x-0.5 group-hover:text-zinc-500"
+          />
+        ) : null}
       </span>
     </Wrapper>
   );
