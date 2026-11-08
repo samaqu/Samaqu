@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import * as LucideIcons from "lucide-react";
-import PanelDetailPesanan from "@/components/ops/transaksi/PanelDetailPesanan";
+import PanelDetailPesanan, { PanelDetailShell } from "@/components/ops/transaksi/PanelDetailPesanan";
 
 /** Gambar kosong 1x1 untuk item tanpa foto (drawer butuh atribut src). */
 const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
@@ -1397,7 +1397,8 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
       .join(", ");
 
     return (
-      <PanelDetailPesanan
+      <PanelDetailShell open onClose={onClose} tema="warna">
+        <PanelDetailPesanan
         tema="warna"
         sumber={row.source || "Website"}
         tahap={tahap}
@@ -1422,7 +1423,7 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
         ongkir={Number(row.shipping_cost) || 0}
         diskon={Number(row.discount) || 0}
         total={Number(row.total) || 0}
-        metodeBayar={row.payment_method || row.channel || "-"}
+        metodeBayar={row.payment_method_label || row.channel || "-"}
         waktuPesan={dateTime(row.created_at)}
         waktuBayar={row.paid_at ? dateTime(row.paid_at) : null}
         nomorPesanan={row.order_number || "-"}
@@ -1431,6 +1432,7 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
         onChat={() => undefined}
         onClose={onClose}
       />
+      </PanelDetailShell>
     );
   }
 
