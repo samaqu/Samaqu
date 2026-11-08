@@ -1341,7 +1341,7 @@ Satu modul agregasi: **`src/lib/best-sellers.ts`**
   sama dengan jumlah `quantity` mentah di periode itu — itu cara termudah memeriksanya;
 - **omzet = SETELAH diskon** (2026-11-09, permintaan pemilik "omsetnya harusnya sama kayak card di
   atas"): `revenue` tiap baris = `harga × qty − porsi diskon pesanan` (`discount_share` yang sama
-  yang ditampilkan sebagai "setelah diskon Rp …"), sehingga `totals.revenue` **sama persis** dengan
+  yang dihitung server), sehingga `totals.revenue` **sama persis** dengan
   kartu `Total Omset` di `/ops/laporan` (`summary.gross` = `orderRevenue` = total − ongkir). Dulu
   `revenue` bruto, jadi Produk Terlaris (Rp 21.184.000) beda Rp 219.000 dari kartu atas — selisih itu
   memang total diskon periode, bukan pesanan batal (batal/belum bayar tidak pernah ikut). Jangan

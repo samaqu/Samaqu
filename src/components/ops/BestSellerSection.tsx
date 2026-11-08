@@ -469,11 +469,6 @@ export default function BestSellerSection() {
                               termasuk {nfmt(row.addonUnits)} add-on Open Order
                             </span>
                           ) : null}
-                          {Number(row.discount) > 0 ? (
-                            <span className="mt-0.5 block text-[10px] font-bold text-emerald-600">
-                              setelah diskon {rp(row.discount)}
-                            </span>
-                          ) : null}
                           <span className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[11px] font-semibold text-slate-500 sm:hidden">
                             <span className="tabular-nums">{nfmt(row.units)} unit</span>
                             <span className="tabular-nums">{rp(row.revenue)}</span>
