@@ -128,12 +128,38 @@ export async function GET(req: NextRequest) {
   for (const item of escalations || []) {
     escalationItems.push({ ...item, messages: await history(admin, String(item.sender)) });
   }
-  const draftItems = (drafts || []).map((item) => ({
-    ...item,
-    // Tanda tangani ulang tiap kali dibaca: URL R2 private kedaluwarsa, jangan
-    // mengandalkan proof_url yang tersimpan saat draft dibuat.
-    proof_url: waMediaSignedUrl(item.proof_key) || item.proof_url,
-  }));
+  const draftProductIds = [
+    ...new Set(
+      (drafts || []).flatMap((draft) => {
+        const rows = Array.isArray(draft.payload?.items) ? draft.payload.items : [];
+        return rows.map((row: any) => String(row?.product_id || "")).filter(Boolean);
+      }),
+    ),
+  ];
+  // Draft dari AI tidak menyimpan `series`, padahal admin butuh series saat mereview.
+  // Lengkapi dari master produk saat dibaca supaya draft lama ikut tampil benar.
+  const { data: draftProducts } = draftProductIds.length
+    ? await admin.from("products").select("id, series").in("id", draftProductIds)
+    : { data: [] as { id: string; series: string | null }[] };
+  const seriesById = new Map(
+    (draftProducts || []).map((row) => [String(row.id), row.series ?? null]),
+  );
+  const draftItems = (drafts || []).map((item) => {
+    const payload = item.payload && typeof item.payload === "object" ? item.payload : {};
+    const rows = Array.isArray(payload.items)
+      ? payload.items.map((row: any) => ({
+          ...row,
+          series: row?.series ?? seriesById.get(String(row?.product_id || "")) ?? null,
+        }))
+      : payload.items;
+    return {
+      ...item,
+      payload: { ...payload, items: rows },
+      // Tanda tangani ulang tiap kali dibaca: URL R2 private kedaluwarsa, jangan
+      // mengandalkan proof_url yang tersimpan saat draft dibuat.
+      proof_url: waMediaSignedUrl(item.proof_key) || item.proof_url,
+    };
+  });
 
   return NextResponse.json({
     escalations: escalationItems,
@@ -370,6 +396,7 @@ export async function POST(req: NextRequest) {
       normalized.push({
         product_id: productId,
         product_name: product.name,
+        series: product.series ?? null,
         color,
         size,
         quantity,

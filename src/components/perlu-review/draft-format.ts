@@ -45,7 +45,8 @@ export const productName = (item: any) =>
 export const itemMeta = (item: any) => {
   const qty = Number(item?.quantity) || 1;
   const size = String(item?.size || "").trim();
-  return [size ? `Ukuran ${size}` : "", `${qty} pcs`].filter(Boolean).join(" · ");
+  const series = String(item?.series || "").trim();
+  return [series, size ? `Ukuran ${size}` : "", `${qty} pcs`].filter(Boolean).join(" · ");
 };
 
 export const addressText = (shipping: any, name?: string | null, whatsapp?: string | null) =>
