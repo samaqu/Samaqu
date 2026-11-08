@@ -360,7 +360,9 @@ export async function getAvailableSeries(jenisKainId: string | null | undefined,
 
   let query = supabase
     .from("products")
-    .select("id, name, series, price, minimum_price, create_your_price_enabled");
+    .select("id, name, series, price, minimum_price, create_your_price_enabled")
+    // Series yang tidak tampil di website tidak ditawarkan: URL-nya akan 404 kalau dipilih.
+    .eq("is_published", true);
 
   if (jenisKainId) {
     query = query.eq("jenis_kain_id", jenisKainId);

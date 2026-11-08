@@ -141,6 +141,9 @@ export default function OpenOrderWizard({
   startDate: startDateProp,
   endDate: endDateProp,
   focusProductId,
+  focusColor,
+  focusSize,
+  focusSeries,
 }: {
   /** Status jendela Open Order — dibaca di server (route halaman) supaya tidak pop-in. */
   initialState: OpenOrderState;
@@ -159,6 +162,10 @@ export default function OpenOrderWizard({
    * halaman lain (`/open-order?product=<id>`). Kosong = mulai dari katalog seperti biasa.
    */
   focusProductId?: string | null;
+  /** Pilihan dari tautan: `?warna=`, `?ukuran=`, `?series=` (opsional). */
+  focusColor?: string | null;
+  focusSize?: string | null;
+  focusSeries?: string | null;
 }) {
   const [step, setStep] = useState<Step>(1);
   const [catalog, setCatalog] = useState<Product[]>([]);
@@ -325,11 +332,47 @@ export default function OpenOrderWizard({
     openedFocusRef.current = true;
     const initialColor =
       product.variants.find((variant) => variant.stock > 0)?.color ?? product.colors[0] ?? "";
-    const next = defaultDraft(products, product.id, initialColor);
+    const pickedColor =
+      focusColor && product.colors.includes(focusColor) ? focusColor : initialColor;
+    const next = defaultDraft(products, product.id, pickedColor);
     if (!next) return;
+    if (focusSeries) {
+      const match = product.series.find(
+        (item) => item.name.toLowerCase() === String(focusSeries).toLowerCase()
+      );
+      if (match) {
+        next.series = match.name;
+        next.price = match.price;
+      }
+    }
+    const variant = openOrderVariantFor(product, next.color, next.series);
+    if (focusSize && variant?.sizes.includes(focusSize)) next.size = focusSize;
     setDraft(next);
     setStep(2);
-  }, [focusProductId, products]);
+  }, [focusProductId, focusColor, focusSize, focusSeries, products]);
+
+  // URL langkah 2 mengikuti pilihan (produk/warna/ukuran/series) supaya link bisa
+  // dibagikan dan membuka persis pilihan itu. Halaman ini noindex, jadi cukup
+  // replaceState — tidak memicu permintaan ulang ke server seperti router.replace.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (step !== 1 && step !== 2) return;
+    const url = new URL(window.location.href);
+    const keys = ["product", "warna", "ukuran", "series", "color", "size"];
+    if (step === 2 && draft) {
+      url.searchParams.set("product", draft.productId);
+      const setOrDelete = (key: string, value: string) => {
+        if (value) url.searchParams.set(key, value);
+        else url.searchParams.delete(key);
+      };
+      setOrDelete("warna", draft.color);
+      setOrDelete("ukuran", draft.size);
+      setOrDelete("series", draft.series);
+    } else {
+      keys.forEach((key) => url.searchParams.delete(key));
+    }
+    window.history.replaceState(null, "", url.toString());
+  }, [step, draft?.productId, draft?.color, draft?.size, draft?.series]);
 
   // ── Add-on Extra Cover & Hanger = produk katalog `cover-hanger` ──
   // Customer memilih "Cover Thobe + Hanger" atau "Cover Koko + Hanger". Keduanya varian

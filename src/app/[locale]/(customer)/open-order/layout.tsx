@@ -4,10 +4,10 @@ import { localePageMetadata } from "@/lib/seo-metadata";
 /**
  * Metadata halaman Open Order (id + en).
  *
- * Judul & deskripsi khusus halaman ini (bukan mewarisi judul homepage) supaya hasil
- * pencarian tidak kembar. Teksnya tidak menulis angka harga spesifik — cukup
- * "mulai dari harga minimal" — karena harga berubah sewaktu-waktu sedangkan
- * halaman ini ikut diindeks mesin pencari.
+ * Halaman ini adalah alur transaksi (step 1–6, keranjang, harga pilihan sendiri),
+ * bukan halaman konten — konten produk kanonik ada di /katalog/<produk>. Karena itu
+ * halaman ini `noindex, follow`: deep link tetap bisa dibagikan, tapi tidak bersaing
+ * dengan halaman katalog di mesin pencari (menghindari duplikat & thin content).
  */
 const META = {
   id: {
@@ -37,7 +37,7 @@ export async function generateMetadata({
     // (dulu jadi "…, Pilih Harga Sendiri | SAMAQU").
     title: { absolute: meta.title },
     description: meta.description,
-    robots: { index: true, follow: true },
+    robots: { index: false, follow: true },
     openGraph: {
       ...base.openGraph,
       title: meta.title,

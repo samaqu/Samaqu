@@ -30,8 +30,12 @@ export default async function OpenOrderPage({
 }) {
   const window = await readOpenOrderWindow();
   const params = await searchParams;
-  const focusParam = params.product;
-  const focusProductId = Array.isArray(focusParam) ? focusParam[0] : focusParam;
+  const first = (value: string | string[] | undefined) =>
+    Array.isArray(value) ? value[0] : value;
+  const focusProductId = first(params.product);
+  const focusColor = first(params.warna) ?? first(params.color);
+  const focusSize = first(params.ukuran) ?? first(params.size);
+  const focusSeries = first(params.series);
 
   return (
     <OpenOrderWizard
@@ -42,6 +46,9 @@ export default async function OpenOrderPage({
       startDate={window.open_order_start_date}
       endDate={window.open_order_end_date}
       focusProductId={focusProductId}
+      focusColor={focusColor}
+      focusSize={focusSize}
+      focusSeries={focusSeries}
     />
   );
 }
