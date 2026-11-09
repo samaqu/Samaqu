@@ -36,6 +36,8 @@ export interface ChatProductCard {
 export interface ChatToolResult {
   text: string;
   products?: ChatProductCard[];
+  /** Foto (URL) yang harus ditampilkan di balasan asisten. */
+  images?: string[];
 }
 
 export const CHAT_TOOLS = [
@@ -61,6 +63,23 @@ export const CHAT_TOOLS = [
           },
           max_harga: { type: "number", description: "Batas harga maksimum dalam Rupiah (opsional)." },
           warna: { type: "string", description: "Filter warna (opsional), mis. 'hitam'." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "info_series",
+      description:
+        "Ambil penjelasan resmi dan FOTO tiap series Thobe (Imron, Jiharkah, Nahawand, Bayati, Imalah). Pakai saat pelanggan bertanya beda series, ciri kerah/placket, atau minta foto series.",
+      parameters: {
+        type: "object",
+        properties: {
+          series: {
+            type: "string",
+            description: "Nama series (opsional), mis. Jiharkah. Kosongkan untuk semua series.",
+          },
         },
       },
     },
@@ -601,6 +620,72 @@ async function hubungiAdmin(args: Record<string, unknown>, ctx: ChatToolContext)
   };
 }
 
+/**
+ * Penjelasan + foto series dari Product Knowledge Academy.
+ *
+ * Sumbernya `content_items` type `product` kategori "Product Series" (bukan katalog
+ * Samaqu), karena foto resmi per series diunggah admin di sana. Tanpa env Academy,
+ * tool mengarahkan pelanggan ke admin.
+ */
+async function infoSeries(args: Record<string, unknown>): Promise<ChatToolResult> {
+  const base = String(process.env.ACADEMY_SUPABASE_URL || "").replace(/\/+$/, "");
+  const key = String(process.env.ACADEMY_SERVICE_ROLE_KEY || "");
+  if (!base || !key) {
+    return { text: "Data series belum tersedia di server. Arahkan pelanggan ke admin." };
+  }
+
+  const res = await fetch(
+    `${base}/rest/v1/content_items?select=data&type=eq.product&data->>category=eq.Product%20Series`,
+    { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: "no-store" },
+  );
+  if (!res.ok) {
+    console.error("[CHAT-TOOL] info_series gagal:", res.status);
+    return { text: "Gagal mengambil data series. Arahkan pelanggan ke admin." };
+  }
+  const rows = (await res.json().catch(() => [])) as Array<{ data?: Record<string, unknown> }>;
+  const all = rows
+    .map((row) => row?.data)
+    .filter((data): data is Record<string, unknown> => Boolean(data && data.name));
+  if (!all.length) {
+    return { text: "Data series belum tersedia. Arahkan pelanggan ke admin." };
+  }
+
+  const wanted = String(args.series || "").trim().toLowerCase();
+  const picked = wanted
+    ? all.filter((data) => {
+        const name = String(data.name || "").toLowerCase();
+        return name.includes(wanted) || wanted.includes(name);
+      })
+    : all;
+  if (!picked.length) {
+    return {
+      text: `Series "${args.series}" tidak ditemukan. Series yang ada: ${all
+        .map((data) => String(data.name || ""))
+        .join(", ")}.`,
+    };
+  }
+
+  const text = picked
+    .map((data) =>
+      [
+        `**${String(data.name || "")}**`,
+        data.collar ? `Kerah: ${String(data.collar)}` : "",
+        data.placket ? `Placket: ${String(data.placket)}` : "",
+        data.description ? `Deskripsi: ${String(data.description)}` : "",
+        data.characteristics ? `Ciri: ${String(data.characteristics).replace(/\n/g, "; ")}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    )
+    .join("\n\n");
+
+  const images = [...new Set(picked.map((data) => String(data.image || "").trim()))]
+    .filter((url) => /^https:\/\//i.test(url))
+    .slice(0, 5);
+
+  return { text, images };
+}
+
 /** Konteks opsional dari route (sessionId untuk pembatas percobaan, transcript untuk eskalasi). */
 export interface ChatToolContext {
   sessionId?: string | null;
@@ -625,6 +710,8 @@ export async function executeChatTool(
     switch (name) {
       case "cari_produk":
         return await cariProduk(args);
+      case "info_series":
+        return await infoSeries(args);
       case "panduan_ukuran":
         return panduanUkuran(args);
       case "cari_area_ongkir":

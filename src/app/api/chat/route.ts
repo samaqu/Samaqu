@@ -46,7 +46,7 @@ ATURAN:
 - Kalau pertanyaannya di luar topik itu (mis. coding, politik, pelajaran), TOLAK sopan dan singkat, contoh: "${REFUSAL}". Jangan menjawab pertanyaannya.
 - Pakai Bahasa Indonesia yang ramah, santai, ringkas.
 - FORMAT & PANJANG: jawab sesingkat mungkin — maksimal ~4 baris/poin. Kalau menyebut beberapa produk, pakai daftar berpoin (awali "- "), satu produk per baris. Tebalkan nama produk/harga dengan **teks**. JANGAN menuliskan seluruh stok semua warna/ukuran — cukup yang ditanyakan atau yang paling relevan.
-- JANGAN mengarang produk, harga, warna, atau stok. Untuk data produk/harga/stok TERKINI, panggil tool "cari_produk". Untuk ukuran, panggil "panduan_ukuran".
+- JANGAN mengarang produk, harga, warna, atau stok. Untuk data produk/harga/stok TERKINI, panggil tool "cari_produk". Untuk ukuran, panggil "panduan_ukuran". Untuk pertanyaan beda series / ciri kerah / minta foto series, panggil "info_series" — fotonya otomatis dikirim ke pelanggan, cukup bilang "ini fotonya".
 - Pelanggan bisa melampirkan gambar (mis. kondisi produk, referensi model). Kalau ada gambar, perhatikan isinya dan tanggapi sesuai konteks SAMAQU.
 - Untuk pertanyaan "pesanan saya sudah diproses/dikirim belum?", pakai tool "cek_status_pesanan". Minta nomor pesanan (mis. SMQ-... atau CYO-...) DAN nomor HP yang dipakai saat memesan. Jangan pernah menampilkan alamat lengkap atau data pribadi lain — cukup status & nomor resi.
 - Kalau pelanggan minta bicara dengan admin/manusia, atau masalahnya butuh admin (keluhan, retur/garansi, pembayaran bermasalah), tanyakan dulu nomor WhatsApp pelanggan, lalu pakai tool "hubungi_admin" dengan ringkasan singkat.
@@ -204,6 +204,7 @@ export async function POST(req: NextRequest) {
       let failure: string | null = null;
       const toolsUsed: string[] = [];
       const productCards: ChatProductCard[] = [];
+      const toolImages: string[] = [];
 
       try {
         const convo: Array<Record<string, unknown>> = [{ role: "system", content: system }, ...mimoMessages];
@@ -270,6 +271,11 @@ export async function POST(req: NextRequest) {
                   if (!productCards.some((x) => x.id === p.id)) productCards.push(p);
                 }
               }
+              if (result.images) {
+                for (const url of result.images) {
+                  if (toolImages.length < 5 && !toolImages.includes(url)) toolImages.push(url);
+                }
+              }
               convo.push({ role: "tool", tool_call_id: call.id, content: result.text });
             }
             continue;
@@ -286,6 +292,7 @@ export async function POST(req: NextRequest) {
         ) {
           send({ products: productCards.slice(0, 4) });
         }
+        if (toolImages.length) send({ images: toolImages });
         send({ done: true });
       } catch (error) {
         console.error("[CHAT] Permintaan gagal:", error);

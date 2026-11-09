@@ -134,7 +134,12 @@ export default function ChatPanel({
       { role: "user", content: text, images: sentImage ? [sentImage] : undefined },
     ];
     let cards: NonNullable<Msg["products"]> = [];
-    const render = (content: string) => setMessages([...history, { role: "assistant", content, products: cards }]);
+    let imgs: NonNullable<Msg["images"]> = [];
+    const render = (content: string) =>
+      setMessages([
+        ...history,
+        { role: "assistant", content, products: cards, images: imgs.length ? imgs : undefined },
+      ]);
     setMessages([...history, { role: "assistant", content: "" }]);
     setInput("");
     setImageUrl(null);
@@ -178,7 +183,7 @@ export default function ChatPanel({
           const payload = trimmed.slice(5).trim();
           if (!payload) continue;
 
-          let evt: { delta?: string; reset?: boolean; error?: string; done?: boolean; products?: Msg["products"] };
+          let evt: { delta?: string; reset?: boolean; error?: string; done?: boolean; products?: Msg["products"]; images?: Msg["images"] };
           try {
             evt = JSON.parse(payload);
           } catch {
@@ -187,6 +192,7 @@ export default function ChatPanel({
 
           if (evt.reset) acc = "";
           else if (Array.isArray(evt.products)) cards = evt.products;
+          else if (Array.isArray(evt.images)) imgs = evt.images;
           else if (typeof evt.delta === "string") acc += evt.delta;
           else if (evt.error) acc = acc || evt.error;
 
@@ -298,7 +304,22 @@ export default function ChatPanel({
                   {m.content}
                 </>
               ) : (
-                renderRichText(m.content)
+                <>
+                  {m.images && m.images.length > 0 ? (
+                    <div className="mb-1.5 flex flex-wrap gap-1.5">
+                      {m.images.map((u) => (
+                        <img
+                          key={u}
+                          src={u}
+                          alt=""
+                          loading="lazy"
+                          className="block rounded-lg max-h-44 w-auto"
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  {renderRichText(m.content)}
+                </>
               )}
             </div>
             {m.products && m.products.length > 0 && (
