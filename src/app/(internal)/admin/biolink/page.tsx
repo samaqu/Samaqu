@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Loader2, Plus, Save, Trash2, Upload } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { requestRevalidate } from "@/lib/admin-revalidate";
 import AdminShell from "@/components/AdminShell";
 import { useToast } from "@/components/AdminToast";
 import { uploadToCloudinary, validateMediaFile } from "@/lib/cloudinary";
@@ -373,6 +374,8 @@ export default function BiolinkPage() {
       return;
     }
     toast.showToast("success", "Halaman bio berhasil disimpan");
+    // Halaman bio statis: segarkan sekarang, tanpa revalidate berkala.
+    void requestRevalidate();
   }
 
   if (loading) {

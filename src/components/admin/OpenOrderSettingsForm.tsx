@@ -34,6 +34,7 @@ import {
   type OpenOrderState,
 } from "@/lib/open-order-window";
 import { supabase } from "@/lib/supabase";
+import { requestRevalidate } from "@/lib/admin-revalidate";
 
 const LABEL = "text-[11px] font-medium uppercase tracking-[0.14em]";
 const LABEL_COLOR = "var(--text-muted)";
@@ -281,6 +282,8 @@ export default function OpenOrderSettingsForm() {
     setOriginalTime({ start: startTime, end: endTime });
     setEditing(false);
     toast.showToast("success", "Jendela Open Order disimpan");
+    // Banner Open Order di halaman bio ikut disegarkan saat jendela berubah.
+    void requestRevalidate();
   }
 
   /**

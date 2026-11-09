@@ -10,10 +10,12 @@ import {
 } from "@/lib/open-order-window";
 
 /**
- * Konten Bio + status Open Order global. 600 detik (dulu 180/60): konten Biolink diatur admin
- * dan jarang berubah, sementara banner status masih akurat dalam hitungan menit.
+ * Konten Bio + status Open Order global.
+ *
+ * Sengaja TANPA `revalidate` berkala: halaman ini jarang berubah, jadi dibuat statis.
+ * Saat admin menyimpan konten bio atau jendela Open Order, `/api/revalidate` yang
+ * menyegarkan halaman ini (on-demand), bukan timer.
  */
-export const revalidate = 600;
 
 export default async function Page() {
   const content = await fetchBioPageContent();
