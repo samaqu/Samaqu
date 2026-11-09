@@ -74,7 +74,7 @@ const BASE_MENU_GROUPS: MenuGroup[] = [
   {
     label: "Keuangan",
     items: [
-      { title: "Pengeluaran", href: "/ops/pengeluaran", icon: WalletIcon, soon: true },
+      { title: "Pengeluaran", href: "/ops/pengeluaran", icon: WalletIcon },
       { title: "Target Profit", href: "/ops/target-penjualan", icon: Target, soon: true },
       { title: "Laporan", href: "/ops/laporan", icon: BarChart3 },
       { title: "Ongkir J&T", href: "/ops/ongkir-jnt", icon: Receipt },

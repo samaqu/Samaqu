@@ -51,6 +51,7 @@ declare module "lucide-react" {
   export const Sparkles: FC<IconProps>;
   export const Shirt: FC<IconProps>;
   export const Heart: FC<IconProps>;
+  export const Gift: FC<IconProps>;
   export const Headphones: FC<IconProps>;
   export const Scissors: FC<IconProps>;
   export const Search: FC<IconProps>;
@@ -120,5 +121,14 @@ declare module "lucide-react" {
   export const Wand2: FC<IconProps>;
   export const Store: FC<IconProps>;
   export const Maximize2: FC<IconProps>;
+  // Pemilih metode bayar drawer Pengeluaran
+  export const Banknote: FC<IconProps>;
+  export const Landmark: FC<IconProps>;
+  export const QrCode: FC<IconProps>;
+  // Ikon kategori drawer Pengeluaran
+  export const Zap: FC<IconProps>;
+  export const Building2: FC<IconProps>;
+  export const Wrench: FC<IconProps>;
+  export const Laptop: FC<IconProps>;
   export type LucideIcon = FC<IconProps>;
 }

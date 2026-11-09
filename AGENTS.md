@@ -1339,6 +1339,13 @@ Satu modul agregasi: **`src/lib/best-sellers.ts`**
 - produk induk = `products.category::products.name` (fallback: nama dibersihkan dari kain/size/cover);
 - unit & omzet dari SEMUA item pesanan sah `SALE_STATUSES` (bukan top-N), jadi `totals.units` harus
   sama dengan jumlah `quantity` mentah di periode itu — itu cara termudah memeriksanya;
+- **omzet = SETELAH diskon** (2026-11-09, permintaan pemilik "omsetnya harusnya sama kayak card di
+  atas"): `revenue` tiap baris = `harga × qty − porsi diskon pesanan` (`discount_share` yang sama
+  yang dihitung server), sehingga `totals.revenue` **sama persis** dengan
+  kartu `Total Omset` di `/ops/laporan` (`summary.gross` = `orderRevenue` = total − ongkir). Dulu
+  `revenue` bruto, jadi Produk Terlaris (Rp 21.184.000) beda Rp 219.000 dari kartu atas — selisih itu
+  memang total diskon periode, bukan pesanan batal (batal/belum bayar tidak pernah ikut). Jangan
+  mengembalikan `price * qty` tanpa potongan diskon;
 - breakdown per ukuran dan per kain/opsi disimpan untuk baris yang di-expand.
 
 Batas periode **WIB** (`jakartaMonthBounds`/`jakartaDayBounds`). Pembanding apple-to-apple: bulan
@@ -1785,3 +1792,260 @@ hari ini"). Jangan menulis ulang kalimatnya literal di satu layar — impor kons
 captionnya tidak lagi memuat periode/jumlah, `periodeKartu` + `formatTanggalID` di halaman
 Transaksi dihapus (tidak terpakai; `orders.length` tetap dipakai tab tahap, dan jumlah hariannya
 tetap terbaca di tooltip kartu beranda panel admin `hint`). `npx tsc --noEmit` bersih.
+
+## Modul Pengeluaran (menu Keuangan > Pengeluaran, `/ops/pengeluaran`)
+
+- **Migration `supabase/migrations/20261109_pengeluaran.sql`** membuat tabel baru `expense_items`
+  (master barang packing) + `expenses` (packing/operasional, `request_id` unik, total packing = qty ×
+  harga satuan). RLS aktif **tanpa policy** (hanya service role), index pada `tanggal` & `tipe`.
+  **Sudah dijalankan 2026-11-08** ke project hosted (`bzoitgivmozhwpuomuhj`) lewat Supabase
+  Management API (`POST /v1/projects/<ref>/database/query`, header `Authorization: Bearer
+  $SUPABASE_ACCESS_TOKEN`) — jadi jalur DDL dari sandbox kini ada; catatan "sandbox tidak punya
+  jalur DDL" di bagian lain hanya berlaku kalau secret itu tidak diisi. Sebelum migration, halaman
+  menampilkan banner "Tabel pengeluaran belum dibuat…" dan `/api/ops/pengeluaran*` membalas 500
+  (tabel belum ada); sesudahnya REST service-role = 200 dan tulis/baca jalan.
+- **API**: `src/app/api/ops/pengeluaran/route.ts` (GET daftar + ringkasan per tipe, POST, PATCH,
+  DELETE) dan `src/app/api/ops/pengeluaran/barang/route.ts` (GET/POST/PATCH master barang). Guard
+  `isOpsAdmin`, DB via `getSupabaseAdmin`, pesan error bahasa Indonesia. Helper bersama di
+  `src/lib/pengeluaran.ts` (`asText`/`asInt`/`asDateKey`, `readPengeluaranPeriod` = batas bulan WIB
+  dari `BIZ_OFFSET_MS`, `buildPengeluaranSummary`). Barang yang sudah dipakai **tidak** dihapus —
+  tidak ada endpoint DELETE untuk `expense_items`, cukup `PATCH { aktif: false }`.
+- **UI**: `src/app/(internal)/ops/pengeluaran/page.tsx` → `src/components/ops/pengeluaran/`
+  (`PengeluaranView`, `PengeluaranHeader`, `PengeluaranSummaryCards`, `PengeluaranTable`,
+  `ExpenseDrawer`, `BarangDrawer`, `MetodeBayarSelect`, `fields.tsx`, `helpers.ts`, `types.ts`).
+  Panggil API langsung (bukan shim `ops-api`), React Query dengan `initialData` kosong seperti
+  halaman ops lain. **Metode Bayar** di drawer operasional memakai `MetodeBayarSelect` (dropdown
+  berikon monokrom: Transfer Bank/Cash/QRIS/E-Wallet/Lainnya, ikon dari `lucide-react.d.ts`),
+  bukan lagi `<input list>` + `<datalist>`; nilainya tetap teks bebas yang disimpan ke kolom
+  `expenses.metode_bayar`.
+- **Kategori operasional = 8 kartu berikon (permintaan pemilik 2026-11-08)**: isian bebas
+  `<input list>` + `<datalist>` diganti `KategoriPicker.tsx` (grid 2 kolom, `aria-pressed`, ikon
+  lucide monokrom per kategori). Daftarnya di `KATEGORI_OPERASIONAL` (`helpers.ts`): Iklan &
+  Promosi · Admin Marketplace · Ongkos Kirim · Gaji Karyawan · Listrik & Air · Sewa Tempat ·
+  Maintenance · Tools & Software. Nilai yang dikirim tetap nama kategori (string), jadi API tidak
+  berubah; baris lama dengan kategori di luar daftar tetap tampil sebagai kartu tambahan (ikon Tag)
+  supaya bisa dipertahankan/diganti. Ikon baru (`Zap`, `Building2`, `Wrench`, `Laptop`) sudah
+  ditambahkan ke `src/types/lucide-react.d.ts`.
+- **Field Deskripsi dihapus dari form operasional (permintaan pemilik 2026-11-08)**: drawer hanya
+  berisi Tanggal · Kategori · Jumlah · Metode Bayar · Catatan (Catatan yang dipakai untuk keterangan),
+  dan kolom "Deskripsi" ikut dihapus dari tabel operasional (`kolom` di `PengeluaranTable` jadi
+  dinamis: 6 packing / 5 operasional). Payload klien tidak lagi mengirim `deskripsi`; kolom
+  `expenses.deskripsi` **tetap ada** di DB/API supaya baris lama tidak hilang — PATCH memakai nilai
+  tersimpan (`merged` di route) saat field itu tidak dikirim, jadi jangan hapus kolomnya.
+- **Form packing (permintaan pemilik 2026-11-08)**: yang diisi adalah **Total Harga** (harga
+  pembelian), lalu **Harga Satuan dihitung otomatis** `Math.round(total ÷ qty)` dan ditampilkan
+  read-only; server tetap menyimpan `jumlah = qty × harga_satuan` seperti sebelumnya, jadi
+  `harga_satuan` (bukan total) yang dikirim di payload. Kalau total tidak habis dibagi qty,
+  ringkasan menulis "harga satuan dibulatkan" dan angka Total di kartu = hasil pembulatan itu
+  (angka yang benar-benar tersimpan). Saat mengubah baris, Total diisi `qty × harga_satuan` dari
+  DB. Kedua kolom uang (Total Harga packing & Jumlah operasional) memakai `RupiahInput` di
+  `fields.tsx` — state menyimpan digit polos, pemisah ribuan hanya untuk tampilan, jangan pernah
+  menyimpan nilai berformat.
+- **Warna (permintaan pemilik 2026-11-08)**: biru tidak dipakai lagi di modul ini — paletnya
+  monokrom hitam–grafit seperti Samaqu. Kartu header = gradien gelap `#111113 → #2d2d33` berisi
+  judul, pemilih Bulan/Tahun, dan **tiga kartu statistik di dalamnya** (`PengeluaranSummaryCards`,
+  tile `border-white/15 bg-white/[0.06]`); tab aktif (dengan ikon), tombol Tambah, dan tombol simpan
+  di kedua drawer memakai `#18181b` (hover `black`); header tabel juga `#18181b`. Jangan
+  mengembalikan `bg-blue-600`/`text-blue-*` di folder `src/components/ops/pengeluaran/`.
+- **Laporan Keuangan membaca modul ini (2026-11-08)**: `/api/ops/laporan` menjumlah `expenses`
+  periode itu (kolom `tanggal`, inklusif) → `biayaPacking` + `biayaOperasional`, lalu
+  `biaya = packing + operasional + mayarFee`. Sebelumnya `EXPENSES_AVAILABLE = false` membuat
+  "Biaya" hanya berisi fee Mayar, jadi laba terlalu besar. Kalau tabel `expenses` belum ada,
+  balasannya `expensesAvailable:false` → biaya TIDAK dianggap Rp0 (kartu "—" dan laba "belum final").
+  Kartu atas `/ops/laporan` = **satu kontainer kartu terang** (putih, border `zinc-200/80`, radius
+  24) berisi 4 tile **Total Omset / Total HPP / Total Biaya / Laba Bersih** (label uppercase abu,
+  nilai `zinc-900`, keterangan, ikon bulat di kanan) — semuanya membaca `summary` API yang sama,
+  jangan menghitung ulang di klien. **Revisi 2026-11-08 (pemilik: "kalo full item gini jelek, cari
+  kombinasi warna yg bagus, riset dulu")**: latar grafit `#111113 → #2d2d33` yang dulu menutupi
+  seluruh kartu diganti pola dashboard standar — permukaan terang netral (pola persisnya diganti
+  revisi "kontras dibalik" di bawah), dan **satu
+  aksen gelap kecil** (`bg-zinc-900` hanya di tile ikon judul, tombol Export PDF, dan pill bulan
+  aktif). Teks kartu `text-zinc-*` (bukan lagi `text-white/*`), tile metrik memakai
+  `from-white to-zinc-50/60` + border `zinc-200/80` supaya terpisah dari kartu induknya. Jangan
+  mengembalikan blok grafit selebar kartu atau memakai ulang `text-white/*`/`border-white/*` di sini.
+  **Revisi 2026-11-08 (pemilik: "background globalnya putih terus card-nya jangan terlalu putih,
+  riset dulu perpaduan warnanya")**: kontrasnya DIBALIK dari pola umum dashboard — kanvas halaman
+  **putih murni** (`#FFFFFF`), kartu **abu netral lembut** `#EFEFF1` + border `#E4E4E7`, dan panel
+  di dalam kartu (tile metrik, wadah tabel, empty state) `#FAFAFA`/`#FFFFFF` sebagai lapisan ketiga.
+  Jadi tidak ada satu pun permukaan kartu yang putih murni; putih hanya milik kanvas. Kanvas putih
+  dibuat menutup gutter `main` lewat `-m-4 p-4 md:-m-6 md:p-6 lg:-m-8 lg:p-8` di pembungkus halaman
+  (padding-nya dikembalikan, jadi posisi kartu tidak bergeser). Track progress bar ikut dinaikkan ke
+  `#E4E4E7` dan tile ikon/badge peringkat jadi `bg-white` supaya tidak hilang di atas kartu abu.
+  `BestSellerSection.tsx` ikut palet ini (kartu `#EFEFF1`, segmented control `bg-white` + item aktif
+  `#EFEFF1`). Saat mengubah warna di halaman ini ukur lewat `getComputedStyle` (kanvas
+  `rgb(255,255,255)`, kartu `rgb(239,239,241)`, tile `rgb(250,250,250)`) — tangkapan layar preview
+  tidak bisa diandalkan untuk selisih 5% ini. `Total Biaya`
+  = operasional + packing + Mayar; baris "Biaya Operasional & Packing" di rincian memakai
+  `biayaOperasional + biayaPacking` (dulu `biaya` yang sudah termasuk Mayar → dobel dengan baris
+  Mayar). **`products.hpp` masih 0 untuk semua 120 produk** (dicek 2026-11-08), jadi `hppStatus`
+  = `missing` dan Total HPP / Laba tampil "—" sampai kolom HPP diisi di katalog — itu disengaja,
+  jangan mengganti 0 jadi "modal diketahui". Tombol **Export PDF** memakai `window.print()`
+  (dialog print browser → Save as PDF), bukan generator PDF baru.
+- **Kartu atas = pola "Rekap Pengeluaran" (permintaan pemilik 2026-11-08: "card di laporan mending
+  samain aja deh kaya yg di rekap pengeluaran")**: kartu header `/ops/laporan` kembali memakai
+  gradien grafit yang sama dengan `PengeluaranHeader` (`#111113 → #2d2d33`, radius 24, judul 14 px
+  ikon di kotak `border-white/15 bg-white/10`, pemilih bulan `#1d1d21`), dan 4 tile metrik memakai
+  susunan `PengeluaranSummaryCards` (ikon + label sebaris, nilai besar, keterangan di bawah, kelas
+  `border-white/15 bg-white/[0.06]`, teks `text-white/*`) — jadi `ReportMetric` sekarang setara
+  tile di modul Pengeluaran (ikon bulat di kanan sudah dihapus). Ini **menimpa** catatan "jangan
+  mengembalikan blok grafit selebar kartu" di atas; kartu-kartu lain di halaman (Perhitungan Laba,
+  Pending, Chart, Sumber Pesanan, Metode Pembayaran, tabel) tetap permukaan terang `#EFEFF1`.
+  Tiga baris teks di kartu itu **dihapus atas permintaan pemilik**: baris periode ("1 Nov 2026 – 8
+  Nov 2026 · 8 hari · dibanding … · 54 transaksi · rata-rata …", hanya chip **Bulan Ini/Bulan Lalu**
+  yang tinggal), paragraf penjelasan rumus ("Omset = nilai transaksi diakui … Laba bersih = …"), dan
+  baris delta/margin ("+20,4% penjualan bersih vs periode sebelumnya · margin —"). Datanya
+  (`period`, `aov`, `deltas`, `margin`) masih ada di respons API — jangan hapus dari route, hanya
+  tidak ditampilkan lagi di kartu ini.
+- **Revisi 2026-11-08 (pemilik: "bagusan warna yg sebelumnya")**: gradien grafit di kartu atas
+  `/ops/laporan` **dicabut lagi** — kartu header kembali permukaan terang `#EFEFF1` + border
+  `#E4E4E7`, judul `text-zinc-900` dengan tile ikon `bg-zinc-900`, tombol Dashboard/Export PDF &
+  pemilih bulan kembali pil putih + satu tombol `bg-zinc-900`, dan 4 tile `ReportMetric` kembali
+  `bg-[#FAFAFA]` dengan label abu, nilai `text-zinc-900`, dan ikon bulat di kanan (badge
+  PROFIT/RUGI/BELUM FINAL kembali versi terang `bg-emerald-50`/`bg-red-50`/`bg-amber-50`). Catatan
+  "kartu atas harus grafit seperti Rekap Pengeluaran" di atas **tidak berlaku**; halaman
+  Pengeluaran sendiri tidak diubah. Tiga baris teks yang dihapus (periode, rumus, delta) tetap
+  tidak ditampilkan. Verifikasi: `getComputedStyle` kartu header = `rgb(239, 239, 241)` dengan teks
+  `rgb(10, 10, 10)`, 0 error console.
+- Verifikasi (2026-11-08): `/ops/pengeluaran` = 200; dirender lewat **iframe same-origin** di preview
+  (`navigate()` gagal untuk route `/ops/*`): header + pemilih Bulan/Tahun, 3 kartu (0 / Rp 0), dua tab
+  (aktif hitam grafit), judul "Detail Pengeluaran …", tombol Kelola Barang (hanya packing) & Tambah,
+  banner migration, drawer form packing tampil (Tanggal/Barang/Qty/Harga Satuan/Total/Catatan),
+  0 error console, tanpa scroll samping. **Belum** terbukti dengan data nyata: ubah (PATCH), filter
+  bulan, dan Kelola Barang.
+- **Tulis/baca/hapus nyata (dibuktikan 2026-11-08, sesi admin diputar ulang, iframe same-origin
+  1280 px)**: tab Operasional → Tambah → isi Kategori "Gaji" / Deskripsi / Jumlah 125000 / Metode
+  Bayar **QRIS lewat dropdown baru** → Simpan = toast "Pengeluaran tersimpan", baris muncul di tabel
+  (`8 Nov 2026 · Gaji · QRIS · Rp 125.000`), kartu ringkasan 0 → 1 transaksi / Rp 125.000. Barisnya
+  **ada di database**: dibaca ulang dengan service role (`expenses` → `kategori: Gaji`,
+  `jumlah: 125000`, `metode_bayar: QRIS`, `catatan: catatan uji`, `created_by:
+  officialsamaqu@gmail.com`, `request_id` unik) dan tetap tampil setelah **muat ulang penuh**
+  (`iframe src=/ops/pengeluaran?fresh=…`), bukan cuma state optimistis. Hapus lewat ikon tempat
+  sampah → dialog "Yakin ingin menghapus pengeluaran ini? · Gaji · Rp 125.000" → Hapus = toast
+  "Pengeluaran dihapus", baris & ringkasan hilang, dan `expenses` kembali **0 baris** (data uji
+  tidak tertinggal; `expense_items` 1 baris milik owner tidak disentuh). `npx tsc --noEmit` bersih.
+  Catatan tool: klik di dalam iframe lewat `MouseEvent` yang disebar **tidak** memicu handler React
+  (`drawerOpen` tetap false) — pakai `element.click()`.
+
+## Animasi counter kartu laporan (`CountUp`)
+
+Permintaan pemilik 2026-11-09: kartu `/ops/laporan` ("kurang modern, kalo bisa di card nya ada
+animasi counter") memakai **`src/components/admin/CountUp.tsx`** yang sama dengan dashboard admin —
+kartu metrik `ReportMetric`, kartu Mayar, kartu pending, dan angka "Estimasi Laba" menerima **angka
+mentah + `format`**, bukan string rupiah jadi, supaya tiap frame animasi diformat sama.
+
+Dua bug di komponen itu yang harus tetap diperbaiki (ditemukan saat memverifikasi halaman ini,
+sebelumnya tidak terlihat di dashboard karena nilainya baru masuk SETELAH mount):
+
+- **Strict Mode menahan kartu di Rp 0.** React dev menjalankan effect dua kali
+  (mount → cleanup → mount). Cleanup lama menulis target akhir ke ref titik-awal, jadi mount kedua
+  menganggap animasi sudah selesai dan angka tampil 0 selamanya. Sekarang posisi animasi disimpan di
+  `displayedRef` yang **hanya** berubah saat sebuah frame benar-benar tampil, dan cleanup hanya
+  membatalkan rAF. Jangan kembalikan `fromRef.current = to` di cleanup.
+- **Frame pertama bisa negatif** (`Rp -1.643.556`): timestamp rAF bisa lebih awal daripada
+  `performance.now()` di effect, jadi progres dijepit `Math.max(0, …)`.
+
+Verifikasi (2026-11-09, `/ops/laporan` lewat iframe same-origin, sesi admin diputar ulang):
+`npx tsc --noEmit` bersih; 37 nilai berbeda pada kartu Total Omset (`Rp 0` → … →
+`Rp 20.965.000`), tanpa nilai negatif; kartu Mayar (Rp 24.542 / Rp 0 / 3) dan panel "Perhitungan
+Laba" ikut beranimasi; permukaan kartu tetap `#EFEFF1` (kanvas putih); 0 px geser samping di 1280 px
+dan 390 px; 0 error console.
+
+**Tampilan modern (halaman yang sama, 2026-11-09)** — semua tetap di palet monokrom terang yang
+diwajibkan (kartu `#EFEFF1`, tile `#FAFAFA`, kanvas putih; **jangan** mengembalikan header grafit):
+kartu metrik naik halus saat hover + tile ikon membalik jadi hitam, tiap section punya tile ikon
+konsisten (Perhitungan Laba & Tren Keuangan), bar porsi tumbuh dari kiri, dan grafik Tren Keuangan
+memakai satu Area bergradasi grafit + garis monokrom (`#A1A1AA` / `#18181B` / `#52525B`) — biru
+`#2563EB` dan hijau `#10B981` lama di grafik sudah dicabut. Animasi masuk/stagger ada di
+`src/app/globals.css` dengan awalan **`lpr-`** (`lpr-rise`, `lpr-bar`) + fallback
+`prefers-reduced-motion`. Baris periode/rumus/delta di kartu atas tetap **tidak** ditampilkan
+(permintaan pemilik sebelumnya).
+
+**Breakdown Pengeluaran (kartu rincian biaya, 2026-11-09)** — section baru di `/ops/laporan`
+(setelah "Perhitungan Laba") berisi **tiga kartu akordeon**: Modal Barang Terjual (COGS) · **Biaya Mayar** · Operating Expenses
+(kartu kedua dulu berjudul "Potongan Marketplace & Fee" — diganti atas permintaan pemilik
+2026-11-09; angkanya tetap fee Mayar per channel). Komponennya
+**`src/components/ops/laporan/BreakdownPengeluaran.tsx`** (`useState` satu kartu terbuka —
+akordeon, jadi klik kartu lain menutup yang sebelumnya; kartu COGS terbuka saat pertama dimuat).
+Semua angkanya dari **`GET /api/ops/laporan`** → field **`breakdown: { cogs, fees, packing,
+operasional }`** (top-level, bukan di `summary`):
+- `cogs` = agregasi `order_items` pesanan sah per `product_id` + series + varian (`Kain … · warna ·
+  size`; `color: "default"` disembunyikan) → `{ id, name, series, variant, qty, hpp, unknownQty }`.
+  **Series diambil dari `order_items.series`** (`products.series` kosong di semua 96 baris katalog,
+  jadi membaca katalog tidak pernah menampilkan apa pun), dengan fallback `seriesFromName(name)`
+  dari `src/lib/best-sellers.ts` untuk item lama yang menaruh series di nama
+  ("Thobe Imron Series …" / "Thobe Superblack — Jiharkah"). UI merendernya sebagai **badge**
+  di samping nama produk (`LineRow` prop `series`), bukan lagi di dalam teks varian — dan series
+  ikut jadi bagian key agregasi supaya dua series produk yang sama tidak tergabung.
+  **Kartu COGS dipaginasi (2026-11-09)**: 5 baris per halaman dengan tombol ‹ › + `halaman/total`
+  dan tombol **Tampilkan semua / Ringkas**, plus baris "1–5 dari 50 produk" (`CogsPager`,
+  `COGS_PAGE_SIZE`). Paginasi hanya di sisi klien — daftar `cogs` dari API tidak dipotong. `unknownQty` =
+  unit yang belum punya modal (`order_items.hpp` / `products.hpp` kosong), jadi barisnya menampilkan
+  "N unit tanpa modal" dan nominal "—" — **jangan** mengubah 0 jadi angka karangan.
+- `fees` = fee Mayar settled per `paymentChannelLabel(detail.channel)` → `{ channel, count, fee }`.
+- `packing`/`operasional` = baris `expenses` periode itu → `{ nama, qty, jumlah }`
+  (`packing` memakai `nama_barang`, `operasional` memakai `kategori`).
+Query `expenses` di route itu sekarang ikut `select` `kategori, nama_barang, qty` — kolom itu
+**hanya** untuk rincian, total `biayaPacking`/`biayaOperasional` tetap dari `jumlah`.
+Total kartu memakai angka summary yang sudah ada (`hpp`, `mayarFee`, `biayaPacking`,
+`biayaOperasional`) supaya rincian tidak bisa beda dengan kartu atas; persen dihitung di klien
+terhadap total kartunya. Palet tetap monokrom (ikon + teks zinc), **bukan** oranye/ungu/biru seperti
+referensi desain.
+Verifikasi (2026-11-09, `/ops/laporan` lewat iframe same-origin 920 px, sesi admin diputar ulang):
+`npx tsc --noEmit` bersih; API membalas 50 baris `cogs`, 1 `fees` (QRIS · 3 transaksi · Rp 24.542),
+1 `packing` (Lakban Bening 50x · Rp 250.000) dan 1 `operasional` (Tools & Software · Rp 165.410);
+ketiga kartu terbuka lewat klik dan menampilkan baris rinciannya, COGS badge "75 unit tanpa modal"
+(Total HPP memang masih Rp 0 — `products.hpp` kosong), 0 px geser samping, 0 error console.
+
+**Tabel "Biaya Mayar · Cair / Belum Cair" (perbaikan 2026-11-09)** — baris kedua tabel itu membuka
+drawer **detail pesanan** yang sama dengan tab Penjualan (`DetailDrawer` → `PanelDetailPesanan`),
+jadi `mayarSettled`/`mayarPending` di `/api/ops/laporan` disusun dari **seluruh baris pesanan**
+(`{ ...row, channel }`), bukan lagi 5 field pilihan. Sebelumnya drawer menampilkan "Tidak ada produk
+tercatat" dengan Subtotal/Ongkir Rp 0 padahal totalnya ratusan ribu (pemilik: "masa detailnya aneh").
+Jangan menyalin sebagian field lagi ke `base` — drawer butuh `items`, `subtotal`, `shipping_cost`,
+`discount`, alamat, dan resi. Kolom **Diskon FCH hanya dirender di tab Penjualan**: di tabel biaya
+Mayar kolomnya selalu "-" (tidak ada baris `cover-hanger`), dan header `mayar-pending` dulu tidak
+sinkron dengan selnya (6 header vs 7 sel). Verifikasi (2026-11-09, iframe same-origin, sesi admin
+diputar ulang): `npx tsc --noEmit` bersih; tabel Cair 7 header = 7 sel; drawer berisi produk
+(Thobe Grey Indigo — Imron + Extra Cover & Hanger), Subtotal Rp359.000, Ongkir Rp93.000, Total
+Rp452.000; tab Penjualan tetap 8 kolom; 0 error console.
+
+**Rekap "Promosi Cover Hanger" (2026-11-09)** — di panel Order Management, pesanan dari WA sering
+ditambah baris `cover-hanger` harga penuh lalu diberi **diskon Rp35.000** di level pesanan
+(`orders.discount`), jadi uang masuk tetap harga produk dan diskon itu tidak muncul di laporan.
+Sekarang nilainya direkap sebagai baris **informasi** di tahap 01 kartu "Perhitungan Laba"
+(`Promosi Cover Hanger (N cover)`), **bukan pengurang**: omzet sudah memakai `total` setelah
+diskon, jadi mengurangi lagi akan dobel. Angkanya dari `summary.promoTotal` / `promoOrders` /
+`promoCoverQty` (`GET /api/ops/laporan`, dihitung `promoValueOf()`): untuk tiap pesanan sah, nilai =
+`cover gratis + min(diskon, nilai kotor baris cover)` — **tanpa** membatasi hasilnya dengan nilai
+kotor baris cover. Dua pola yang dikenali: (a) diskon pesanan menutup cover berharga penuh (form
+Tambah Transaksi WA), dan (b) **cover Rp0 dari promo website** yang dihitung penuh Rp35.000/cover —
+batas `min(nilai kotor, …)` yang lama membuat pola (b) selalu Rp0 sehingga bonus promo website tidak
+pernah terekap (pemilik 2026-11-09: "Promosi Cover Hanger (6 cover) salah, ikutkan promo website").
+`fchDiscountOf()` di halaman (kolom "Diskon FCH" tabel Penjualan) memakai aturan yang sama dan
+**semua varian** cover (Thobe/Koko/lama), dulu hanya "Cover Thobe". Verifikasi (2026-11-09,
+`/ops/laporan` lewat iframe same-origin 920 px, sesi admin diputar ulang): `npx tsc --noEmit`
+bersih; baris berbunyi `Promosi Cover Hanger (8 cover) · Rp 280.000` — cocok dengan data (5 pesanan
+WA Nov 2026: 35+70+35+35+35 rb = Rp210.000 / 6 cover, plus 2 pesanan promo website FCH
+(`FCH-20261107-359`, `FCH-20261104-177`) dengan cover Rp0 = Rp70.000 / 2 cover); `0` px geser
+samping; 0 error console.
+
+**Rincian Biaya Free Gift (2026-11-09)** — kartu **`src/components/ops/laporan/RincianFreeGift.tsx`**
+di `/ops/laporan` (setelah "Perhitungan Laba") merinci HPP barang yang dibagikan gratis pada periode
+itu: kolom `# · SKU · Nama Produk · Qty Dibagikan · HPP/Unit · Total Biaya · % Dari Total Promosi`,
+empty state "Belum ada data free gift pada periode ini", dan footer total + jumlah unit. Datanya dari
+**`summary.freeGift`** (`GET /api/ops/laporan` → `{ items, total, qty, unknownQty }`): satu baris
+gabungan per `product_id|series|varian` (`variant` = `hpp`/COGS: `Kain … · warna · ukuran`, jadi
+Cover Thobe + Hanger dan Set Hanger + Cover tampil terpisah walau `product_id`-nya sama), `sku` dari
+`products.sku`. Aturan "gratis"-nya **sama dengan
+`promoValueOf()`**: cover Rp0 dihitung penuh, cover berbayar hanya sebanyak
+`floor(min(diskon, nilai kotor cover) / 35000)` unit — unit yang tertutup diskon dibagikan ke baris
+berbayar sesuai urutannya, bukan semuanya ke baris pertama — dan item non-cover berharga Rp0 ikut terhitung —
+jadi angka "N cover" di baris Promosi dan kartu ini tidak bisa beda. Biaya = qty × HPP/unit
+(`order_items.hpp` → fallback `products.hpp`); `products.hpp` masih 0 untuk semua produk, jadi
+HPP/Unit & Total Biaya tampil "—" dan kolom persen jatuh ke porsi jumlah unit — jangan mengubah 0 jadi
+angka karangan. Palet tetap monokrom (referensi desainnya ungu/pink, sengaja tidak diikuti).
+Verifikasi (2026-11-09, iframe same-origin 920/1280/390 px, sesi admin diputar ulang): `tsc --noEmit`
+bersih; 2 baris per varian — `CVH-SHC · Cover & Hanger (Cover Thobe + Hanger · ALL SIZE) · 13 ·
+92,9%` dan `CVH-SHC · Extra Cover & Hanger Samaqu (Set Hanger + Cover · ALL SIZE) · 1 · 7,1%` —,
+total `Rp 0 · 14 unit`, cocok dengan `Promosi Cover Hanger (14 cover)`; 0 px geser samping di ketiga
+lebar; 0 error console. (Sebelum revisi varian, keduanya tergabung jadi satu baris 14 unit.)

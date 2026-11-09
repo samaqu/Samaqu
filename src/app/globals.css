@@ -737,3 +737,27 @@ a { text-decoration: none; }
   .oo-shine-text { background: none; color: #fff; -webkit-text-fill-color: #fff; animation: none !important; }
   .oo-roll span, .oo-tick span, .oo-shimmer, .oo-ping, .oo-ping-light { animation: none !important; }
 }
+
+/* ===== Laporan Keuangan (/ops/laporan) =====
+   Animasi presentasi saja: kartu muncul berurutan dan bar porsi tumbuh dari kiri.
+   Angka di kartu dianimasikan komponen `CountUp`; tidak ada nilai data yang diubah. */
+.lpr-rise {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: lpr-rise .55s cubic-bezier(.22, 1, .36, 1) forwards;
+}
+@keyframes lpr-rise {
+  to { opacity: 1; transform: none; }
+}
+.lpr-bar {
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: lpr-bar .9s cubic-bezier(.22, 1, .36, 1) forwards;
+}
+@keyframes lpr-bar {
+  to { transform: scaleX(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lpr-rise { opacity: 1; transform: none; animation: none; }
+  .lpr-bar { transform: none; animation: none; }
+}

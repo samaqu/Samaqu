@@ -5,6 +5,7 @@ import { BIZ_OFFSET_MS } from "@/lib/ops-followup";
 import { SALE_STATUSES, ORDER_SOURCE_LABEL, orderRevenue, orderSourceKey } from "@/lib/transaksi";
 import { paymentChannelLabel } from "@/lib/payment-channel";
 import { loadMayarFees } from "@/lib/mayar-fees";
+import { seriesFromName } from "@/lib/best-sellers";
 
 /**
  * Laporan keuangan owner.
@@ -27,11 +28,11 @@ import { loadMayarFees } from "@/lib/mayar-fees";
 const DAY_MS = 86_400_000;
 
 /**
- * Modul Pengeluaran (biaya operasional) belum ada di aplikasi — sidebar masih "SOON".
- * Selama belum ada sumber datanya, biaya TIDAK boleh dianggap Rp0; laporan harus
- * menandainya "belum tersedia" supaya laba tidak terlihat lebih besar dari kenyataan.
+ * Biaya operasional & packing dibaca dari tabel `expenses` (menu Keuangan > Pengeluaran).
+ * Kalau migration belum dijalankan tabelnya belum ada, dan biaya TIDAK boleh dianggap Rp0:
+ * laporan menandainya "belum tersedia" supaya laba tidak terlihat lebih besar dari kenyataan.
  */
-const EXPENSES_AVAILABLE = false;
+const EXPENSES_MISSING_CODES = ["42P01", "PGRST205"];
 
 function todayWibKey() {
   return new Date(Date.now() + BIZ_OFFSET_MS).toISOString().slice(0, 10);
@@ -116,6 +117,45 @@ const LEGACY_PAYMENT_LABELS: Record<string, string> = {
 };
 
 const UNKNOWN_PAYMENT_LABEL = "Belum tercatat";
+
+/** Harga normal Cover & Hanger (satu paket) di katalog — dasar nilai promo. */
+const COVER_HANGER_VALUE = 35_000;
+
+/**
+ * Nilai promo cover hanger pada SATU pesanan.
+ *
+ * Ada dua cara promo ini tercatat:
+ *  - **Tambah Transaksi (WA):** baris `cover-hanger` masuk harga penuh (Rp35.000), lalu admin
+ *    menempel diskon Rp35.000 di level pesanan → uang masuk tetap harga produk.
+ *  - **Promo website (Free Cover Hanger):** baris `cover-hanger` berharga Rp0.
+ *
+ * Nilainya TIDAK mengurangi omzet lagi (omzet sudah memakai `total` setelah diskon); ini hanya
+ * rekap "berapa nilai yang digratiskan". Cover berharga Rp0 dihitung penuh (itulah bonus promo
+ * website), sedangkan diskon pesanan dibatasi nilai kotor baris cover yang dibayar supaya diskon
+ * untuk hal lain tidak ikut terhitung sebagai promo cover.
+ */
+function promoValueOf(order: any, items: any[]): { value: number; covers: number } {
+  const coverLines = (items || []).filter((item) => {
+    const id = String(item?.product_id || "");
+    return id === "cover-hanger" || id === "addon-cover-hanger";
+  });
+  if (!coverLines.length) return { value: 0, covers: 0 };
+
+  const covers = coverLines.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0);
+  const gross = coverLines.reduce(
+    (sum, item) => sum + (Number(item?.price) || 0) * (Number(item?.quantity) || 0),
+    0,
+  );
+  const freeFromPrice = coverLines.reduce(
+    (sum, item) =>
+      sum + Math.max(0, COVER_HANGER_VALUE - (Number(item?.price) || 0)) * (Number(item?.quantity) || 0),
+    0,
+  );
+  const appliedDiscount = Math.min(Math.max(0, Number(order?.discount) || 0), gross);
+  // Cover berharga Rp0 (promo website) tidak punya nilai kotor, jadi TIDAK boleh dibatasi
+  // `gross` — kalau dibatasi, bonus promo website selalu terbaca Rp0 dan tidak ikut terekap.
+  return { value: freeFromPrice + appliedDiscount, covers };
+}
 
 function paymentLabelFor(raw: string, methodById: Map<string, string>): string {
   const key = String(raw || "").trim();
@@ -216,7 +256,7 @@ async function loadPeriod(
   const startIso = startOfDayIso(from);
   const endIso = startOfDayIso(addDaysKey(to, 1));
 
-  const [ordersRes, returnsCreatedRes, refundsRes, exchangesRes] = await Promise.all([
+  const [ordersRes, returnsCreatedRes, refundsRes, exchangesRes, expensesRes] = await Promise.all([
     admin
       .from("orders")
       .select("id, order_number, customer_name, customer_whatsapp, created_at, total, discount, subtotal, shipping_cost, shipping_address, shipping_city, shipping_kecamatan, shipping_province, shipping_postal_code, shipping_method, awb_no, weight, status, shipping_status, tracking_status_text, tracking_city, tracking_updated_at, source, payment_method, payment_provider, payment_channel, payment_ref, paid_at")
@@ -247,11 +287,40 @@ async function loadPeriod(
       .gte("price_difference_settled_at", startIso)
       .lt("price_difference_settled_at", endIso)
       .limit(1000),
+    // Biaya operasional & packing (menu Pengeluaran) — basis kolom `tanggal` (date), inklusif.
+    admin
+      .from("expenses")
+      .select("tipe, jumlah, kategori, nama_barang, qty")
+      .gte("tanggal", from)
+      .lte("tanggal", to)
+      .limit(5000),
   ]);
 
   for (const res of [ordersRes, returnsCreatedRes, refundsRes, exchangesRes]) {
     if (res.error) throw new Error(res.error.message);
   }
+
+  // Tabel `expenses` belum ada (migration belum dijalankan) → biaya tidak boleh dianggap Rp0.
+  const expensesErrorCode = String((expensesRes.error as { code?: string } | null)?.code || "");
+  const expensesErrorMessage = String((expensesRes.error as { message?: string } | null)?.message || "");
+  const expensesAvailable =
+    !expensesRes.error ||
+    !(
+      EXPENSES_MISSING_CODES.includes(expensesErrorCode) ||
+      /could not find the table|relation .* does not exist/i.test(expensesErrorMessage)
+    );
+  if (expensesRes.error && expensesAvailable) throw new Error(expensesErrorMessage);
+  /**
+   * `kategori`/`nama_barang`/`qty` hanya dipakai rincian "Breakdown Pengeluaran"
+   * (detail per pengeluaran), bukan perhitungan total.
+   */
+  const expenseRows = (expensesRes.data || []) as Array<{
+    tipe?: string | null;
+    jumlah?: number | null;
+    kategori?: string | null;
+    nama_barang?: string | null;
+    qty?: number | null;
+  }>;
 
   const orders = (ordersRes.data || []) as OrderRow[];
   const returnsCreated = (returnsCreatedRes.data || []) as ReturnRow[];
@@ -300,10 +369,16 @@ async function loadPeriod(
 
   const productIds = [...new Set(orderItems.map((item) => String(item.product_id || "")).filter(Boolean))];
   const productHpp = new Map<string, number>();
+  /** SKU katalog — dipakai rincian free gift supaya barisnya bisa dikenali pemilik. */
+  const productSku = new Map<string, string>();
   if (productIds.length > 0) {
-    const { data, error } = await admin.from("products").select("id, hpp").in("id", productIds);
+    const { data, error } = await admin.from("products").select("id, hpp, sku").in("id", productIds);
     if (error) throw new Error(error.message);
-    for (const product of data || []) productHpp.set(String(product.id), Number(product.hpp) || 0);
+    for (const product of data || []) {
+      productHpp.set(String(product.id), Number(product.hpp) || 0);
+      const sku = String((product as { sku?: string | null }).sku || "").trim();
+      if (sku) productSku.set(String(product.id), sku);
+    }
 
     // Foto item untuk drawer detail (sama seperti detail transaksi panel admin).
     const { data: imageRows } = await admin
@@ -415,13 +490,204 @@ async function loadPeriod(
     }
   }
 
-  const biayaOperasional = 0;
-  const biaya = biayaOperasional + mayarFee;
-  /**
-   * Biaya dianggap lengkap hanya bila data operasional tersedia DAN seluruh transaksi Mayar
-   * periode ini sudah cair. Kalau tidak, laba masih bisa bertambah turun setelah dana cair.
+  /*
+   * ── Biaya operasional & packing dari menu Pengeluaran ──
+   * Basis `expenses.tanggal` (tanggal pengeluaran), sama dengan halaman Pengeluaran.
+   * Mayar tetap dipisah sebagai biaya transaksi; Total Biaya = packing + operasional + Mayar.
    */
-  const biayaAvailable = EXPENSES_AVAILABLE && mayarPendingCount === 0;
+  const biayaPacking = expenseRows
+    .filter((row) => row.tipe === "packing")
+    .reduce((sum, row) => sum + (Number(row.jumlah) || 0), 0);
+  const biayaOperasional = expenseRows
+    .filter((row) => row.tipe === "operasional")
+    .reduce((sum, row) => sum + (Number(row.jumlah) || 0), 0);
+  const biaya = biayaPacking + biayaOperasional + mayarFee;
+  /**
+   * Biaya dianggap lengkap hanya bila tabel pengeluaran terbaca DAN seluruh transaksi Mayar
+   * periode ini sudah cair. Kalau tidak, laba masih bisa turun setelah biaya menyusul.
+   */
+  const biayaAvailable = expensesAvailable && mayarPendingCount === 0;
+
+  /*
+   * ── Rincian "Breakdown Pengeluaran" ──
+   * Hanya untuk tampilan detail (per produk / per kanal / per pengeluaran).
+   * Totalnya tetap angka di atas (hpp, mayarFee, biayaPacking/Operasional),
+   * jadi agregasi ini tidak boleh mengubah perhitungan mana pun.
+   */
+  /**
+   * Varian baris pesanan (`Kain … · warna · ukuran`). Dipakai bersama rincian HPP dan free gift
+   * supaya baris produk yang sama tapi variannya beda (mis. Cover Thobe vs Set Hanger) tidak
+   * digabung jadi satu baris.
+   */
+  const variantOf = (item: any) =>
+    [
+      item.kain ? `Kain ${item.kain}` : "",
+      item.color && item.color !== "default" ? String(item.color) : "",
+      item.size ? String(item.size) : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+  const cogsGroups = new Map<
+    string,
+    { id: string; name: string; series: string; variant: string; qty: number; hpp: number; unknownQty: number }
+  >();
+  for (const item of orderItems) {
+    if (!validIds.has(String(item.order_id || ""))) continue;
+    const qty = Number(item.quantity ?? item.qty) || 0;
+    if (qty <= 0) continue;
+    const lineHpp = Number(item.hpp);
+    const unitHpp = Number.isFinite(lineHpp) && lineHpp > 0 ? lineHpp : productHpp.get(String(item.product_id)) || 0;
+    const name = String(item.product_name || "Tanpa nama");
+    // Series disimpan di baris pesanan (`order_items.series`); `products.series` kosong di
+    // database ini, jadi jangan dibaca dari katalog. Nama item lama bisa memuat series
+    // ("Thobe Imron Series …" / "Thobe Superblack — Jiharkah") → ambil dari situ.
+    const series = String(item.series || "").trim() || seriesFromName(name);
+    const variant = variantOf(item);
+    const key = `${item.product_id || name}|${series}|${variant}`;
+    const row = cogsGroups.get(key) || { id: key, name, series, variant, qty: 0, hpp: 0, unknownQty: 0 };
+    row.qty += qty;
+    row.hpp += unitHpp * qty;
+    if (unitHpp <= 0) row.unknownQty += qty;
+    cogsGroups.set(key, row);
+  }
+  const cogsDetail = [...cogsGroups.values()].sort((a, b) => b.hpp - a.hpp || b.qty - a.qty);
+
+  /*
+   * ── Rincian biaya free gift ──
+   * Barang yang dibagikan gratis pada periode ini: baris pesanan berharga Rp0 (bonus promo
+   * website) dan baris cover hanger yang nilainya tertutup diskon pesanan (form Tambah
+   * Transaksi memberi diskon Rp35.000 per cover). Biayanya memakai HPP per unit yang sama
+   * dengan modal barang terjual, jadi rincian ini TIDAK menambah atau mengurangi total HPP.
+   */
+  const freeGiftGroups = new Map<
+    string,
+    {
+      id: string;
+      sku: string;
+      name: string;
+      series: string;
+      variant: string;
+      qty: number;
+      unitHpp: number;
+      cost: number;
+      unknownQty: number;
+    }
+  >();
+  const itemsOfOrder = new Map<string, any[]>();
+  for (const item of orderItems) {
+    const key = String(item.order_id || "");
+    const list = itemsOfOrder.get(key);
+    if (list) list.push(item);
+    else itemsOfOrder.set(key, [item]);
+  }
+  const addFreeGift = (item: any, freeQty: number) => {
+    if (freeQty <= 0) return;
+    const productId = String(item.product_id || "");
+    const lineHpp = Number(item.hpp);
+    const unitHpp = Number.isFinite(lineHpp) && lineHpp > 0 ? lineHpp : productHpp.get(productId) || 0;
+    const name = String(item.product_name || "Tanpa nama");
+    const series = String(item.series || "").trim() || seriesFromName(name);
+    // Varian ikut jadi bagian baris: satu produk bisa punya beberapa varian (Cover Thobe /
+    // Cover Koko / Set Hanger) dan masing-masing harus tampil sendiri.
+    const variant = variantOf(item);
+    const key = `${productId || name}|${series}|${variant}`;
+    const row =
+      freeGiftGroups.get(key) ||
+      {
+        id: key,
+        sku: productSku.get(productId) || "",
+        name,
+        series,
+        variant,
+        qty: 0,
+        unitHpp,
+        cost: 0,
+        unknownQty: 0,
+      };
+    row.qty += freeQty;
+    row.cost += unitHpp * freeQty;
+    if (unitHpp <= 0) row.unknownQty += freeQty;
+    freeGiftGroups.set(key, row);
+  };
+  for (const order of validOrders) {
+    const items = itemsOfOrder.get(String(order.id)) || [];
+    const discount = Number((order as { discount?: number | null }).discount) || 0;
+    // Cover hanger gratis: cover Rp0 (promo website) + cover yang tertutup diskon pesanan.
+    // Aturannya sama dengan `promoValueOf()` supaya jumlah cover di baris Promosi tidak beda.
+    const coverItems = items.filter(
+      (item) => item.product_id === "cover-hanger" || item.product_id === "addon-cover-hanger",
+    );
+    if (coverItems.length > 0) {
+      const qtyOf = (item: any) => Number(item.quantity ?? item.qty) || 0;
+      const priceOf = (item: any) => Number(item.price) || 0;
+      const coverQty = coverItems.reduce((sum, item) => sum + qtyOf(item), 0);
+      const coverGross = coverItems.reduce((sum, item) => sum + priceOf(item) * qtyOf(item), 0);
+      const freeFromPriceQty = coverItems
+        .filter((item) => priceOf(item) <= 0)
+        .reduce((sum, item) => sum + qtyOf(item), 0);
+      const coveredByDiscount = Math.min(
+        Math.max(0, coverQty - freeFromPriceQty),
+        Math.floor(Math.min(discount, coverGross) / COVER_HANGER_VALUE),
+      );
+      // Sisa cover yang tertutup diskon dibagikan ke baris berbayar sesuai urutan barisnya,
+      // supaya tiap varian hanya menerima unitnya sendiri (bukan semuanya ke baris pertama).
+      let discountLeft = coveredByDiscount;
+      for (const item of coverItems) {
+        const qty = qtyOf(item);
+        const freeByPrice = priceOf(item) <= 0 ? qty : 0;
+        const freeByDiscount = priceOf(item) > 0 ? Math.min(discountLeft, qty) : 0;
+        discountLeft -= freeByDiscount;
+        addFreeGift(item, freeByPrice + freeByDiscount);
+      }
+    }
+    // Barang lain yang dibagikan tanpa harga.
+    for (const item of items) {
+      if (item.product_id === "cover-hanger" || item.product_id === "addon-cover-hanger") continue;
+      if ((Number(item.price) || 0) > 0) continue;
+      addFreeGift(item, Number(item.quantity ?? item.qty) || 0);
+    }
+  }
+  const freeGiftItems = [...freeGiftGroups.values()].sort((a, b) => b.cost - a.cost || b.qty - a.qty);
+  const freeGift = {
+    items: freeGiftItems,
+    total: freeGiftItems.reduce((sum, row) => sum + row.cost, 0),
+    qty: freeGiftItems.reduce((sum, row) => sum + row.qty, 0),
+    unknownQty: freeGiftItems.reduce((sum, row) => sum + row.unknownQty, 0),
+  };
+
+  const feeGroups = new Map<string, { channel: string; count: number; fee: number }>();
+  for (const order of validOrders) {
+    const provider = String((order as { payment_provider?: string | null }).payment_provider || "").toLowerCase();
+    if (provider !== "mayar") continue;
+    const ref = String((order as { payment_ref?: string | null }).payment_ref || "").trim();
+    const detail = ref ? mayarFeesPeriod.get(ref) : undefined;
+    if (!detail || detail.status !== "settled" || !Number.isFinite(detail.fee)) continue;
+    const channel = paymentChannelLabel(detail.channel) || "Mayar";
+    const row = feeGroups.get(channel) || { channel, count: 0, fee: 0 };
+    row.count += 1;
+    row.fee += detail.fee;
+    feeGroups.set(channel, row);
+  }
+  const feeDetail = [...feeGroups.values()].sort((a, b) => b.fee - a.fee);
+
+  const packingDetail = expenseRows
+    .filter((row) => row.tipe === "packing")
+    .map((row) => ({
+      nama: String(row.nama_barang || row.kategori || "Packing"),
+      qty: Number(row.qty) || 0,
+      jumlah: Number(row.jumlah) || 0,
+    }))
+    .sort((a, b) => b.jumlah - a.jumlah);
+  const operasionalDetail = expenseRows
+    .filter((row) => row.tipe === "operasional")
+    .map((row) => ({
+      nama: String(row.kategori || row.nama_barang || "Operasional"),
+      qty: Number(row.qty) || 0,
+      jumlah: Number(row.jumlah) || 0,
+    }))
+    .sort((a, b) => b.jumlah - a.jumlah);
+  const breakdown = { cogs: cogsDetail, fees: feeDetail, packing: packingDetail, operasional: operasionalDetail };
 
   /**
    * Laba hanya boleh disebut final kalau modal DAN biaya lengkap.
@@ -447,7 +713,7 @@ async function loadPeriod(
         ? `${hppNote} Estimasi laba belum dapat dihitung.`
         : mayarPendingCount > 0
           ? `${mayarPendingCount} transaksi Mayar belum cair — biayanya belum dipotong, jadi laba masih bisa turun setelah dana masuk.`
-          : "Data biaya operasional belum tersedia; estimasi laba belum final.";
+          : "Tabel pengeluaran belum tersedia; biaya operasional & packing belum ikut dihitung, jadi laba belum final.";
 
   const pendingReturns = returnsCreated.filter(
     (row) =>
@@ -484,11 +750,16 @@ async function loadPeriod(
     exchangeTotal,
     net,
     biaya,
-    /** Rincian biaya: Mayar dipisah dari operasional supaya sumbernya jelas. */
+    /** Rincian biaya: packing/operasional/Mayar dipisah supaya sumbernya jelas. */
     mayarFee,
     mayarPendingCount,
+    biayaPacking,
     biayaOperasional,
+    expensesAvailable,
     biayaAvailable,
+    breakdown,
+    /** Rincian HPP barang yang dibagikan gratis (free gift/promosi) — informasi, bukan pengurang. */
+    freeGift,
     hppStatus,
     hppNote,
     hppCoverage: {
@@ -683,6 +954,26 @@ export async function GET(req: NextRequest) {
     // dilihat & dipisahkan dari penjualan lain tanpa mengubah angka omzet total.
     const sources = buildSourceBreakdown(current.validOrders);
 
+    /*
+     * ── Rekap promosi cover hanger ──
+     * Pesanan WA dari form "Tambah Transaksi" sering menambahkan baris Cover Thobe + Hanger
+     * lalu memberi diskon Rp35.000, jadi uang masuk tetap harga produk. Diskon itu tidak
+     * dikirim ke mana pun sebelumnya; di sini dijumlah per periode supaya nilai promosi
+     * terlihat terpisah dari omzet (omzet sudah memakai `total` setelah diskon).
+     */
+    const promo = current.validOrders.reduce(
+      (acc, order) => {
+        const { value, covers } = promoValueOf(order, current.itemsByOrder[String(order.id)] || []);
+        acc.total += value;
+        if (value > 0) {
+          acc.orders += 1;
+          acc.covers += covers;
+        }
+        return acc;
+      },
+      { total: 0, orders: 0, covers: 0 },
+    );
+
     const trend = buildTrend(
       from,
       to,
@@ -722,11 +1013,14 @@ export async function GET(req: NextRequest) {
       const detail = ref ? mayarFees.get(ref) : undefined;
       const settled = detail?.status === "settled" && Number.isFinite(detail?.fee);
 
+      /*
+       * Baris tabel biaya Mayar dibuka di drawer detail pesanan, jadi WAJIB membawa
+       * seluruh data pesanan (items, subtotal, ongkir, diskon, alamat, resi, …).
+       * Dulu hanya 5 field yang disalin → drawer menampilkan "Tidak ada produk tercatat"
+       * dengan Subtotal/Ongkir Rp 0 padahal totalnya ratusan ribu.
+       */
       const base = {
-        order_number: row.order_number,
-        customer_name: row.customer_name,
-        created_at: row.created_at,
-        total: row.total,
+        ...row,
         channel: detail?.channel ?? null,
       };
 
@@ -777,13 +1071,21 @@ export async function GET(req: NextRequest) {
         /* Rincian biaya — WAJIB ikut dikirim; tanpa ini kartu "Biaya Mayar" selalu Rp 0. */
         mayarFee: current.mayarFee,
         mayarPendingCount: current.mayarPendingCount,
+        biayaPacking: current.biayaPacking,
         biayaOperasional: current.biayaOperasional,
+        expensesAvailable: current.expensesAvailable,
         profitStatus: current.profitStatus,
         profitNote: current.profitNote,
         transactions: current.transactions,
         aov: current.aov,
+        /* Rekap promosi cover hanger (nilai yang digratiskan, bukan pengurang omzet). */
+        promoTotal: promo.total,
+        promoOrders: promo.orders,
+        promoCoverQty: promo.covers,
+        /* Rincian biaya free gift (HPP barang yang dibagikan gratis). */
+        freeGift: current.freeGift,
         hppReversal: false,
-        biayaNote: "Modul Pengeluaran belum tersedia",
+        biayaNote: current.expensesAvailable ? "" : "Tabel pengeluaran belum tersedia",
       },
       previous: {
         gross: previous.gross,
@@ -804,6 +1106,8 @@ export async function GET(req: NextRequest) {
       trend,
       payments,
       sources,
+      /* Rincian per produk / per kanal / per pengeluaran (kartu Breakdown Pengeluaran). */
+      breakdown: current.breakdown,
       tables: {
         sales: salesRows,
         mayarSettled,

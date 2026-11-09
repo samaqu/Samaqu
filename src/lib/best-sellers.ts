@@ -65,8 +65,12 @@ interface BestSellerRowBase {
   kain: string;
   category: string;
   units: number;
+  /**
+   * Omzet baris ini SETELAH dipotong porsi diskon pesanan, supaya totalnya sama dengan
+   * angka "Penjualan" di Laporan (`orderRevenue` = total − ongkir).
+   */
   revenue: number;
-  /** Diskon pesanan yang menempel pada baris ini (porsi harga baris). */
+  /** Diskon pesanan yang menempel pada baris ini (sudah dipotong dari `revenue`). */
   discount: number;
   sizes: BestSellerBreakdown[];
   /** true = item lama tanpa relasi master; sengaja tidak digabung. */
@@ -124,7 +128,7 @@ export function normalizeSize(raw?: string | null, fallbackName?: string | null)
 }
 
 /** Series dari teks nama — hanya dipakai kalau item tidak punya relasi master. */
-function seriesFromName(rawName?: string | null): string {
+export function seriesFromName(rawName?: string | null): string {
   const name = String(rawName || "");
   const phrase = name.match(SERIES_PHRASE_IN_NAME_RE);
   if (phrase) return phrase[1];
@@ -316,7 +320,7 @@ export function aggregateBestSellers(
         addonUnits: 0,
       } as SeriesAcc);
     seriesEntry.units += qty;
-    seriesEntry.revenue += price * qty;
+    seriesEntry.revenue += price * qty - lineDiscount;
     seriesEntry.discount += lineDiscount;
     if (isAddon) seriesEntry.addonUnits += qty;
     bump(seriesEntry.sizes, sizeLabel, qty);
@@ -339,7 +343,7 @@ export function aggregateBestSellers(
         series: new Map(),
       } as ProductAcc);
     productEntry.units += qty;
-    productEntry.revenue += price * qty;
+    productEntry.revenue += price * qty - lineDiscount;
     productEntry.discount += lineDiscount;
     if (isAddon) productEntry.addonUnits += qty;
     bump(productEntry.sizes, sizeLabel, qty);
@@ -349,7 +353,7 @@ export function aggregateBestSellers(
       productEntry.series.get(seriesKey) ||
       { label: seriesLabel, units: 0, revenue: 0, sizes: new Map<string, number>() };
     seriesBreakdown.units += qty;
-    seriesBreakdown.revenue += price * qty;
+    seriesBreakdown.revenue += price * qty - lineDiscount;
     bump(seriesBreakdown.sizes, sizeLabel, qty);
     productEntry.series.set(seriesKey, seriesBreakdown);
     productGroups.set(productKey, productEntry);
