@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { m as motion, AnimatePresence, type Variants } from "framer-motion";
 import { SlidersHorizontal, X, ChevronDown, ChevronRight } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb";
@@ -18,12 +19,32 @@ import { getCatalogProducts } from "@/lib/db";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/Toast";
-import FilterDrawer, { applyFilters, type FilterState } from "@/components/FilterDrawer";
-import KainSeriesModal, { getKainGradient, getKainSwatchColor } from "@/components/KainSeriesModal";
+import { applyFilters, type FilterState } from "@/lib/katalog-filter";
+import { getKainGradient, getKainSwatchColor } from "@/lib/kain-series-color";
 import { SITE_URL } from "@/lib/site-config";
 import { useWishlist } from "@/lib/use-wishlist";
 import { useSafeTranslations } from "@/lib/safe-i18n";
 import { trackSearch } from "@/lib/meta-pixel";
+
+function ModalLoading({ label }: { label: string }) {
+  return (
+    <div className="fixed inset-0 z-[120] grid place-items-center bg-black/30" role="status" aria-live="polite">
+      <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-black shadow">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-black" />
+        {label}
+      </div>
+    </div>
+  );
+}
+
+const FilterDrawer = dynamic(() => import("@/components/FilterDrawer"), {
+  ssr: false,
+  loading: () => <ModalLoading label="Memuat filter..." />,
+});
+const KainSeriesModal = dynamic(() => import("@/components/KainSeriesModal"), {
+  ssr: false,
+  loading: () => <ModalLoading label="Memuat info..." />,
+});
 
 /* ── Katalog grouping: 1 produk utama (name + category) = 1 kartu ──
    Row per series dikumpulkan ke group; representative = row terlama.
@@ -338,6 +359,8 @@ export default function KatalogPage() {
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [drawerFilters, setDrawerFilters] = useState<FilterState>({ sizes: [], colors: [], priceRange: null });
   const [infoSheet, setInfoSheet] = useState<"kain" | "series" | null>(null);
+  const [filterEverOpened, setFilterEverOpened] = useState(false);
+  const [infoEverOpened, setInfoEverOpened] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [colorHex, setColorHex] = useState<Record<string, string>>({});
@@ -346,6 +369,13 @@ export default function KatalogPage() {
   const [stockLoadFailed, setStockLoadFailed] = useState(false);
   const [katalogInfoImages, setKatalogInfoImages] = useState<{ id: string; category: string; type: string; image_url: string; alt_text: string }[]>([]);
   const wishlist = useWishlist();
+
+  useEffect(() => {
+    if (filterDrawerOpen) setFilterEverOpened(true);
+  }, [filterDrawerOpen]);
+  useEffect(() => {
+    if (infoSheet) setInfoEverOpened(true);
+  }, [infoSheet]);
 
   /* Fetch products from database */
   useEffect(() => {
@@ -825,21 +855,25 @@ export default function KatalogPage() {
       </div>
 
       {/* Filter Drawer */}
-      <FilterDrawer
-        open={filterDrawerOpen}
-        onClose={() => setFilterDrawerOpen(false)}
-        initial={drawerFilters}
-        onApply={setDrawerFilters}
-        activeCount={drawerFilterCount}
-      />
+      {filterEverOpened ? (
+        <FilterDrawer
+          open={filterDrawerOpen}
+          onClose={() => setFilterDrawerOpen(false)}
+          initial={drawerFilters}
+          onApply={setDrawerFilters}
+          activeCount={drawerFilterCount}
+        />
+      ) : null}
 
       {/* Kain / Series info sheet */}
-      <KainSeriesModal
-        type={infoSheet}
-        onClose={() => setInfoSheet(null)}
-        category={category}
-        images={infoSheet ? katalogInfoImages.filter((k) => k.category === category && k.type === infoSheet && k.image_url) : []}
-      />
+      {infoEverOpened ? (
+        <KainSeriesModal
+          type={infoSheet}
+          onClose={() => setInfoSheet(null)}
+          category={category}
+          images={infoSheet ? katalogInfoImages.filter((k) => k.category === category && k.type === infoSheet && k.image_url) : []}
+        />
+      ) : null}
     </section>
   );
 }

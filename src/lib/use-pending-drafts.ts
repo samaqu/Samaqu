@@ -66,9 +66,16 @@ export function usePendingDraftCount(enabled: boolean) {
     // lewat event setelah approve/tolak/hapus di halaman review.
     void refresh();
     const onChanged = () => { void refresh(true); };
+    // Saat tab kembali aktif, ambil sekali (tanpa timer) supaya draft baru dari WA
+    // ikut terlihat tanpa harus reload.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh(true);
+    };
     window.addEventListener(PERLU_REVIEW_EVENT, onChanged);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.removeEventListener(PERLU_REVIEW_EVENT, onChanged);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [enabled, refresh]);
 

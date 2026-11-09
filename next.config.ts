@@ -158,6 +158,9 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
+    // Hasil optimasi gambar disimpan 30 hari. Foto yang diganti memakai URL baru
+    // (Cloudinary version/random id), jadi tidak tertahan cache lama.
+    minimumCacheTTL: 2592000,
     remotePatterns: [
       { protocol: "https", hostname: "res.cloudinary.com" },
       // Media katalog sudah dimigrasi ke Supabase Storage (bucket publik

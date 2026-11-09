@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { m as motion, AnimatePresence } from "framer-motion";
 import { X, SlidersHorizontal, Check } from "lucide-react";
 import { colorMap, type Category } from "@/lib/katalog-data";
+import { priceRanges, type FilterState } from "@/lib/katalog-filter";
 
 const allSizes = ["S", "M", "L", "XL", "XXL"];
 
@@ -12,17 +13,6 @@ const allColors = [
   "Coffee Brown", "Deep Maroon", "Charcoal Grey", "Soft Grey",
 ];
 
-const priceRanges = [
-  { id: "under300", label: "Di bawah Rp 300.000", min: 0, max: 299999 },
-  { id: "300to500", label: "Rp 300.000 – 500.000", min: 300000, max: 500000 },
-  { id: "above500", label: "Di atas Rp 500.000", min: 500001, max: Infinity },
-];
-
-export interface FilterState {
-  sizes: string[];
-  colors: string[];
-  priceRange: string | null;
-}
 
 interface FilterDrawerProps {
   open: boolean;
@@ -212,26 +202,4 @@ function FilterSection({ title, children }: { title: string; children: React.Rea
       {children}
     </div>
   );
-}
-
-/* ── Helper: apply filter state to product list ── */
-export function applyFilters<T extends { colors: string[]; price: number }>(
-  items: T[],
-  filters: FilterState
-): T[] {
-  let result = items;
-  if (filters.sizes.length > 0) {
-    // Products with any matching size — since sizes aren't in product data,
-    // we keep all products when size filter is active (size is per-variant, not per-product)
-  }
-  if (filters.colors.length > 0) {
-    result = result.filter((p) => p.colors.some((c) => filters.colors.includes(c)));
-  }
-  if (filters.priceRange) {
-    const range = priceRanges.find((r) => r.id === filters.priceRange);
-    if (range) {
-      result = result.filter((p) => p.price >= range.min && p.price <= range.max);
-    }
-  }
-  return result;
 }
