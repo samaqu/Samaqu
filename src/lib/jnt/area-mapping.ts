@@ -22,6 +22,23 @@ export const JNT_AREAS: JntAreaRow[] = (rawRows as string[]).map((line) => {
 const norm = (s: string) => s.trim().toUpperCase();
 
 /**
+ * Ejaan kota lokal → ejaan baku di `area-data.json`.
+ *
+ * Daftar ini EKSPLISIT (bukan pencocokan mirip/tebakan) supaya kode area tidak pernah salah.
+ * Contoh nyata: alamat/RajaOngkir menulis "PANGKAJENE DAN KEPULAUAN", sedangkan dataset J&T
+ * menulis "KAB. PANGKAJENE KEPULAUAN". Tanpa alias, destination code `PAJ` tidak ketemu
+ * walaupun kecamatannya ada.
+ */
+const CITY_ALIASES: Record<string, string> = {
+  "PANGKAJENE DAN KEPULAUAN": "PANGKAJENE KEPULAUAN",
+};
+
+const normCity = (s: string) => {
+  const key = norm(s);
+  return CITY_ALIASES[key] ?? key;
+};
+
+/**
  * Ejaan lama nama kecamatan lokal yang masih tersimpan di data pesanan/alamat.
  *
  * Dataset resmi sempat menulis "PALENGGAAN" (typo template L3). Setelah dibakukan menjadi
@@ -69,7 +86,7 @@ const districtToCode3 = new Map<string, string>(); // "LOCAL_KEC" | "JNT_KEC" �
 const districtToSendSite = new Map<string, string>(); // "LOCAL_KEC" | "JNT_KEC" → JNT city name
 
 for (const r of JNT_AREAS) {
-  const k1 = `${normDistrict(r.localDistrict)}|${norm(r.localCity)}`;
+  const k1 = `${normDistrict(r.localDistrict)}|${normCity(r.localCity)}`;
   if (!byLocalDistrict.has(k1)) byLocalDistrict.set(k1, r);
   const kn = `${normDistrict(r.localDistrict)}|${stripCityPrefix(r.localCity)}`;
   if (!byDistrictAndCity.has(kn)) byDistrictAndCity.set(kn, r);
@@ -78,10 +95,10 @@ for (const r of JNT_AREAS) {
   const k2 = normDistrict(r.localDistrict);
   if (!byLocalDistrictOnly.has(k2)) byLocalDistrictOnly.set(k2, []);
   byLocalDistrictOnly.get(k2)!.push(r);
-  const k3 = `${norm(r.jntDistrict)}|${norm(r.jntCity)}`;
+  const k3 = `${norm(r.jntDistrict)}|${normCity(r.jntCity)}`;
   if (!byJntDistrict.has(k3)) byJntDistrict.set(k3, r);
-  const kc = norm(r.localCity);
-  const kj = norm(r.jntCity);
+  const kc = normCity(r.localCity);
+  const kj = normCity(r.jntCity);
   if (!cityToCode3.has(kc)) cityToCode3.set(kc, r.code3);
   if (!cityToCode3.has(kj)) cityToCode3.set(kj, r.code3);
   const kcNo = stripCityPrefix(r.localCity);
@@ -104,7 +121,7 @@ for (const r of JNT_AREAS) {
 
 function findRow(city: string, district: string): JntAreaRow | null {
   const d = normDistrict(district);
-  const c = norm(city);
+  const c = normCity(city);
 
   // 1. Exact match: district + city
   const exact =
@@ -138,10 +155,10 @@ function findRow(city: string, district: string): JntAreaRow | null {
  * (mis. "Bekasi" bisa Kab. atau Kota — kecamatan yang menentukan).
  */
 export function getOriginCode(city: string, district = ""): string | null {
-  const exact = cityToCode3.get(norm(city));
+  const exact = cityToCode3.get(normCity(city));
   if (exact) return exact;
 
-  const stripped = stripCityPrefix(city);
+  const stripped = stripCityPrefix(normCity(city));
   const plain = cityToCode3NoPrefix.get(stripped);
   if (plain) return plain;
 
@@ -149,8 +166,8 @@ export function getOriginCode(city: string, district = ""): string | null {
   if (district) {
     const row =
       byDistrictAndCity.get(`${normDistrict(district)}|${stripped}`) ||
-      byLocalDistrict.get(`${normDistrict(district)}|${norm(city)}`) ||
-      byJntDistrict.get(`${normDistrict(district)}|${norm(city)}`);
+      byLocalDistrict.get(`${normDistrict(district)}|${normCity(city)}`) ||
+      byJntDistrict.get(`${normDistrict(district)}|${normCity(city)}`);
     if (row) return row.code3;
   }
 
@@ -168,7 +185,7 @@ export function getReceiverArea(city: string, district: string): string | null {
 
 /** Tariff Check: origin site name e.g. "DEPOK" */
 export function getSendSiteCode(city: string): string | null {
-  return cityToSendSite.get(norm(city)) ?? null;
+  return cityToSendSite.get(normCity(city)) ?? null;
 }
 
 /** Order API: get code3 by district name (e.g. "WOYLA" → "MEH") */
