@@ -173,7 +173,10 @@ export async function GET(req: NextRequest) {
       .from("wa_inbox")
       .select("id", { count: "exact", head: true })
       .gte("created_at", failSince)
-      .not("error", "is", null);
+      .not("error", "is", null)
+      // `error` juga dipakai untuk alasan skip ("digabung", "penutup tanpa
+      // pertanyaan"). Itu bukan kegagalan kirim, jangan sampai memicu alert.
+      .neq("status", "skipped");
     sendFailures = count || 0;
   } catch {
     sendFailures = 0;
