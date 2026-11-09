@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized, stockStatus } from "@/lib/ops-auth";
 import { ownSizeMap, resolveStock } from "@/lib/ops-stock";
 import { compareOpsRows, variantSortKey } from "@/lib/ops-order";
+import { isLayananCategory } from "@/lib/layanan";
 
 /**
  * Varian stok untuk dashboard internal.
@@ -188,6 +189,9 @@ export async function GET(req: NextRequest) {
         series_name: prod.series || "",
         image: firstProductImage(prod),
         category: prod.category || null,
+        // Baris layanan (Jasa Potong Panjang) tidak punya stok: tetap boleh dipilih admin
+        // di transaksi manual, tapi tidak pernah muncul di katalog customer.
+        service: isLayananCategory(prod.category),
         jenis_kain_name: prod.jenis_kain?.name || null,
         color: r.color || "default",
         hex: r.hex || null,
@@ -279,7 +283,7 @@ export async function GET(req: NextRequest) {
       visible = visible.filter((item: any) => !componentIds.has(String(item.product_id)));
     }
     visible = visible
-      .map((item: any) => filterSellableSizes(item))
+      .map((item: any) => (item.service ? item : filterSellableSizes(item)))
       .filter((item: any) => item !== null);
   }
 

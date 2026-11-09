@@ -400,6 +400,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       product_id: variant.product_id,
       product_name: variant.product_name,
       category: variant.category || "",
+      // Baris layanan (Jasa Potong Panjang): tidak punya stok, tetap bisa dipilih.
+      service: variant.service === true || String(variant.category || "") === "Jasa",
       kain: variant.jenis_kain_name || "",
       warna: variantSortKey(variant).warna,
       series: variant.series_name || "",
@@ -678,9 +680,10 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       const key = `${entry.category}|${entry.kain}|${entry.product_name}`;
       let group = map.get(key);
       if (!group) {
-        group = { key, product_id: entry.product_id, name: entry.product_name, category: entry.category, kain: entry.kain, warnas: [], series: [], stockTotal: 0 };
+        group = { key, product_id: entry.product_id, name: entry.product_name, category: entry.category, kain: entry.kain, warnas: [], series: [], stockTotal: 0, service: false };
         map.set(key, group);
       }
+      if (entry.service) group.service = true;
       if (!group.warnas.includes(entry.warna)) group.warnas.push(entry.warna);
       if (entry.series && !group.series.includes(entry.series)) group.series.push(entry.series);
       // Stok grup dihitung HANYA dari baris pemilik stok (tanpa `linkedTo`). Baris pengikut
@@ -831,6 +834,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
           stock: (Number(entry.sizes?.[size]) || 0) + reservedFor(entry.product_id, entry.color, size),
           price: pathPrice(entry),
           linkedTo: entry.linkedTo,
+          service: Boolean(entry.service),
         })),
       )
       .sort((a, b) => sizeRank(a.size) - sizeRank(b.size) || cmpId(a.color, b.color));
@@ -885,6 +889,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     // sana). Di transaksi manual, produk `cover-hanger` adalah produk BIASA: bebas diubah,
     // dihapus, dan beratnya ikut dihitung seperti baris lain.
     const isAddonRow = isOpenOrderEdit && isOpenOrderAddonLine({ product_id: product?.product_id });
+    const service = Boolean(product?.service) || String(product?.category || "") === "Jasa";
     const options = sizeOptions(product);
     const chosen = paket ? options[0] || null : options.find((entry) => entry.value === row.variant) || null;
     const quantity = Number(row.quantity) || 0;
@@ -899,7 +904,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       const entry = requested[`${product.product_id}||${chosen?.value}`];
       // Add-on Open Order dipatok: barisnya tidak boleh diubah. Format baru memegang stok
       // varian katalog, tapi stoknya dikelola di luar form ini (dipatok seperti format lama).
-      if (!isAddonRow && entry && entry.total > entry.option.stock) {
+      if (!isAddonRow && !service && entry && entry.total > entry.option.stock) {
         issue = paket
           ? `Stok paket "${entry.option.color}" tersedia ${entry.option.stock}, diminta ${entry.total}`
           : `Stok ${entry.option.size} tersedia ${entry.option.stock}, diminta ${entry.total}`;
@@ -912,6 +917,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       product,
       paket,
       isAddon: isAddonRow,
+      service,
       options,
       chosen,
       quantity,
@@ -2570,7 +2576,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                     if (isPanelForm && isEdit && !row.editing && rowComplete(row) && info.chosen) {
                       const group = groupOf(row);
                       const qty = Number(row.quantity) || 1;
-                      const stockMax = info.chosen.stock;
+                      const stockMax = info.service ? 99 : info.chosen.stock;
                       const thumb = openRowThumb(index);
                       const hargaBerubah = row.priceManual;
 
@@ -2645,7 +2651,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                               </div>
                               <p className="mt-1 text-[11px] font-medium" style={{ color: PANEL_MUTED }}>
                                 {info.chosen.linkedTo ? `Stok mengikuti ${info.chosen.linkedTo} · ` : ""}
-                                Sisa stok {stockMax} · {info.unitWeight.source === "missing" ? "berat belum diisi" : formatWeightExact(info.unitWeight.grams)}
+                                {info.service ? "Layanan tanpa stok" : `Sisa stok ${stockMax}`} · {info.unitWeight.source === "missing" ? "berat belum diisi" : formatWeightExact(info.unitWeight.grams)}
                               </p>
                             </div>
                             <button
@@ -2666,7 +2672,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                             <div className="flex flex-wrap gap-1.5">
                               {info.options.map((option) => {
                                 const active = row.variant === option.value;
-                                const habis = option.stock <= 0 && !active;
+                                const habis = option.stock <= 0 && !active && !info.service;
                                 return (
                                   <button
                                     key={option.value}
@@ -2787,7 +2793,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                       const summary = summaryParts.join(" · ");
                       const weightMissing = info.unitWeight.source === "missing";
                       const quantity = Number(row.quantity) || 1;
-                      const maxStock = info.chosen.stock;
+                      const maxStock = info.service ? 99 : info.chosen.stock;
                       return (
                         <div
                           key={index}
@@ -2804,7 +2810,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                 Rp {formatRupiah(info.subtotal)}
                                 {row.priceManual ? ` · harga manual Rp ${formatRupiah(info.unitPrice)}/pcs` : ""}
-                                {!info.isAddon ? (
+                                {info.service ? (
+                                  <span className="font-bold text-slate-500 dark:text-slate-400"> · jasa</span>
+                                ) : !info.isAddon ? (
                                   <>{` · stok ${info.chosen.stock}`}{info.chosen.linkedTo ? ` · stok mengikuti ${info.chosen.linkedTo}` : ""}</>
                                 ) : (
                                   <span className="font-bold text-slate-500 dark:text-slate-400"> · add-on tetap</span>
@@ -2947,7 +2955,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                     }
 
                     const group = groupOf(row);
-                    const maxStock = info.chosen ? info.chosen.stock : 0;
+                    const maxStock = info.service ? 99 : info.chosen ? info.chosen.stock : 0;
                     const quantity = Number(row.quantity) || 1;
 
                     return (
@@ -3065,7 +3073,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                           : "text-slate-400 dark:text-slate-500"
                                       }`}
                                     >
-                                      {option.stockTotal > 0 ? `sisa ${option.stockTotal}` : "habis"}
+                                      {option.service ? "jasa" : option.stockTotal > 0 ? `sisa ${option.stockTotal}` : "habis"}
                                     </span>
                                   </button>
                                 ))
@@ -3232,7 +3240,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                             <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                               {info.options.map((option) => {
                                 const active = row.variant === option.value;
-                                const soldOut = option.stock <= 0;
+                                const soldOut = option.stock <= 0 && !info.service;
                                 return (
                                   <button
                                     key={option.value}
@@ -3271,7 +3279,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                             : "text-slate-500 dark:text-slate-400"
                                       }`}
                                     >
-                                      {soldOut ? "habis" : `sisa ${option.stock}`}
+                                      {info.service ? "jasa" : soldOut ? "habis" : `sisa ${option.stock}`}
                                     </span>
                                   </button>
                                 );
