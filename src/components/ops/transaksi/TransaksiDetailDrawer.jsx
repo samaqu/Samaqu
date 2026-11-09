@@ -10,8 +10,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Ban, CreditCard, MapPin, Pencil, Receipt, ShoppingBag, Trash2, Truck, X } from "lucide-react";
+import { Ban, CreditCard, MapPin, Pencil, Receipt, Scissors, ShoppingBag, Trash2, Truck, X } from "lucide-react";
 import { NEUTRAL_ITEM_PHOTO } from "@/lib/order-photo";
+import { isPotongPanjangLine } from "@/lib/layanan";
 import { isPaketItem, variantName } from "@/lib/item-label";
 import { ORDER_STAGE_LABEL, orderStage } from "@/lib/order-flow";
 import CopyButton from "@/components/ui/CopyButton";
@@ -686,7 +687,10 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
                         />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-900 dark:text-white">{item.product_name}</p>
+                        <p className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          {isPotongPanjangLine(item) ? <Scissors size={14} aria-hidden /> : null}
+                          {item.product_name}
+                        </p>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                           {isPaketItem(item)
                             ? [item.kain ? `Kain ${item.kain}` : null, variantName(item.color) || variantName(item.series) || null].filter(Boolean).join(" · ")

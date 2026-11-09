@@ -6,6 +6,7 @@ import {
   Copy,
   Loader2,
   Pencil,
+  Scissors,
   Send,
   Sparkles,
   Trash2,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PERLU_REVIEW_EVENT } from "@/lib/use-pending-drafts";
+import { isPotongPanjangLine } from "@/lib/layanan";
 import { toast } from "@/components/ops/ui/use-toast";
 import DraftEditor from "./DraftEditor";
 import DraftList from "./DraftList";
@@ -709,11 +711,17 @@ function DraftDetail({
           <div className="mt-1 space-y-1 text-sm">
             {items.map((item: any, index: number) => (
               <div key={index} className="flex justify-between gap-2">
-                <span style={{ color: "#141414" }}>{item.product_name || item.product_id} · {item.color || "default"} · {item.size} × {item.quantity}</span>
+                <span className="inline-flex items-center gap-1" style={{ color: "#141414" }}>
+                  {isPotongPanjangLine(item) ? <Scissors size={13} aria-hidden /> : null}
+                  {item.product_name || item.product_id} · {item.color || "default"} · {item.size} × {item.quantity}
+                </span>
                 <span className="shrink-0 font-semibold" style={{ color: "#141414" }}>{item.price ? money(Number(item.price) * Number(item.quantity || 1)) : "-"}</span>
               </div>
             ))}
           </div>
+          {payload.notes ? (
+            <p className="mt-2 text-xs" style={{ color: "#6B6A64" }}>Catatan: {payload.notes}</p>
+          ) : null}
           <div className="mt-2 flex justify-between border-t pt-2 text-xs" style={{ borderColor: "#E7E6E1", color: "#6B6A64" }}>
             <span>Ongkir {payload.shipping_method || ""}</span><span>{money(payload.shipping_cost)}</span>
           </div>

@@ -8,8 +8,9 @@
  * Yang berbeda hanya warna aksen; susunan, data, dan ikonnya sama.
  */
 
-import { CreditCard, MapPin, ShoppingBag, Truck } from "lucide-react";
+import { CreditCard, MapPin, Scissors, ShoppingBag, Truck } from "lucide-react";
 import { NEUTRAL_ITEM_PHOTO } from "@/lib/order-photo";
+import { isPotongPanjangLine } from "@/lib/layanan";
 import { isPaketItem, variantName } from "@/lib/item-label";
 import { ORDER_STAGE_LABEL, SHIPPING_STATUS_LABEL, orderStage } from "@/lib/order-flow";
 import CopyButton from "@/components/ui/CopyButton";
@@ -197,7 +198,10 @@ export default function OrderDetailPanel({
               <img src={item.product_image || NEUTRAL_ITEM_PHOTO} alt={item.product_name} loading="lazy" decoding="async" />
             </div>
             <div>
-              <b>{item.product_name}</b>
+              <b style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                {isPotongPanjangLine(item) ? <Scissors size={14} aria-hidden /> : null}
+                {item.product_name}
+              </b>
               <small>
                 {isPaketItem(item)
                   ? [item.kain ? `Kain ${item.kain}` : null, variantName(item.color) || variantName(item.series) || null]

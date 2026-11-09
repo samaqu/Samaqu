@@ -5,6 +5,7 @@ import { cancelOrderCompletely, type CancelableOrder } from "@/lib/cancel-order"
 import { MANUAL_PRICE_MAX, MANUAL_PRICE_MIN, MANUAL_SOURCE_KEYS, RESELLER_SOURCE_KEY, hasManualPrice, itemSummary, manualPrice, orderSourceKey, orderSourceLabel, sourceKey, statusLabel } from "@/lib/transaksi";
 import { localPhone } from "@/lib/whatsapp";
 import { notifyCustomerInvoice } from "@/lib/fonnte";
+import { isLayananCategory } from "@/lib/layanan";
 import { kotaFromShipping } from "@/lib/kota";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { resolveItemPhotos } from "@/lib/order-photo";
@@ -167,6 +168,8 @@ type Snapshot = {
   customer_price?: number | null;
   minimum_price?: number | null;
   product_image?: string | null;
+  /** Kategori master produk; baris kategori "Jasa" tidak menyentuh stok. */
+  category?: string | null;
 };
 
 type Admin = ReturnType<typeof getSupabaseAdmin>;
@@ -203,7 +206,7 @@ async function buildSnapshot(admin: Admin, input: ItemInput[]): Promise<{ items?
 
   const productIds = [...new Set(cleaned.map((row) => row.product_id))];
   const [{ data: products }, { data: variants }] = await Promise.all([
-    admin.from("products").select("id, name, series, price, jenis_kain(name)").in("id", productIds),
+    admin.from("products").select("id, name, series, price, category, jenis_kain(name)").in("id", productIds),
     admin.from("product_variants").select("product_id, color, size").in("product_id", productIds),
   ]);
 
@@ -258,6 +261,7 @@ async function buildSnapshot(admin: Admin, input: ItemInput[]): Promise<{ items?
       quantity: row.quantity,
       price,
       manual_price: manual,
+      category: product.category ?? null,
     });
   }
   return { items };
@@ -472,6 +476,8 @@ async function buildEditSnapshot(
 async function deductStock(admin: Admin, items: Snapshot[], orderId: string) {
   const done: Snapshot[] = [];
   for (const item of items) {
+    // Baris layanan (mis. Jasa Potong Panjang) tidak punya stok.
+    if (isLayananCategory(item.category)) continue;
     const { data, error } = await admin.rpc("samaqu_decrement_stock", {
       p_product_id: item.product_id,
       p_color: item.color,
@@ -500,6 +506,8 @@ async function deductStock(admin: Admin, items: Snapshot[], orderId: string) {
 /** Kembalikan stok yang sudah terpotong saat transaksi gagal — error dicatat, bukan diabaikan. */
 async function restoreStock(admin: Admin, items: Snapshot[], orderId: string) {
   for (const item of items) {
+    // Baris layanan tidak pernah dipotong, jadi tidak ada yang dikembalikan.
+    if (isLayananCategory(item.category)) continue;
     const { error } = await admin.rpc("samaqu_restore_stock", {
       p_product_id: item.product_id,
       p_color: item.color,

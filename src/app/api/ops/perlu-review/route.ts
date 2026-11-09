@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, opsActorEmail, unauthorized } from "@/lib/ops-auth";
 import { getChatConfig } from "@/lib/chat-config";
 import { waMediaSignedUrl } from "@/lib/wa-media";
+import { POTONG_PANJANG_ID, POTONG_PANJANG_NAME, POTONG_PANJANG_PRICE } from "@/lib/layanan";
 
 /**
  * Menu "Perlu Review".
@@ -152,6 +153,39 @@ async function releaseDraftClaim(
     .eq("id", id)
     .eq("status", "approved")
     .is("approved_order_number", null);
+}
+
+/**
+ * Tambahkan baris jasa potong panjang (Rp35.000) kalau AI/admin menandainya.
+ * Baris jasa tidak punya stok; kategori "Jasa" dilewati oleh jalur stok.
+ */
+function withPotongPanjang(payload: any) {
+  const ukuran = String(payload?.potong_panjang || "").trim();
+  if (!ukuran) return payload;
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  const catatan = /potong panjang/i.test(String(payload?.notes || ""))
+    ? String(payload?.notes || "").trim()
+    : [String(payload?.notes || "").trim(), `Potong panjang Thobe: ${ukuran} - Rp35.000`]
+        .filter(Boolean)
+        .join(" - ");
+  if (items.some((item: any) => String(item?.product_id || "") === POTONG_PANJANG_ID)) {
+    return { ...payload, notes: catatan };
+  }
+  return {
+    ...payload,
+    notes: catatan,
+    items: [
+      ...items,
+      {
+        product_id: POTONG_PANJANG_ID,
+        product_name: POTONG_PANJANG_NAME,
+        color: "Jasa",
+        size: "ALL SIZE",
+        quantity: 1,
+        price: POTONG_PANJANG_PRICE,
+      },
+    ],
+  };
 }
 
 async function history(admin: ReturnType<typeof getSupabaseAdmin>, sender: string) {
@@ -434,7 +468,7 @@ export async function POST(req: NextRequest) {
       closing_id: body?.closing_id ? String(body.closing_id) : null,
       customer_name: String(payload.customer_name || body?.customer_name || "").trim() || null,
       customer_whatsapp: String(payload.customer_whatsapp || body?.customer_whatsapp || "").trim() || null,
-      payload: applyCoverDiscount(await withFreeCoverHanger(admin, normalizedPayload)),
+      payload: applyCoverDiscount(await withFreeCoverHanger(admin, withPotongPanjang(normalizedPayload))),
       proof_key: proofKey,
       proof_url: proofKey ? waMediaSignedUrl(proofKey) : body?.proof_url ? String(body.proof_url) : null,
       ai_note: body?.ai_note ? String(body.ai_note) : null,

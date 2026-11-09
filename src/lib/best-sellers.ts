@@ -15,6 +15,7 @@
 
 import { SALE_STATUSES } from "@/lib/transaksi";
 import { OPEN_ORDER_ADDON, OPEN_ORDER_ADDON_TARGET_ID } from "@/lib/open-order-config";
+import { isLayananCategory } from "@/lib/layanan";
 
 /** Baris `order_items` yang dipakai agregasi. */
 export interface BestSellerItem {
@@ -291,6 +292,9 @@ export function aggregateBestSellers(
       fallbackItems += 1;
       fallbackUnits += qty;
     }
+
+    // Baris layanan (Jasa Potong Panjang) bukan barang yang diperingkatkan.
+    if (isLayananCategory(category)) continue;
 
     // Cover & Hanger / Kabak memakai `size = "ALL SIZE"` hanya sebagai placeholder;
     // varian sebenarnya ada di `color` (mis. "Set Hanger + Cover", "Kabak 12").

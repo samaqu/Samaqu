@@ -9,6 +9,7 @@ import {
   Pencil,
   Plus,
   Save,
+  Scissors,
   Search,
   Shirt,
   Trash2,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { isPaketItem, variantName } from "@/lib/item-label";
+import { isPotongPanjangLine } from "@/lib/layanan";
 
 type Draft = {
   id: string;
@@ -464,7 +466,10 @@ export default function DraftEditor({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-black leading-snug" style={{ color: "#2a1a22" }}>{itemTitle}</p>
+                        <p className="flex items-center gap-1.5 text-sm font-black leading-snug" style={{ color: "#2a1a22" }}>
+                          {isPotongPanjangLine(item) ? <Scissors size={14} aria-hidden /> : null}
+                          {itemTitle}
+                        </p>
                         <button type="button" onClick={() => setItems((current) => current.filter((_, rowIndex) => rowIndex !== index))} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: "#fdf0f4", color: "#d85b78" }} aria-label="Hapus produk">
                           <Trash2 size={15} />
                         </button>

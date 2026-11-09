@@ -6,6 +6,7 @@ import { syncCommissionStatus } from "@/lib/affiliate/commission";
 import { claimResellerNotification, notifyResellerOrderCancelled } from "@/lib/reseller/notify";
 import { refundResellerOnCancel } from "@/lib/reseller/refund";
 import { revertLeadOnOrderCancelled } from "@/lib/ops-lead-sync";
+import { isPotongPanjangLine } from "@/lib/layanan";
 
 /**
  * Satu jalur pembatalan pesanan untuk semua pemanggil: customer (`/api/orders/cancel`),
@@ -87,7 +88,13 @@ export async function cancelOrderCompletely(
       .eq("order_id", order.id);
 
     const restored = (items ?? []).filter(
-      (item) => item.product_id && item.color && item.size && Number(item.quantity) > 0
+      (item) =>
+        item.product_id &&
+        item.color &&
+        item.size &&
+        Number(item.quantity) > 0 &&
+        // Baris layanan tidak punya stok, jadi tidak ikut dikembalikan.
+        !isPotongPanjangLine(item)
     );
 
     for (const item of restored) {

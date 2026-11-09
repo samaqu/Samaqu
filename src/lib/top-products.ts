@@ -18,6 +18,7 @@
 
 import { SALE_STATUSES } from "@/lib/transaksi";
 import { OPEN_ORDER_ADDON, OPEN_ORDER_ADDON_TARGET_ID } from "@/lib/open-order-config";
+import { isLayananCategory, isPotongPanjangLine } from "@/lib/layanan";
 
 /**
  * Status pesanan yang dianggap penjualan sah — SATU sumbernya di `src/lib/transaksi.ts`
@@ -55,6 +56,7 @@ export interface TopProductCatalogRow {
   name?: string | null;
   series?: string | null;
   product_type?: string | null;
+  category?: string | null;
 }
 
 /**
@@ -123,7 +125,7 @@ export function rankTopProducts(input: {
       .filter((p) => p.id)
       .map((p, index) => [
         String(p.id),
-        { name: String(p.name || "").trim(), series: String(p.series || "").trim(), index },
+        { name: String(p.name || "").trim(), series: String(p.series || "").trim(), category: p.category ?? null, index },
       ] as const),
   );
 
@@ -146,6 +148,8 @@ export function rankTopProducts(input: {
       (productId === OPEN_ORDER_ADDON_TARGET_ID && String(it.product_name || "").trim() === OPEN_ORDER_ADDON.name);
     const targetId = productId === OPEN_ORDER_ADDON.id ? OPEN_ORDER_ADDON_TARGET_ID : productId;
     const catalog = targetId ? catalogById.get(targetId) : undefined;
+    // Baris layanan (Jasa Potong Panjang) tidak ikut peringkat produk.
+    if (isPotongPanjangLine(it) || isLayananCategory(catalog?.category)) continue;
     const rawName = String(it.product_name || "").trim() || "(tanpa nama)";
     const kain = String(it.kain || "").trim();
     const series = String(it.series || "").trim() || catalog?.series || "";
