@@ -235,11 +235,14 @@ interface KainSeriesModalProps {
 export default function KainSeriesModal({ type, onClose, category, images }: KainSeriesModalProps) {
   const items = type === "kain" ? KAIN : [];
   const slideCount = type === "series" ? THOBE_SERIES.length : items.length;
-  const title = type === "kain" ? `Perbedaan Jenis Kain ${category || "Thobe"}` : `Perbedaan Series ${category || "Thobe"}`;
+  const title =
+    type === "kain"
+      ? `Perbedaan Jenis Kain ${category || "Thobe"}`
+      : `${category || "Thobe"} Series Differences`;
   const subtitle =
     type === "kain"
       ? "Setiap kain punya karakter terbaiknya. Pilih yang paling sesuai untukmu."
-      : "Tiap series punya detail kerah dan placket yang berbeda. Pilih yang paling pas dengan gayamu.";
+      : "Each series has different collar and placket details. Pick the one that best fits your style.";
   const swipeWord = type === "kain" ? "jenis kain" : "series";
   // Gambar dari DB hanya dipakai untuk sheet kain; sheet series selalu memakai slide 6 series.
   const hasImages = type === "kain" && !!images && images.length > 0;
@@ -342,7 +345,7 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className={`fixed inset-0 sm:inset-4 md:inset-6 sm:m-auto z-[9995] overflow-hidden flex flex-col ${type === "series" ? "bg-[#0e0d0c] sm:bg-[#111111] sm:max-w-[640px] sm:max-h-[550px] sm:rounded-[20px]" : "bg-[#0e0d0c] sm:max-w-[920px] sm:max-h-[600px] sm:rounded-3xl"}`}
+            className={`fixed inset-0 sm:inset-4 md:inset-6 sm:m-auto z-[9995] overflow-hidden flex flex-col ${type === "series" ? "bg-[#0e0d0c] sm:bg-[#111111] sm:max-w-[640px] sm:max-h-[560px] sm:rounded-[20px]" : "bg-[#0e0d0c] sm:max-w-[920px] sm:max-h-[600px] sm:rounded-3xl"}`}
             style={{ color: "white" }}
           >
             {/* Header (desktop) */}
@@ -373,17 +376,17 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
             </div>
 
             {/* Close */}
-            <button onClick={onClose} aria-label="Tutup" className={`absolute right-4 top-4 z-30 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25 ${type === "series" ? "bg-[rgba(255,255,255,.12)] sm:right-[14px] sm:top-[14px] sm:w-[30px] sm:h-[30px] sm:bg-[#2a2a2a]" : "bg-[rgba(255,255,255,.12)]"}`}>
+            <button onClick={onClose} aria-label={type === "series" ? "Close" : "Tutup"} className={`absolute right-4 top-4 z-30 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25 ${type === "series" ? "bg-[rgba(255,255,255,.12)] sm:right-[14px] sm:top-[14px] sm:w-[30px] sm:h-[30px] sm:bg-[#2a2a2a]" : "bg-[rgba(255,255,255,.12)]"}`}>
               <X size={16} />
             </button>
 
             {/* Prev / Next */}
             {navCount > 1 && (
               <>
-                <button onClick={() => goTo(index - 1)} aria-label="Sebelumnya" className={`absolute left-3 ${arrowYClass} -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25 ${type === "series" ? "bg-[rgba(255,255,255,.12)] sm:left-2.5 sm:w-8 sm:h-8 sm:bg-[rgba(255,255,255,.18)]" : "bg-[rgba(255,255,255,.12)]"}`}>
+                <button onClick={() => goTo(index - 1)} aria-label={type === "series" ? "Previous" : "Sebelumnya"} className={`absolute left-3 ${arrowYClass} -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25 ${type === "series" ? "bg-[rgba(255,255,255,.12)] sm:left-2.5 sm:w-8 sm:h-8 sm:bg-[rgba(255,255,255,.18)]" : "bg-[rgba(255,255,255,.12)]"}`}>
                   <ChevronLeft size={17} />
                 </button>
-                <button onClick={() => goTo(index + 1)} aria-label="Berikutnya" className={`absolute right-3 ${arrowYClass} -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25 ${type === "series" ? "bg-[rgba(255,255,255,.12)] sm:right-2.5 sm:w-8 sm:h-8 sm:bg-[rgba(255,255,255,.18)]" : "bg-[rgba(255,255,255,.12)]"}`}>
+                <button onClick={() => goTo(index + 1)} aria-label={type === "series" ? "Next" : "Berikutnya"} className={`absolute right-3 ${arrowYClass} -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25 ${type === "series" ? "bg-[rgba(255,255,255,.12)] sm:right-2.5 sm:w-8 sm:h-8 sm:bg-[rgba(255,255,255,.18)]" : "bg-[rgba(255,255,255,.12)]"}`}>
                   <ChevronRight size={17} />
                 </button>
               </>
@@ -392,7 +395,7 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
             {/* Dots */}
             <div className={`${type === "series" ? "static shrink-0 py-2 sm:pt-3 sm:pb-2.5" : "absolute inset-x-0 bottom-[104px] sm:static sm:shrink-0 sm:py-3"} z-20 flex justify-center ${type === "series" ? "gap-2.5 sm:gap-[7px]" : "gap-2.5"}`}>
               {Array.from({ length: navCount }).map((_, i) => (
-                <button key={i} onClick={() => goTo(i)} aria-label={`Ke slide ${i + 1}`}
+                <button key={i} onClick={() => goTo(i)} aria-label={type === "series" ? `Go to slide ${i + 1}` : `Ke slide ${i + 1}`}
                   className={`h-2 rounded-full transition-all ${i === index
                     ? `bg-white ${type === "series" ? "w-[18px] sm:w-[26px]" : "w-[18px]"}`
                     : `w-2 ${type === "series" ? "bg-[rgba(255,255,255,.28)] sm:bg-[#555555]" : "bg-[rgba(255,255,255,.28)]"}`}`} />
@@ -401,7 +404,9 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
 
             {/* Footer chip */}
             <div className={`${type === "series" ? "static shrink-0 px-6 pt-4 pb-5 sm:px-4 sm:pt-3 sm:pb-3" : "absolute inset-x-0 bottom-0 px-6 pt-4 pb-5 sm:py-3.5"} sm:static sm:shrink-0 z-20 rounded-t-3xl sm:rounded-none text-center shadow-[0_-10px_30px_rgba(0,0,0,.35)] sm:shadow-none ${type === "series" ? "bg-[var(--cream)] text-[var(--espresso)] sm:bg-white sm:text-[#111111]" : "bg-[var(--cream)] text-[var(--espresso)]"}`}>
-              <p className={`font-medium font-ui ${type === "series" ? "text-[12.5px] sm:text-[13px]" : "text-[12.5px]"}`}>Swipe untuk melihat {swipeWord} lainnya</p>
+              <p className={`font-medium font-ui ${type === "series" ? "text-[12.5px] sm:text-[13px]" : "text-[12.5px]"}`}>
+                {type === "series" ? "Swipe to see other series" : `Swipe untuk melihat ${swipeWord} lainnya`}
+              </p>
               {type === "series" ? (
                 <div className="mt-1 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-[12px] font-ui">
                   {THOBE_SERIES.map((s, i) => (

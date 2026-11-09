@@ -75,7 +75,7 @@ export default function ThobeSeriesSlide({ item, onZoom }: ThobeSeriesSlideProps
             <button
               type="button"
               onClick={() => { if (!photoFailed) onZoom?.(); }}
-              aria-label={`Perbesar foto ${item.name}`}
+              aria-label={`Zoom in on ${item.name} photo`}
               className="relative block aspect-square w-full overflow-hidden rounded-2xl cursor-zoom-in focus:outline-none focus-visible:ring-2 sm:aspect-auto sm:h-full sm:min-h-[210px] sm:rounded-xl"
               style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.12)" }}
             >
@@ -146,7 +146,7 @@ export default function ThobeSeriesSlide({ item, onZoom }: ThobeSeriesSlideProps
             >
               <span className="sm:hidden" style={{ color: "#FFFFFF" }}>✦</span>
               <div>
-                <p className="text-[11.5px] sm:text-[13px] font-ui sm:font-medium sm:mb-0.5" style={{ color: "#FFFFFF" }}>Cocok untuk</p>
+                <p className="text-[11.5px] sm:text-[13px] font-ui sm:font-medium sm:mb-0.5" style={{ color: "#FFFFFF" }}>Perfect for</p>
                 <p className="text-[11.5px] sm:text-[12px] leading-snug sm:leading-[1.45] font-ui text-[rgba(255,255,255,.7)] sm:text-[#d6d1ca]">{item.fit}</p>
               </div>
             </div>
