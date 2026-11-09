@@ -23,7 +23,13 @@ const cache = new Map<string, { ts: number; data: PublicTrackPayload }>();
 
 interface PublicTrackPayload {
   awb: string;
-  detail: { services_code: string; weight: number | null; receiver: { city: string | null } };
+  detail: {
+    services_code: string;
+    weight: number | null;
+    receiver: { city: string | null };
+    /** Kota tujuan dari alamat order Samaqu. J&T memakai nama hub sendiri (mis. CIBINONG). */
+    destination_city: string | null;
+  };
   history: TrackHistoryItem[];
   /** Kapan data ini benar-benar diambil dari J&T (ISO). */
   fetchedAt: string;
@@ -31,15 +37,36 @@ interface PublicTrackPayload {
   stale?: boolean;
 }
 
+/** Kota tujuan dari alamat order Samaqu, supaya customer tidak melihat nama hub J&T. */
+async function orderDestinationCity(awb: string): Promise<string | null> {
+  try {
+    const { data, error } = await getSupabaseAdmin()
+      .from("orders")
+      .select("shipping_city")
+      .eq("awb_no", awb)
+      .maybeSingle();
+    if (error || !data) return null;
+    return String(data.shipping_city || "").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 /** Ambil hanya field yang dipakai UI (buang alamat pengirim/penerima). Data kurir & nama penerima
  *  hanya ikut kalau pemintanya admin ops (`sertakanPetugas`) — halaman customer tetap bersih. */
-function toPublic(data: TrackResponse, fetchedAt: string, sertakanPetugas = false): PublicTrackPayload {
+function toPublic(
+  data: TrackResponse,
+  fetchedAt: string,
+  sertakanPetugas = false,
+  destinationCity: string | null = null,
+): PublicTrackPayload {
   return {
     awb: data.awb,
     detail: {
       services_code: data.detail?.services_code ?? "",
       weight: data.detail?.weight ?? null,
       receiver: { city: data.detail?.receiver?.city ?? null },
+      destination_city: destinationCity,
     },
     history: (data.history ?? []).map((h) => ({
       date_time: h.date_time,
@@ -62,7 +89,12 @@ function toPublic(data: TrackResponse, fetchedAt: string, sertakanPetugas = fals
 }
 
 /** Riwayat terakhir yang tersimpan di `order_tracking_events` (dipakai saat J&T gagal). */
-async function storedPayload(awb: string, fetchedAt: string, sertakanPetugas = false): Promise<PublicTrackPayload | null> {
+async function storedPayload(
+  awb: string,
+  fetchedAt: string,
+  sertakanPetugas = false,
+  destinationCity: string | null = null,
+): Promise<PublicTrackPayload | null> {
   try {
     const { data, error } = await getSupabaseAdmin()
       .from("order_tracking_events")
@@ -94,7 +126,7 @@ async function storedPayload(awb: string, fetchedAt: string, sertakanPetugas = f
 
     return {
       awb,
-      detail: { services_code: "", weight: null, receiver: { city: null } },
+      detail: { services_code: "", weight: null, receiver: { city: null }, destination_city: destinationCity },
       history,
       fetchedAt,
       stale: true,
@@ -146,6 +178,8 @@ export async function GET(request: NextRequest) {
     if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return json(hit.data);
   }
 
+  const destinationCity = await orderDestinationCity(awb);
+
   const config = await getJntConfig();
   const configured = config.trackUsername && config.trackPassword && config.companyId;
 
@@ -153,7 +187,7 @@ export async function GET(request: NextRequest) {
     try {
       const result = await trackShipment(awb);
       if (result.success && result.data) {
-        const payload = toPublic(result.data, new Date().toISOString(), sertakanPetugas);
+        const payload = toPublic(result.data, new Date().toISOString(), sertakanPetugas, destinationCity);
         cache.set(cacheKey, { ts: Date.now(), data: payload });
         // Cadangan: simpan riwayat mentah (idempoten) supaya bisa dipakai saat J&T gagal.
         void storeTrackingEvents(getSupabaseAdmin(), awb, result.data.history ?? []);
@@ -161,19 +195,19 @@ export async function GET(request: NextRequest) {
       }
       // J&T menjawab 200 dengan { error_id, error_message } untuk resi/kredensial tak dikenal —
       // coba riwayat tersimpan dulu sebelum menyerah.
-      const stored = await storedPayload(awb, new Date().toISOString(), sertakanPetugas);
+      const stored = await storedPayload(awb, new Date().toISOString(), sertakanPetugas, destinationCity);
       if (stored) return json(stored);
       return fail(result.error?.error_message || "Data pelacakan tidak ditemukan.");
     } catch (err) {
       console.error("[J&T Track] Error:", err);
-      const stored = await storedPayload(awb, new Date().toISOString(), sertakanPetugas);
+      const stored = await storedPayload(awb, new Date().toISOString(), sertakanPetugas, destinationCity);
       if (stored) return json(stored);
       return fail("Tidak bisa menghubungi layanan J&T. Coba lagi sebentar lagi.");
     }
   }
 
   // J&T belum dikonfigurasi: tetap tampilkan riwayat tersimpan kalau ada.
-  const stored = await storedPayload(awb, new Date().toISOString(), sertakanPetugas);
+  const stored = await storedPayload(awb, new Date().toISOString(), sertakanPetugas, destinationCity);
   if (stored) return json(stored);
   return fail("Pelacakan J&T belum dikonfigurasi.");
 }

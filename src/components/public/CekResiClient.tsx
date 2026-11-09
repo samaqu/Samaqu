@@ -13,6 +13,7 @@ interface TrackPayload {
     services_code?: string;
     weight?: number | null;
     receiver?: { city?: string | null };
+    destination_city?: string | null;
   };
   history?: TrackHistoryItem[];
   fetchedAt?: string;
@@ -80,7 +81,7 @@ export default function CekResiClient() {
   );
   const awb = payload?.awb || checkedAwb;
   const service = String(payload?.detail?.services_code || "").toUpperCase();
-  const destination = payload?.detail?.receiver?.city || "";
+  const destination = payload?.detail?.destination_city || payload?.detail?.receiver?.city || "";
   const weight = Number(payload?.detail?.weight) || 0;
 
   async function salin() {
