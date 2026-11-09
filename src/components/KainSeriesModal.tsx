@@ -342,14 +342,14 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed inset-0 sm:inset-4 md:inset-6 sm:m-auto z-[9995] sm:max-w-[920px] sm:max-h-[600px] sm:rounded-3xl overflow-hidden flex flex-col"
-            style={{ background: "#0e0d0c", color: "white" }}
+            className={`fixed inset-0 sm:inset-4 md:inset-6 sm:m-auto z-[9995] overflow-hidden flex flex-col ${type === "series" ? "bg-[#0e0d0c] sm:bg-[#111111] sm:max-w-[640px] sm:max-h-[550px] sm:rounded-[20px]" : "bg-[#0e0d0c] sm:max-w-[920px] sm:max-h-[600px] sm:rounded-3xl"}`}
+            style={{ color: "white" }}
           >
             {/* Header (desktop) */}
-            <div className="hidden sm:block shrink-0 px-8 pt-5 pb-3 text-center">
-              <p className="text-[10px] tracking-[0.34em] font-ui" style={{ color: "#ffffff" }}>SAMAQU</p>
-              <h2 className="mt-1.5 text-[20px] lg:text-[24px] font-semibold leading-tight uppercase tracking-[0.04em] font-ui">{title}</h2>
-              <p className="mt-1.5 text-[12px] max-w-[54ch] mx-auto font-ui" style={{ color: "rgba(255,255,255,.6)" }}>{subtitle}</p>
+            <div className={`hidden sm:block shrink-0 text-center ${type === "series" ? "px-6 pt-5 pb-3.5" : "px-8 pt-5 pb-3"}`}>
+              <p className={`font-ui ${type === "series" ? "text-[11px] tracking-[0.25em]" : "text-[10px] tracking-[0.34em]"}`} style={{ color: type === "series" ? "#bbbbbb" : "#ffffff" }}>SAMAQU</p>
+              <h2 className={`font-semibold leading-tight uppercase font-ui ${type === "series" ? "mt-1.5 mb-1 text-[18px] tracking-[0.02em]" : "mt-1.5 text-[20px] lg:text-[24px] tracking-[0.04em]"}`}>{title}</h2>
+              <p className={`mx-auto font-ui ${type === "series" ? "mt-0 text-[12px] max-w-[420px]" : "mt-1.5 text-[12px] max-w-[54ch]"}`} style={{ color: type === "series" ? "#aaaaaa" : "rgba(255,255,255,.6)" }}>{subtitle}</p>
             </div>
 
             {/* Slides */}
@@ -373,45 +373,43 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
             </div>
 
             {/* Close */}
-            <button onClick={onClose} aria-label="Tutup" className="absolute right-4 top-4 z-30 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25" style={{ background: "rgba(255,255,255,.12)" }}>
+            <button onClick={onClose} aria-label="Tutup" className={`absolute right-4 top-4 z-30 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25 ${type === "series" ? "bg-[rgba(255,255,255,.12)] sm:right-[14px] sm:top-[14px] sm:w-[30px] sm:h-[30px] sm:bg-[#2a2a2a]" : "bg-[rgba(255,255,255,.12)]"}`}>
               <X size={16} />
             </button>
 
             {/* Prev / Next */}
             {navCount > 1 && (
               <>
-                <button onClick={() => goTo(index - 1)} aria-label="Sebelumnya" className={`absolute left-3 ${arrowYClass} -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25`} style={{ background: "rgba(255,255,255,.12)" }}>
+                <button onClick={() => goTo(index - 1)} aria-label="Sebelumnya" className={`absolute left-3 ${arrowYClass} -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25 ${type === "series" ? "bg-[rgba(255,255,255,.12)] sm:left-2.5 sm:w-8 sm:h-8 sm:bg-[rgba(255,255,255,.18)]" : "bg-[rgba(255,255,255,.12)]"}`}>
                   <ChevronLeft size={17} />
                 </button>
-                <button onClick={() => goTo(index + 1)} aria-label="Berikutnya" className={`absolute right-3 ${arrowYClass} -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25`} style={{ background: "rgba(255,255,255,.12)" }}>
+                <button onClick={() => goTo(index + 1)} aria-label="Berikutnya" className={`absolute right-3 ${arrowYClass} -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25 ${type === "series" ? "bg-[rgba(255,255,255,.12)] sm:right-2.5 sm:w-8 sm:h-8 sm:bg-[rgba(255,255,255,.18)]" : "bg-[rgba(255,255,255,.12)]"}`}>
                   <ChevronRight size={17} />
                 </button>
               </>
             )}
 
             {/* Dots */}
-            <div className={`${type === "series" ? "static shrink-0 py-2" : "absolute inset-x-0 bottom-[104px]"} sm:static sm:shrink-0 sm:py-3 z-20 flex justify-center gap-2.5`}>
+            <div className={`${type === "series" ? "static shrink-0 py-2 sm:pt-3 sm:pb-2.5" : "absolute inset-x-0 bottom-[104px] sm:static sm:shrink-0 sm:py-3"} z-20 flex justify-center ${type === "series" ? "gap-2.5 sm:gap-[7px]" : "gap-2.5"}`}>
               {Array.from({ length: navCount }).map((_, i) => (
-                <button key={i} onClick={() => goTo(i)} aria-label={`Ke slide ${i + 1}`} className="h-2 rounded-full transition-all"
-                  style={{ width: i === index ? 18 : 8, background: i === index ? "#ffffff" : "rgba(255,255,255,.28)" }} />
+                <button key={i} onClick={() => goTo(i)} aria-label={`Ke slide ${i + 1}`}
+                  className={`h-2 rounded-full transition-all ${i === index
+                    ? `bg-white ${type === "series" ? "w-[18px] sm:w-[26px]" : "w-[18px]"}`
+                    : `w-2 ${type === "series" ? "bg-[rgba(255,255,255,.28)] sm:bg-[#555555]" : "bg-[rgba(255,255,255,.28)]"}`}`} />
               ))}
             </div>
 
             {/* Footer chip */}
-            <div className={`${type === "series" ? "static shrink-0" : "absolute inset-x-0 bottom-0"} sm:static sm:shrink-0 z-20 rounded-t-3xl sm:rounded-none px-6 pt-4 pb-5 sm:py-3.5 text-center shadow-[0_-10px_30px_rgba(0,0,0,.35)] sm:shadow-none`}
-              style={{ background: "var(--cream)", color: "var(--espresso)" }}>
-              <p className="text-[12.5px] font-medium font-ui">Swipe untuk melihat {swipeWord} lainnya</p>
+            <div className={`${type === "series" ? "static shrink-0 px-6 pt-4 pb-5 sm:px-4 sm:pt-3 sm:pb-3" : "absolute inset-x-0 bottom-0 px-6 pt-4 pb-5 sm:py-3.5"} sm:static sm:shrink-0 z-20 rounded-t-3xl sm:rounded-none text-center shadow-[0_-10px_30px_rgba(0,0,0,.35)] sm:shadow-none ${type === "series" ? "bg-[var(--cream)] text-[var(--espresso)] sm:bg-white sm:text-[#111111]" : "bg-[var(--cream)] text-[var(--espresso)]"}`}>
+              <p className={`font-medium font-ui ${type === "series" ? "text-[12.5px] sm:text-[13px]" : "text-[12.5px]"}`}>Swipe untuk melihat {swipeWord} lainnya</p>
               {type === "series" ? (
                 <div className="mt-1 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-[12px] font-ui">
                   {THOBE_SERIES.map((s, i) => (
                     <span key={s.id} className="inline-flex items-center gap-x-1.5">
-                      {i > 0 && <span aria-hidden style={{ color: "var(--stone)" }}>·</span>}
-                      <span
-                        style={{
-                          color: i === index ? "var(--espresso)" : "var(--stone)",
-                          fontWeight: i === index ? 600 : 400,
-                        }}
-                      >
+                      {i > 0 && <span aria-hidden className="text-[var(--stone)] sm:text-[#888888]">·</span>}
+                      <span className={i === index
+                        ? "font-semibold text-[var(--espresso)] sm:font-medium sm:text-[#111111]"
+                        : "text-[var(--stone)] sm:text-[#888888]"}>
                         {s.name}
                       </span>
                     </span>

@@ -57,23 +57,26 @@ export default function ThobeSeriesSlide({ item, onZoom }: ThobeSeriesSlideProps
 
   return (
     <div className="snap-center shrink-0 w-full h-full relative overflow-hidden">
-      <div className="absolute inset-0" style={{ background: "linear-gradient(160deg, #2b2b2b 0%, #141414 100%)" }} />
+      {/* Latar mobile (tampilan lama) */}
+      <div className="absolute inset-0 sm:hidden" style={{ background: "linear-gradient(160deg, #2b2b2b 0%, #141414 100%)" }} />
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 sm:hidden"
         style={{
           background:
             "linear-gradient(180deg, rgba(10,10,10,.86) 0%, rgba(12,12,12,.6) 32%, rgba(10,10,10,.8) 100%)",
         }}
       />
+      {/* Latar desktop sesuai mockup */}
+      <div className="absolute inset-0 hidden sm:block" style={{ background: "linear-gradient(180deg, #4a4540 0%, #2d2a27 100%)" }} />
 
-      <div className="relative h-full overflow-y-auto scrollbar-hide px-5 sm:px-12 pt-4 pb-4 sm:pt-5 sm:pb-5 flex flex-col sm:grid sm:grid-cols-[190px_minmax(0,1fr)] sm:gap-x-8 sm:items-center">
+      <div className="relative h-full overflow-y-auto scrollbar-hide px-5 sm:px-[52px] pt-4 pb-4 sm:py-[22px] flex flex-col sm:grid sm:grid-cols-[190px_minmax(0,1fr)] sm:gap-x-5 sm:items-stretch sm:min-h-[280px]">
         <div className="my-auto flex w-full flex-col sm:contents">
-          <div className="mx-auto w-full max-w-[168px] sm:mx-0 sm:w-[190px] sm:max-w-none">
+          <div className="mx-auto w-full max-w-[168px] sm:mx-0 sm:h-full sm:w-[190px] sm:max-w-none">
             <button
               type="button"
               onClick={() => { if (!photoFailed) onZoom?.(); }}
               aria-label={`Perbesar foto ${item.name}`}
-              className="relative block aspect-square w-full overflow-hidden rounded-2xl cursor-zoom-in focus:outline-none focus-visible:ring-2"
+              className="relative block aspect-square w-full overflow-hidden rounded-2xl cursor-zoom-in focus:outline-none focus-visible:ring-2 sm:aspect-auto sm:h-full sm:min-h-[210px] sm:rounded-xl"
               style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.12)" }}
             >
               {!photoFailed ? (
@@ -103,48 +106,48 @@ export default function ThobeSeriesSlide({ item, onZoom }: ThobeSeriesSlideProps
   
           <div className="mt-4 min-w-0 sm:mt-0">
             <p
-              className="text-[30px] sm:text-[38px] lg:text-[44px] leading-none"
+              className="mb-2 text-[30px] leading-[1.1]"
               style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "white" }}
             >
               {item.name}
             </p>
             <span
-              className="inline-block mt-2 rounded-full px-2.5 py-0.5 text-[10.5px] font-ui sm:mt-2.5 sm:px-3 sm:py-1 sm:text-[11px]"
+              className="inline-block rounded-full px-2.5 py-0.5 text-[10.5px] font-ui sm:mb-3 sm:px-[11px] sm:py-[5px] sm:text-[12px]"
               style={{ background: "rgba(255,255,255,.14)", color: "#FFFFFF" }}
             >
               {item.tag}
             </span>
-  
-            <div className="mt-3 h-px w-10 sm:mt-3.5 sm:w-12" style={{ background: "#ffffff" }} />
-  
-            <div className="mt-3 space-y-2.5 sm:mt-4 sm:space-y-3.5">
+
+            <div className="mt-3 h-px w-10 sm:hidden" style={{ background: "#ffffff" }} />
+
+            <div className="mt-3 space-y-2.5 sm:mt-0 sm:space-y-3">
               {item.points.map((p) => {
                 const Icon = POINT_ICON[p.icon];
                 return (
-                  <div key={p.title} className="flex gap-3 sm:gap-3.5">
+                  <div key={p.title} className="flex gap-3 sm:gap-[10px]">
                     <span
-                      className="mt-0.5 w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-xl grid place-items-center"
-                      style={{ background: "rgba(255,255,255,.1)", color: "#FFFFFF" }}
+                      className="mt-0.5 w-8 h-8 sm:w-[34px] sm:h-[34px] shrink-0 rounded-xl sm:rounded-[9px] grid place-items-center bg-[rgba(255,255,255,.1)] sm:bg-[rgba(255,255,255,.12)]"
+                      style={{ color: "#FFFFFF" }}
                     >
-                      <Icon size={15} strokeWidth={1.6} />
+                      <Icon size={16} strokeWidth={1.6} />
                     </span>
                     <div>
-                      <p className="text-[12.5px] sm:text-[13.5px] font-medium leading-snug font-ui" style={{ color: "white" }}>{p.title}</p>
-                      <p className="mt-0.5 text-[11.5px] sm:text-[12px] leading-snug font-ui" style={{ color: "rgba(255,255,255,.6)" }}>{p.desc}</p>
+                      <p className="text-[12.5px] sm:text-[13px] font-medium leading-snug font-ui" style={{ color: "white" }}>{p.title}</p>
+                      <p className="mt-0.5 text-[11.5px] sm:text-[12px] leading-snug font-ui text-[rgba(255,255,255,.6)] sm:text-[#c9c4bd]">{p.desc}</p>
                     </div>
                   </div>
                 );
               })}
             </div>
-  
+
             <div
-              className="mt-3.5 rounded-2xl p-3 sm:mt-4 sm:p-3.5 flex gap-3"
-              style={{ background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)" }}
+              className="mt-3.5 rounded-2xl p-3 sm:mt-3 sm:rounded-xl sm:px-3 sm:py-2.5 flex gap-3 border-[1px] border-[rgba(255,255,255,.1)] sm:border-[0.5px] sm:border-[rgba(255,255,255,.2)]"
+              style={{ background: "rgba(255,255,255,.07)" }}
             >
-              <span style={{ color: "#FFFFFF" }}>✦</span>
+              <span className="sm:hidden" style={{ color: "#FFFFFF" }}>✦</span>
               <div>
-                <p className="text-[11.5px] sm:text-[12px] font-ui" style={{ color: "#FFFFFF" }}>Cocok untuk</p>
-                <p className="text-[11.5px] sm:text-[12px] leading-snug font-ui" style={{ color: "rgba(255,255,255,.7)" }}>{item.fit}</p>
+                <p className="text-[11.5px] sm:text-[13px] font-ui sm:font-medium sm:mb-0.5" style={{ color: "#FFFFFF" }}>Cocok untuk</p>
+                <p className="text-[11.5px] sm:text-[12px] leading-snug sm:leading-[1.45] font-ui text-[rgba(255,255,255,.7)] sm:text-[#d6d1ca]">{item.fit}</p>
               </div>
             </div>
           </div>
