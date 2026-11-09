@@ -46,7 +46,8 @@ ATURAN:
 - Kalau pertanyaannya di luar topik itu (mis. coding, politik, pelajaran), TOLAK sopan dan singkat, contoh: "${REFUSAL}". Jangan menjawab pertanyaannya.
 - Pakai Bahasa Indonesia yang ramah, santai, ringkas.
 - FORMAT & PANJANG: jawab sesingkat mungkin — maksimal ~4 baris/poin. Kalau menyebut beberapa produk, pakai daftar berpoin (awali "- "), satu produk per baris. Tebalkan nama produk/harga dengan **teks**. JANGAN menuliskan seluruh stok semua warna/ukuran — cukup yang ditanyakan atau yang paling relevan.
-- JANGAN mengarang produk, harga, warna, atau stok. Untuk data produk/harga/stok TERKINI, panggil tool "cari_produk". Untuk ukuran, panggil "panduan_ukuran". Untuk pertanyaan beda series / ciri kerah / minta foto series, panggil "info_series" — fotonya otomatis dikirim ke pelanggan, cukup bilang "ini fotonya".
+- JANGAN mengarang produk, harga, warna, atau stok. Untuk data produk/harga/stok TERKINI, panggil tool "cari_produk". Untuk ukuran, panggil "panduan_ukuran". Untuk pertanyaan beda series / ciri kerah / minta foto series, panggil "info_series" (data card Series, bukan Produk) — fotonya otomatis dikirim ke pelanggan, cukup bilang "ini fotonya".
+- Panggil tool secukupnya: maksimal 2-3 panggilan per pertanyaan. Jangan mengulang pencarian yang sama; kalau data sudah cukup, langsung jawab.
 - Pelanggan bisa melampirkan gambar (mis. kondisi produk, referensi model). Kalau ada gambar, perhatikan isinya dan tanggapi sesuai konteks SAMAQU.
 - Untuk pertanyaan "pesanan saya sudah diproses/dikirim belum?", pakai tool "cek_status_pesanan". Minta nomor pesanan (mis. SMQ-... atau CYO-...) DAN nomor HP yang dipakai saat memesan. Jangan pernah menampilkan alamat lengkap atau data pribadi lain — cukup status & nomor resi.
 - Kalau pelanggan minta bicara dengan admin/manusia, atau masalahnya butuh admin (keluhan, retur/garansi, pembayaran bermasalah), tanyakan dulu nomor WhatsApp pelanggan, lalu pakai tool "hubungi_admin" dengan ringkasan singkat.
@@ -283,6 +284,33 @@ export async function POST(req: NextRequest) {
 
           answer = content;
           break;
+        }
+
+        // Putaran tool habis tanpa jawaban final (mis. model mengulang cari_produk).
+        // Satu panggilan tanpa tool supaya customer tetap dapat ringkasan, bukan error.
+        if (!answer) {
+          try {
+            send({ reset: true });
+            const finalRes = await streamChatCompletion({
+              baseUrl: profile.baseUrl,
+              apiKey: profile.apiKey,
+              model: profile.model,
+              messages: convo,
+              temperature: profile.temperature,
+              maxTokens: profile.maxTokens,
+              timeoutMs: profile.timeoutMs,
+            });
+            if (finalRes.ok && finalRes.body) {
+              const final = await consumeOpenAIStream(finalRes.body, (delta) => send({ delta }));
+              answer = final.content || "";
+            }
+          } catch (error) {
+            console.error("[CHAT] jawaban penutup gagal:", error);
+          }
+          if (!answer) {
+            answer =
+              "Maaf Ka, informasinya belum bisa saya rangkum. Boleh sebutkan satu produk atau series yang paling ingin dicek?";
+          }
         }
 
         if (
