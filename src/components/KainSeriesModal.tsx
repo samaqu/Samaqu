@@ -236,17 +236,6 @@ function Slide({ item, isEnglish }: { item: KainSeriesDisplayItem; isEnglish: bo
           >
             {item.code}
           </p>
-          <span
-            className="inline-block mt-2.5 rounded-full px-3 py-1 text-[11px] font-ui"
-            style={{ background: "rgba(255,255,255,.14)", color: ACCENT_ON_DARK }}
-          >
-            {item.tag}
-          </span>
-          {item.price && (
-            <p className="mt-3 text-[13px] font-medium font-ui" style={{ color: ACCENT_ON_DARK }}>
-              {isEnglish ? "Starting from:" : "Harga mulai dari:"} {item.price}
-            </p>
-          )}
           <div className="mt-3.5 h-px w-12" style={{ background: "#ffffff" }} />
           <div
             className="hidden md:flex mt-5 rounded-2xl p-3.5 gap-3"
