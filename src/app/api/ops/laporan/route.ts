@@ -369,11 +369,15 @@ async function loadPeriod(
 
   const productIds = [...new Set(orderItems.map((item) => String(item.product_id || "")).filter(Boolean))];
   const productHpp = new Map<string, number>();
+  /** SKU katalog — dipakai rincian free gift supaya barisnya bisa dikenali pemilik. */
+  const productSku = new Map<string, string>();
   if (productIds.length > 0) {
-    const { data, error } = await admin.from("products").select("id, hpp").in("id", productIds);
+    const { data, error } = await admin.from("products").select("id, hpp, sku").in("id", productIds);
     if (error) throw new Error(error.message);
     for (const product of data || []) {
       productHpp.set(String(product.id), Number(product.hpp) || 0);
+      const sku = String((product as { sku?: string | null }).sku || "").trim();
+      if (sku) productSku.set(String(product.id), sku);
     }
 
     // Foto item untuk drawer detail (sama seperti detail transaksi panel admin).
@@ -541,6 +545,77 @@ async function loadPeriod(
   }
   const cogsDetail = [...cogsGroups.values()].sort((a, b) => b.hpp - a.hpp || b.qty - a.qty);
 
+  /*
+   * ── Rincian biaya free gift ──
+   * Barang yang dibagikan gratis pada periode ini: baris pesanan berharga Rp0 (bonus promo
+   * website) dan baris cover hanger yang nilainya tertutup diskon pesanan (form Tambah
+   * Transaksi memberi diskon Rp35.000 per cover). Biayanya memakai HPP per unit yang sama
+   * dengan modal barang terjual, jadi rincian ini TIDAK menambah atau mengurangi total HPP.
+   */
+  const freeGiftGroups = new Map<
+    string,
+    { id: string; sku: string; name: string; series: string; qty: number; unitHpp: number; cost: number; unknownQty: number }
+  >();
+  const itemsOfOrder = new Map<string, any[]>();
+  for (const item of orderItems) {
+    const key = String(item.order_id || "");
+    const list = itemsOfOrder.get(key);
+    if (list) list.push(item);
+    else itemsOfOrder.set(key, [item]);
+  }
+  const addFreeGift = (item: any, freeQty: number) => {
+    if (freeQty <= 0) return;
+    const productId = String(item.product_id || "");
+    const lineHpp = Number(item.hpp);
+    const unitHpp = Number.isFinite(lineHpp) && lineHpp > 0 ? lineHpp : productHpp.get(productId) || 0;
+    const name = String(item.product_name || "Tanpa nama");
+    const series = String(item.series || "").trim() || seriesFromName(name);
+    const key = `${productId || name}|${series}`;
+    const row =
+      freeGiftGroups.get(key) ||
+      { id: key, sku: productSku.get(productId) || "", name, series, qty: 0, unitHpp, cost: 0, unknownQty: 0 };
+    row.qty += freeQty;
+    row.cost += unitHpp * freeQty;
+    if (unitHpp <= 0) row.unknownQty += freeQty;
+    freeGiftGroups.set(key, row);
+  };
+  for (const order of validOrders) {
+    const items = itemsOfOrder.get(String(order.id)) || [];
+    const discount = Number((order as { discount?: number | null }).discount) || 0;
+    // Cover hanger gratis: cover Rp0 (promo website) + cover yang tertutup diskon pesanan.
+    // Aturannya sama dengan `promoValueOf()` supaya jumlah cover di baris Promosi tidak beda.
+    const coverItems = items.filter(
+      (item) => item.product_id === "cover-hanger" || item.product_id === "addon-cover-hanger",
+    );
+    if (coverItems.length > 0) {
+      const qtyOf = (item: any) => Number(item.quantity ?? item.qty) || 0;
+      const priceOf = (item: any) => Number(item.price) || 0;
+      const coverQty = coverItems.reduce((sum, item) => sum + qtyOf(item), 0);
+      const coverGross = coverItems.reduce((sum, item) => sum + priceOf(item) * qtyOf(item), 0);
+      const freeFromPriceQty = coverItems
+        .filter((item) => priceOf(item) <= 0)
+        .reduce((sum, item) => sum + qtyOf(item), 0);
+      const coveredByDiscount = Math.min(
+        Math.max(0, coverQty - freeFromPriceQty),
+        Math.floor(Math.min(discount, coverGross) / COVER_HANGER_VALUE),
+      );
+      addFreeGift(coverItems[0], freeFromPriceQty + coveredByDiscount);
+    }
+    // Barang lain yang dibagikan tanpa harga.
+    for (const item of items) {
+      if (item.product_id === "cover-hanger" || item.product_id === "addon-cover-hanger") continue;
+      if ((Number(item.price) || 0) > 0) continue;
+      addFreeGift(item, Number(item.quantity ?? item.qty) || 0);
+    }
+  }
+  const freeGiftItems = [...freeGiftGroups.values()].sort((a, b) => b.cost - a.cost || b.qty - a.qty);
+  const freeGift = {
+    items: freeGiftItems,
+    total: freeGiftItems.reduce((sum, row) => sum + row.cost, 0),
+    qty: freeGiftItems.reduce((sum, row) => sum + row.qty, 0),
+    unknownQty: freeGiftItems.reduce((sum, row) => sum + row.unknownQty, 0),
+  };
+
   const feeGroups = new Map<string, { channel: string; count: number; fee: number }>();
   for (const order of validOrders) {
     const provider = String((order as { payment_provider?: string | null }).payment_provider || "").toLowerCase();
@@ -643,6 +718,8 @@ async function loadPeriod(
     expensesAvailable,
     biayaAvailable,
     breakdown,
+    /** Rincian HPP barang yang dibagikan gratis (free gift/promosi) — informasi, bukan pengurang. */
+    freeGift,
     hppStatus,
     hppNote,
     hppCoverage: {
@@ -965,6 +1042,8 @@ export async function GET(req: NextRequest) {
         promoTotal: promo.total,
         promoOrders: promo.orders,
         promoCoverQty: promo.covers,
+        /* Rincian biaya free gift (HPP barang yang dibagikan gratis). */
+        freeGift: current.freeGift,
         hppReversal: false,
         biayaNote: current.expensesAvailable ? "" : "Tabel pengeluaran belum tersedia",
       },

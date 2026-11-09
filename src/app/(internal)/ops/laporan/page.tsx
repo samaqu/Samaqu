@@ -34,6 +34,7 @@ import { statusLabel, orderSourceLabel } from "@/lib/transaksi";
 import CountUp from "@/components/admin/CountUp";
 import BestSellerSection from "@/components/ops/BestSellerSection";
 import BreakdownPengeluaran, { type BreakdownData } from "@/components/ops/laporan/BreakdownPengeluaran";
+import RincianFreeGift, { type FreeGiftData } from "@/components/ops/laporan/RincianFreeGift";
 
 /**
  * Sebagian ikon lucide ada di runtime tapi belum masuk definisi tipe versi ini —
@@ -82,6 +83,11 @@ type Summary = {
   promoTotal?: number;
   promoOrders?: number;
   promoCoverQty?: number;
+  /**
+   * Rincian HPP barang yang dibagikan gratis (free gift/promosi) pada periode ini.
+   * Opsional: respons lama tanpa field ini tetap tampil normal (kartu kosong).
+   */
+  freeGift?: FreeGiftData;
   hppReversal: boolean;
   biayaNote: string;
   hppStatus: HppStatus;
@@ -893,6 +899,9 @@ export default function LaporanKeuanganPage() {
           </div>
         </div>
       </section>
+
+      {/* RINCIAN BIAYA FREE GIFT — HPP barang yang dibagikan gratis di periode ini */}
+      <RincianFreeGift data={s.freeGift} />
 
       {/* BREAKDOWN PENGELUARAN — rincian tiap komponen biaya (buka/tutup) */}
       <section className="lpr-rise rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
