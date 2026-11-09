@@ -49,11 +49,45 @@ export default function BotSwitchCard() {
   }
 
   useEffect(() => {
+    let timer: number | null = null;
+    let disposed = false;
+
+    const stop = () => {
+      if (timer !== null) {
+        window.clearInterval(timer);
+        timer = null;
+      }
+    };
+    const start = () => {
+      if (disposed || timer !== null) return;
+      timer = window.setInterval(() => {
+        if (document.visibilityState === "visible") void load();
+      }, 60_000);
+    };
+    const onVisibility = () => {
+      if (disposed) return;
+      if (document.visibilityState === "visible") {
+        // Tab kembali terlihat: ambil status terbaru sekali, lalu lanjut interval.
+        void load();
+        start();
+      } else {
+        stop();
+      }
+    };
+    const onFocus = () => {
+      if (!disposed && document.visibilityState === "visible") void load();
+    };
+
     void load();
-    // Selaraskan dengan server tiap 15 detik: kalau mode diubah dari tab lain
-    // atau penyimpanan gagal, tampilan tidak "menipu".
-    const timer = window.setInterval(() => void load(), 15000);
-    return () => window.clearInterval(timer);
+    start();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      disposed = true;
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

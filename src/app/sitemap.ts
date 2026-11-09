@@ -5,8 +5,9 @@ import { PROMO_META } from "@/lib/promo/free-cover-hanger";
 
 const PROMO_PATH = "/promo/free-cover-hanger";
 
-// Sitemap di-cache 1 jam supaya produk baru ikut terdaftar tanpa redeploy.
-export const revalidate = 3600;
+// Sitemap berisi daftar URL; perubahan produk disegarkan lewat /api/revalidate.
+// Timer panjang (7 hari) hanya jaring pengaman.
+export const revalidate = 604800;
 
 type Freq = "daily" | "weekly" | "monthly";
 

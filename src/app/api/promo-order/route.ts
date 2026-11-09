@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 import {
@@ -662,6 +663,10 @@ export async function POST(request: NextRequest) {
         console.warn("[PROMO-ORDER] CAPI Purchase dilewati:", error instanceof Error ? error.message : "unknown");
       }
     });
+
+    // Kuota/stok promo berubah karena order ini → halaman promo langsung segar,
+    // jadi timer 6 jam tidak membuat sisa kuota tampak basi.
+    revalidatePath("/[locale]/promo/free-cover-hanger/pesan", "page");
 
     return NextResponse.json({
       success: true,

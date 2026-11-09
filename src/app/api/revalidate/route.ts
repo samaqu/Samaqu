@@ -42,6 +42,8 @@ export async function POST(request: NextRequest) {
   revalidatePath("/[locale]/open-order", "page");
   // Halaman form promo Free Cover Hanger.
   revalidatePath("/[locale]/promo/free-cover-hanger/pesan", "page");
+  // Daftar URL ikut segar saat produk ditambah/berubah status.
+  revalidatePath("/sitemap.xml");
 
   if (productId) {
     for (const locale of LOCALES) {

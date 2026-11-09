@@ -19,7 +19,7 @@ import PromoOrderWizard from "@/components/promo/free-cover-hanger/order/PromoOr
  * penulisan cache tanpa manfaat: katalog & ongkir di wizard tetap diambil di browser.
  * Perubahan dari admin tetap instan untuk produk/katalog lewat /api/revalidate.
  */
-export const revalidate = 600;
+export const revalidate = 21600;
 
 export default async function PromoOrderPage() {
   const promo = await readPromoFchSettings();
