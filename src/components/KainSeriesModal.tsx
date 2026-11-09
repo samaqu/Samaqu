@@ -73,54 +73,54 @@ const ACCENT_ON_DARK = "#FFFFFF";
 const KAIN: KainSeriesItem[] = [
   {
     code: "B.01",
-    tag: "Ketebalan: Tinggi",
+    tag: "Thickness: High",
     gradient: "linear-gradient(160deg, #2b2b2b 0%, #141414 100%)",
     points: [
-      { icon: LayersIcon, title: "Lebih tebal & kokoh", desc: "Memberikan struktur yang kuat dan tidak mudah menerawang." },
-      { icon: StretchIcon, title: "Stretch", desc: "Nyaman bergerak, tidak terasa kaku." },
-      { icon: DrapeIcon, title: "Jatuh lebih rapi", desc: "Memberikan tampilan yang elegan dan berkelas." },
-      { icon: AirIcon, title: "Adem & nyaman", desc: "Sirkulasi udara baik, nyaman dipakai seharian." },
+      { icon: LayersIcon, title: "Thicker & sturdier", desc: "Provides a strong structure and is not easily see-through." },
+      { icon: StretchIcon, title: "Stretch", desc: "Comfortable to move in, never stiff." },
+      { icon: DrapeIcon, title: "Drapes neater", desc: "Creates an elegant, refined look." },
+      { icon: AirIcon, title: "Breathable & comfortable", desc: "Good air circulation, comfortable all day." },
     ],
-    fit: "Aktivitas formal, acara penting, dan tampilan premium sehari-hari.",
+    fit: "Formal activities, important events, and premium everyday looks.",
     price: "Rp 329.000",
   },
   {
     code: "B.02",
-    tag: "Ketebalan: Sedang-Tinggi",
+    tag: "Thickness: Medium-High",
     gradient: "linear-gradient(160deg, #2a3350 0%, #1e2436 100%)",
     points: [
-      { icon: LayersIcon, title: "Tebal seimbang", desc: "Kokoh namun tetap ringan saat dipakai." },
-      { icon: StretchIcon, title: "Serat halus", desc: "Permukaan lembut dengan kilau tipis." },
-      { icon: DrapeIcon, title: "Siluet bersih", desc: "Jatuh lurus, minim kerutan." },
-      { icon: AirIcon, title: "Breathable", desc: "Cocok untuk cuaca panas maupun ruang ber-AC." },
+      { icon: LayersIcon, title: "Balanced thickness", desc: "Sturdy yet still light to wear." },
+      { icon: StretchIcon, title: "Fine fibers", desc: "Soft surface with a subtle sheen." },
+      { icon: DrapeIcon, title: "Clean silhouette", desc: "Drapes straight with minimal wrinkles." },
+      { icon: AirIcon, title: "Breathable", desc: "Suitable for hot weather and air-conditioned rooms." },
     ],
-    fit: "Kerja, kajian, dan pemakaian harian yang tetap rapi.",
+    fit: "Work, study sessions, and everyday wear that stays neat.",
     price: "Rp 379.000",
   },
   {
     code: "A.02",
-    tag: "Ketebalan: Sedang",
+    tag: "Thickness: Medium",
     gradient: "linear-gradient(160deg, #c9baa9 0%, #b4a79b 100%)",
     points: [
-      { icon: LayersIcon, title: "Ringan", desc: "Terasa enteng, nyaman untuk mobilitas tinggi." },
-      { icon: StretchIcon, title: "Lentur", desc: "Mengikuti gerak tubuh dengan baik." },
-      { icon: DrapeIcon, title: "Flowy", desc: "Jatuh mengalir, kesan santai namun sopan." },
-      { icon: AirIcon, title: "Sangat adem", desc: "Pilihan terbaik untuk suhu panas." },
+      { icon: LayersIcon, title: "Lightweight", desc: "Feels airy and comfortable for high mobility." },
+      { icon: StretchIcon, title: "Flexible", desc: "Moves well with your body." },
+      { icon: DrapeIcon, title: "Flowy", desc: "Drapes smoothly with a relaxed yet modest look." },
+      { icon: AirIcon, title: "Very breathable", desc: "The best choice for hot temperatures." },
     ],
-    fit: "Perjalanan, aktivitas outdoor, dan pemakaian santai.",
+    fit: "Travel, outdoor activities, and casual wear.",
     price: "Rp 324.000",
   },
   {
     code: "C.01",
-    tag: "Ketebalan: Sedang",
+    tag: "Thickness: Medium",
     gradient: "linear-gradient(160deg, #e4d9c8 0%, #cdbfb0 100%)",
     points: [
-      { icon: LayersIcon, title: "Klasik", desc: "Tekstur katun premium dengan nuansa lembut." },
-      { icon: StretchIcon, title: "Nyaman di kulit", desc: "Halus, tidak panas, tidak gatal." },
-      { icon: DrapeIcon, title: "Rapi natural", desc: "Tampilan bersih tanpa terlihat kaku." },
-      { icon: AirIcon, title: "Mudah dirawat", desc: "Cepat kering dan tidak rewel saat disetrika." },
+      { icon: LayersIcon, title: "Classic", desc: "Premium cotton texture with a soft feel." },
+      { icon: StretchIcon, title: "Skin-friendly", desc: "Smooth, not hot, and non-itchy." },
+      { icon: DrapeIcon, title: "Naturally neat", desc: "A clean look without feeling stiff." },
+      { icon: AirIcon, title: "Easy to care for", desc: "Quick-drying and easy to iron." },
     ],
-    fit: "Pemakaian harian, ibadah, dan acara keluarga.",
+    fit: "Everyday wear, worship, and family events.",
     price: "Rp 254.000",
   },
 ];
@@ -177,7 +177,7 @@ function Slide({ item }: { item: KainSeriesItem }) {
           </span>
           {item.price && (
             <p className="mt-3 text-[13px] font-medium font-ui" style={{ color: ACCENT_ON_DARK }}>
-              Harga mulai dari: {item.price}
+              Starting from: {item.price}
             </p>
           )}
           <div className="mt-3.5 h-px w-12" style={{ background: "#ffffff" }} />
@@ -187,7 +187,7 @@ function Slide({ item }: { item: KainSeriesItem }) {
           >
             <span style={{ color: ACCENT_ON_DARK }}>✦</span>
             <div>
-              <p className="text-[12px] font-ui" style={{ color: ACCENT_ON_DARK }}>Cocok untuk</p>
+              <p className="text-[12px] font-ui" style={{ color: ACCENT_ON_DARK }}>Perfect for</p>
               <p className="text-[12px] leading-snug font-ui" style={{ color: "rgba(255,255,255,.7)" }}>{item.fit}</p>
             </div>
           </div>
@@ -214,7 +214,7 @@ function Slide({ item }: { item: KainSeriesItem }) {
           >
             <span style={{ color: ACCENT_ON_DARK }}>✦</span>
             <div>
-              <p className="text-[12px] font-ui" style={{ color: ACCENT_ON_DARK }}>Cocok untuk</p>
+              <p className="text-[12px] font-ui" style={{ color: ACCENT_ON_DARK }}>Perfect for</p>
               <p className="text-[12px] leading-snug font-ui" style={{ color: "rgba(255,255,255,.7)" }}>{item.fit}</p>
             </div>
           </div>
@@ -237,13 +237,13 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
   const slideCount = type === "series" ? THOBE_SERIES.length : items.length;
   const title =
     type === "kain"
-      ? `Perbedaan Jenis Kain ${category || "Thobe"}`
+      ? `${category || "Thobe"} Fabric Differences`
       : `${category || "Thobe"} Series Differences`;
   const subtitle =
     type === "kain"
-      ? "Setiap kain punya karakter terbaiknya. Pilih yang paling sesuai untukmu."
+      ? "Every fabric has its own strengths. Choose the one that suits you best."
       : "Each series has different collar and placket details. Pick the one that best fits your style.";
-  const swipeWord = type === "kain" ? "jenis kain" : "series";
+  const swipeLabel = type === "kain" ? "Swipe to see other fabrics" : "Swipe to see other series";
   // Gambar dari DB hanya dipakai untuk sheet kain; sheet series selalu memakai slide 6 series.
   const hasImages = type === "kain" && !!images && images.length > 0;
   const navCount = hasImages ? images!.length : slideCount;
@@ -313,7 +313,7 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
           {hasImages ? (
             <div className="fixed inset-0 z-[9995]">
               {/* Close */}
-              <button onClick={onClose} aria-label="Tutup" className="absolute right-4 top-4 z-30 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25" style={{ background: "rgba(255,255,255,.12)" }}>
+              <button onClick={onClose} aria-label="Close" className="absolute right-4 top-4 z-30 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25" style={{ background: "rgba(255,255,255,.12)" }}>
                 <X size={16} color="white" />
               </button>
 
@@ -376,17 +376,17 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
             </div>
 
             {/* Close */}
-            <button onClick={onClose} aria-label={type === "series" ? "Close" : "Tutup"} className={`absolute right-4 top-4 z-30 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25 ${type === "series" ? "bg-[rgba(255,255,255,.12)] sm:right-[14px] sm:top-[14px] sm:w-[30px] sm:h-[30px] sm:bg-[#2a2a2a]" : "bg-[rgba(255,255,255,.12)]"}`}>
+            <button onClick={onClose} aria-label="Close" className={`absolute right-4 top-4 z-30 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25 ${type === "series" ? "bg-[rgba(255,255,255,.12)] sm:right-[14px] sm:top-[14px] sm:w-[30px] sm:h-[30px] sm:bg-[#2a2a2a]" : "bg-[rgba(255,255,255,.12)]"}`}>
               <X size={16} />
             </button>
 
             {/* Prev / Next */}
             {navCount > 1 && (
               <>
-                <button onClick={() => goTo(index - 1)} aria-label={type === "series" ? "Previous" : "Sebelumnya"} className={`absolute left-3 ${arrowYClass} -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25 ${type === "series" ? "bg-[rgba(255,255,255,.12)] sm:left-2.5 sm:w-8 sm:h-8 sm:bg-[rgba(255,255,255,.18)]" : "bg-[rgba(255,255,255,.12)]"}`}>
+                <button onClick={() => goTo(index - 1)} aria-label="Previous" className={`absolute left-3 ${arrowYClass} -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25 ${type === "series" ? "bg-[rgba(255,255,255,.12)] sm:left-2.5 sm:w-8 sm:h-8 sm:bg-[rgba(255,255,255,.18)]" : "bg-[rgba(255,255,255,.12)]"}`}>
                   <ChevronLeft size={17} />
                 </button>
-                <button onClick={() => goTo(index + 1)} aria-label={type === "series" ? "Next" : "Berikutnya"} className={`absolute right-3 ${arrowYClass} -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25 ${type === "series" ? "bg-[rgba(255,255,255,.12)] sm:right-2.5 sm:w-8 sm:h-8 sm:bg-[rgba(255,255,255,.18)]" : "bg-[rgba(255,255,255,.12)]"}`}>
+                <button onClick={() => goTo(index + 1)} aria-label="Next" className={`absolute right-3 ${arrowYClass} -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25 ${type === "series" ? "bg-[rgba(255,255,255,.12)] sm:right-2.5 sm:w-8 sm:h-8 sm:bg-[rgba(255,255,255,.18)]" : "bg-[rgba(255,255,255,.12)]"}`}>
                   <ChevronRight size={17} />
                 </button>
               </>
@@ -395,7 +395,7 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
             {/* Dots */}
             <div className={`${type === "series" ? "static shrink-0 py-2 sm:pt-3 sm:pb-2.5" : "absolute inset-x-0 bottom-[104px] sm:static sm:shrink-0 sm:py-3"} z-20 flex justify-center ${type === "series" ? "gap-2.5 sm:gap-[7px]" : "gap-2.5"}`}>
               {Array.from({ length: navCount }).map((_, i) => (
-                <button key={i} onClick={() => goTo(i)} aria-label={type === "series" ? `Go to slide ${i + 1}` : `Ke slide ${i + 1}`}
+                <button key={i} onClick={() => goTo(i)} aria-label={`Go to slide ${i + 1}`}
                   className={`h-2 rounded-full transition-all ${i === index
                     ? `bg-white ${type === "series" ? "w-[18px] sm:w-[26px]" : "w-[18px]"}`
                     : `w-2 ${type === "series" ? "bg-[rgba(255,255,255,.28)] sm:bg-[#555555]" : "bg-[rgba(255,255,255,.28)]"}`}`} />
@@ -405,7 +405,7 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
             {/* Footer chip */}
             <div className={`${type === "series" ? "static shrink-0 px-6 pt-4 pb-5 sm:px-4 sm:pt-3 sm:pb-3" : "absolute inset-x-0 bottom-0 px-6 pt-4 pb-5 sm:py-3.5"} sm:static sm:shrink-0 z-20 rounded-t-3xl sm:rounded-none text-center shadow-[0_-10px_30px_rgba(0,0,0,.35)] sm:shadow-none ${type === "series" ? "bg-[var(--cream)] text-[var(--espresso)] sm:bg-white sm:text-[#111111]" : "bg-[var(--cream)] text-[var(--espresso)]"}`}>
               <p className={`font-medium font-ui ${type === "series" ? "text-[12.5px] sm:text-[13px]" : "text-[12.5px]"}`}>
-                {type === "series" ? "Swipe to see other series" : `Swipe untuk melihat ${swipeWord} lainnya`}
+                {swipeLabel}
               </p>
               {type === "series" ? (
                 <div className="mt-1 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-[12px] font-ui">
