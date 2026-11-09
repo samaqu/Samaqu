@@ -1607,6 +1607,23 @@ export default function TambahProdukPage({
 
     // SKU per varian harus unik. Kalau bentrok, tampilkan daftarnya di kolom SKU
     // (jangan menimpa SKU yang sudah diisi manual).
+    //
+    // Mode edit Thobe memuat SEMUA baris series sekaligus (Jiharkah/Bayati/…), jadi
+    // seluruh id group itu dikecualikan — bukan hanya id yang sedang dibuka. Kalau hanya
+    // `editProductId`, SKU series saudaranya dilaporkan bentrok padahal itu baris yang
+    // sama-sama sedang diedit.
+    const skuExceptProductIds = isEdit
+      ? category === "Thobe"
+        ? Array.from(
+            new Set(
+              [editProductId, ...selectedSeries.map((sn) => seriesBlocks[sn]?.productId)].filter(
+                (id): id is string => Boolean(id),
+              ),
+            ),
+          )
+        : editProductId
+      : null;
+
     if (category) {
       const variantSkus: string[] = [];
       const productSkus: string[] = [];
@@ -1661,8 +1678,8 @@ export default function TambahProdukPage({
       // Dicek di sini supaya admin melihat pesan jelas, bukan error database mentah.
       if (!e.sku) {
         const [productClash, variantClash] = await Promise.all([
-          findProductSkuClashes(supabase, productSkus, isEdit ? editProductId : null),
-          findVariantSkuClashes(supabase, variantSkus, isEdit ? editProductId : null),
+          findProductSkuClashes(supabase, productSkus, skuExceptProductIds),
+          findVariantSkuClashes(supabase, variantSkus, skuExceptProductIds),
         ]);
         const clashes = [...productClash, ...variantClash];
         if (clashes.length > 0) e.sku = skuClashMessage(clashes);

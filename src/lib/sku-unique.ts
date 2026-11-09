@@ -23,22 +23,26 @@ export interface SkuClash {
 
 const norm = (value: unknown) => String(value ?? "").trim().toUpperCase();
 
-/** SKU yang sudah dipakai produk LAIN (selain `exceptProductId`). */
+/**
+ * SKU yang sudah dipakai produk LAIN.
+ * `exceptProductIds` boleh lebih dari satu: form Thobe mengedit semua baris series
+ * (Jiharkah/Bayati/…) sekaligus, jadi SKU milik group itu sendiri bukan bentrok.
+ */
 export async function findProductSkuClashes(
   client: SupabaseClient,
   skus: (string | null | undefined)[],
-  exceptProductId?: string | null
+  exceptProductIds?: string | string[] | null
 ): Promise<SkuClash[]> {
-  return findClashes(client, "products", skus, exceptProductId);
+  return findClashes(client, "products", skus, exceptProductIds);
 }
 
-/** SKU yang sudah dipakai VARIAN lain (selain baris milik `exceptProductId`). */
+/** SKU yang sudah dipakai VARIAN lain (selain baris milik product id di `exceptProductIds`). */
 export async function findVariantSkuClashes(
   client: SupabaseClient,
   skus: (string | null | undefined)[],
-  exceptProductId?: string | null
+  exceptProductIds?: string | string[] | null
 ): Promise<SkuClash[]> {
-  return findClashes(client, "product_variants", skus, exceptProductId);
+  return findClashes(client, "product_variants", skus, exceptProductIds);
 }
 
 type SkuRow = {
@@ -53,10 +57,14 @@ async function findClashes(
   client: SupabaseClient,
   table: "products" | "product_variants",
   skus: (string | null | undefined)[],
-  exceptProductId?: string | null
+  exceptProductIds?: string | string[] | null
 ): Promise<SkuClash[]> {
   const wanted = [...new Set(skus.map(norm).filter(Boolean))];
   if (wanted.length === 0) return [];
+
+  const exceptIds = new Set(
+    (Array.isArray(exceptProductIds) ? exceptProductIds : exceptProductIds ? [exceptProductIds] : []).filter(Boolean)
+  );
 
   const select = table === "products" ? "id, name, sku" : "product_id, color, sku";
   const rows: SkuRow[] = [];
@@ -85,7 +93,7 @@ async function findClashes(
     if (!sku || !wanted.includes(sku)) continue;
 
     const productId = String(table === "products" ? row.id ?? "" : row.product_id ?? "");
-    if (exceptProductId && productId === exceptProductId) continue;
+    if (exceptIds.size > 0 && exceptIds.has(productId)) continue;
 
     const key = `${sku}|${productId}`;
     if (seen.has(key)) continue;
