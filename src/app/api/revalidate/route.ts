@@ -36,6 +36,8 @@ export async function POST(request: NextRequest) {
   // Bio statis (tanpa revalidate berkala) — disegarkan hanya saat admin menyimpan
   // konten bio / jendela Open Order.
   revalidatePath("/bio");
+  // FAQ juga statis; disegarkan saat admin menyimpan konten website.
+  revalidatePath("/[locale]/faq", "page");
 
   if (productId) {
     for (const locale of LOCALES) {

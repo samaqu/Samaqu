@@ -5,8 +5,10 @@ import { fetchFaqItems } from "./faq-data";
 import idMessages from "@/i18n/messages/id.json";
 import enMessages from "@/i18n/messages/en.json";
 
-/** FAQ hampir tidak pernah berubah; konten di-cache dan diperbarui tiap 1 jam. */
-export const revalidate = 3600;
+/**
+ * FAQ hampir tidak pernah berubah — sengaja TANPA timer.
+ * Setiap admin menyimpan konten, `/api/revalidate` menyegarkan /faq saat itu juga.
+ */
 
 export async function generateMetadata({
   params,
