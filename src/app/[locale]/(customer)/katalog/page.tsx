@@ -200,6 +200,7 @@ function ProductCard({ product, index, wishlist, colorHex, totalStock }: { produ
     >
       <Link
         href={`/katalog/${product.id}`}
+        prefetch={false}
         className="group relative flex flex-col h-full rounded-2xl overflow-hidden cursor-pointer"
         style={{
           background: "#ffffff",

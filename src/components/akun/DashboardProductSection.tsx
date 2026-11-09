@@ -39,6 +39,7 @@ function ProductCard({
   return (
     <Link
       href={href}
+      prefetch={false}
       className="group flex flex-col overflow-hidden rounded-2xl border border-[#E7E3DE] bg-white shadow-[0_2px_10px_rgba(0,0,0,.035)] transition hover:shadow-[0_8px_22px_rgba(0,0,0,.08)] active:scale-[.99]"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-[#F1EFEC]">

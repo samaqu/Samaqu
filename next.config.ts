@@ -130,12 +130,30 @@ const nextConfig: NextConfig = {
     return legacyRedirects();
   },
   async headers() {
+    // Aset publik di folder ini jarang diganti. Cache 7 hari + revalidasi latar
+    // supaya pengunjung berulang tidak mengunduh ulang (hemat CDN Requests).
+    const publicMediaHeaders = [
+      { key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" },
+    ];
+    const publicMediaFolders = [
+      "/images/:path*",
+      "/fonts/:path*",
+      "/video/:path*",
+      "/series/:path*",
+      "/products/:path*",
+      "/promo/:path*",
+      "/bio-images/:path*",
+      "/campaign/:path*",
+      "/assets/:path*",
+      "/garansi/:path*",
+    ];
     return [
       {
         // Semua route, termasuk API dan aset statis.
         source: "/:path*",
         headers: securityHeaders,
       },
+      ...publicMediaFolders.map((source) => ({ source, headers: publicMediaHeaders })),
     ];
   },
   images: {
