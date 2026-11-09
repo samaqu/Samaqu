@@ -832,7 +832,7 @@ svg.heart { width: 14px; height: 14px; fill: #e46a92; stroke: none; color: #e46a
   --panel-soon-bg: #fff1c2;
   --panel-soon-fg: #c98a00;
   --panel-danger: #c98a00;
-  --sunflower-hero: url("https://res.cloudinary.com/dqjh7utdb/image/upload/v1792312164/dt5rl7p62g9n8seudc54.png");
+  --sunflower-hero: url("https://samaqu-media.samaqu.workers.dev/panel-admin/sunflower-hero-1794231423687.jpg");
   --font: var(--font-inter), Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
 .sunflower .side {
