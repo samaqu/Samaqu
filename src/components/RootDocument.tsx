@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Providers from "@/components/Providers";
+import MotionProvider from "@/components/MotionProvider";
 import VercelAnalytics from "@/components/VercelAnalytics";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, SITE_CONTACT, OG_IMAGE } from "@/lib/site-config";
 
@@ -125,9 +126,11 @@ export function RootDocument({ lang, children }: { lang: string; children: React
         }) }} />
       </head>
       <body>
-        <Providers>
-          {children}
-        </Providers>
+        <MotionProvider>
+          <Providers>
+            {children}
+          </Providers>
+        </MotionProvider>
         <VercelAnalytics />
       </body>
     </html>

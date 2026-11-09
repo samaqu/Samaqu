@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, Variants } from "framer-motion";
+import { m as motion, type Variants } from "framer-motion";
 import { useSafeTranslations } from "@/lib/safe-i18n";
 
 /* ─── Data ─── */

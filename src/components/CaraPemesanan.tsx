@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { motion, useInView, type Variants } from "framer-motion";
+import { m as motion, useInView, type Variants } from "framer-motion";
 import { CoatHanger } from "@phosphor-icons/react/dist/csr/CoatHanger";
 import { Ruler } from "@phosphor-icons/react/dist/csr/Ruler";
 import { ChatCircle } from "@phosphor-icons/react/dist/csr/ChatCircle";

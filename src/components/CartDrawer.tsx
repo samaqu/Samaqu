@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence } from "framer-motion";
 import { X, Minus, Plus, Trash2, Tag, ShoppingBag, ShoppingCart } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
 import { colorMap } from "@/lib/katalog-data";

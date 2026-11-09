@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence } from "framer-motion";
 import { getWhatsAppLink } from "@/lib/store-settings";
 import { trackWhatsAppClick } from "@/lib/meta-pixel";
 import { useSafeTranslations } from "@/lib/safe-i18n";

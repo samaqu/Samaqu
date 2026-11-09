@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence, Variants } from "framer-motion";
+import { m as motion, AnimatePresence, type Variants } from "framer-motion";
 import { SlidersHorizontal, X, ChevronDown, ChevronRight } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb";
 import {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence } from "framer-motion";
 import { Star, CheckCircle, MessageCircle, Quote, Shirt, Ruler, Headphones, Heart, X, Play } from "lucide-react";
 import Breadcrumb from "@/components/Breadcrumb";
 import { getTestimonials, type DbTestimonial } from "@/lib/db";

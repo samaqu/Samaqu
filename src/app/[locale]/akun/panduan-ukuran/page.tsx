@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence } from "framer-motion";
 import { Ruler, Loader2, MessageCircle, Eye, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useSafeTranslations } from "@/lib/safe-i18n";
 import { supabase } from "@/lib/supabase";

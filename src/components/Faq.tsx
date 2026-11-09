@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion, Variants } from "framer-motion";
+import { m as motion, type Variants } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { useSafeTranslations } from "@/lib/safe-i18n";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, Variants } from "framer-motion";
+import { m as motion, type Variants } from "framer-motion";
 import { getWhatsAppLink } from "@/lib/store-settings";
 import { trackWhatsAppClick } from "@/lib/meta-pixel";
 import { useSafeTranslations } from "@/lib/safe-i18n";

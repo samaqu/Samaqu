@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence } from "framer-motion";
 import { X, SlidersHorizontal, Check } from "lucide-react";
 import { colorMap, type Category } from "@/lib/katalog-data";
 
