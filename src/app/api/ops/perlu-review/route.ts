@@ -67,6 +67,93 @@ async function withFreeCoverHanger(
   };
 }
 
+const ADDRESS_FIELDS = ["address", "province", "city", "kecamatan", "postal_code"] as const;
+
+/**
+ * Harga & identitas baris draft selalu dihitung ulang dari master produk.
+ * Dipakai saat draft dibuat (AI) dan saat draft diedit admin, supaya harga
+ * kiriman AI tidak pernah dipakai dan draft selalu bisa di-approve.
+ */
+async function normalizeItems(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  items: any[],
+): Promise<{ rows?: any[]; error?: string }> {
+  const productIds = [...new Set(items.map((item: any) => String(item?.product_id || "").trim()).filter(Boolean))];
+  if (!productIds.length) return { error: "Draft harus punya minimal 1 produk." };
+
+  const [{ data: products }, { data: variants }] = await Promise.all([
+    admin.from("products").select("id, name, series, price").in("id", productIds),
+    admin.from("product_variants").select("product_id, color, size, price_override").in("product_id", productIds),
+  ]);
+  const productMap = new Map((products || []).map((item) => [String(item.id), item]));
+  const variantKey = (productId: string, color: string, size: string) =>
+    `${productId}|${color || "default"}|${size}`;
+  const variantMap = new Map(
+    (variants || []).map((item) => [
+      variantKey(String(item.product_id), String(item.color || "default"), String(item.size || "").toUpperCase()),
+      item,
+    ]),
+  );
+  // Produk yang warnanya menempel di nama ("Thobe Mint Karim") hanya punya varian
+  // "default". Warna kiriman draft AI ("Mint") dipetakan ke "default" supaya tidak
+  // ditolak saat draft disimpan/disetujui.
+  const variantColors = new Map<string, Set<string>>();
+  for (const item of variants || []) {
+    const pid = String(item.product_id);
+    if (!variantColors.has(pid)) variantColors.set(pid, new Set());
+    variantColors.get(pid)!.add(String(item.color || "default"));
+  }
+
+  const rows = [];
+  for (const item of items) {
+    const productId = String(item?.product_id || "").trim();
+    const size = String(item?.size || "").trim().toUpperCase();
+    let color = String(item?.color || "default").trim() || "default";
+    const product = productMap.get(productId);
+    if (!product || !size) return { error: `Produk ${productId || "(kosong)"} tidak valid.` };
+    if (!variantMap.has(variantKey(productId, color, size))) {
+      const colors = variantColors.get(productId);
+      if (colors?.size === 1 && colors.has("default")) color = "default";
+      if (!variantMap.has(variantKey(productId, color, size))) {
+        return { error: `Ukuran ${size} untuk ${product.name} tidak tersedia.` };
+      }
+    }
+    const quantity = Math.max(1, Math.min(99, Number(item?.quantity) || 1));
+    const override = Number(variantMap.get(variantKey(productId, color, size))?.price_override);
+    rows.push({
+      product_id: productId,
+      product_name: product.name,
+      series: product.series ?? null,
+      color,
+      size,
+      quantity,
+      price: override > 0 ? override : Number(product.price) || 0,
+    });
+  }
+  return { rows };
+}
+
+/**
+ * Lepas klaim approve kalau pembuatan order gagal, supaya draft kembali ke antrean.
+ * Hanya menyentuh draft yang belum punya nomor order.
+ */
+async function releaseDraftClaim(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  id: string,
+) {
+  await admin
+    .from("order_drafts")
+    .update({
+      status: "pending",
+      reviewed_by: null,
+      reviewed_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("status", "approved")
+    .is("approved_order_number", null);
+}
+
 async function history(admin: ReturnType<typeof getSupabaseAdmin>, sender: string) {
   const { data } = await admin
     .from("wa_inbox")
@@ -307,6 +394,16 @@ export async function POST(req: NextRequest) {
     if (!payload || typeof payload !== "object" || !Array.isArray(payload.items) || !payload.items.length) {
       return bad("payload transaksi tidak valid");
     }
+    // Draft dari AI baru boleh masuk kalau alamatnya sudah lengkap.
+    const shipping = payload.shipping || {};
+    for (const key of ADDRESS_FIELDS) {
+      if (!String(shipping[key] || "").trim()) return bad("Alamat draft belum lengkap.");
+    }
+    // Harga dari AI tidak dipakai: semua baris dihitung ulang dari master produk,
+    // sama seperti saat admin mengedit draft.
+    const priced = await normalizeItems(admin, payload.items);
+    if (priced.error) return bad(priced.error);
+    const normalizedPayload = { ...payload, items: priced.rows };
     const sourceInboxId = body?.source_inbox_id ? String(body.source_inbox_id) : null;
     let proofKey: string | null = null;
     if (sourceInboxId) {
@@ -337,7 +434,7 @@ export async function POST(req: NextRequest) {
       closing_id: body?.closing_id ? String(body.closing_id) : null,
       customer_name: String(payload.customer_name || body?.customer_name || "").trim() || null,
       customer_whatsapp: String(payload.customer_whatsapp || body?.customer_whatsapp || "").trim() || null,
-      payload: applyCoverDiscount(await withFreeCoverHanger(admin, payload)),
+      payload: applyCoverDiscount(await withFreeCoverHanger(admin, normalizedPayload)),
       proof_key: proofKey,
       proof_url: proofKey ? waMediaSignedUrl(proofKey) : body?.proof_url ? String(body.proof_url) : null,
       ai_note: body?.ai_note ? String(body.ai_note) : null,
@@ -412,60 +509,13 @@ export async function POST(req: NextRequest) {
     const items = Array.isArray(payload?.items) ? payload.items : [];
     const shipping = payload?.shipping || {};
     if (!items.length) return bad("Draft harus punya minimal 1 produk.");
-    for (const key of ["address", "province", "city", "kecamatan", "postal_code"]) {
+    for (const key of ADDRESS_FIELDS) {
       if (!String(shipping[key] || "").trim()) return bad("Alamat draft belum lengkap.");
     }
 
-    const productIds = [...new Set(items.map((item: any) => String(item?.product_id || "")).filter(Boolean))];
-    const [{ data: products }, { data: variants }] = await Promise.all([
-      admin.from("products").select("id, name, series, price").in("id", productIds),
-      admin.from("product_variants").select("product_id, color, size, price_override").in("product_id", productIds),
-    ]);
-    const productMap = new Map((products || []).map((item) => [String(item.id), item]));
-    const variantKey = (productId: string, color: string, size: string) =>
-      `${productId}|${color || "default"}|${size}`;
-    const variantMap = new Map(
-      (variants || []).map((item) => [
-        variantKey(String(item.product_id), String(item.color || "default"), String(item.size || "").toUpperCase()),
-        item,
-      ]),
-    );
-    // Produk yang warnanya menempel di nama ("Thobe Mint Karim") hanya punya varian
-    // "default". Warna kiriman draft AI ("Mint") dipetakan ke "default" supaya tidak
-    // ditolak saat draft disimpan/disetujui.
-    const variantColors = new Map<string, Set<string>>();
-    for (const item of variants || []) {
-      const pid = String(item.product_id);
-      if (!variantColors.has(pid)) variantColors.set(pid, new Set());
-      variantColors.get(pid)!.add(String(item.color || "default"));
-    }
-
-    const normalized = [];
-    for (const item of items) {
-      const productId = String(item?.product_id || "").trim();
-      const size = String(item?.size || "").trim().toUpperCase();
-      let color = String(item?.color || "default").trim() || "default";
-      const product = productMap.get(productId);
-      if (!product || !size) return bad(`Produk ${productId || "(kosong)"} tidak valid.`);
-      if (!variantMap.has(variantKey(productId, color, size))) {
-        const colors = variantColors.get(productId);
-        if (colors?.size === 1 && colors.has("default")) color = "default";
-        if (!variantMap.has(variantKey(productId, color, size))) {
-          return bad(`Ukuran ${size} untuk ${product.name} tidak tersedia.`);
-        }
-      }
-      const quantity = Math.max(1, Math.min(99, Number(item?.quantity) || 1));
-      const override = Number(variantMap.get(variantKey(productId, color, size))?.price_override);
-      normalized.push({
-        product_id: productId,
-        product_name: product.name,
-        series: product.series ?? null,
-        color,
-        size,
-        quantity,
-        price: override > 0 ? override : Number(product.price) || 0,
-      });
-    }
+    const priced = await normalizeItems(admin, items);
+    if (priced.error) return bad(priced.error);
+    const normalized = priced.rows || [];
 
     const subtotal = normalized.reduce(
       (sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
@@ -515,29 +565,45 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === "draft_approve") {
+    // Klaim atomik: hanya satu request yang boleh mengubah pending -> approved.
+    // Double click / dua admin bersamaan akan kena 409 dan tidak membuat order kedua.
+    const claimedAt = new Date().toISOString();
     const { data: draft, error } = await admin
       .from("order_drafts")
-      .select("*")
+      .update({
+        status: "approved",
+        reviewed_by: actor,
+        reviewed_at: claimedAt,
+        updated_at: claimedAt,
+      })
       .eq("id", id)
       .eq("status", "pending")
+      .select()
       .maybeSingle();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!draft) return bad("Draft sudah diproses.", 409);
     const token = req.headers.get("authorization") || "";
-    const txRes = await fetch(new URL("/api/ops/transaksi", req.url), {
-      method: "POST",
-      headers: { Authorization: token, "Content-Type": "application/json" },
-      body: JSON.stringify(applyCoverDiscount(draft.payload)),
-    });
+    let txRes: Response;
+    try {
+      txRes = await fetch(new URL("/api/ops/transaksi", req.url), {
+        method: "POST",
+        headers: { Authorization: token, "Content-Type": "application/json" },
+        body: JSON.stringify(applyCoverDiscount(draft.payload)),
+      });
+    } catch (err) {
+      await releaseDraftClaim(admin, id);
+      return bad(err instanceof Error ? err.message : "Gagal membuat transaksi.");
+    }
     const txJson = await txRes.json().catch(() => null);
-    if (!txRes.ok) return bad(txJson?.error || `Gagal membuat transaksi (${txRes.status})`);
+    if (!txRes.ok) {
+      // Gagal bikin order: draft kembali ke antrean supaya bisa diperbaiki admin.
+      await releaseDraftClaim(admin, id);
+      return bad(txJson?.error || `Gagal membuat transaksi (${txRes.status})`);
+    }
     await admin
       .from("order_drafts")
       .update({
-        status: "approved",
         approved_order_number: txJson?.order_number || null,
-        reviewed_by: actor,
-        reviewed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
