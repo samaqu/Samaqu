@@ -21,6 +21,8 @@ export type FreeGiftRow = {
   name: string;
   /** Series produk (`order_items.series` / nama item); kosong untuk produk tanpa series. */
   series: string;
+  /** Varian baris pesanan (warna/ukuran), mis. "Cover Thobe + Hanger · ALL SIZE". */
+  variant: string;
   /** Unit yang dibagikan gratis pada periode ini. */
   qty: number;
   /** HPP per unit — 0 berarti modal produk belum diisi di katalog. */
@@ -114,6 +116,9 @@ export default function RincianFreeGift({ data }: { data?: FreeGiftData }) {
                     </td>
                     <td className="px-3 py-3">
                       <p className="text-xs font-bold leading-snug text-zinc-900">{row.name}</p>
+                      {row.variant ? (
+                        <p className="mt-0.5 text-[10px] font-semibold text-zinc-500">{row.variant}</p>
+                      ) : null}
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         {row.series ? (
                           <span className="rounded-full border border-[#E4E4E7] bg-[#FAFAFA] px-1.5 py-0.5 text-[10px] font-bold text-zinc-600">

@@ -514,6 +514,20 @@ async function loadPeriod(
    * Totalnya tetap angka di atas (hpp, mayarFee, biayaPacking/Operasional),
    * jadi agregasi ini tidak boleh mengubah perhitungan mana pun.
    */
+  /**
+   * Varian baris pesanan (`Kain … · warna · ukuran`). Dipakai bersama rincian HPP dan free gift
+   * supaya baris produk yang sama tapi variannya beda (mis. Cover Thobe vs Set Hanger) tidak
+   * digabung jadi satu baris.
+   */
+  const variantOf = (item: any) =>
+    [
+      item.kain ? `Kain ${item.kain}` : "",
+      item.color && item.color !== "default" ? String(item.color) : "",
+      item.size ? String(item.size) : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
   const cogsGroups = new Map<
     string,
     { id: string; name: string; series: string; variant: string; qty: number; hpp: number; unknownQty: number }
@@ -529,13 +543,7 @@ async function loadPeriod(
     // database ini, jadi jangan dibaca dari katalog. Nama item lama bisa memuat series
     // ("Thobe Imron Series …" / "Thobe Superblack — Jiharkah") → ambil dari situ.
     const series = String(item.series || "").trim() || seriesFromName(name);
-    const variant = [
-      item.kain ? `Kain ${item.kain}` : "",
-      item.color && item.color !== "default" ? String(item.color) : "",
-      item.size ? String(item.size) : "",
-    ]
-      .filter(Boolean)
-      .join(" · ");
+    const variant = variantOf(item);
     const key = `${item.product_id || name}|${series}|${variant}`;
     const row = cogsGroups.get(key) || { id: key, name, series, variant, qty: 0, hpp: 0, unknownQty: 0 };
     row.qty += qty;
@@ -554,7 +562,17 @@ async function loadPeriod(
    */
   const freeGiftGroups = new Map<
     string,
-    { id: string; sku: string; name: string; series: string; qty: number; unitHpp: number; cost: number; unknownQty: number }
+    {
+      id: string;
+      sku: string;
+      name: string;
+      series: string;
+      variant: string;
+      qty: number;
+      unitHpp: number;
+      cost: number;
+      unknownQty: number;
+    }
   >();
   const itemsOfOrder = new Map<string, any[]>();
   for (const item of orderItems) {
@@ -570,10 +588,23 @@ async function loadPeriod(
     const unitHpp = Number.isFinite(lineHpp) && lineHpp > 0 ? lineHpp : productHpp.get(productId) || 0;
     const name = String(item.product_name || "Tanpa nama");
     const series = String(item.series || "").trim() || seriesFromName(name);
-    const key = `${productId || name}|${series}`;
+    // Varian ikut jadi bagian baris: satu produk bisa punya beberapa varian (Cover Thobe /
+    // Cover Koko / Set Hanger) dan masing-masing harus tampil sendiri.
+    const variant = variantOf(item);
+    const key = `${productId || name}|${series}|${variant}`;
     const row =
       freeGiftGroups.get(key) ||
-      { id: key, sku: productSku.get(productId) || "", name, series, qty: 0, unitHpp, cost: 0, unknownQty: 0 };
+      {
+        id: key,
+        sku: productSku.get(productId) || "",
+        name,
+        series,
+        variant,
+        qty: 0,
+        unitHpp,
+        cost: 0,
+        unknownQty: 0,
+      };
     row.qty += freeQty;
     row.cost += unitHpp * freeQty;
     if (unitHpp <= 0) row.unknownQty += freeQty;
@@ -599,7 +630,16 @@ async function loadPeriod(
         Math.max(0, coverQty - freeFromPriceQty),
         Math.floor(Math.min(discount, coverGross) / COVER_HANGER_VALUE),
       );
-      addFreeGift(coverItems[0], freeFromPriceQty + coveredByDiscount);
+      // Sisa cover yang tertutup diskon dibagikan ke baris berbayar sesuai urutan barisnya,
+      // supaya tiap varian hanya menerima unitnya sendiri (bukan semuanya ke baris pertama).
+      let discountLeft = coveredByDiscount;
+      for (const item of coverItems) {
+        const qty = qtyOf(item);
+        const freeByPrice = priceOf(item) <= 0 ? qty : 0;
+        const freeByDiscount = priceOf(item) > 0 ? Math.min(discountLeft, qty) : 0;
+        discountLeft -= freeByDiscount;
+        addFreeGift(item, freeByPrice + freeByDiscount);
+      }
     }
     // Barang lain yang dibagikan tanpa harga.
     for (const item of items) {

@@ -2034,13 +2034,18 @@ di `/ops/laporan` (setelah "Perhitungan Laba") merinci HPP barang yang dibagikan
 itu: kolom `# · SKU · Nama Produk · Qty Dibagikan · HPP/Unit · Total Biaya · % Dari Total Promosi`,
 empty state "Belum ada data free gift pada periode ini", dan footer total + jumlah unit. Datanya dari
 **`summary.freeGift`** (`GET /api/ops/laporan` → `{ items, total, qty, unknownQty }`): satu baris
-gabungan per `product_id|series`, `sku` dari `products.sku`. Aturan "gratis"-nya **sama dengan
+gabungan per `product_id|series|varian` (`variant` = `hpp`/COGS: `Kain … · warna · ukuran`, jadi
+Cover Thobe + Hanger dan Set Hanger + Cover tampil terpisah walau `product_id`-nya sama), `sku` dari
+`products.sku`. Aturan "gratis"-nya **sama dengan
 `promoValueOf()`**: cover Rp0 dihitung penuh, cover berbayar hanya sebanyak
-`floor(min(diskon, nilai kotor cover) / 35000)` unit, dan item non-cover berharga Rp0 ikut terhitung —
+`floor(min(diskon, nilai kotor cover) / 35000)` unit — unit yang tertutup diskon dibagikan ke baris
+berbayar sesuai urutannya, bukan semuanya ke baris pertama — dan item non-cover berharga Rp0 ikut terhitung —
 jadi angka "N cover" di baris Promosi dan kartu ini tidak bisa beda. Biaya = qty × HPP/unit
 (`order_items.hpp` → fallback `products.hpp`); `products.hpp` masih 0 untuk semua produk, jadi
 HPP/Unit & Total Biaya tampil "—" dan kolom persen jatuh ke porsi jumlah unit — jangan mengubah 0 jadi
 angka karangan. Palet tetap monokrom (referensi desainnya ungu/pink, sengaja tidak diikuti).
 Verifikasi (2026-11-09, iframe same-origin 920/1280/390 px, sesi admin diputar ulang): `tsc --noEmit`
-bersih; 1 baris `CVH-SHC · Cover & Hanger · 14 unit · 14 · — · — · 100%`, total `Rp 0 · 14 unit`,
-cocok dengan `Promosi Cover Hanger (14 cover)`; 0 px geser samping di ketiga lebar; 0 error console.
+bersih; 2 baris per varian — `CVH-SHC · Cover & Hanger (Cover Thobe + Hanger · ALL SIZE) · 13 ·
+92,9%` dan `CVH-SHC · Extra Cover & Hanger Samaqu (Set Hanger + Cover · ALL SIZE) · 1 · 7,1%` —,
+total `Rp 0 · 14 unit`, cocok dengan `Promosi Cover Hanger (14 cover)`; 0 px geser samping di ketiga
+lebar; 0 error console. (Sebelum revisi varian, keduanya tergabung jadi satu baris 14 unit.)
