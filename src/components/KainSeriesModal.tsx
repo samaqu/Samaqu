@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { THOBE_SERIES } from "@/lib/thobe-series";
+import ThobeSeriesSlide from "@/components/ThobeSeriesSlide";
 
 /* ── Inline icons (custom SVG — avoids relying on less-common lucide-react named exports) ── */
 type IconProps = { size?: number; strokeWidth?: number };
@@ -44,22 +46,6 @@ function AirIcon(props: IconProps) {
   return (
     <IconBase {...props}>
       <path d="M3 8h12a3 3 0 1 0-3-3M3 13h15a3 3 0 1 1-3 3M3 18h9" />
-    </IconBase>
-  );
-}
-
-function RulerIcon(props: IconProps) {
-  return (
-    <IconBase {...props}>
-      <path d="M3 9h18v6H3zM7 9v3M11 9v3M15 9v3M19 9v3" />
-    </IconBase>
-  );
-}
-
-function CutIcon(props: IconProps) {
-  return (
-    <IconBase {...props}>
-      <path d="M12 4v16M8 8l8 8M16 8l-8 8" />
     </IconBase>
   );
 }
@@ -162,44 +148,7 @@ export function getKainSwatchColor(code?: string | null): string {
   return KAIN_FLAT_COLOR[normalized] || "#c9b79c";
 }
 
-/* ── Content: Perbedaan Series Thobe ── */
-const SERIES: KainSeriesItem[] = [
-  {
-    code: "Regular",
-    tag: "Potongan: Longgar",
-    gradient: "linear-gradient(160deg, #e4d9c8 0%, #cdbfb0 100%)",
-    points: [
-      { icon: RulerIcon, title: "Lebar dada relaks", desc: "Ruang gerak maksimal, nyaman untuk semua bentuk tubuh." },
-      { icon: CutIcon, title: "Lengan lurus", desc: "Model klasik dengan manset standar." },
-      { icon: DrapeIcon, title: "Jatuh lurus", desc: "Siluet tradisional yang sopan." },
-    ],
-    fit: "Yang suka pakaian longgar dan santai.",
-  },
-  {
-    code: "Slim",
-    tag: "Potongan: Ramping",
-    gradient: "linear-gradient(160deg, #c9baa9 0%, #b4a79b 100%)",
-    points: [
-      { icon: RulerIcon, title: "Badan lebih ramping", desc: "Mengikuti bentuk tubuh tanpa terasa sempit." },
-      { icon: CutIcon, title: "Lengan lebih kecil", desc: "Tampilan modern dan bersih." },
-      { icon: DrapeIcon, title: "Siluet tegas", desc: "Terlihat lebih tinggi dan proporsional." },
-    ],
-    fit: "Tampilan modern, acara formal, dan foto.",
-  },
-  {
-    code: "Pro",
-    tag: "Potongan: Terstruktur",
-    gradient: "linear-gradient(160deg, #2b2b2b 0%, #141414 100%)",
-    points: [
-      { icon: RulerIcon, title: "Pola presisi", desc: "Dikembangkan dari data ukuran pelanggan." },
-      { icon: CutIcon, title: "Detail jahitan rapat", desc: "Finishing kuat dan tahan lama." },
-      { icon: DrapeIcon, title: "Struktur premium", desc: "Bahu dan kerah lebih terbentuk." },
-    ],
-    fit: "Pemakaian intens dan tampilan paling premium.",
-  },
-];
-
-/* ── Single slide ── */
+/* ── Single slide (kain) ── */
 function Slide({ item }: { item: KainSeriesItem }) {
   return (
     <div className="snap-center shrink-0 w-full h-full relative overflow-hidden">
@@ -283,14 +232,17 @@ interface KainSeriesModalProps {
 }
 
 export default function KainSeriesModal({ type, onClose, category, images }: KainSeriesModalProps) {
-  const items = type === "kain" ? KAIN : type === "series" ? SERIES : [];
+  const items = type === "kain" ? KAIN : [];
+  const slideCount = type === "series" ? THOBE_SERIES.length : items.length;
   const title = type === "kain" ? `Perbedaan Jenis Kain ${category || "Thobe"}` : `Perbedaan Series ${category || "Thobe"}`;
   const subtitle =
     type === "kain"
       ? "Setiap kain punya karakter terbaiknya. Pilih yang paling sesuai untukmu."
-      : "Series menentukan potongan dan siluet. Pilih yang paling pas dengan gayamu.";
+      : "Tiap series punya detail kerah dan placket yang berbeda. Pilih yang paling pas dengan gayamu.";
   const swipeWord = type === "kain" ? "jenis kain" : "series";
-  const hasImages = images && images.length > 0;
+  // Gambar dari DB hanya dipakai untuk sheet kain; sheet series selalu memakai slide 6 series.
+  const hasImages = type === "kain" && !!images && images.length > 0;
+  const navCount = hasImages ? images!.length : slideCount;
 
   const trackRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
@@ -309,7 +261,7 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
   }, [type]);
 
   function goTo(i: number) {
-    const clamped = Math.max(0, Math.min(items.length - 1, i));
+    const clamped = Math.max(0, Math.min(navCount - 1, i));
     const track = trackRef.current;
     if (track) track.scrollTo({ left: clamped * track.clientWidth, behavior: "smooth" });
     setIndex(clamped);
@@ -325,7 +277,7 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, index, items.length]);
+  }, [type, index, navCount]);
 
   function handleScroll() {
     const track = trackRef.current;
@@ -396,9 +348,9 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
 
             {/* Slides */}
             <div ref={trackRef} onScroll={handleScroll} className="relative flex-1 min-h-0 flex overflow-x-auto snap-x snap-mandatory scrollbar-hide scroll-smooth">
-              {items.map((item) => (
-                <Slide key={item.code} item={item} />
-              ))}
+              {type === "series"
+                ? THOBE_SERIES.map((item) => <ThobeSeriesSlide key={item.id} item={item} />)
+                : items.map((item) => <Slide key={item.code} item={item} />)}
             </div>
 
             {/* Header overlay (mobile) */}
@@ -414,7 +366,7 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
             </button>
 
             {/* Prev / Next */}
-            {items.length > 1 && (
+            {navCount > 1 && (
               <>
                 <button onClick={() => goTo(index - 1)} aria-label="Sebelumnya" className="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25" style={{ background: "rgba(255,255,255,.12)" }}>
                   <ChevronLeft size={17} />
@@ -427,7 +379,7 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
 
             {/* Dots */}
             <div className="absolute inset-x-0 bottom-[104px] sm:static sm:shrink-0 sm:py-3 z-20 flex justify-center gap-2.5">
-              {items.map((_, i) => (
+              {Array.from({ length: navCount }).map((_, i) => (
                 <button key={i} onClick={() => goTo(i)} aria-label={`Ke slide ${i + 1}`} className="h-2 rounded-full transition-all"
                   style={{ width: i === index ? 18 : 8, background: i === index ? "#ffffff" : "rgba(255,255,255,.28)" }} />
               ))}
@@ -437,7 +389,25 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
             <div className="absolute inset-x-0 bottom-0 sm:static sm:shrink-0 z-20 rounded-t-3xl sm:rounded-none px-6 pt-4 pb-5 sm:py-3.5 text-center shadow-[0_-10px_30px_rgba(0,0,0,.35)] sm:shadow-none"
               style={{ background: "var(--cream)", color: "var(--espresso)" }}>
               <p className="text-[12.5px] font-medium font-ui">Swipe untuk melihat {swipeWord} lainnya</p>
-              <p className="mt-1 text-[12px] font-ui" style={{ color: "var(--stone)" }}>{items.map((d) => d.code).join("  ·  ")}</p>
+              {type === "series" ? (
+                <div className="mt-1 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-[12px] font-ui">
+                  {THOBE_SERIES.map((s, i) => (
+                    <span key={s.id} className="inline-flex items-center gap-x-1.5">
+                      {i > 0 && <span aria-hidden style={{ color: "var(--stone)" }}>·</span>}
+                      <span
+                        style={{
+                          color: i === index ? "var(--espresso)" : "var(--stone)",
+                          fontWeight: i === index ? 600 : 400,
+                        }}
+                      >
+                        {s.name}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-1 text-[12px] font-ui" style={{ color: "var(--stone)" }}>{items.map((d) => d.code).join("  ·  ")}</p>
+              )}
             </div>
           </motion.div>
           )}
