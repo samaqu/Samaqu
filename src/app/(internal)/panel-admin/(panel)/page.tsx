@@ -317,7 +317,7 @@ export default function PanelAdminHome() {
         <div className={styles.heroText}>
           <h2 className={styles.heroTitle}>
             <span>
-              {greeting}, <span className={styles.heroName}>Lea</span>
+              {greeting}, <span className={styles.heroName}>Cantik</span>
             </span>
             <Hand />
           </h2>
