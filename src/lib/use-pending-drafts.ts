@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { startVisiblePolling } from "@/lib/visible-poll";
 
 /**
  * Jumlah draft transaksi yang menunggu review (`order_drafts.status = 'pending'`).
@@ -15,7 +14,6 @@ import { startVisiblePolling } from "@/lib/visible-poll";
 
 export const PERLU_REVIEW_EVENT = "perlu-review-changed";
 
-const POLL_MS = 60 * 1000;
 const CACHE_MS = 20 * 1000;
 
 let cached: { value: number; at: number } | null = null;
@@ -64,13 +62,13 @@ export function usePendingDraftCount(enabled: boolean) {
 
   useEffect(() => {
     if (!enabled) return undefined;
+    // Tanpa polling: angka diambil sekali saat panel dibuka, lalu diperbarui
+    // lewat event setelah approve/tolak/hapus di halaman review.
     void refresh();
     const onChanged = () => { void refresh(true); };
     window.addEventListener(PERLU_REVIEW_EVENT, onChanged);
-    const stop = startVisiblePolling(() => { void refresh(true); }, POLL_MS);
     return () => {
       window.removeEventListener(PERLU_REVIEW_EVENT, onChanged);
-      stop();
     };
   }, [enabled, refresh]);
 
