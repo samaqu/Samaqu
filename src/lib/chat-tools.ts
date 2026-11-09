@@ -87,6 +87,23 @@ export const CHAT_TOOLS = [
   {
     type: "function",
     function: {
+      name: "info_bahan",
+      description:
+        "Ambil penjelasan resmi dan FOTO tiap bahan/kain SAMAQU (mis. B-01, B-02, A-02). Pakai saat pelanggan bertanya jenis bahan, karakter kain, atau minta foto bahan.",
+      parameters: {
+        type: "object",
+        properties: {
+          bahan: {
+            type: "string",
+            description: "Nama atau kode bahan (opsional), mis. B-01. Kosongkan untuk semua bahan.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "panduan_ukuran",
       description:
         "Ambil panduan ukuran SAMAQU untuk sebuah kategori. Pakai kalau pelanggan bertanya soal ukuran/pas atau butuh rekomendasi ukuran.",
@@ -686,6 +703,68 @@ async function infoSeries(args: Record<string, unknown>): Promise<ChatToolResult
   return { text, images };
 }
 
+/**
+ * Penjelasan + foto bahan/kain dari card "Bahan" (Fabric Collection) Academy.
+ */
+async function infoBahan(args: Record<string, unknown>): Promise<ChatToolResult> {
+  const base = String(process.env.ACADEMY_SUPABASE_URL || "").replace(/\/+$/, "");
+  const key = String(process.env.ACADEMY_SERVICE_ROLE_KEY || "");
+  if (!base || !key) {
+    return { text: "Data bahan belum tersedia di server. Arahkan pelanggan ke admin." };
+  }
+
+  const res = await fetch(
+    `${base}/rest/v1/content_items?select=data&type=eq.product&data->>category=eq.Fabric%20Collection`,
+    { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: "no-store" },
+  );
+  if (!res.ok) {
+    console.error("[CHAT-TOOL] info_bahan gagal:", res.status);
+    return { text: "Gagal mengambil data bahan. Arahkan pelanggan ke admin." };
+  }
+  const rows = (await res.json().catch(() => [])) as Array<{ data?: Record<string, unknown> }>;
+  const all = rows
+    .map((row) => row?.data)
+    .filter((data): data is Record<string, unknown> => Boolean(data && data.name));
+  if (!all.length) return { text: "Data bahan belum ada di Product Knowledge." };
+
+  const wanted = String(args.bahan || "").trim().toLowerCase();
+  const picked = wanted
+    ? all.filter((data) => {
+        const name = String(data.name || "").toLowerCase();
+        const code = String(data.code || "").toLowerCase();
+        return name.includes(wanted) || code.includes(wanted) || wanted.includes(code);
+      })
+    : all;
+  if (!picked.length) {
+    return {
+      text: `Bahan "${args.bahan}" tidak ditemukan. Bahan yang ada: ${all
+        .map((data) => String(data.name || ""))
+        .join(", ")}.`,
+    };
+  }
+
+  const text = picked
+    .map((data) =>
+      [
+        `**${String(data.name || "")}**${data.code ? ` (${String(data.code)})` : ""}`,
+        data.composition ? `Komposisi: ${String(data.composition)}` : "",
+        data.gsm ? `GSM: ${String(data.gsm)}` : "",
+        data.characteristics ? `Karakteristik: ${String(data.characteristics).replace(/\n/g, "; ")}` : "",
+        data.advantages ? `Keunggulan: ${String(data.advantages).replace(/\n/g, "; ")}` : "",
+        data.extra ? `Info tambahan: ${String(data.extra).replace(/\n/g, "; ")}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    )
+    .join("\n\n");
+
+  const images = [...new Set(picked.map((data) => String(data.image || "").trim()))]
+    .filter((url) => /^https:\/\//i.test(url))
+    .slice(0, 3);
+
+  return { text, images };
+}
+
 /** Konteks opsional dari route (sessionId untuk pembatas percobaan, transcript untuk eskalasi). */
 export interface ChatToolContext {
   sessionId?: string | null;
@@ -712,6 +791,8 @@ export async function executeChatTool(
         return await cariProduk(args);
       case "info_series":
         return await infoSeries(args);
+      case "info_bahan":
+        return await infoBahan(args);
       case "panduan_ukuran":
         return panduanUkuran(args);
       case "cari_area_ongkir":
