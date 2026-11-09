@@ -330,6 +330,8 @@ export default function OpenOrderSettingsForm() {
     }
     setItems((prev) => prev.map((item) => (item.id === card.id ? { ...item, openOrderEnabled: next } : item)));
     toast.showToast("success", next ? `${card.name} tampil di Open Order` : `${card.name} disembunyikan dari Open Order`);
+    // Halaman Open Order langsung mengikuti toggle produk.
+    void requestRevalidate();
   }
 
   const fieldStyle = {

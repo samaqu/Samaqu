@@ -38,6 +38,10 @@ export async function POST(request: NextRequest) {
   revalidatePath("/bio");
   // FAQ juga statis; disegarkan saat admin menyimpan konten website.
   revalidatePath("/[locale]/faq", "page");
+  // Open Order: jendela + produk yang tampil.
+  revalidatePath("/[locale]/open-order", "page");
+  // Halaman form promo Free Cover Hanger.
+  revalidatePath("/[locale]/promo/free-cover-hanger/pesan", "page");
 
   if (productId) {
     for (const locale of LOCALES) {

@@ -9,10 +9,10 @@ import {
 } from "@/lib/open-order-window";
 
 /**
- * Jendela Open Order global. 180 detik (dulu 60): hemat penulisan cache, sementara
- * status buka/tutup masih terbaca baru dalam hitungan menit.
+ * Halaman Open Order membaca `searchParams` (fokus produk/warna/ukuran), jadi selalu
+ * dirender segar per kunjungan. Sengaja TANPA `revalidate` berkala; perubahan setting
+ * admin tetap langsung terlihat.
  */
-export const revalidate = 180;
 
 /**
  * Open Order Samaqu — alur 6 langkah (daftar produk → detail → keranjang → data pemesan →

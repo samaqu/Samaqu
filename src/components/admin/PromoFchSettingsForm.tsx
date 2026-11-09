@@ -23,6 +23,7 @@ import { PROMO_ORDER_PATH } from "@/lib/promo/free-cover-hanger";
 import { SITE_URL } from "@/lib/site-config";
 import { OPEN_ORDER_ADDON_TARGET_ID, OPEN_ORDER_ADDON_VARIANT, ADDON_COVER_OPTIONS } from "@/lib/open-order-config";
 import { supabase } from "@/lib/supabase";
+import { requestRevalidate } from "@/lib/admin-revalidate";
 import { StatusCard } from "./promo-fch/StatusCard";
 import { TeksCard } from "./promo-fch/TeksCard";
 import { KuotaCard } from "./promo-fch/KuotaCard";
@@ -269,6 +270,8 @@ export default function PromoFchSettingsForm() {
     savedRef.current = settings;
     setSaved(settings);
     setNotice({ kind: "ok", text: "Pengaturan promo tersimpan" });
+    // Halaman promo langsung memakai pengaturan baru.
+    void requestRevalidate();
   }
 
   function resetSettings() {
@@ -307,6 +310,7 @@ export default function PromoFchSettingsForm() {
           : product,
       ),
     );
+    void requestRevalidate();
   }
 
   /**
@@ -345,6 +349,7 @@ export default function PromoFchSettingsForm() {
         ),
       };
     });
+    void requestRevalidate();
   }
 
   /**
@@ -375,6 +380,7 @@ export default function PromoFchSettingsForm() {
       text: enabled ? "Semua produk aktif sekarang ikut promo" : "Semua produk dimatikan dari promo",
     });
     setProducts((prev) => prev.map((product) => ({ ...product, promo_fch_enabled: enabled }) as Product));
+    void requestRevalidate();
   }
 
   if (loading) {
