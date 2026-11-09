@@ -16,9 +16,11 @@ interface ImageZoomProps {
   alt: string;
   isOpen: boolean;
   onClose: () => void;
+  /** Kelas z-index overlay; default cocok untuk halaman biasa, dinaikkan saat dipakai di dalam modal. */
+  zClassName?: string;
 }
 
-export default function ImageZoom({ media, initialIndex, alt, isOpen, onClose }: ImageZoomProps) {
+export default function ImageZoom({ media, initialIndex, alt, isOpen, onClose, zClassName = "z-[100]" }: ImageZoomProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -150,7 +152,7 @@ export default function ImageZoom({ media, initialIndex, alt, isOpen, onClose }:
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
-          className="fixed inset-0 z-[100] flex flex-col"
+          className={`fixed inset-0 ${zClassName} flex flex-col`}
           style={{ background: "rgba(26,18,14,.95)" }}
         >
           {/* Header */}

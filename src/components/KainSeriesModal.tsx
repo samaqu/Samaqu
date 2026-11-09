@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { THOBE_SERIES } from "@/lib/thobe-series";
 import ThobeSeriesSlide from "@/components/ThobeSeriesSlide";
+import ImageZoom from "@/components/ImageZoom";
 
 /* ── Inline icons (custom SVG — avoids relying on less-common lucide-react named exports) ── */
 type IconProps = { size?: number; strokeWidth?: number };
@@ -243,13 +244,17 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
   // Gambar dari DB hanya dipakai untuk sheet kain; sheet series selalu memakai slide 6 series.
   const hasImages = type === "kain" && !!images && images.length > 0;
   const navCount = hasImages ? images!.length : slideCount;
+  // Di mobile, panah series diletakkan sejajar foto supaya tidak menimpa tag/konten.
+  const arrowYClass = type === "series" ? "top-[31%] sm:top-1/2" : "top-1/2";
 
   const trackRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
+  const [zoom, setZoom] = useState<{ src: string; alt: string } | null>(null);
 
   useEffect(() => {
     if (!type) return;
     setIndex(0);
+    setZoom(null);
     document.body.style.overflow = "hidden";
     const raf = requestAnimationFrame(() => {
       trackRef.current?.scrollTo({ left: 0 });
@@ -269,7 +274,8 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (!type) return;
+      // Saat foto sedang di-zoom, Escape/panah ditangani ImageZoom — jangan tutup modal.
+      if (!type || zoom) return;
       if (e.key === "Escape") onClose();
       if (e.key === "ArrowRight") goTo(index + 1);
       if (e.key === "ArrowLeft") goTo(index - 1);
@@ -277,7 +283,7 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, index, navCount]);
+  }, [type, index, navCount, zoom]);
 
   function handleScroll() {
     const track = trackRef.current;
@@ -349,15 +355,21 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
             {/* Slides */}
             <div ref={trackRef} onScroll={handleScroll} className="relative flex-1 min-h-0 flex overflow-x-auto snap-x snap-mandatory scrollbar-hide scroll-smooth">
               {type === "series"
-                ? THOBE_SERIES.map((item) => <ThobeSeriesSlide key={item.id} item={item} />)
+                ? THOBE_SERIES.map((item) => (
+                    <ThobeSeriesSlide
+                      key={item.id}
+                      item={item}
+                      onZoom={() => setZoom({ src: item.image, alt: item.name })}
+                    />
+                  ))
                 : items.map((item) => <Slide key={item.code} item={item} />)}
             </div>
 
-            {/* Header overlay (mobile) */}
-            <div className="sm:hidden absolute inset-x-0 top-0 z-20 px-6 pt-6 pb-4 text-center pointer-events-none">
+            {/* Header (mobile) — series ikut alur flex supaya tidak menimpa foto/konten */}
+            <div className={`sm:hidden z-20 text-center ${type === "series" ? "relative order-first shrink-0 px-5 pt-4 pb-3" : "absolute inset-x-0 top-0 pointer-events-none px-6 pt-6 pb-4"}`}>
               <p className="text-[10px] tracking-[0.34em] font-ui" style={{ color: "#ffffff" }}>SAMAQU</p>
-              <h2 className="mt-2 text-[21px] font-semibold leading-[1.15] uppercase tracking-[0.04em] max-w-[16ch] mx-auto font-ui">{title}</h2>
-              <p className="mt-2.5 text-[12px] leading-relaxed max-w-[30ch] mx-auto font-ui" style={{ color: "rgba(255,255,255,.6)" }}>{subtitle}</p>
+              <h2 className={`font-semibold uppercase tracking-[0.04em] mx-auto font-ui ${type === "series" ? "mt-1.5 text-[19px] leading-[1.12] max-w-[18ch]" : "mt-2 text-[21px] leading-[1.15] max-w-[16ch]"}`}>{title}</h2>
+              <p className={`mx-auto font-ui ${type === "series" ? "mt-2 text-[11.5px] leading-snug max-w-[42ch]" : "mt-2.5 text-[12px] leading-relaxed max-w-[30ch]"}`} style={{ color: "rgba(255,255,255,.6)" }}>{subtitle}</p>
             </div>
 
             {/* Close */}
@@ -368,17 +380,17 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
             {/* Prev / Next */}
             {navCount > 1 && (
               <>
-                <button onClick={() => goTo(index - 1)} aria-label="Sebelumnya" className="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25" style={{ background: "rgba(255,255,255,.12)" }}>
+                <button onClick={() => goTo(index - 1)} aria-label="Sebelumnya" className={`absolute left-3 ${arrowYClass} -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25`} style={{ background: "rgba(255,255,255,.12)" }}>
                   <ChevronLeft size={17} />
                 </button>
-                <button onClick={() => goTo(index + 1)} aria-label="Berikutnya" className="absolute right-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25" style={{ background: "rgba(255,255,255,.12)" }}>
+                <button onClick={() => goTo(index + 1)} aria-label="Berikutnya" className={`absolute right-3 ${arrowYClass} -translate-y-1/2 z-20 w-9 h-9 rounded-full grid place-items-center transition-colors hover:bg-white/25`} style={{ background: "rgba(255,255,255,.12)" }}>
                   <ChevronRight size={17} />
                 </button>
               </>
             )}
 
             {/* Dots */}
-            <div className="absolute inset-x-0 bottom-[104px] sm:static sm:shrink-0 sm:py-3 z-20 flex justify-center gap-2.5">
+            <div className={`${type === "series" ? "static shrink-0 py-2" : "absolute inset-x-0 bottom-[104px]"} sm:static sm:shrink-0 sm:py-3 z-20 flex justify-center gap-2.5`}>
               {Array.from({ length: navCount }).map((_, i) => (
                 <button key={i} onClick={() => goTo(i)} aria-label={`Ke slide ${i + 1}`} className="h-2 rounded-full transition-all"
                   style={{ width: i === index ? 18 : 8, background: i === index ? "#ffffff" : "rgba(255,255,255,.28)" }} />
@@ -386,7 +398,7 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
             </div>
 
             {/* Footer chip */}
-            <div className="absolute inset-x-0 bottom-0 sm:static sm:shrink-0 z-20 rounded-t-3xl sm:rounded-none px-6 pt-4 pb-5 sm:py-3.5 text-center shadow-[0_-10px_30px_rgba(0,0,0,.35)] sm:shadow-none"
+            <div className={`${type === "series" ? "static shrink-0" : "absolute inset-x-0 bottom-0"} sm:static sm:shrink-0 z-20 rounded-t-3xl sm:rounded-none px-6 pt-4 pb-5 sm:py-3.5 text-center shadow-[0_-10px_30px_rgba(0,0,0,.35)] sm:shadow-none`}
               style={{ background: "var(--cream)", color: "var(--espresso)" }}>
               <p className="text-[12.5px] font-medium font-ui">Swipe untuk melihat {swipeWord} lainnya</p>
               {type === "series" ? (
@@ -410,6 +422,17 @@ export default function KainSeriesModal({ type, onClose, category, images }: Kai
               )}
             </div>
           </motion.div>
+          )}
+
+          {zoom && (
+            <ImageZoom
+              media={[{ src: zoom.src, type: "image" }]}
+              initialIndex={0}
+              alt={zoom.alt}
+              isOpen
+              onClose={() => setZoom(null)}
+              zClassName="z-[10000]"
+            />
           )}
         </>
       )}
