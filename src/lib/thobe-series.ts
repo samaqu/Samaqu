@@ -35,18 +35,6 @@ export const THOBE_SERIES: ThobeSeriesItem[] = [
     fit: "Yang suka tampilan bersih dan rapi untuk harian.",
   },
   {
-    id: "bayati",
-    name: "Bayati",
-    tag: "Kerah Bulat · Eyelet",
-    image: "/series/thobe/bayati.png",
-    points: [
-      { icon: "collar", title: "Kerah bulat", desc: "Tampilan simpel dan rapi" },
-      { icon: "placket", title: "Placket eyelet", desc: "Aksen eyelet berlubang" },
-      ALL_SERIES_POINT,
-    ],
-    fit: "Yang mau aksen di placket tapi tetap praktis.",
-  },
-  {
     id: "imron",
     name: "Imron",
     tag: "Kerah Bulat · Kancing Diamond",
@@ -54,6 +42,18 @@ export const THOBE_SERIES: ThobeSeriesItem[] = [
     points: [
       { icon: "collar", title: "Kerah bulat", desc: "Tampilan simpel dan rapi" },
       { icon: "placket", title: "Placket kancing diamond", desc: "Aksen kancing diamond" },
+      ALL_SERIES_POINT,
+    ],
+    fit: "Yang mau aksen di placket tapi tetap praktis.",
+  },
+  {
+    id: "bayati",
+    name: "Bayati",
+    tag: "Kerah Bulat · Eyelet",
+    image: "/series/thobe/bayati.png",
+    points: [
+      { icon: "collar", title: "Kerah bulat", desc: "Tampilan simpel dan rapi" },
+      { icon: "placket", title: "Placket eyelet", desc: "Aksen eyelet berlubang" },
       ALL_SERIES_POINT,
     ],
     fit: "Yang mau aksen di placket tapi tetap praktis.",
@@ -71,18 +71,6 @@ export const THOBE_SERIES: ThobeSeriesItem[] = [
     fit: "Yang suka tampilan simpel dan gampang dipadukan.",
   },
   {
-    id: "imalah",
-    name: "Imalah",
-    tag: "Kerah Kemeja · Pin Collar",
-    image: "/series/thobe/imalah.png",
-    points: [
-      { icon: "collar", title: "Kerah kemeja + pin collar", desc: "Dilengkapi aksesoris pin collar" },
-      { icon: "placket", title: "Placket polos", desc: "Tanpa kancing diamond" },
-      ALL_SERIES_POINT,
-    ],
-    fit: "Yang mau tampilan formal yang lebih tegas.",
-  },
-  {
     id: "karim",
     name: "Karim",
     tag: "Kerah Kemeja · Kancing Diamond",
@@ -93,5 +81,17 @@ export const THOBE_SERIES: ThobeSeriesItem[] = [
       ALL_SERIES_POINT,
     ],
     fit: "Yang mau aksen di placket tapi tetap praktis.",
+  },
+  {
+    id: "imalah",
+    name: "Imalah",
+    tag: "Kerah Kemeja · Pin Collar",
+    image: "/series/thobe/imalah.png",
+    points: [
+      { icon: "collar", title: "Kerah kemeja + pin collar", desc: "Dilengkapi aksesoris pin collar" },
+      { icon: "placket", title: "Placket polos", desc: "Tanpa kancing diamond" },
+      ALL_SERIES_POINT,
+    ],
+    fit: "Yang mau tampilan formal yang lebih tegas.",
   },
 ];
