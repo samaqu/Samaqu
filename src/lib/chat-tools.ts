@@ -243,7 +243,20 @@ function summarizeStock(variants: VariantRow[]): string {
   return parts.join(" | ") || "stok tidak terkelola";
 }
 
-async function cariProduk(args: Record<string, unknown>): Promise<ChatToolResult> {
+export const SERIES_NAMES = ["Imron", "Jiharkah", "Nahawand", "Bayati", "Imalah", "Karim"] as const;
+
+/** Series terakhir yang disebut dalam percakapan, untuk menjaga fokus foto. */
+export function detectSeriesName(text: string): string | null {
+  const lower = String(text || "").toLowerCase();
+  let best: { name: string; index: number } | null = null;
+  for (const name of SERIES_NAMES) {
+    const index = lower.lastIndexOf(name.toLowerCase());
+    if (index >= 0 && (!best || index > best.index)) best = { name, index };
+  }
+  return best?.name ?? null;
+}
+
+async function cariProduk(args: Record<string, unknown>, ctx?: ChatToolContext): Promise<ChatToolResult> {
   const admin = getSupabaseAdmin();
   const term = sanitize(args.query);
   const kategori = sanitize(args.kategori);
@@ -292,6 +305,16 @@ async function cariProduk(args: Record<string, unknown>): Promise<ChatToolResult
 
   if (!products.length) {
     return { text: "Tidak ada produk yang cocok dengan kriteria itu. Tawarkan bantuan lain atau arahkan ke admin." };
+  }
+
+  const preferredSeries = series || detectSeriesName(String(ctx?.transcript || "")) || "";
+  if (preferredSeries) {
+    const key = preferredSeries.toLowerCase();
+    products = [...products].sort(
+      (a, b) =>
+        Number(String(b.series || "").toLowerCase() === key) -
+        Number(String(a.series || "").toLowerCase() === key),
+    );
   }
 
   products = products.slice(0, 8);
@@ -345,8 +368,12 @@ async function cariProduk(args: Record<string, unknown>): Promise<ChatToolResult
     return `- ${p.name} [${p.category}] (id: ${p.id}) | kain ${kain}${jenis?.material ? ` (${jenis.material})` : ""}${p.series ? ` | series ${p.series}` : ""} | ${priceLabel} | warna: ${colors} | stok (warna → ukuran:jumlah): ${summarizeStock(byProduct.get(p.id as string) || [])}`;
   });
 
+  const focusedCards = preferredSeries
+    ? cards.filter((card) => String(card.series || "").toLowerCase() === preferredSeries.toLowerCase())
+    : [];
+  const imageSource = focusedCards.length ? focusedCards : cards;
   const productImages = [
-    ...new Set(cards.map((card) => card.image).filter((url): url is string => Boolean(url))),
+    ...new Set(imageSource.map((card) => card.image).filter((url): url is string => Boolean(url))),
   ].slice(0, 3);
 
   return {
@@ -793,7 +820,7 @@ export async function executeChatTool(
   try {
     switch (name) {
       case "cari_produk":
-        return await cariProduk(args);
+        return await cariProduk(args, ctx);
       case "info_series":
         return await infoSeries(args);
       case "info_bahan":

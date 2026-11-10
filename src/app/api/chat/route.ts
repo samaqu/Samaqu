@@ -4,7 +4,7 @@ import { consumeOpenAIStream, streamChatCompletion, type ToolCall } from "@/lib/
 import { getKnowledgeContext } from "@/lib/chat-knowledge";
 import { CHAT_PERSONA } from "@/lib/chat-persona";
 import { maybeAlertErrorSpike, ERROR_ALERT_THRESHOLD } from "@/lib/chat-alerts";
-import { CHAT_TOOLS, executeChatTool, type ChatProductCard } from "@/lib/chat-tools";
+import { CHAT_TOOLS, detectSeriesName, executeChatTool, type ChatProductCard } from "@/lib/chat-tools";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -48,6 +48,7 @@ ATURAN:
 - FORMAT & PANJANG: jawab sesingkat mungkin — maksimal ~4 baris/poin. Kalau menyebut beberapa produk, pakai daftar berpoin (awali "- "), satu produk per baris. Tebalkan nama produk/harga dengan **teks**. JANGAN menuliskan seluruh stok semua warna/ukuran — cukup yang ditanyakan atau yang paling relevan.
 - JANGAN mengarang produk, harga, warna, atau stok. Untuk data produk/harga/stok TERKINI, panggil tool "cari_produk". Untuk ukuran, panggil "panduan_ukuran". Untuk pertanyaan beda series / ciri kerah / minta foto series, panggil "info_series" (data card Series, bukan Produk) — fotonya otomatis dikirim ke pelanggan, cukup bilang "ini fotonya". Untuk pertanyaan bahan/kain atau minta foto bahan, panggil "info_bahan" (card Bahan) — fotonya juga otomatis dikirim. Kalau pelanggan minta foto/model produk tertentu, panggil "cari_produk" dengan nama produk itu; fotonya otomatis dikirim (maksimal 3).
 - Panggil tool secukupnya: maksimal 2-3 panggilan per pertanyaan. Jangan mengulang pencarian yang sama; kalau data sudah cukup, langsung jawab. Jangan memanggil tool yang sama dua kali dengan argumen yang sama.
+- Kalau pelanggan minta foto/fotonya/gambar, WAJIB panggil tool foto (cari_produk untuk produk, info_series untuk series, info_bahan untuk bahan). Jangan hanya menulis "ini fotonya" tanpa memanggil tool.
 - Pelanggan bisa melampirkan gambar (mis. kondisi produk, referensi model). Kalau ada gambar, perhatikan isinya dan tanggapi sesuai konteks SAMAQU.
 - Untuk pertanyaan "pesanan saya sudah diproses/dikirim belum?", pakai tool "cek_status_pesanan". Minta nomor pesanan (mis. SMQ-... atau CYO-...) DAN nomor HP yang dipakai saat memesan. Jangan pernah menampilkan alamat lengkap atau data pribadi lain — cukup status & nomor resi.
 - Kalau pelanggan minta bicara dengan admin/manusia, atau masalahnya butuh admin (keluhan, retur/garansi, pembayaran bermasalah), tanyakan dulu nomor WhatsApp pelanggan, lalu pakai tool "hubungi_admin" dengan ringkasan singkat.
@@ -325,6 +326,36 @@ export async function POST(req: NextRequest) {
           if (!answer) {
             answer =
               "Maaf Ka, informasinya belum bisa saya rangkum. Boleh sebutkan satu produk atau series yang paling ingin dicek?";
+          }
+        }
+
+        // Fallback khusus live chat: pelanggan minta foto tapi model lupa memanggil tool.
+        // Cari series/produk terakhir yang dibahas, lalu kirim fotonya.
+        if (!toolImages.length && /(foto|fotonya|photo|gambar)/i.test(question)) {
+          const series = detectSeriesName(`${transcript}\n${question}\n${answer || ""}`);
+          const args = series
+            ? { query: series, series }
+            : { query: question.replace(/foto(nya)?|gambar|photo/gi, " ").trim() };
+          const fallback = await executeChatTool("cari_produk", JSON.stringify(args), {
+            sessionId,
+            transcript,
+          });
+          toolsUsed.push("cari_produk");
+          for (const product of fallback.products ?? []) {
+            if (!productCards.some((x) => x.id === product.id)) productCards.push(product);
+          }
+          for (const url of fallback.images ?? []) {
+            if (toolImages.length < 5 && !toolImages.includes(url)) toolImages.push(url);
+          }
+          if (!toolImages.length && series) {
+            const seriesInfo = await executeChatTool("info_series", JSON.stringify({ series }), {
+              sessionId,
+              transcript,
+            });
+            toolsUsed.push("info_series");
+            for (const url of seriesInfo.images ?? []) {
+              if (toolImages.length < 5 && !toolImages.includes(url)) toolImages.push(url);
+            }
           }
         }
 
