@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { X, Send, Loader2, Image as ImageIcon } from "lucide-react";
+import ImageZoom, { type ZoomMedia } from "@/components/ImageZoom";
 import { useSafeTranslations, useSafeLocale } from "@/lib/safe-i18n";
 import { waNumber } from "@/lib/whatsapp";
 import { validateMediaFile } from "@/lib/cloudinary";
@@ -38,6 +39,7 @@ export default function ChatPanel({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [zoom, setZoom] = useState<{ media: ZoomMedia[]; index: number } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [identityReady, setIdentityReady] = useState(false);
   const [identity, setIdentity] = useState({ name: "", phone: "" });
@@ -298,8 +300,18 @@ export default function ChatPanel({
             >
               {m.role === "user" ? (
                 <>
-                  {m.images?.map((u) => (
-                    <img key={u} src={u} alt="" className="block rounded-lg max-h-48 w-auto mb-1.5" />
+                  {m.images?.map((u, index) => (
+                    <button
+                      key={u}
+                      type="button"
+                      onClick={() =>
+                        setZoom({ media: m.images!.map((src) => ({ src, type: "image" as const })), index })
+                      }
+                      className="mb-1.5 block cursor-zoom-in"
+                      aria-label="Perbesar gambar"
+                    >
+                      <img src={u} alt="" className="block rounded-lg max-h-48 w-auto" />
+                    </button>
                   ))}
                   {m.content}
                 </>
@@ -307,14 +319,23 @@ export default function ChatPanel({
                 <>
                   {m.images && m.images.length > 0 ? (
                     <div className="mb-1.5 flex flex-wrap gap-1.5">
-                      {m.images.map((u) => (
-                        <img
+                      {m.images.map((u, index) => (
+                        <button
                           key={u}
-                          src={u}
-                          alt=""
-                          loading="lazy"
-                          className="block rounded-lg max-h-44 w-auto"
-                        />
+                          type="button"
+                          onClick={() =>
+                            setZoom({ media: m.images!.map((src) => ({ src, type: "image" as const })), index })
+                          }
+                          className="block cursor-zoom-in"
+                          aria-label="Perbesar gambar"
+                        >
+                          <img
+                            src={u}
+                            alt=""
+                            loading="lazy"
+                            className="block rounded-lg max-h-44 w-auto"
+                          />
+                        </button>
                       ))}
                     </div>
                   ) : null}
@@ -486,6 +507,14 @@ export default function ChatPanel({
           </button>
         </div>
       </form>
+
+      <ImageZoom
+        media={zoom?.media ?? []}
+        initialIndex={zoom?.index ?? 0}
+        alt="Gambar chat"
+        isOpen={Boolean(zoom)}
+        onClose={() => setZoom(null)}
+      />
     </div>
   );
 }

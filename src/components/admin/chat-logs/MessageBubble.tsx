@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Loader2, Plus } from "lucide-react";
+import ImageZoom, { type ZoomMedia } from "@/components/ImageZoom";
 import { renderRichText } from "@/components/chat/shared";
 import type { ChatLog } from "./types";
 import { formatTime, statusOfLog } from "./utils";
@@ -21,6 +23,11 @@ export default function MessageBubble({
   const answerImages = log.answer_images || [];
   const hasQuestion = Boolean(log.question?.trim()) || images.length > 0;
   const tools = [...new Set(log.tools_used || [])];
+  const [zoom, setZoom] = useState<{ media: ZoomMedia[]; index: number; alt: string } | null>(null);
+
+  const openZoom = (urls: string[], index: number, alt: string) => {
+    setZoom({ media: urls.map((src) => ({ src, type: "image" as const })), index, alt });
+  };
 
   return (
     <div className="space-y-3">
@@ -39,15 +46,21 @@ export default function MessageBubble({
             >
               {images.length > 0 ? (
                 <div className="mb-2 flex flex-wrap gap-2">
-                  {images.map((url) => (
-                    <a key={url} href={url} target="_blank" rel="noreferrer">
+                  {images.map((url, index) => (
+                    <button
+                      key={url}
+                      type="button"
+                      onClick={() => openZoom(images, index, "Lampiran customer")}
+                      className="cursor-zoom-in"
+                      aria-label="Perbesar lampiran customer"
+                    >
                       <img
                         src={url}
                         alt="Lampiran customer"
                         className="h-16 w-16 rounded-lg object-cover"
                         style={{ border: "1px solid #E7E6E1" }}
                       />
-                    </a>
+                    </button>
                   ))}
                 </div>
               ) : null}
@@ -86,15 +99,21 @@ export default function MessageBubble({
               </div>
               {answerImages.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {answerImages.map((url) => (
-                    <a key={url} href={url} target="_blank" rel="noreferrer">
+                  {answerImages.map((url, index) => (
+                    <button
+                      key={url}
+                      type="button"
+                      onClick={() => openZoom(answerImages, index, "Foto dari asisten")}
+                      className="cursor-zoom-in"
+                      aria-label="Perbesar foto dari asisten"
+                    >
                       <img
                         src={url}
                         alt="Foto dari asisten"
                         className="h-24 w-24 rounded-lg object-cover"
                         style={{ border: "1px solid rgba(255,255,255,0.25)" }}
                       />
-                    </a>
+                    </button>
                   ))}
                 </div>
               ) : null}
@@ -130,6 +149,14 @@ export default function MessageBubble({
           </div>
         </div>
       ) : null}
+
+      <ImageZoom
+        media={zoom?.media ?? []}
+        initialIndex={zoom?.index ?? 0}
+        alt={zoom?.alt ?? ""}
+        isOpen={Boolean(zoom)}
+        onClose={() => setZoom(null)}
+      />
     </div>
   );
 }
