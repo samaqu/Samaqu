@@ -47,7 +47,7 @@ ATURAN:
 - Pakai Bahasa Indonesia yang ramah, santai, ringkas.
 - FORMAT & PANJANG: jawab sesingkat mungkin — maksimal ~4 baris/poin. Kalau menyebut beberapa produk, pakai daftar berpoin (awali "- "), satu produk per baris. Tebalkan nama produk/harga dengan **teks**. JANGAN menuliskan seluruh stok semua warna/ukuran — cukup yang ditanyakan atau yang paling relevan.
 - JANGAN mengarang produk, harga, warna, atau stok. Untuk data produk/harga/stok TERKINI, panggil tool "cari_produk". Untuk ukuran, panggil "panduan_ukuran". Untuk pertanyaan beda series / ciri kerah / minta foto series, panggil "info_series" (data card Series, bukan Produk) — fotonya otomatis dikirim ke pelanggan, cukup bilang "ini fotonya". Untuk pertanyaan bahan/kain atau minta foto bahan, panggil "info_bahan" (card Bahan) — fotonya juga otomatis dikirim. Kalau pelanggan minta foto/model produk tertentu, panggil "cari_produk" dengan nama produk itu; kalau hasilnya maksimal 3 produk, fotonya otomatis dikirim.
-- Panggil tool secukupnya: maksimal 2-3 panggilan per pertanyaan. Jangan mengulang pencarian yang sama; kalau data sudah cukup, langsung jawab.
+- Panggil tool secukupnya: maksimal 2-3 panggilan per pertanyaan. Jangan mengulang pencarian yang sama; kalau data sudah cukup, langsung jawab. Jangan memanggil tool yang sama dua kali dengan argumen yang sama.
 - Pelanggan bisa melampirkan gambar (mis. kondisi produk, referensi model). Kalau ada gambar, perhatikan isinya dan tanggapi sesuai konteks SAMAQU.
 - Untuk pertanyaan "pesanan saya sudah diproses/dikirim belum?", pakai tool "cek_status_pesanan". Minta nomor pesanan (mis. SMQ-... atau CYO-...) DAN nomor HP yang dipakai saat memesan. Jangan pernah menampilkan alamat lengkap atau data pribadi lain — cukup status & nomor resi.
 - Kalau pelanggan minta bicara dengan admin/manusia, atau masalahnya butuh admin (keluhan, retur/garansi, pembayaran bermasalah), tanyakan dulu nomor WhatsApp pelanggan, lalu pakai tool "hubungi_admin" dengan ringkasan singkat.
@@ -222,6 +222,7 @@ export async function POST(req: NextRequest) {
             timeoutMs: profile.timeoutMs,
           });
 
+        const toolCache = new Map<string, Awaited<ReturnType<typeof executeChatTool>>>();
         for (let round = 0; round < profile.maxToolRounds; round++) {
           if (round > 0) send({ reset: true }); // buang teks parsial sebelum putaran tool berikutnya
 
@@ -266,7 +267,15 @@ export async function POST(req: NextRequest) {
             convo.push({ role: "assistant", content: content || null, tool_calls: toolCalls });
             for (const call of toolCalls) {
               toolsUsed.push(call.function.name);
-              const result = await executeChatTool(call.function.name, call.function.arguments, { sessionId, transcript });
+              const cacheKey = `${call.function.name}:${call.function.arguments}`;
+              const cached = toolCache.get(cacheKey);
+              const result = cached
+                ? {
+                    ...cached,
+                    text: `${cached.text}\n\n(Catatan: data ini sudah diambil. Jawab langsung dari hasil ini; jangan panggil tool yang sama lagi.)`,
+                  }
+                : await executeChatTool(call.function.name, call.function.arguments, { sessionId, transcript });
+              if (!cached) toolCache.set(cacheKey, result);
               if (result.products) {
                 for (const p of result.products) {
                   if (!productCards.some((x) => x.id === p.id)) productCards.push(p);
@@ -291,6 +300,12 @@ export async function POST(req: NextRequest) {
         if (!answer) {
           try {
             send({ reset: true });
+            convo.push({
+              role: "system",
+              content:
+                "Data dari tool sudah cukup. Jawab pelanggan sekarang memakai data di atas. " +
+                "Jangan memanggil tool lagi. Jangan menyerahkan ke admin kecuali data yang diminta benar-benar tidak ada.",
+            });
             const finalRes = await streamChatCompletion({
               baseUrl: profile.baseUrl,
               apiKey: profile.apiKey,
