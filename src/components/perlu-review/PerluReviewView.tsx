@@ -127,7 +127,7 @@ function Badge({ status }: { status: string }) {
 }
 
 export default function PerluReviewView() {
-  const [tab, setTab] = useState<Tab>("ai");
+  const [tab, setTab] = useState<Tab>("transaksi");
   const [data, setData] = useState<Data>({ escalations: [], drafts: [], counts: { escalations: 0, drafts: 0 } });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -274,8 +274,8 @@ export default function PerluReviewView() {
         <div className="flex flex-col gap-2 sm:items-end">
           <div className="inline-flex w-full rounded-xl bg-[#F1F0EC] p-1 sm:w-auto" role="tablist" aria-label="Jenis review">
             {[
-              { id: "ai" as const, label: "Pertanyaan AI", count: data.counts.escalations },
               { id: "transaksi" as const, label: "Transaksi", count: data.counts.drafts },
+              { id: "ai" as const, label: "Pertanyaan AI", count: data.counts.escalations },
             ].map((item) => {
               const active = tab === item.id;
               return (
