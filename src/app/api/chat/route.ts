@@ -46,7 +46,7 @@ ATURAN:
 - Kalau pertanyaannya di luar topik itu (mis. coding, politik, pelajaran), TOLAK sopan dan singkat, contoh: "${REFUSAL}". Jangan menjawab pertanyaannya.
 - Pakai Bahasa Indonesia yang ramah, santai, ringkas.
 - FORMAT & PANJANG: jawab sesingkat mungkin — maksimal ~4 baris/poin. Kalau menyebut beberapa produk, pakai daftar berpoin (awali "- "), satu produk per baris. Tebalkan nama produk/harga dengan **teks**. JANGAN menuliskan seluruh stok semua warna/ukuran — cukup yang ditanyakan atau yang paling relevan.
-- JANGAN mengarang produk, harga, warna, atau stok. Untuk data produk/harga/stok TERKINI, panggil tool "cari_produk". Untuk ukuran, panggil "panduan_ukuran". Untuk pertanyaan beda series / ciri kerah / minta foto series, panggil "info_series" (data card Series, bukan Produk) — fotonya otomatis dikirim ke pelanggan, cukup bilang "ini fotonya". Untuk pertanyaan bahan/kain atau minta foto bahan, panggil "info_bahan" (card Bahan) — fotonya juga otomatis dikirim.
+- JANGAN mengarang produk, harga, warna, atau stok. Untuk data produk/harga/stok TERKINI, panggil tool "cari_produk". Untuk ukuran, panggil "panduan_ukuran". Untuk pertanyaan beda series / ciri kerah / minta foto series, panggil "info_series" (data card Series, bukan Produk) — fotonya otomatis dikirim ke pelanggan, cukup bilang "ini fotonya". Untuk pertanyaan bahan/kain atau minta foto bahan, panggil "info_bahan" (card Bahan) — fotonya juga otomatis dikirim. Kalau pelanggan minta foto/model produk tertentu, panggil "cari_produk" dengan nama produk itu; kalau hasilnya maksimal 3 produk, fotonya otomatis dikirim.
 - Panggil tool secukupnya: maksimal 2-3 panggilan per pertanyaan. Jangan mengulang pencarian yang sama; kalau data sudah cukup, langsung jawab.
 - Pelanggan bisa melampirkan gambar (mis. kondisi produk, referensi model). Kalau ada gambar, perhatikan isinya dan tanggapi sesuai konteks SAMAQU.
 - Untuk pertanyaan "pesanan saya sudah diproses/dikirim belum?", pakai tool "cek_status_pesanan". Minta nomor pesanan (mis. SMQ-... atau CYO-...) DAN nomor HP yang dipakai saat memesan. Jangan pernah menampilkan alamat lengkap atau data pribadi lain — cukup status & nomor resi.
@@ -350,6 +350,7 @@ export async function POST(req: NextRequest) {
                 customer_phone: customerPhone || null,
                 question,
                 question_images: questionImages.length ? questionImages : null,
+                answer_images: toolImages.length ? toolImages : null,
                 answer: answer || "",
                 tools_used: toolsUsed,
                 escalated: toolsUsed.includes("hubungi_admin"),

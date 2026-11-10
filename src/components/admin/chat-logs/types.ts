@@ -6,6 +6,7 @@ export interface ChatLog {
   customer_phone: string | null;
   question: string | null;
   question_images: string[] | null;
+  answer_images: string[] | null;
   answer: string | null;
   tools_used: string[] | null;
   escalated: boolean | null;

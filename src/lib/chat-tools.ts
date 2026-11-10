@@ -345,9 +345,15 @@ async function cariProduk(args: Record<string, unknown>): Promise<ChatToolResult
     return `- ${p.name} [${p.category}] (id: ${p.id}) | kain ${kain}${jenis?.material ? ` (${jenis.material})` : ""}${p.series ? ` | series ${p.series}` : ""} | ${priceLabel} | warna: ${colors} | stok (warna → ukuran:jumlah): ${summarizeStock(byProduct.get(p.id as string) || [])}`;
   });
 
+  const productImages =
+    products.length <= 3
+      ? [...new Set(cards.map((card) => card.image).filter((url): url is string => Boolean(url)))].slice(0, 3)
+      : [];
+
   return {
     text: `Ditemukan ${products.length} produk:\n${lines.join("\n")}`,
     products: cards,
+    ...(productImages.length ? { images: productImages } : {}),
   };
 }
 

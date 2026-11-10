@@ -18,6 +18,7 @@ export default function MessageBubble({
 }) {
   const status = statusOfLog(log);
   const images = log.question_images || [];
+  const answerImages = log.answer_images || [];
   const hasQuestion = Boolean(log.question?.trim()) || images.length > 0;
   const tools = [...new Set(log.tools_used || [])];
 
@@ -83,6 +84,20 @@ export default function MessageBubble({
                   <span className="opacity-80">Tidak ada jawaban.</span>
                 )}
               </div>
+              {answerImages.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {answerImages.map((url) => (
+                    <a key={url} href={url} target="_blank" rel="noreferrer">
+                      <img
+                        src={url}
+                        alt="Foto dari asisten"
+                        className="h-24 w-24 rounded-lg object-cover"
+                        style={{ border: "1px solid rgba(255,255,255,0.25)" }}
+                      />
+                    </a>
+                  ))}
+                </div>
+              ) : null}
               {log.error ? (
                 <p className="mt-2 break-words text-[11px]" style={{ color: "#FCA5A5" }}>
                   {log.error}

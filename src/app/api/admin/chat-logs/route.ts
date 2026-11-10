@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await getSupabaseAdmin()
     .from("chat_logs")
     .select(
-      "id, session_id, locale, customer_name, customer_phone, question, question_images, answer, tools_used, escalated, error, created_at",
+      "id, session_id, locale, customer_name, customer_phone, question, question_images, answer_images, answer, tools_used, escalated, error, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
