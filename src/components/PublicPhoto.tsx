@@ -19,6 +19,7 @@ export default function PublicPhoto({
   className = "object-cover",
   style,
   fallbackLabel,
+  onLoad,
 }: {
   src: string;
   alt: string;
@@ -27,6 +28,7 @@ export default function PublicPhoto({
   className?: string;
   style?: React.CSSProperties;
   fallbackLabel?: string;
+  onLoad?: (event: React.SyntheticEvent<HTMLImageElement>) => void;
 }) {
   const [failed, setFailed] = useState(false);
 
@@ -55,6 +57,7 @@ export default function PublicPhoto({
       priority={priority}
       className={className}
       style={style}
+      onLoad={onLoad}
       onError={() => setFailed(true)}
     />
   );

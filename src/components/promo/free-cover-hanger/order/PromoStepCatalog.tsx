@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, Lock } from "lucide-react";
 import { cloudinaryUrl } from "@/lib/cloudinary";
+import PublicPhoto from "@/components/PublicPhoto";
 import { openOrderProductImage } from "@/lib/open-order-catalog";
 import {
   openOrderProductPrice,
@@ -262,20 +263,16 @@ export default function PromoStepCatalog({
               onClick={() => onOpen(product, initialColor)}
             >
               <div className="relative aspect-[3/4] overflow-hidden bg-[#f5f5f4]">
-                {mainImage && (
-                  <img
-                    src={cloudinaryUrl(mainImage, { width: 700 })}
-                    alt={product.name}
-                    loading="lazy"
-                    /* `object-contain` → foto produk tampil UTUH (nggak terpotong), beda sama
-                       kartu katalog yang pakai `object-cover`. */
-                    className="h-full w-full object-contain p-1 transition-transform duration-700 group-hover:scale-[1.03]"
-                    style={isSoldOut ? { filter: "grayscale(35%) brightness(.85)" } : undefined}
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                )}
+                {/* `object-contain` → foto produk tampil UTUH (nggak terpotong), beda sama
+                    kartu katalog yang pakai `object-cover`. */}
+                <PublicPhoto
+                  src={mainImage ? cloudinaryUrl(mainImage, { width: 700 }) : ""}
+                  alt={product.name}
+                  sizes="(max-width: 768px) 50vw, 340px"
+                  className="object-contain p-1 transition-transform duration-700 group-hover:scale-[1.03]"
+                  style={isSoldOut ? { filter: "grayscale(35%) brightness(.85)" } : undefined}
+                  fallbackLabel={product.name}
+                />
 
                 {/* Badge "Sold Out" saja — tulisan stok ("Ready stock") nggak dipakai di sini. */}
                 {isSoldOut && (

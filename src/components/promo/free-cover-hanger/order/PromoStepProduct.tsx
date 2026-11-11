@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Minus, Plus } from "lucide-react";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import { toImgUrl, toLegacyUrl } from "@/lib/image-url";
+import PublicPhoto from "@/components/PublicPhoto";
 import { colorMap } from "@/lib/katalog-data";
 import { openOrderGallery } from "@/lib/open-order-catalog";
 import { OPEN_ORDER_SIZES } from "@/lib/open-order-config";
@@ -184,21 +185,18 @@ export default function PromoStepProduct({
               />
             ) : (
               <>
-                {videoPoster ? (
-                  <img
-                    src={cloudinaryUrl(videoPoster, { width: 1200 })}
-                    alt={`${product.name} ${colorLabel}${series ? ` — ${series.name}` : ""}`}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    onLoad={(e) => {
-                      const img = e.currentTarget;
-                      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                        setMediaRatio(img.naturalWidth / img.naturalHeight);
-                      }
-                    }}
-                  />
-                ) : (
-                  <div className="absolute inset-0" style={{ background: "#e5e5e5" }} />
-                )}
+                <PublicPhoto
+                  src={videoPoster ? cloudinaryUrl(videoPoster, { width: 1200 }) : ""}
+                  alt={`${product.name} ${colorLabel}${series ? ` — ${series.name}` : ""}`}
+                  sizes="(max-width: 768px) 100vw, 560px"
+                  fallbackLabel={product.name}
+                  onLoad={(e) => {
+                    const img = e.currentTarget;
+                    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                      setMediaRatio(img.naturalWidth / img.naturalHeight);
+                    }
+                  }}
+                />
                 <button
                   type="button"
                   onClick={() => setPlaying(true)}
@@ -217,25 +215,23 @@ export default function PromoStepProduct({
                 </button>
               </>
             )
-          ) : currentMedia ? (
-            <img
-              key={currentMedia.src}
-              src={cloudinaryUrl(currentMedia.src, { width: 1200 })}
+          ) : (
+            <PublicPhoto
+              key={currentMedia?.src ?? "kosong"}
+              src={currentMedia ? cloudinaryUrl(currentMedia.src, { width: 1200 }) : ""}
               alt={`${product.name} ${colorLabel}${series ? ` — ${series.name}` : ""}`}
+              sizes="(max-width: 768px) 100vw, 560px"
+              fallbackLabel={product.name}
               /* `object-cover` + wadah yang sudah mengikuti rasio foto = gambar memenuhi
                  kotak tanpa ruang kosong, dan tanpa terpotong (rasio wadah = rasio foto). */
-              className="absolute inset-0 w-full h-full object-cover"
               onLoad={(e) => {
                 const img = e.currentTarget;
                 if (img.naturalWidth > 0 && img.naturalHeight > 0) {
                   setMediaRatio(img.naturalWidth / img.naturalHeight);
                 }
               }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
             />
-          ) : null}
+          )}
           {gallery.length > 1 && (
             <>
               <button
@@ -291,7 +287,11 @@ export default function PromoStepProduct({
                 {item.type === "video" ? (
                   <>
                     {/* Thumbnail video memakai poster foto (bukan elemen video) + ikon play. */}
-                    <img src={cloudinaryUrl(videoPoster || item.src, { width: 300 })} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    <PublicPhoto
+                      src={cloudinaryUrl(videoPoster || item.src, { width: 300 })}
+                      alt=""
+                      sizes="120px"
+                    />
                     <span className="absolute inset-0 grid place-items-center" style={{ background: "rgba(0,0,0,.28)" }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
                         <path d="M8 5v14l11-7z" fill="#fff" />
@@ -299,7 +299,7 @@ export default function PromoStepProduct({
                     </span>
                   </>
                 ) : (
-                  <img src={cloudinaryUrl(item.src, { width: 300 })} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  <PublicPhoto src={cloudinaryUrl(item.src, { width: 300 })} alt="" sizes="120px" />
                 )}
               </button>
             ))}
