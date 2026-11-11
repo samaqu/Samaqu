@@ -57,6 +57,20 @@ const FEEL_ITEMS = [
   { icon: <Headphones size={20} strokeWidth={1.5} />, title: "Pelayanan", desc: "Dari konsultasi sebelum order, proses 1–2 hari kerja, sampai bantuan retur — tim kami mendampingi di setiap tahap." },
 ];
 
+const VIDEO_FILE_RE = /\.(mp4|m4v|webm|mov)(\?|#|$)/i;
+
+/**
+ * Foto untuk kartu testimoni. Kalau item hanya punya berkas video, jangan pasang URL
+ * video ke `<img>` (hasilnya gambar rusak) — biarkan placeholder.
+ */
+function cardImageOf(t: Testimoni): string {
+  const img = String(t.img || "").trim();
+  if (img && !VIDEO_FILE_RE.test(img)) return img;
+  const video = String(t.video_url || "").trim();
+  if (video && !VIDEO_FILE_RE.test(video)) return video;
+  return "";
+}
+
 function TestimonialCard({ t, onImageClick }: { t: Testimoni; onImageClick: (url: string) => void }) {
   const hasMedia = Boolean(t.img || t.video_url);
   const displayName = t.name && t.name !== "Pelanggan" ? t.name : "Pelanggan SAMAQU";
@@ -80,10 +94,11 @@ function TestimonialCard({ t, onImageClick }: { t: Testimoni; onImageClick: (url
           style={{ background: "#f1f1f1", aspectRatio: "4 / 5" }}
         >
           <PublicPhoto
-            src={cloudinaryUrl(t.img || t.video_url || "", { width: 800 })}
+            src={cloudinaryUrl(cardImageOf(t), { width: 800 })}
             alt=""
             sizes="(max-width: 768px) 100vw, 400px"
             className="object-cover transition duration-500 group-hover:scale-[1.03]"
+            fallbackLabel={t.video_url ? "Video" : "Foto"}
           />
           <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur">
             {t.video_url ? <Play size={11} fill="white" stroke="none" /> : <Star size={11} fill="white" stroke="none" />}
