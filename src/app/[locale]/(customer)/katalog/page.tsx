@@ -17,6 +17,7 @@ import {
 } from "@/lib/katalog-data";
 import { getCatalogProducts } from "@/lib/db";
 import { cloudinaryUrl } from "@/lib/cloudinary";
+import PublicPhoto from "@/components/PublicPhoto";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/Toast";
 import { applyFilters, type FilterState } from "@/lib/katalog-filter";
@@ -237,16 +238,15 @@ function ProductCard({ product, index, wishlist, colorHex, totalStock }: { produ
             background: `linear-gradient(135deg, ${c0 || "#e5e5e5"}44, ${c1 || "#d4c5a9"}44)`,
           }}
         />
-        {/* Actual product image */}
-        <img
+        {/* Actual product image — same-origin lewat next/image; gradient di atas jadi
+            fallback kalau gambar kosong/gagal. */}
+        <PublicPhoto
           src={cloudinaryUrl(product.media.find((m) => m.type === "image")?.src || product.image, { width: 600 })}
           alt={product.name}
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
-          loading="lazy"
+          sizes="(max-width: 768px) 50vw, 300px"
+          priority={index < 4}
+          className="object-cover transition-transform duration-700 group-hover:scale-[1.04]"
           style={isSoldOut ? { filter: "grayscale(35%) brightness(.85)" } : undefined}
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
         />
         {/* Sold out overlay */}
         {isSoldOut && (

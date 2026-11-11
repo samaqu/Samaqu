@@ -14,6 +14,7 @@ import { colorMap, type Product, type MediaItem } from "@/lib/katalog-data";
 import { getCatalogProductById, getAvailableSeries, getRelatedProducts, type SeriesOption } from "@/lib/db";
 import { relatedProductTitle } from "@/lib/related-products";
 import { cloudinaryUrl } from "@/lib/cloudinary";
+import PublicPhoto from "@/components/PublicPhoto";
 import { useCart } from "@/lib/cart-context";
 import { useToast } from "@/components/Toast";
 import { getWhatsAppLink, useStoreSettings } from "@/lib/store-settings";
@@ -86,7 +87,12 @@ function MediaDisplay({ item, poster, className, style, allMedia }: { item: Gall
         ) : (
           <>
             {videoPoster ? (
-              <img src={cloudinaryUrl(videoPoster, { width: 1200 })} alt="" className="w-full h-full object-cover" />
+              <PublicPhoto
+                src={cloudinaryUrl(videoPoster, { width: 1200 })}
+                alt=""
+                sizes="(max-width: 768px) 100vw, 560px"
+                className="object-cover"
+              />
             ) : (
               <div className="w-full h-full flex items-center justify-center" style={{ background: "#e5e5e5" }}>
                 <Play size={32} style={{ color: "#000000" }} />
@@ -109,7 +115,12 @@ function MediaDisplay({ item, poster, className, style, allMedia }: { item: Gall
 
   return (
     <div className={`relative ${className || ""}`} style={{ background: "#e5e5e5", ...style }}>
-      <img src={cloudinaryUrl(item.src, { width: 1200 })} alt="" className="block w-full h-full object-cover object-center" loading="lazy" />
+      <PublicPhoto
+        src={cloudinaryUrl(item.src, { width: 1200 })}
+        alt=""
+        sizes="(max-width: 768px) 100vw, 560px"
+        className="object-cover object-center"
+      />
     </div>
   );
 }
@@ -166,11 +177,12 @@ function RelatedProductCard({ p }: { p: Product }) {
       style={{ background: "white", border: "1px solid rgba(0,0,0,.06)" }}
     >
       <div className="relative aspect-[3/4] overflow-hidden" style={{ background: "#e5e5e5" }}>
-        <img
+        <PublicPhoto
           src={cloudinaryUrl(p.media.find((m) => m.type === "image")?.src || p.image, { width: 500 })}
           alt={p.name}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-          loading="lazy"
+          sizes="(max-width: 768px) 50vw, 260px"
+          className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+          fallbackLabel={p.name}
         />
         {p.colors[0] && (
           <span
@@ -1100,7 +1112,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         </div>
                       </>
                     ) : (
-                      <img src={cloudinaryUrl(item.src, { width: 300 })} alt="" className="w-full h-full object-cover" loading="lazy" />
+                      <PublicPhoto
+                        src={cloudinaryUrl(item.src, { width: 300 })}
+                        alt=""
+                        sizes="120px"
+                        className="object-cover"
+                      />
                     )}
                   </button>
                 ))}
