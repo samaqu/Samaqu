@@ -12,6 +12,7 @@
  */
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import { ArrowUpRight, ChevronRight, Lock } from "lucide-react";
 import { InstagramGlyph } from "./icons";
 import { cloudinaryUrl } from "@/lib/cloudinary";
@@ -23,6 +24,54 @@ const ALL = "semua";
 
 /** Format harga kartu katalog: "Rp 299.000". */
 const rupiah = (value: number) => "Rp " + Math.round(value).toLocaleString("id-ID");
+
+/**
+ * Foto kartu produk.
+ *
+ * Dirender lewat `next/image` supaya URL-nya keluar dari domain sendiri (`/_next/image`)
+ * — tidak bergantung pada jangkauan domain R2 dari perangkat customer — dan otomatis
+ * mengecilkan berkas sesuai lebar kartu. Kalau gambarnya tidak ada atau gagal dimuat,
+ * kartu menampilkan placeholder abu + nama produk, bukan kotak kosong tanpa keterangan.
+ */
+function ProductCardImage({
+  src,
+  name,
+  soldOut,
+  eager,
+  highPriority,
+}: {
+  src: string;
+  name: string;
+  soldOut: boolean;
+  eager: boolean;
+  highPriority: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <div className="absolute inset-0 grid place-items-center bg-[#f5f5f4] p-3 text-center md:p-4">
+        <span className="text-[11px] font-medium leading-snug text-neutral-500 md:text-sm">{name}</span>
+      </div>
+    );
+  }
+
+  return (
+    <Image
+      src={cloudinaryUrl(src, { width: 700 })}
+      alt={name}
+      fill
+      sizes="(max-width: 768px) 50vw, 340px"
+      /* Next 16 hanya mengizinkan quality bawaan config (75) — lihat laporan. */
+      quality={75}
+      priority={highPriority}
+      loading={eager ? "eager" : "lazy"}
+      className="object-contain p-1 transition-transform duration-700 group-hover:scale-[1.03]"
+      style={soldOut ? { filter: "grayscale(35%) brightness(.85)" } : undefined}
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export default function StepCatalog({
   products,
@@ -189,7 +238,7 @@ export default function StepCatalog({
             : "mt-12 grid grid-cols-2 gap-3 md:flex md:flex-wrap md:justify-center md:gap-6 [&>article]:w-full [&>article]:md:w-[340px]"
         }
       >
-        {shown.map((product) => {
+        {shown.map((product, index) => {
           const label = product.kain ? `Kain ${product.kain}` : product.category;
           const totalStock = product.totalStock;
           const isSoldOut = totalStock === 0;
@@ -216,20 +265,16 @@ export default function StepCatalog({
               onClick={() => onOpen(product, initialColor)}
             >
               <div className="relative aspect-[3/4] overflow-hidden bg-[#f5f5f4]">
-                {mainImage && (
-                  <img
-                    src={cloudinaryUrl(mainImage, { width: 700 })}
-                    alt={product.name}
-                    loading="lazy"
-                    /* `object-contain` → foto produk tampil UTUH (nggak terpotong), beda sama
-                       kartu katalog yang pakai `object-cover`. */
-                    className="h-full w-full object-contain p-1 transition-transform duration-700 group-hover:scale-[1.03]"
-                    style={isSoldOut ? { filter: "grayscale(35%) brightness(.85)" } : undefined}
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                )}
+                {/* `object-contain` → foto produk tampil UTUH (nggak terpotong), beda sama
+                    kartu katalog yang pakai `object-cover`. */}
+                <ProductCardImage
+                  src={mainImage}
+                  name={product.name}
+                  soldOut={isSoldOut}
+                  /* 6 kartu pertama dimuat langsung; 2 teratas dapat fetch priority tinggi. */
+                  eager={index < 6}
+                  highPriority={index < 2}
+                />
 
                 {/* Badge "Sold Out" saja — tulisan stok ("Ready stock") nggak dipakai di sini. */}
                 {isSoldOut && (
