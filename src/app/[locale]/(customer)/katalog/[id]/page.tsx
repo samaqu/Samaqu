@@ -14,6 +14,7 @@ import { colorMap, type Product, type MediaItem } from "@/lib/katalog-data";
 import { getCatalogProductById, getAvailableSeries, getRelatedProducts, type SeriesOption } from "@/lib/db";
 import { relatedProductTitle } from "@/lib/related-products";
 import { cloudinaryUrl } from "@/lib/cloudinary";
+import { toImgUrl, toLegacyUrl } from "@/lib/image-url";
 import PublicPhoto from "@/components/PublicPhoto";
 import { useCart } from "@/lib/cart-context";
 import { useToast } from "@/components/Toast";
@@ -52,6 +53,8 @@ function dedupeByUrl(list: MediaItem[]): MediaItem[] {
 function MediaDisplay({ item, poster, className, style, allMedia }: { item: GalleryMedia; poster?: string; className?: string; style?: React.CSSProperties; allMedia?: MediaItem[] }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
+  /** 0 = host gambar (img.samaqu.id), 1 = host lama (fallback sekali). */
+  const [videoAttempt, setVideoAttempt] = useState<0 | 1>(0);
 
   // For video items, find a valid image poster
   function getVideoPoster(): string {
@@ -70,8 +73,9 @@ function MediaDisplay({ item, poster, className, style, allMedia }: { item: Gall
       <div className={`relative ${className || ""}`} style={style}>
         {playing ? (
           <video
+            key={`${item.src}-${videoAttempt}`}
             ref={videoRef}
-            src={item.src}
+            src={videoAttempt === 0 ? toImgUrl(item.src) : toLegacyUrl(item.src)}
             className="w-full h-full object-cover"
             loop
             playsInline
@@ -82,6 +86,11 @@ function MediaDisplay({ item, poster, className, style, allMedia }: { item: Gall
                 videoRef.current.pause();
                 setPlaying(false);
               }
+            }}
+            onError={() => {
+              // Coba host lama sekali; gagal lagi → kembali ke poster, bukan kotak hitam.
+              if (videoAttempt === 0) setVideoAttempt(1);
+              else setPlaying(false);
             }}
           />
         ) : (

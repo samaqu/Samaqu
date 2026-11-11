@@ -14,6 +14,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Minus, Plus } from "lucide-react";
 import { cloudinaryUrl } from "@/lib/cloudinary";
+import { toImgUrl, toLegacyUrl } from "@/lib/image-url";
 import { colorMap } from "@/lib/katalog-data";
 import { openOrderGallery } from "@/lib/open-order-catalog";
 import { OPEN_ORDER_SIZES } from "@/lib/open-order-config";
@@ -97,6 +98,8 @@ export default function PromoStepProduct({
   // Video: tampilkan poster + tombol play dulu (sama seperti halaman katalog), supaya
   // tidak ada kotak hitam saat frame video belum ter-paint.
   const [playing, setPlaying] = useState(false);
+  /** 0 = host gambar (img.samaqu.id), 1 = host lama (fallback sekali). */
+  const [videoAttempt, setVideoAttempt] = useState<0 | 1>(0);
 
   const gallery = product ? openOrderGallery(product, draft.color, series?.name ?? null) : [];
   const activePhoto = Math.min(photo, Math.max(gallery.length - 1, 0));
@@ -114,6 +117,8 @@ export default function PromoStepProduct({
   const [mediaRatio, setMediaRatio] = useState<number | null>(null);
   useEffect(() => {
     setMediaRatio(null);
+    // Slide media berganti → video berikutnya mulai lagi dari host gambar.
+    setVideoAttempt(0);
   }, [currentMedia?.src]);
   const galleryAspect = mediaRatio ?? 3 / 4;
 
@@ -163,13 +168,18 @@ export default function PromoStepProduct({
           {currentMedia?.type === "video" ? (
             playing ? (
               <video
-                key={currentMedia.src}
-                src={currentMedia.src}
+                key={`${currentMedia.src}-${videoAttempt}`}
+                src={videoAttempt === 0 ? toImgUrl(currentMedia.src) : toLegacyUrl(currentMedia.src)}
                 loop
                 playsInline
                 autoPlay
                 preload="auto"
                 onClick={() => setPlaying(false)}
+                onError={() => {
+                  // Coba host lama sekali; gagal lagi → balik ke poster, bukan kotak kosong.
+                  if (videoAttempt === 0) setVideoAttempt(1);
+                  else setPlaying(false);
+                }}
                 className="absolute inset-0 w-full h-full object-cover cursor-pointer"
               />
             ) : (

@@ -5,6 +5,7 @@ import { useSafeTranslations } from "@/lib/safe-i18n";
 import { getWhatsAppLink } from "@/lib/store-settings";
 import { trackWhatsAppClick } from "@/lib/meta-pixel";
 import { supabase } from "@/lib/supabase";
+import { toImgUrl, toLegacyUrl } from "@/lib/image-url";
 
 /* ── Video hero ──
    URL-nya diganti dari dashboard admin: Konten Website → Hero / Banner Utama →
@@ -25,6 +26,8 @@ export default function Hero() {
   // Sumber video hero: dibaca dari DB, fallback ke video bawaan kalau kosong/gagal.
   // Video dipasang `absolute inset-0 object-cover`, jadi mengganti link TIDAK mengubah layout.
   const [videoSrc, setVideoSrc] = useState(HERO_VIDEO_DEFAULT);
+  /** 0 = host gambar (img.samaqu.id), 1 = host lama (fallback sekali). */
+  const [videoAttempt, setVideoAttempt] = useState<0 | 1>(0);
   useEffect(() => {
     let alive = true;
     supabase
@@ -34,7 +37,11 @@ export default function Hero() {
       .maybeSingle()
       .then(({ data }) => {
         const url = (data as { video_url?: string | null } | null)?.video_url?.trim();
-        if (alive && url) setVideoSrc(url);
+        if (alive && url) {
+          setVideoSrc(url);
+          // Sumber baru (dari DB) → coba host gambar dulu.
+          setVideoAttempt(0);
+        }
       });
     return () => {
       alive = false;
@@ -117,7 +124,7 @@ export default function Hero() {
           final dari editor, jadi ditampilkan apa adanya. */}
       <div className="absolute inset-0 overflow-hidden">
         <video
-          key={videoSrc}
+          key={`${videoSrc}-${videoAttempt}`}
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
           autoPlay
@@ -127,11 +134,18 @@ export default function Hero() {
           preload="auto"
         >
           <source
-            src={videoSrc}
+            src={videoAttempt === 0 ? toImgUrl(videoSrc) : toLegacyUrl(videoSrc)}
             type="video/mp4"
             onError={() => {
-              // Link yang rusak tidak boleh bikin hero kosong — balik ke video bawaan.
-              if (videoSrc !== HERO_VIDEO_DEFAULT) setVideoSrc(HERO_VIDEO_DEFAULT);
+              // 1) host gambar gagal → coba host lama sekali
+              // 2) masih gagal dan bukan video bawaan → balik ke video bawaan
+              // 3) video bawaan pun gagal → berhenti, jangan loop retry.
+              if (videoAttempt === 0) {
+                setVideoAttempt(1);
+              } else if (videoSrc !== HERO_VIDEO_DEFAULT) {
+                setVideoSrc(HERO_VIDEO_DEFAULT);
+                setVideoAttempt(0);
+              }
             }}
           />
         </video>
