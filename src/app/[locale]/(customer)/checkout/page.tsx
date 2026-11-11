@@ -17,6 +17,7 @@ import { PaymentIcon } from "@/lib/payment-icons";
 import { fetchActivePaymentMethods, isOnlinePaymentMethod, normalizeMethodType, paymentMethodLabel, type PaymentMethodRow } from "@/lib/payment-methods";
 import { startOnlinePayment } from "@/lib/mayar-client";
 import { cloudinaryUrl } from "@/lib/cloudinary";
+import PublicPhoto from "@/components/PublicPhoto";
 import WilayahSelect from "@/components/wilayah/WilayahSelect";
 
 interface ShipOpt { courier: string; service: string; description: string; cost: number; etd: string; }
@@ -1141,8 +1142,13 @@ function CheckoutContent() {
               <div className="space-y-4">
                 {items.map((item) => (
                   <div key={`${item.id}-${item.color}-${item.size}-${item.series ?? ""}`} className="flex gap-3 sm:gap-4">
-                    <div className="w-16 h-20 sm:w-20 sm:h-24 rounded-lg flex-shrink-0 overflow-hidden" style={{ background: "#e5e5e5" }}>
-                      <img src={cloudinaryUrl(item.image, { width: 160 })} alt={item.name} className="w-full h-full object-cover" />
+                    <div className="relative w-16 h-20 sm:w-20 sm:h-24 rounded-lg flex-shrink-0 overflow-hidden" style={{ background: "#e5e5e5" }}>
+                      <PublicPhoto
+                        src={cloudinaryUrl(item.image, { width: 160 })}
+                        alt={item.name}
+                        sizes="96px"
+                        fallbackLabel={item.name}
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] sm:text-sm font-ui font-medium leading-snug" style={{ color: "var(--espresso)" }}>{item.name}</p>
@@ -1166,8 +1172,13 @@ function CheckoutContent() {
               </p>
             ) : (
               <div className="flex gap-3 sm:gap-4">
-                <div className="w-16 h-20 sm:w-20 sm:h-24 rounded-lg flex-shrink-0 overflow-hidden" style={{ background: "#e5e5e5" }}>
-                  <img src={cloudinaryUrl(product.image, { width: 160 })} alt={product.name} className="w-full h-full object-cover" />
+                <div className="relative w-16 h-20 sm:w-20 sm:h-24 rounded-lg flex-shrink-0 overflow-hidden" style={{ background: "#e5e5e5" }}>
+                  <PublicPhoto
+                    src={cloudinaryUrl(product.image, { width: 160 })}
+                    alt={product.name}
+                    sizes="96px"
+                    fallbackLabel={product.name}
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] sm:text-sm font-ui font-medium leading-snug" style={{ color: "var(--espresso)" }}>{product!.name}</p>

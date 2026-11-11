@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PublicPhoto from "@/components/PublicPhoto";
 import { money } from "@/lib/open-order-catalog";
 import type { CampaignProduct, CampaignWindowState } from "../_data/products";
 import { OPEN_ORDER_PATH, openOrderProductHref } from "../_data/order-href";
@@ -92,24 +93,16 @@ export default function ProductsSection({
                   // dan sebagian berupa `.mp4`. Menambah host ke config global di luar lingkup
                   // halaman ini, jadi di sini dipakai tag gambar biasa yang selalu aman.
                   // `object-contain` + padding → foto tampil UTUH, sama seperti kartu Open Order.
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <PublicPhoto
                     src={product.image}
                     alt={product.name}
-                    loading="lazy"
-                    decoding="async"
+                    sizes="(max-width: 768px) 50vw, 280px"
+                    className="object-contain p-1"
                     style={{
-                      position: "absolute",
-                      inset: 0,
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "contain",
-                      padding: "4px",
-                      boxSizing: "border-box",
-                      display: "block",
                       // Produk habis / jendela ditutup digelapkan sedikit, sama seperti kartu Open Order.
                       filter: locked || !product.available ? "grayscale(35%) brightness(.85)" : undefined,
                     }}
+                    fallbackLabel={product.name}
                   />
                 ) : (
                   <div

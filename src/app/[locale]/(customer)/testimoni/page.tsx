@@ -9,6 +9,8 @@ import { getWhatsAppLink } from "@/lib/store-settings";
 import { supabase } from "@/lib/supabase";
 import { useSafeTranslations } from "@/lib/safe-i18n";
 import { cloudinaryUrl } from "@/lib/cloudinary";
+import { toImgUrl } from "@/lib/image-url";
+import PublicPhoto from "@/components/PublicPhoto";
 
 interface Product {
   id: string;
@@ -77,11 +79,11 @@ function TestimonialCard({ t, onImageClick }: { t: Testimoni; onImageClick: (url
           className="relative block w-full overflow-hidden"
           style={{ background: "#f1f1f1", aspectRatio: "4 / 5" }}
         >
-          <img
+          <PublicPhoto
             src={cloudinaryUrl(t.img || t.video_url || "", { width: 800 })}
             alt=""
-            loading="lazy"
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+            sizes="(max-width: 768px) 100vw, 400px"
+            className="object-cover transition duration-500 group-hover:scale-[1.03]"
           />
           <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur">
             {t.video_url ? <Play size={11} fill="white" stroke="none" /> : <Star size={11} fill="white" stroke="none" />}
@@ -168,7 +170,7 @@ function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         {isVideo ? (
-          <video src={url} controls className="w-full h-auto max-h-[80vh] sm:max-h-[85vh] object-contain rounded-xl" />
+                  <video src={toImgUrl(url)} controls className="w-full h-auto max-h-[80vh] sm:max-h-[85vh] object-contain rounded-xl" />
         ) : (
           <img src={cloudinaryUrl(url, { width: 1600 })} alt="" className="w-full h-auto max-h-[80vh] sm:max-h-[85vh] object-contain rounded-xl" />
         )}

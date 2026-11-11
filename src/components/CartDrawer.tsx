@@ -6,6 +6,7 @@ import { X, Minus, Plus, Trash2, Tag, ShoppingBag, ShoppingCart } from "lucide-r
 import { useCart } from "@/lib/cart-context";
 import { colorMap } from "@/lib/katalog-data";
 import { cloudinaryUrl } from "@/lib/cloudinary";
+import PublicPhoto from "@/components/PublicPhoto";
 import { supabase } from "@/lib/supabase";
 import { useSafeLocale } from "@/lib/safe-i18n";
 import { useRouter } from "next/navigation";
@@ -130,8 +131,13 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                           className="flex gap-3 p-3 rounded-xl"
                           style={{ background: "rgba(255,255,255,.6)", border: "1px solid rgba(0,0,0,.12)" }}>
                           {/* Image */}
-                          <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0" style={{ background: "#e5e5e5" }}>
-                            <img src={cloudinaryUrl(item.image, { width: 160 })} alt={item.name} className="w-full h-full object-cover" />
+                          <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0" style={{ background: "#e5e5e5" }}>
+                            <PublicPhoto
+                              src={cloudinaryUrl(item.image, { width: 160 })}
+                              alt={item.name}
+                              sizes="64px"
+                              fallbackLabel={item.name}
+                            />
                           </div>
                           {/* Details */}
                           <div className="flex-1 min-w-0">

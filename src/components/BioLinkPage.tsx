@@ -1,4 +1,6 @@
 import type { BioPageContent } from "@/lib/bio-page-content";
+import { toImgUrl } from "@/lib/image-url";
+import PublicPhoto from "@/components/PublicPhoto";
 import BioLinkEffects from "@/components/BioLinkEffects";
 import BioOpenOrderBanner, { type BioOpenOrderPhase } from "@/components/BioOpenOrderBanner";
 
@@ -172,7 +174,7 @@ export default function BioLinkPage({
                   id="bio-reel"
                   className="bio-kb h-full w-full object-cover"
                   style={{ objectPosition: "50% 12%" }}
-                  poster={videoPoster || undefined}
+                  poster={videoPoster ? toImgUrl(videoPoster) : undefined}
                   autoPlay
                   muted
                   loop
@@ -182,18 +184,20 @@ export default function BioLinkPage({
                 >
                   {mobileVideo && mobileVideo !== hero.video_url ? (
                     <>
-                      <source src={mobileVideo} media="(max-width: 640px)" type="video/mp4" />
-                      <source src={hero.video_url} type="video/mp4" />
+                      <source src={toImgUrl(mobileVideo)} media="(max-width: 640px)" type="video/mp4" />
+                      <source src={toImgUrl(hero.video_url)} type="video/mp4" />
                     </>
                   ) : (
-                    <source src={hero.video_url} type="video/mp4" />
+                    <source src={toImgUrl(hero.video_url)} type="video/mp4" />
                   )}
                 </video>
               ) : (
-                <img
+                <PublicPhoto
                   src={hero.image_url}
                   alt={hero.title}
-                  className="bio-kb h-full w-full object-cover object-top transition duration-700 group-hover:scale-105"
+                  sizes="(max-width: 768px) 100vw, 420px"
+                  priority
+                  className="object-cover object-top transition duration-700 group-hover:scale-105"
                 />
               )}
               <div
@@ -276,10 +280,11 @@ export default function BioLinkPage({
                   href={cat.href}
                   className="rv group relative block aspect-square overflow-hidden rounded-2xl bg-white"
                 >
-                  <img
+                  <PublicPhoto
                     src={cat.image_url}
                     alt={cat.label}
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
+                    sizes="(max-width: 768px) 50vw, 220px"
+                    className="object-cover transition duration-500 group-hover:scale-110"
                     style={{ objectPosition: cat.position || "50% 50%" }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />

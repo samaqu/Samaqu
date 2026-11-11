@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Minus, Plus, Trash2, Tag, ShoppingBag } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
 import { colorMap } from "@/lib/katalog-data";
+import PublicPhoto from "@/components/PublicPhoto";
 import { isPaketItem } from "@/lib/item-label";
 
 export default function CartPage() {
@@ -96,8 +97,8 @@ export default function CartPage() {
                     style={{ background: "rgba(255,255,255,.65)", border: "1px solid rgba(0,0,0,.15)", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
                     <div className="flex gap-3">
                       {/* Image */}
-                      <div className="w-[72px] h-[72px] rounded-xl overflow-hidden shrink-0" style={{ background: "#e5e5e5" }}>
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      <div className="relative w-[72px] h-[72px] rounded-xl overflow-hidden shrink-0" style={{ background: "#e5e5e5" }}>
+                        <PublicPhoto src={item.image} alt={item.name} sizes="72px" fallbackLabel={item.name} />
                       </div>
                       {/* Details */}
                       <div className="flex-1 min-w-0">

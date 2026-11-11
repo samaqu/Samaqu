@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useSafeTranslations } from "@/lib/safe-i18n";
+import PublicPhoto from "@/components/PublicPhoto";
 
 interface CategoryItem {
   name: string;
@@ -72,7 +73,7 @@ export default function Koleksi() {
 
           {/* Thobe — tall (left col, spans 2 rows) */}
           <Link href="/katalog" className="card group relative overflow-hidden rounded-[14px] sm:rounded-[22px] shadow-[0_18px_40px_-18px_rgba(0,0,0,.45)] row-span-2 min-h-[340px] sm:min-h-[460px] lg:min-h-[560px]" style={{ background: "#000000" }}>
-            <img src={categories[0]?.image_url} alt="Thobe" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition-transform duration-[800ms] ease-[cubic-bezier(.2,.7,.2,1)] group-hover:scale-[1.06]" />
+            <PublicPhoto src={categories[0]?.image_url || ""} alt="Thobe" sizes="(max-width: 768px) 50vw, 560px" priority className="object-cover transition-transform duration-[800ms] ease-[cubic-bezier(.2,.7,.2,1)] group-hover:scale-[1.06]" />
             <span className="absolute top-2.5 left-2.5 sm:top-4 sm:left-4 z-20 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-[10px] font-semibold tracking-[0.18em] uppercase text-white" style={{ background: "#000000" }}>{t("bestSeller")}</span>
             <div className="absolute inset-0 card-shade" />
             <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-2 sm:gap-4 p-3 sm:p-6">
@@ -88,7 +89,7 @@ export default function Koleksi() {
 
           {/* Koko — wide (right col, row 1) */}
           <Link href="/katalog" className="card group relative overflow-hidden rounded-[14px] sm:rounded-[22px] shadow-[0_18px_40px_-18px_rgba(0,0,0,.45)] min-h-[160px] sm:min-h-[220px] lg:min-h-[270px]" style={{ background: "#000000" }}>
-            <img src={categories[2]?.image_url} alt="Koko" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover object-[62%_35%] transition-transform duration-[800ms] ease-[cubic-bezier(.2,.7,.2,1)] group-hover:scale-[1.06]" />
+            <PublicPhoto src={categories[2]?.image_url || ""} alt="Koko" sizes="(max-width: 768px) 50vw, 560px" priority className="object-cover object-[62%_35%] transition-transform duration-[800ms] ease-[cubic-bezier(.2,.7,.2,1)] group-hover:scale-[1.06]" />
             <div className="absolute inset-0 wide-shade" />
             <div className="absolute inset-0 z-10 flex items-end justify-between gap-2 sm:gap-4 p-3 sm:p-6">
               <div>
@@ -103,7 +104,7 @@ export default function Koleksi() {
 
           {/* Vest — wide (right col, row 2) */}
           <Link href="/katalog" className="card group relative overflow-hidden rounded-[14px] sm:rounded-[22px] shadow-[0_18px_40px_-18px_rgba(0,0,0,.45)] min-h-[160px] sm:min-h-[220px] lg:min-h-[270px]" style={{ background: "#000000" }}>
-            <img src={categories[3]?.image_url} alt="Vest" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover object-[55%_18%] transition-transform duration-[800ms] ease-[cubic-bezier(.2,.7,.2,1)] group-hover:scale-[1.06]" />
+            <PublicPhoto src={categories[3]?.image_url || ""} alt="Vest" sizes="(max-width: 768px) 50vw, 560px" className="object-cover object-[55%_18%] transition-transform duration-[800ms] ease-[cubic-bezier(.2,.7,.2,1)] group-hover:scale-[1.06]" />
             <div className="absolute inset-0 wide-shade" />
             <div className="absolute inset-0 z-10 flex items-end justify-between gap-2 sm:gap-4 p-3 sm:p-6">
               <div>
@@ -118,7 +119,7 @@ export default function Koleksi() {
 
           {/* Kandora — tall (left col, spans 2 rows) */}
           <Link href="/katalog" className="card group relative overflow-hidden rounded-[14px] sm:rounded-[22px] shadow-[0_18px_40px_-18px_rgba(0,0,0,.45)] row-span-2 min-h-[340px] sm:min-h-[460px] lg:min-h-[560px]" style={{ background: "#000000" }}>
-            <img src={categories[1]?.image_url} alt="Kandora" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition-transform duration-[800ms] ease-[cubic-bezier(.2,.7,.2,1)] group-hover:scale-[1.06]" />
+            <PublicPhoto src={categories[1]?.image_url || ""} alt="Kandora" sizes="(max-width: 768px) 50vw, 560px" className="object-cover transition-transform duration-[800ms] ease-[cubic-bezier(.2,.7,.2,1)] group-hover:scale-[1.06]" />
             <div className="absolute inset-0 card-shade" />
             <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-2 sm:gap-4 p-3 sm:p-6">
               <div>
@@ -133,7 +134,7 @@ export default function Koleksi() {
 
           {/* Kabak — wide (right col, row 3) */}
           <Link href="/katalog" className="card group relative overflow-hidden rounded-[14px] sm:rounded-[22px] shadow-[0_18px_40px_-18px_rgba(0,0,0,.45)] min-h-[160px] sm:min-h-[220px] lg:min-h-[270px]" style={{ background: "#0d0d0d" }}>
-            <img src={categories[4]?.image_url} alt="Kabak" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover object-[50%_55%] transition-transform duration-[800ms] ease-[cubic-bezier(.2,.7,.2,1)] group-hover:scale-[1.06]" />
+            <PublicPhoto src={categories[4]?.image_url || ""} alt="Kabak" sizes="(max-width: 768px) 50vw, 560px" className="object-cover object-[50%_55%] transition-transform duration-[800ms] ease-[cubic-bezier(.2,.7,.2,1)] group-hover:scale-[1.06]" />
             <div className="absolute inset-0 wide-shade" />
             <div className="absolute inset-0 z-10 flex items-end justify-between gap-2 sm:gap-4 p-3 sm:p-6">
               <div>
@@ -148,7 +149,7 @@ export default function Koleksi() {
 
           {/* Cover Hanger — wide (right col, row 4) */}
           <Link href="/katalog" className="card group relative overflow-hidden rounded-[14px] sm:rounded-[22px] shadow-[0_18px_40px_-18px_rgba(0,0,0,.45)] min-h-[160px] sm:min-h-[220px] lg:min-h-[270px]" style={{ background: "#000000" }}>
-            <img src={categories[5]?.image_url} alt="Cover Hanger" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover object-[62%_45%] transition-transform duration-[800ms] ease-[cubic-bezier(.2,.7,.2,1)] group-hover:scale-[1.06]" />
+            <PublicPhoto src={categories[5]?.image_url || ""} alt="Cover Hanger" sizes="(max-width: 768px) 50vw, 560px" className="object-cover object-[62%_45%] transition-transform duration-[800ms] ease-[cubic-bezier(.2,.7,.2,1)] group-hover:scale-[1.06]" />
             <div className="absolute inset-0 wide-shade" />
             <div className="absolute inset-0 z-10 flex items-end justify-between gap-2 sm:gap-4 p-3 sm:p-6">
               <div>

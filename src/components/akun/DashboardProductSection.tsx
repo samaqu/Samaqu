@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getCatalogProducts } from "@/lib/db";
 import { cloudinaryUrl } from "@/lib/cloudinary";
+import PublicPhoto from "@/components/PublicPhoto";
 import { supabase } from "@/lib/supabase";
 import { useSafeLocale } from "@/lib/safe-i18n";
 import { useWishlist } from "@/lib/use-wishlist";
@@ -43,15 +44,12 @@ function ProductCard({
       className="group flex flex-col overflow-hidden rounded-2xl border border-[#E7E3DE] bg-white shadow-[0_2px_10px_rgba(0,0,0,.035)] transition hover:shadow-[0_8px_22px_rgba(0,0,0,.08)] active:scale-[.99]"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-[#F1EFEC]">
-        <img
+        <PublicPhoto
           src={cloudinaryUrl(image, { width: 500 })}
           alt={product.name}
-          loading="lazy"
-          decoding="async"
-          className={`h-full w-full object-cover transition duration-500 group-hover:scale-[1.03] ${soldOut ? "grayscale-[35%] brightness-90" : ""}`}
-          onError={(event) => {
-            (event.target as HTMLImageElement).style.display = "none";
-          }}
+          sizes="(max-width: 768px) 50vw, 300px"
+          className={`object-cover transition duration-500 group-hover:scale-[1.03] ${soldOut ? "grayscale-[35%] brightness-90" : ""}`}
+          fallbackLabel={product.name}
         />
 
         {wishlist.isLoggedIn ? (

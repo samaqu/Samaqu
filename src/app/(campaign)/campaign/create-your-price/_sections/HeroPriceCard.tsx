@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PublicPhoto from "@/components/PublicPhoto";
 import type { HeroData } from "../_data/products";
 import s from "../campaign.module.css";
 
@@ -68,19 +69,12 @@ export default function HeroPriceCard({ data }: { data: HeroData }) {
           {/* Sengaja `<img>`, bukan `next/image`: foto produk aktif bisa berasal dari host
               yang tidak terdaftar di `next.config.ts` (mis. R2 samaqu-media.samaqu.workers.dev).
               Sama seperti kartu di section produk. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <PublicPhoto
             src={data.image}
             alt={data.photoAlt}
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              objectPosition: "center top",
-              display: "block",
-            }}
+            sizes="400px"
+            className="object-cover object-top"
+            fallbackLabel={data.name}
           />
         </div>
 
