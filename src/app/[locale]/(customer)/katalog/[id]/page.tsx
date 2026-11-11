@@ -70,7 +70,7 @@ function MediaDisplay({ item, poster, className, style, allMedia }: { item: Gall
   if (item.type === "video") {
     const videoPoster = getVideoPoster();
     return (
-      <div className={`relative ${className || ""}`} style={style}>
+      <div className={`relative h-full w-full ${className || ""}`} style={style}>
         {playing ? (
           <video
             key={`${item.src}-${videoAttempt}`}
@@ -123,7 +123,7 @@ function MediaDisplay({ item, poster, className, style, allMedia }: { item: Gall
   }
 
   return (
-    <div className={`relative ${className || ""}`} style={{ background: "#e5e5e5", ...style }}>
+    <div className={`relative h-full w-full ${className || ""}`} style={{ background: "#e5e5e5", ...style }}>
       <PublicPhoto
         src={cloudinaryUrl(item.src, { width: 1200 })}
         alt=""
