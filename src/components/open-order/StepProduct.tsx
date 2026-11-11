@@ -13,9 +13,8 @@
 
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Minus, Plus } from "lucide-react";
-import { cloudinaryUrl } from "@/lib/cloudinary";
 import { colorMap } from "@/lib/katalog-data";
-import { openOrderGallery } from "@/lib/open-order-catalog";
+import { openOrderGallery, openOrderImage } from "@/lib/open-order-catalog";
 import { OPEN_ORDER_SIZES } from "@/lib/open-order-config";
 import {
   findOpenOrderProduct,
@@ -25,6 +24,7 @@ import {
 } from "@/lib/open-order-offering";
 import type { ProductDraft } from "./types";
 import Countdown, { type OpenOrderPhase } from "./Countdown";
+import { ProductPhoto } from "./StepCart";
 
 /** Format harga sama dengan halaman detail Katalog ("Rp 329.000"). */
 const rupiah = (value: number) => "Rp " + Math.round(value).toLocaleString("id-ID");
@@ -95,8 +95,8 @@ export default function StepProduct({
   const gallery = product ? openOrderGallery(product, draft.color, series?.name ?? null) : [];
   const activePhoto = Math.min(photo, Math.max(gallery.length - 1, 0));
   const currentMedia = gallery[activePhoto] ?? null;
-  /** Foto yang dipakai sebagai cover video — foto pertama di galeri. */
-  const videoPoster = gallery.find((item) => item.type === "image")?.src ?? product?.image ?? "";
+  /** Foto cover video — foto pertama galeri; tidak pernah URL video. */
+  const videoPoster = product ? openOrderImage(product, draft.color, series?.name ?? null) : "";
 
   // Produk/warna/series berganti → harga & foto ikut menyesuaikan.
   useEffect(() => {
@@ -154,15 +154,15 @@ export default function StepProduct({
               />
             ) : (
               <>
-                {videoPoster ? (
-                  <img
-                    src={cloudinaryUrl(videoPoster, { width: 1200 })}
-                    alt={`${product.name} ${colorLabel}${series ? ` — ${series.name}` : ""}`}
-                    className="absolute inset-0 w-full h-full object-contain"
-                  />
-                ) : (
-                  <div className="absolute inset-0" style={{ background: "#e5e5e5" }} />
-                )}
+                <ProductPhoto
+                  key={`poster-${videoPoster}`}
+                  src={videoPoster}
+                  name={product.name}
+                  alt={`${product.name} ${colorLabel}${series ? ` — ${series.name}` : ""}`}
+                  sizes="(max-width: 768px) 100vw, 560px"
+                  priority={activePhoto === 0}
+                  className="object-contain"
+                />
                 <button
                   type="button"
                   onClick={() => setPlaying(true)}
@@ -181,17 +181,17 @@ export default function StepProduct({
                 </button>
               </>
             )
-          ) : currentMedia ? (
-            <img
-              key={currentMedia.src}
-              src={cloudinaryUrl(currentMedia.src, { width: 1200 })}
+          ) : (
+            <ProductPhoto
+              key={currentMedia?.src ?? "kosong"}
+              src={currentMedia?.src ?? ""}
+              name={product.name}
               alt={`${product.name} ${colorLabel}${series ? ` — ${series.name}` : ""}`}
-              className="absolute inset-0 w-full h-full object-contain"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
+              sizes="(max-width: 768px) 100vw, 560px"
+              priority={activePhoto === 0}
+              className="object-contain"
             />
-          ) : null}
+          )}
           {gallery.length > 1 && (
             <>
               <button
@@ -241,13 +241,18 @@ export default function StepProduct({
                 type="button"
                 onClick={() => setPhoto(i)}
                 aria-label={`Media ${i + 1}`}
-                className="relative aspect-square rounded-lg overflow-hidden transition-all duration-200"
+                className="relative aspect-square rounded-lg overflow-hidden bg-[#f5f5f4] transition-all duration-200"
                 style={{ boxShadow: i === activePhoto ? "0 0 0 2px var(--espresso)" : "0 0 0 1px rgba(0,0,0,.3)" }}
               >
                 {item.type === "video" ? (
                   <>
                     {/* Thumbnail video memakai poster foto (bukan elemen video) + ikon play. */}
-                    <img src={cloudinaryUrl(videoPoster || item.src, { width: 300 })} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    <ProductPhoto
+                      key={`thumb-poster-${videoPoster}`}
+                      src={videoPoster}
+                      name={product.name}
+                      sizes="130px"
+                    />
                     <span className="absolute inset-0 grid place-items-center" style={{ background: "rgba(0,0,0,.28)" }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
                         <path d="M8 5v14l11-7z" fill="#fff" />
@@ -255,7 +260,12 @@ export default function StepProduct({
                     </span>
                   </>
                 ) : (
-                  <img src={cloudinaryUrl(item.src, { width: 300 })} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  <ProductPhoto
+                    key={`thumb-${item.src}`}
+                    src={item.src}
+                    name={product.name}
+                    sizes="130px"
+                  />
                 )}
               </button>
             ))}

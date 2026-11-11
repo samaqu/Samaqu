@@ -4,7 +4,6 @@
  * Langkah 5 — review pesanan: item, ongkir J&T, catatan untuk admin, lalu submit ke /api/open-order.
  */
 
-import { cloudinaryUrl } from "@/lib/cloudinary";
 import { money } from "@/lib/open-order-catalog";
 import { OPEN_ORDER_ADDON } from "@/lib/open-order-config";
 import { normalizeMethodType, paymentMethodLabel, type PaymentMethodRow } from "@/lib/payment-methods";
@@ -12,7 +11,7 @@ import { useSafeTranslations } from "@/lib/safe-i18n";
 import { PaymentIcon } from "@/lib/payment-icons";
 import type { OpenOrderProduct } from "@/lib/open-order-offering";
 import type { CartLine, DraftShipping } from "./types";
-import { lineColorLabel, lineImage, lineName } from "./StepCart";
+import { lineColorLabel, lineImage, lineName, ProductPhoto } from "./StepCart";
 import { DANGER, Field, FIELD_BG, LINE, MUTED, PrimaryButton, SummaryRow, TextArea } from "./ui";
 
 export default function StepReview({
@@ -65,10 +64,8 @@ export default function StepReview({
           const image = lineImage(line, products);
           return (
             <div key={line.key} className="flex items-center gap-3.5 rounded-2xl px-4 py-3.5" style={{ border: `1px solid ${LINE}`, background: FIELD_BG }}>
-              <div className="h-14 w-11 shrink-0 overflow-hidden rounded-lg" style={{ background: "#e5e5e5" }}>
-                {image && (
-                  <img src={cloudinaryUrl(image, { width: 200 })} alt={lineName(line, products)} className="h-full w-full object-cover" />
-                )}
+              <div className="relative h-14 w-11 shrink-0 overflow-hidden rounded-lg" style={{ background: "#e5e5e5" }}>
+                <ProductPhoto src={image} name={lineName(line, products)} sizes="56px" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] font-semibold">{lineName(line, products)}</p>

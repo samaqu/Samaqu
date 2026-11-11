@@ -4,8 +4,9 @@
  * Langkah 3 — keranjang: ubah jumlah, hapus item, dan pilih Extra Cover & Hanger.
  */
 
+import { useState } from "react";
+import Image from "next/image";
 import { Trash2 } from "lucide-react";
-import { cloudinaryUrl } from "@/lib/cloudinary";
 import { money, openOrderImage } from "@/lib/open-order-catalog";
 import { OPEN_ORDER_ADDON } from "@/lib/open-order-config";
 import { formatWeightExact } from "@/lib/shipping-weight";
@@ -47,6 +48,55 @@ export function lineName(line: CartLine, products: OpenOrderProduct[]): string {
 export function lineImage(line: CartLine, products: OpenOrderProduct[]): string {
   const product = findOpenOrderProduct(products, line.productId);
   return product ? openOrderImage(product, line.color, line.series) : "";
+}
+
+/**
+ * Foto produk di alur Open Order (keranjang, ringkasan, langkah detail).
+ *
+ * Semua foto lewat `next/image` supaya diminta dari domain sendiri (`/_next/image`) —
+ * tidak bergantung pada jangkauan host R2 dari perangkat customer. Kalau gambarnya tidak
+ * ada atau gagal dimuat, yang tampil placeholder abu + nama produk, bukan kotak kosong.
+ * Parent WAJIB `relative` (komponen ini memakai `fill`).
+ */
+export function ProductPhoto({
+  src,
+  name,
+  alt,
+  sizes,
+  priority = false,
+  className = "object-cover",
+}: {
+  src: string;
+  name: string;
+  /** Teks alternatif lengkap; kalau kosong memakai nama produk. */
+  alt?: string;
+  sizes: string;
+  priority?: boolean;
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <div className="absolute inset-0 grid place-items-center bg-[#f5f5f4] p-1 text-center">
+        <span className="line-clamp-3 text-[9px] font-medium leading-tight text-neutral-500">{name}</span>
+      </div>
+    );
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={alt ?? name}
+      fill
+      sizes={sizes}
+      /* Next 16 hanya mengizinkan quality bawaan config (75). */
+      quality={75}
+      priority={priority}
+      className={className}
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 /** Nama warna untuk tampilan (Thobe: dari nama produk, mis. "Navy"). */
@@ -121,10 +171,8 @@ export default function StepCart({
           const image = lineImage(line, products);
           return (
             <div key={line.key} className="flex gap-4 rounded-2xl p-4" style={{ border: `1px solid ${LINE}`, background: FIELD_BG }}>
-              <div className="h-20 w-16 shrink-0 overflow-hidden rounded-xl" style={{ background: "#e5e5e5" }}>
-                {image && (
-                  <img src={cloudinaryUrl(image, { width: 300 })} alt={lineName(line, products)} className="h-full w-full object-cover" />
-                )}
+              <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-xl" style={{ background: "#e5e5e5" }}>
+                <ProductPhoto src={image} name={lineName(line, products)} sizes="80px" />
               </div>
 
               <div className="min-w-0 flex-1">

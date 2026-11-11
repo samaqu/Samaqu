@@ -21,10 +21,23 @@ export function priceRange(product: OpenOrderProduct): string {
   return min === max ? money(min) : `${money(min)} - ${money(max)}`;
 }
 
-/** Foto utama (gambar) untuk kombinasi warna (+ series); fallback foto produk. */
+/** URL berkas video — tidak boleh dipasang ke elemen gambar. */
+const VIDEO_SRC_RE = /\.(mp4|m4v|webm|ogg)(\?|#|$)/i;
+
+/**
+ * Foto utama (gambar) untuk kombinasi warna (+ series); fallback foto produk.
+ *
+ * Selalu mengembalikan URL GAMBAR atau string kosong. Dulu `media[0]` dipakai sebagai
+ * cadangan, sehingga baris yang medianya hanya video memasang URL `.mp4` ke `<img>` —
+ * hasilnya gambar rusak. Sekarang video dilewati dan pemanggil menampilkan placeholder.
+ */
 export function openOrderImage(product: OpenOrderProduct, color: string, series?: string | null): string {
   const media = openOrderVariantFor(product, color, series)?.media ?? [];
-  return media.find((item) => item.type === "image")?.src ?? media[0]?.src ?? product.image ?? "";
+  const photo = media.find((item) => item.type === "image" && !VIDEO_SRC_RE.test(item.src));
+  if (photo?.src) return photo.src;
+
+  const fallback = product.image || "";
+  return fallback && !VIDEO_SRC_RE.test(fallback) ? fallback : "";
 }
 
 /**
