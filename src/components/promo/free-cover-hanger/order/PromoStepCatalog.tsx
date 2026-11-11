@@ -189,9 +189,9 @@ export default function PromoStepCatalog({
       ) : null}
 
       {/* Timer — siklus 24 jam yang reset tiap tengah malam WIB (bukan tanggal berakhir).
-          Disembunyikan saat promo dimatikan: hitung mundur "buruan" tidak berlaku kalau
-          bonusnya sendiri sedang tidak ditawarkan. */}
-      {promoActive ? (
+          Disembunyikan saat promo dimatikan ATAU bonus sudah habis: hitung mundur "buruan"
+          tidak berlaku kalau bonusnya sendiri sudah tidak bisa didapat. */}
+      {promoActive && bonusAvailable ? (
         <section className="oo-fade-up mx-auto max-w-2xl" style={{ animationDelay: ".1s" }}>
           <Countdown
             target={midnight?.target ?? null}
