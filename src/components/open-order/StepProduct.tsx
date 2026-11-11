@@ -14,6 +14,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Minus, Plus } from "lucide-react";
 import { colorMap } from "@/lib/katalog-data";
+import { toImgUrl, toLegacyUrl } from "@/lib/image-url";
 import { openOrderGallery, openOrderImage } from "@/lib/open-order-catalog";
 import { OPEN_ORDER_SIZES } from "@/lib/open-order-config";
 import {
@@ -91,6 +92,12 @@ export default function StepProduct({
   // Video: tampilkan poster + tombol play dulu (sama seperti halaman katalog), supaya
   // tidak ada kotak hitam saat frame video belum ter-paint.
   const [playing, setPlaying] = useState(false);
+  /**
+   * Percobaan muat video: 0 = host gambar (img.samaqu.id), 1 = host lama (fallback
+   * sekali), 2 = sudah gagal dua kali → kembali ke poster. Tidak ada retry otomatis
+   * berulang; angka ini direset saat slide media berganti.
+   */
+  const [videoAttempt, setVideoAttempt] = useState<0 | 1 | 2>(0);
 
   const gallery = product ? openOrderGallery(product, draft.color, series?.name ?? null) : [];
   const activePhoto = Math.min(photo, Math.max(gallery.length - 1, 0));
@@ -103,8 +110,14 @@ export default function StepProduct({
     setPrice(draft.price);
     setPhoto(0);
     setPlaying(false);
+    setVideoAttempt(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.productId, draft.color, series?.name]);
+
+  // Slide media berganti → video berikutnya mulai lagi dari host gambar (bukan sisa fallback).
+  useEffect(() => {
+    setVideoAttempt(0);
+  }, [currentMedia?.src]);
 
   // Ukuran terpilih harus tetap ada di varian yang baru.
   useEffect(() => {
@@ -143,13 +156,22 @@ export default function StepProduct({
           {currentMedia?.type === "video" ? (
             playing ? (
               <video
-                key={currentMedia.src}
-                src={currentMedia.src}
+                key={`${currentMedia.src}-${videoAttempt}`}
+                src={videoAttempt === 0 ? toImgUrl(currentMedia.src) : toLegacyUrl(currentMedia.src)}
                 loop
                 playsInline
                 autoPlay
                 preload="auto"
                 onClick={() => setPlaying(false)}
+                onError={() => {
+                  // Coba host lama SEKALI; gagal lagi → balik ke poster + tombol play.
+                  if (videoAttempt === 0) {
+                    setVideoAttempt(1);
+                  } else {
+                    setVideoAttempt(2);
+                    setPlaying(false);
+                  }
+                }}
                 className="absolute inset-0 w-full h-full object-cover cursor-pointer"
               />
             ) : (
