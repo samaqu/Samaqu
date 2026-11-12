@@ -25,6 +25,114 @@ const sender62 = (value: unknown) => {
 
 const FREE_COVER_SKU = "CVH-SHC";
 const FREE_COVER_COLOR = "Cover Thobe + Hanger";
+const FREE_COVER_SIZE = "ALL SIZE";
+
+/** Diskon promo gratis cover: satu item "Cover Thobe + Hanger" = Rp35.000. */
+const COVER_DISCOUNT = 35000;
+
+/**
+ * Semua baris cover pada draft — Thobe maupun Koko (`cover-hanger` punya 3 varian warna).
+ * Dipakai supaya guard hanya membuang bonus yang stoknya benar-benar habis, bukan
+ * semua jenis cover sekaligus.
+ */
+const isCoverLine = (item: any) =>
+  String(item?.product_id || "").trim() === "cover-hanger" ||
+  /^cover\b.*hanger$/i.test(String(item?.color || "").trim());
+
+/**
+ * Stok efektif satu varian — sumber yang sama dengan halaman ops dan bot WA:
+ * VIEW `product_variant_stock` (stok sendiri → induk sharing → MIN komponen),
+ * cadangannya RPC `samaqu_effective_stock_map`.
+ * Dibaca dengan retry berbatas supaya gangguan sesaat tidak membuat bonus dibuang
+ * padahal stoknya ada. `null` = benar-benar tidak terbaca.
+ */
+async function effectiveStock(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  productId: string,
+  color: string,
+  size: string,
+  attempt = 0,
+): Promise<number | null> {
+  const view = await admin
+    .from("product_variant_stock")
+    .select("effective_stock")
+    .eq("product_id", productId)
+    .eq("color", color)
+    .eq("size", size)
+    .maybeSingle();
+  const fromView = Number((view.data as any)?.effective_stock);
+  if (!view.error && Number.isFinite(fromView)) return fromView;
+
+  const rpc = await admin.rpc("samaqu_effective_stock_map");
+  if (!rpc.error && Array.isArray(rpc.data)) {
+    const row = (rpc.data as any[]).find(
+      (item) =>
+        String(item?.product_id) === productId &&
+        String(item?.color || "").trim().toLowerCase() === color.trim().toLowerCase() &&
+        String(item?.size || "").trim().toLowerCase() === size.trim().toLowerCase(),
+    );
+    if (row) return Number(row.effective_stock) || 0;
+  }
+
+  if (attempt >= 2) return null;
+  await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+  return effectiveStock(admin, productId, color, size, attempt + 1);
+}
+
+/**
+ * Buang baris bonus cover tertentu dari draft (per warna) + batalkan diskon promonya.
+ */
+function stripFreeCoverBonus(payload: any, alasan: string, habis: string[] = [FREE_COVER_COLOR]) {
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  const drop = new Set(habis.map((color) => color.trim().toLowerCase()));
+  const tersisa = items.filter((item: any) => !drop.has(String(item?.color || "").trim().toLowerCase()));
+  const masihAdaCover = tersisa.some(isCoverLine);
+  // Diskon promo hanya dibatalkan kalau tidak ada lagi baris cover yang tersisa.
+  const promoDiscount = Math.round(Number(payload?.discount) || 0) === COVER_DISCOUNT;
+  return {
+    ...payload,
+    ...(promoDiscount && !masihAdaCover ? { discount: 0 } : {}),
+    free_cover_hanger: masihAdaCover ? payload?.free_cover_hanger === true : false,
+    items: tersisa,
+    notes: [String(payload?.notes || "").trim(), `Bonus Free Cover Hanger tidak dimasukkan: ${alasan}.`]
+      .filter(Boolean)
+      .join(" - "),
+  };
+}
+
+/**
+ * Buang baris bonus cover yang stoknya tidak tersedia, per baris.
+ *
+ * Dipakai jalur create, edit, dan approve. Tidak pernah MENAMBAH baris — jadi kalau
+ * admin sengaja menghapus bonus saat mengedit, baris itu tidak muncul lagi. Draft lama
+ * / manual yang masih membawa cover padahal stok 0 ikut dibersihkan supaya tidak gagal
+ * di `samaqu_decrement_stock` saat approve.
+ *
+ * Dicek per warna: stok "Cover Thobe + Hanger" habis tidak boleh ikut membuang
+ * "Cover Koko + Hanger" yang stoknya masih ada.
+ */
+async function guardFreeCoverStock(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  payload: any,
+) {
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  const coverLines = items.filter(isCoverLine);
+  if (!coverLines.length) return payload;
+
+  const habis: string[] = [];
+  for (const line of coverLines) {
+    const color = String(line?.color || "").trim();
+    const size = String(line?.size || FREE_COVER_SIZE).trim();
+    const stock = await effectiveStock(admin, String(line?.product_id || "cover-hanger"), color, size);
+    if (stock === null || stock <= 0) habis.push(color);
+  }
+  if (!habis.length) return payload;
+
+  const alasan = habis
+    .map((color) => `${color} ${color === FREE_COVER_COLOR ? "habis (0)" : "tidak tersedia"}`)
+    .join(", ");
+  return stripFreeCoverBonus(payload, alasan, habis);
+}
 
 /**
  * Baris bonus Free Cover Hanger untuk draft transaksi.
@@ -32,35 +140,55 @@ const FREE_COVER_COLOR = "Cover Thobe + Hanger";
  * Hanya ditambahkan kalau `payload.free_cover_hanger === true` — agent yang memutuskan
  * setelah `cek_pesanan` (customer belum pernah order). Barisnya memakai HARGA KATALOG
  * supaya stok cover & hanger tetap terpotong; gratisnya diberikan admin sebagai diskon.
+ *
+ * Kalau stok efektif cover habis / tidak terbaca, bonus TIDAK dimasukkan. Tanpa ini
+ * draft terlanjur membawa Rp35.000 dan baru gagal saat approve.
  */
 async function withFreeCoverHanger(
   admin: ReturnType<typeof getSupabaseAdmin>,
   payload: any,
 ) {
   if (payload?.free_cover_hanger !== true) return payload;
-  const items = Array.isArray(payload.items) ? payload.items : [];
-  const exists = items.some(
-    (item: any) =>
-      String(item?.color || "").trim().toLowerCase() === FREE_COVER_COLOR.toLowerCase(),
-  );
-  if (exists) return payload;
+
+  // Buang dulu baris cover yang stoknya habis (termasuk kiriman AI / draft lama).
+  const checked = await guardFreeCoverStock(admin, payload);
+  if (checked?.free_cover_hanger !== true) return checked;
+
+  const items = Array.isArray(checked.items) ? checked.items : [];
+  if (items.some(isCoverLine)) return checked;
 
   const { data: product } = await admin
     .from("products")
     .select("id, name, sku, price")
     .ilike("sku", FREE_COVER_SKU)
     .maybeSingle();
-  if (!product) return payload;
+  if (!product) return checked;
+
+  // Pastikan stoknya masih ada sebelum baris ditambahkan — draft yang tidak bisa
+  // di-approve lebih buruk daripada draft tanpa bonus.
+  const stock = await effectiveStock(
+    admin,
+    String(product.id),
+    FREE_COVER_COLOR,
+    FREE_COVER_SIZE,
+  );
+  if (stock === null || stock <= 0) {
+    return stripFreeCoverBonus(
+      checked,
+      stock === null ? "stok Cover Thobe + Hanger tidak terbaca" : "stok Cover Thobe + Hanger habis (0)",
+      [FREE_COVER_COLOR],
+    );
+  }
 
   return {
-    ...payload,
+    ...checked,
     items: [
       ...items,
       {
         product_id: String(product.id),
         product_name: String(product.name || "Cover & Hanger"),
         color: FREE_COVER_COLOR,
-        size: "ALL SIZE",
+        size: FREE_COVER_SIZE,
         quantity: 1,
         price: Number(product.price) || 0,
       },
@@ -329,9 +457,6 @@ export async function GET(req: NextRequest) {
   });
 }
 
-/** Diskon promo gratis cover: satu item "Cover Thobe + Hanger" = Rp35.000. */
-const COVER_DISCOUNT = 35000;
-
 /**
  * Samakan diskon draft dengan promo cover hanger. Dipakai saat draft dibuat, dibaca,
  * diedit, dan disetujui supaya angka di layar = angka yang dibukukan.
@@ -570,9 +695,12 @@ export async function POST(req: NextRequest) {
       discount: Math.min(Math.max(0, Math.round(Number(payload?.discount) || 0)), subtotal),
       items: normalized,
     };
+    // Admin bisa mengembalikan/menambah baris cover saat mengedit; kalau stoknya habis
+    // baris itu dibuang lagi supaya draft tetap bisa di-approve.
+    const checked = await guardFreeCoverStock(admin, nextPayload);
     const { data, error } = await admin
       .from("order_drafts")
-      .update({ payload: applyCoverDiscount(nextPayload), updated_at: new Date().toISOString() })
+      .update({ payload: applyCoverDiscount(checked), updated_at: new Date().toISOString() })
       .eq("id", id)
       .eq("status", "pending")
       .select()
@@ -619,10 +747,14 @@ export async function POST(req: NextRequest) {
     const token = req.headers.get("authorization") || "";
     let txRes: Response;
     try {
+      // Guard stok bonus diulang saat approve: draft yang dibuat sebelum aturan ini
+      // (atau draft manual) bisa saja masih membawa baris cover padahal stoknya 0.
+      // Tanpa ini approve gagal di `samaqu_decrement_stock` dan draft balik ke antrean.
+      const draftPayload = await guardFreeCoverStock(admin, draft.payload);
       txRes = await fetch(new URL("/api/ops/transaksi", req.url), {
         method: "POST",
         headers: { Authorization: token, "Content-Type": "application/json" },
-        body: JSON.stringify(applyCoverDiscount(draft.payload)),
+        body: JSON.stringify(applyCoverDiscount(draftPayload)),
       });
     } catch (err) {
       await releaseDraftClaim(admin, id);
