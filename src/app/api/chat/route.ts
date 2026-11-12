@@ -336,8 +336,8 @@ export async function POST(req: NextRequest) {
         if (!toolImages.length && /(foto|poto|photo|gambar|gbr)/i.test(question)) {
           const series = detectSeriesName(`${transcript}\n${question}\n${answer || ""}`);
           const args = series
-            ? { query: series, series }
-            : { query: question.replace(/foto(nya)?|gambar|photo/gi, " ").trim() };
+            ? { query: series, series, minta_foto: true }
+            : { query: question.replace(/foto(nya)?|poto(nya)?|gambar|photo|gbr/gi, " ").trim(), minta_foto: true };
           const fallback = await executeChatTool("cari_produk", JSON.stringify(args), {
             sessionId,
             transcript,
@@ -368,7 +368,14 @@ export async function POST(req: NextRequest) {
         ) {
           send({ products: productCards.slice(0, 4) });
         }
-        if (toolImages.length) send({ images: toolImages });
+        // Foto hanya dikirim kalau memang relevan:
+        // - pelanggan minta lihat (foto/poto/gambar), ATAU
+        // - model sengaja memakai tool yang memang menyajikan foto (info_series/info_bahan).
+        // Pertanyaan stok/harga/ukuran lewat cari_produk tidak lagi menempelkan gambar.
+        const photoToolUsed = toolsUsed.some((name) => name === "info_series" || name === "info_bahan");
+        if (toolImages.length && (photoToolUsed || /(foto|poto|photo|gambar|gbr)/i.test(question))) {
+          send({ images: toolImages });
+        }
         send({ done: true });
       } catch (error) {
         console.error("[CHAT] Permintaan gagal:", error);

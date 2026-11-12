@@ -63,6 +63,11 @@ export const CHAT_TOOLS = [
           },
           max_harga: { type: "number", description: "Batas harga maksimum dalam Rupiah (opsional)." },
           warna: { type: "string", description: "Filter warna (opsional), mis. 'hitam'." },
+          minta_foto: {
+            type: "boolean",
+            description:
+              "Isi true HANYA kalau pelanggan minta lihat foto/model produk. Untuk pertanyaan stok, harga, atau ukuran, biarkan kosong: tanpa foto.",
+          },
         },
       },
     },
@@ -424,10 +429,14 @@ async function cariProduk(args: Record<string, unknown>, ctx?: ChatToolContext):
   const focusedCards = preferredSeries
     ? cards.filter((card) => String(card.series || "").toLowerCase() === preferredSeries.toLowerCase())
     : [];
+  // Foto hanya dikirim kalau memang diminta. Dulu setiap cari_produk menempelkan 3 foto,
+  // jadi pertanyaan "stok broken white imalah" pun dibalas gambar. Kartu produk sudah
+  // membawa `image` sendiri, jadi tanpa permintaan cukup kartu + teks.
+  const mintaFoto = args.minta_foto === true || args.minta_foto === "true";
   const imageSource = focusedCards.length ? focusedCards : cards;
-  const productImages = [
-    ...new Set(imageSource.map((card) => card.image).filter((url): url is string => Boolean(url))),
-  ].slice(0, 3);
+  const productImages = mintaFoto
+    ? [...new Set(imageSource.map((card) => card.image).filter((url): url is string => Boolean(url)))].slice(0, 3)
+    : [];
 
   return {
     text: `Ditemukan ${products.length} produk:\n${lines.join("\n")}`,
