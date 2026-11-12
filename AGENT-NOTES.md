@@ -125,6 +125,50 @@ dan setiap fitur **harus benar-benar berfungsi** (jangan tombol pajangan, jangan
 
 ---
 
+## 4b. Jebakan teknis - tambahan 12 November 2026
+
+Bagian ini menambah bagian 4. Kalau ada yang bertentangan, **bagian ini yang berlaku**.
+
+11. **Stok: jangan pernah pakai `product_variants.stock` mentah.**
+    Ini kejadian nyata di **live chat website**, bukan di ops. `src/lib/chat-tools.ts`
+    menghitung stok dari kolom `stock`, sehingga varian turunan yang menumpang stok induk
+    terbaca 0. Contoh: **Thobe Broken White Imalah** - semua ukuran `stock = 0`, padahal
+    stok efektifnya 45 pcs (M=15, L=5, S=8, XS=13, XL=3, XXL=1). Bot menjawab
+    "stok habis semua ukuran" padahal barangnya ada.
+    **Sumber yang benar:** VIEW `product_variant_stock` (kolom `effective_stock`) atau RPC
+    `samaqu_effective_stock_map`. Sudah diperbaiki di `chat-tools.ts` (`loadEffectiveStock`).
+    Setiap tempat baru yang membaca stok wajib memakai salah satu dari dua sumber itu.
+
+12. **Mayar: field `mobile` maksimal 15 karakter.**
+    Nomor pesanan tersimpan apa adanya dari checkout - bisa `+62 896-5265-4335`
+    (17 karakter, ada spasi & strip). Mayar menolak `400 Validation Error`, invoice tidak
+    pernah terbit, dan customer hanya melihat "Link pembayaran belum tersedia".
+    Pakai `mayarMobile()` di `src/lib/mayar.ts` (sudah dipakai di
+    `createOrderPaymentLink` dan `/api/payments/mayar/create`).
+    **Jangan kirim `customer_whatsapp` mentah** ke field `mobile`.
+    Catatan lain: Mayar menolak create duplikat dalam sekitar 1 menit (HTTP 429) - kalau
+    invoice sudah ada, ambil dari `orders.payment_url` / `payment_ref`, jangan buat baru.
+
+13. **Draft transaksi: `payload.created_at` wajib ada.**
+    `draft_approve` meneruskan payload draft ke `POST /api/ops/transaksi`, dan di sana
+    `new Date(String(body?.created_at || ""))` - kalau kosong hasilnya `NaN` lalu ditolak
+    dengan **"Tanggal/jam transaksi tidak valid"**.
+    Draft dari bot selalu punya (`buat_draft_transaksi` mengisinya). Draft **manual**
+    sering lupa - ini sudah pernah kejadian dan membuat approve gagal.
+
+14. **Jangan menulis draft langsung ke tabel `order_drafts`.**
+    `INSERT` langsung melewati `normalizeItems()`, sehingga `price` per item `undefined`
+    dan total jadi `NaN`. Jalur yang benar: `POST /api/ops/perlu-review` dengan
+    `action: draft_create` / `draft_update` - server menghitung ulang harga dari master produk.
+
+15. **Tombol "Bayar Sekarang" jangan diam saat link gagal.**
+    `PayNowButton.tsx` dulu hanya `if (url) window.location.href = url` tanpa `else`,
+    sehingga tombol terasa mati. Sekarang selalu mengarahkan: ke link Mayar kalau berhasil,
+    ke halaman instruksi pembayaran kalau gagal. Halaman `/akun/pesanan/<no>/bayar` untuk
+    metode online juga sudah punya tombol sendiri (dulu hanya menyuruh buka menu lain).
+
+---
+
 ## 5. Kondisi data yang perlu diketahui (kalau bikin fitur baru)
 
 - `stock_in` **masih 0 baris** → semua KPI "Barang Masuk" bernilai 0 (bukan bug). Form Barang
@@ -172,6 +216,46 @@ dan setiap fitur **harus benar-benar berfungsi** (jangan tombol pajangan, jangan
 - **Kebijakan belum bayar**: sekarang stok dipotong saat order dibuat. Kalau user mau stok baru
   dipotong saat dibayar, pindahkan `samaqu_decrement_stock` dari `/api/orders` + `/api/open-order`
   ke saat status jadi `diproses`, lalu sesuaikan `PAID_ORDER_STATUS`.
+
+---
+
+## 7b. Kandidat lanjutan - tambahan 12 November 2026
+
+**Live chat website (`src/app/api/chat/route.ts`, `src/lib/chat-tools.ts`, `src/lib/chat-persona.ts`)**
+
+- Kirim gambar hanya kalau diminta (`minta_foto`) sudah jalan, tapi pencarian isi
+  pesan lama belum ada.
+- Bot belum bisa membuat link pembayaran Mayar dari chat.
+
+**Bot WhatsApp (Edge Function `wa-agent`, DI LUAR repo ini)**
+
+Bot berjalan sebagai Supabase Edge Function di project Academy
+(`rbjxjdgqtcwwbvuwtlpg`), bukan di repo `samaqu`. Yang diubah untuk mengatur
+perilakunya adalah `ai_settings.behavior.systemInstructions` dan `memory_items`
+di database, **bukan** file di repo ini.
+
+Yang belum dikerjakan:
+
+1. **Tool pembayaran Mayar.** Bot punya 17 tool, tidak satu pun soal pembayaran.
+   Customer yang minta bayar online harus dioper ke admin.
+2. **Kode unik TF manual 3 digit.** Sekarang bukti transfer hanya diverifikasi dari
+   screenshot, sehingga nominal kembar tidak bisa dibedakan.
+3. **Observability untuk Reflection Engine.** Audit 12 Nov: dari 4.615
+   `wa_agent_runs` hanya 877 punya `detail`, dan `detail` hanya memuat nama tool +
+   balasan + catatan model. **Tidak ada** argumen tool, hasil tool, atau tautan ke
+   outcome. Perlu tabel `wa_tool_calls` dan `wa_agent_runs.inbox_ids` (jangan
+   menambah `run_id` di tabel SAMAQU - beda project DB, tidak bisa FK).
+4. **Pemangkasan prompt bot.** Persona ~37.900 char + `memory_items` ~44.400 char =
+   sekitar 81.000 karakter. Sudah terbukti ada aturan yang saling bertentangan.
+   Model sudah 1M context; yang membatasi justru angka di kode (output 700-900
+   token, ~5 putaran tool, `WA_AGENT_BATCH=5`, history 8-12 pesan).
+
+**Hal kecil yang belum diselidiki**
+
+- Order `CYO-*` yang `customer_id`-nya tidak ada di tabel `customers` tidak muncul
+  di dashboard customer.
+- Label ukuran 78x100 memang tidak pernah menampilkan nomor telepon (hanya
+  100x150). Bukan bug, tapi belum diputuskan mau ditambah atau tidak.
 
 ---
 
