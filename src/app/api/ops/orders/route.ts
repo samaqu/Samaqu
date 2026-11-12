@@ -49,6 +49,15 @@ export async function GET(req: NextRequest) {
       if (reseller) (data as Record<string, unknown>).reseller = reseller;
     }
 
+    // Nomor toko untuk header label. Dibaca dari `store_settings.whatsapp` supaya label
+    // ikut pengaturan toko, bukan teks tetap. Aditif: field baru, pemakai lain tidak berubah.
+    const { data: store } = await client
+      .from("store_settings")
+      .select("whatsapp, store_name")
+      .eq("id", 1)
+      .maybeSingle();
+    if (store) (data as Record<string, unknown>).store = store;
+
     return NextResponse.json({ order: data });
   }
 

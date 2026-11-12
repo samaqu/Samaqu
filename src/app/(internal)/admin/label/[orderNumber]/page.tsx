@@ -35,6 +35,8 @@ interface OrderData {
   /** Pesanan reseller: ganti blok pengirim dengan nama toko + WA saat toggle aktif. */
   show_reseller_name_on_label?: boolean | null;
   reseller?: { store_name: string; owner_name?: string | null; whatsapp?: string | null } | null;
+  /** Dari `store_settings` (lewat API). `whatsapp` dipakai di header label. */
+  store?: { whatsapp?: string | null; store_name?: string | null } | null;
   order_items?: { product_id?: string; product_name: string; color: string; size: string; series?: string | null; kain?: string | null; quantity: number; price: number }[];
 }
 
@@ -256,6 +258,9 @@ export default function LabelPage() {
   // Label reseller: pengirim = nama toko + WA reseller (resi tetap atas nama SAMAQU).
   const resellerSender =
     order.show_reseller_name_on_label === true && order.reseller?.store_name ? order.reseller : null;
+  // Nomor toko di header label: ikut `store_settings.whatsapp`. Kalau kosong (mis. pesanan
+  // retur yang tidak membawa data toko), tetap tampilkan teks lama supaya label tidak bolong.
+  const storePhone = String(order.store?.whatsapp || "").trim() || "0812-3456-7890";
 
   return (
     <>
@@ -319,7 +324,7 @@ export default function LabelPage() {
             ) : (
               <>
                 <div style={{ fontSize: "20px", fontWeight: "900", letterSpacing: "2px" }}>SAMAQU</div>
-                <div style={{ fontSize: "7px", color: "#333", marginTop: "0.5px" }}>@samaqu.id | 0812-3456-7890</div>
+                <div style={{ fontSize: "7px", color: "#333", marginTop: "0.5px" }}>@samaqu.id | {storePhone}</div>
               </>
             )}
           </div>
