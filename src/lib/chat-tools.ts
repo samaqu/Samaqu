@@ -224,6 +224,8 @@ interface VariantRow {
   color: string | null;
   size: string | null;
   stock: number | null;
+  /** Stok efektif dari VIEW `product_variant_stock` (sharing series + komponen). */
+  effective_stock?: number | null;
 }
 
 function summarizeStock(variants: VariantRow[]): string {
@@ -233,7 +235,12 @@ function summarizeStock(variants: VariantRow[]): string {
     const size = v.size || "-";
     if (!byColor.has(color)) byColor.set(color, new Map());
     const sizes = byColor.get(color)!;
-    sizes.set(size, (sizes.get(size) || 0) + (v.stock || 0));
+    // Stok EFEKTIF lebih dulu: varian turunan (mis. Broken White Imalah) kolom `stock`-nya
+    // 0 karena menumpang induk, padahal masih bisa dijual. Tanpa ini bot menjawab "habis".
+    const value = v.effective_stock !== null && v.effective_stock !== undefined
+      ? Number(v.effective_stock) || 0
+      : Number(v.stock) || 0;
+    sizes.set(size, (sizes.get(size) || 0) + value);
   }
   const parts: string[] = [];
   for (const [color, sizes] of byColor) {
@@ -244,6 +251,40 @@ function summarizeStock(variants: VariantRow[]): string {
 }
 
 export const SERIES_NAMES = ["Imron", "Jiharkah", "Nahawand", "Bayati", "Imalah", "Karim"] as const;
+
+/**
+ * Stok efektif per `product_id|SIZE|color` dari VIEW `product_variant_stock`.
+ * VIEW ini sudah menghitung stok sharing antar series dan stok komponen, jadi angkanya
+ * sama dengan katalog & dashboard ops. Kalau view gagal dibaca, kembalikan peta kosong —
+ * pemanggil lalu jatuh ke `product_variants.stock` seperti sebelumnya.
+ */
+async function loadEffectiveStock(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  productIds: string[],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (!productIds.length) return map;
+  const { data, error } = await admin
+    .from("product_variant_stock")
+    .select("product_id, color, size, effective_stock")
+    .in("product_id", productIds);
+  if (error) {
+    console.error("[CHAT-TOOL] stok efektif gagal dibaca:", error.message);
+    return map;
+  }
+  for (const row of (data ?? []) as {
+    product_id?: string | null;
+    color?: string | null;
+    size?: string | null;
+    effective_stock?: number | null;
+  }[]) {
+    const id = String(row.product_id || "");
+    if (!id) continue;
+    const key = `${id}|${String(row.size || "").toUpperCase()}|${String(row.color || "default")}`;
+    map.set(key, Number(row.effective_stock) || 0);
+  }
+  return map;
+}
 
 /** Series terakhir yang disebut dalam percakapan, untuk menjaga fokus foto. */
 export function detectSeriesName(text: string): string | null {
@@ -323,6 +364,18 @@ async function cariProduk(args: Record<string, unknown>, ctx?: ChatToolContext):
   for (const p of products) {
     const variants = Array.isArray(p.product_variants) ? (p.product_variants as VariantRow[]) : [];
     byProduct.set(p.id as string, variants);
+  }
+
+  // Stok EFEKTIF per (produk, warna, ukuran) dari VIEW `product_variant_stock` — sumber yang
+  // sama dengan katalog/ops. Kolom `product_variants.stock` saja menyesatkan untuk varian
+  // turunan berbagi stok (Broken White Imalah `stock`=0 padahal induknya masih ada).
+  const effectiveByKey = await loadEffectiveStock(admin, products.map((p) => String(p.id)));
+  for (const [productId, variants] of byProduct) {
+    for (const v of variants) {
+      const size = `${v.size || ""}`.toUpperCase();
+      const color = String(v.color || "default");
+      v.effective_stock = effectiveByKey.get(`${productId}|${size}|${color}`) ?? null;
+    }
   }
 
   // Foto kartu: ambil foto pertama yang BUKAN video dari `product_images`.

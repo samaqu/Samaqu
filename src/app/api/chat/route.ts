@@ -331,7 +331,9 @@ export async function POST(req: NextRequest) {
 
         // Fallback khusus live chat: pelanggan minta foto tapi model lupa memanggil tool.
         // Cari series/produk terakhir yang dibahas, lalu kirim fotonya.
-        if (!toolImages.length && /(foto|fotonya|photo|gambar)/i.test(question)) {
+        // "poto" ikut dikenali: ejaan ini yang paling sering dipakai pelanggan, dan dulu
+        // lolos dari penyaring sehingga bot menulis "Ini fotonya" tanpa gambar terkirim.
+        if (!toolImages.length && /(foto|poto|photo|gambar|gbr)/i.test(question)) {
           const series = detectSeriesName(`${transcript}\n${question}\n${answer || ""}`);
           const args = series
             ? { query: series, series }
