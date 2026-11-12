@@ -199,6 +199,31 @@ async function withFreeCoverHanger(
 const ADDRESS_FIELDS = ["address", "province", "city", "kecamatan", "postal_code"] as const;
 
 /**
+ * Alamat draft harus benar-benar alamat, bukan cuma nama kecamatan/kota.
+ *
+ * Pernah kejadian: bot mengambil "Megamendung" (nama kecamatan) sebagai `shipping.address`
+ * karena membaca bukti transfer, sehingga resi J&T terbit tanpa alamat kirim. Draft seperti
+ * itu ditolak supaya admin memperbaiki, bukan terlanjur di-approve.
+ */
+function addressProblem(shipping: any): string | null {
+  const address = String(shipping?.address || "").trim();
+  const kecamatan = String(shipping?.kecamatan || "").trim();
+  const city = String(shipping?.city || "").trim();
+  const normalize = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  if (!address) return "Alamat draft kosong.";
+  // Hanya nama kecamatan / kota / gabungan keduanya = bukan alamat.
+  const only = [kecamatan, city, `${kecamatan}${city}`, `${city}${kecamatan}`]
+    .filter(Boolean)
+    .map(normalize);
+  const flat = normalize(address);
+  if (flat.length < 15 || only.includes(flat)) {
+    return "Alamat draft cuma kecamatan/kota. Tulis alamat lengkap (jalan, RT/RW, desa, nomor rumah).";
+  }
+  return null;
+}
+
+/**
  * Harga & identitas baris draft selalu dihitung ulang dari master produk.
  * Dipakai saat draft dibuat (AI) dan saat draft diedit admin, supaya harga
  * kiriman AI tidak pernah dipakai dan draft selalu bisa di-approve.
@@ -558,6 +583,8 @@ export async function POST(req: NextRequest) {
     for (const key of ADDRESS_FIELDS) {
       if (!String(shipping[key] || "").trim()) return bad("Alamat draft belum lengkap.");
     }
+    const addressIssue = addressProblem(shipping);
+    if (addressIssue) return bad(addressIssue);
     // Harga dari AI tidak dipakai: semua baris dihitung ulang dari master produk,
     // sama seperti saat admin mengedit draft.
     const priced = await normalizeItems(admin, payload.items);
