@@ -150,6 +150,21 @@ export interface MayarInvoiceData {
   expiredAt?: number;
 }
 
+/**
+ * Nomor HP untuk field `mobile` Mayar.
+ *
+ * Mayar menolak 400 kalau `mobile` lebih dari 15 karakter, dan nomor pesanan tersimpan
+ * apa adanya dari checkout (mis. "+62 896-5265-4335" = 17 karakter). Tanpa pembersihan,
+ * invoice tidak pernah terbit dan customer hanya melihat "Link pembayaran belum tersedia".
+ */
+export function mayarMobile(raw?: string | null): string {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (!digits) return "08000000000";
+  const local = digits.startsWith("62") ? `0${digits.slice(2)}` : digits;
+  const value = local.slice(0, 15);
+  return value || "08000000000";
+}
+
 /** Buat invoice (link pembayaran hosted). `extraData.orderNumber` dikembalikan Mayar untuk jejak. */
 export async function createMayarInvoice(input: {
   name: string;
@@ -320,7 +335,7 @@ export async function createOrderPaymentLink(input: {
     const invoice = await createMayarInvoice({
       name: input.customerName || "Pelanggan SAMAQU",
       email: input.customerEmail || mayarPlaceholderEmail(input.orderNumber),
-      mobile: input.customerWhatsapp || "08000000000",
+      mobile: mayarMobile(input.customerWhatsapp),
       amount,
       description: `SAMAQU ${input.orderNumber}`,
       itemLabel: mayarItemLabel(input.orderNumber, input.items),

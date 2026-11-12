@@ -84,10 +84,17 @@ export function PayNowButton({
     setOpening(true);
     try {
       const url = order.payment_url || (await startOnlinePayment(String(order.order_number ?? "")));
+      onNavigate?.();
       if (url) {
-        onNavigate?.();
         window.location.href = url;
+        return;
       }
+      // Gagal membuat link (mis. Mayar menolak data): jangan diam saja seperti tombol mati.
+      // Bawa customer ke halaman instruksi pembayaran supaya dia tetap tahu langkahnya.
+      window.location.href = payHref;
+    } catch {
+      onNavigate?.();
+      window.location.href = payHref;
     } finally {
       setOpening(false);
     }

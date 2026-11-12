@@ -27,6 +27,7 @@ import { useResolvedPaymentMethod } from "@/lib/use-payment-methods";
 import { rupiah, tglID } from "@/lib/akun-format";
 import { getWhatsAppLink } from "@/lib/store-settings";
 import { isAwaitingPayment } from "@/components/akun/PayNowButton";
+import { startOnlinePayment } from "@/lib/mayar-client";
 
 type CustomerOrder = Record<string, any>;
 
@@ -54,6 +55,7 @@ export default function BayarPesananPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [paying, setPaying] = useState(false);
   const { customer, ready } = useAkunCustomer();
 
   useEffect(() => {
@@ -127,6 +129,25 @@ export default function BayarPesananPage() {
   const accountNumber = method?.account_number || "";
   const bankName = method?.bank_name || method?.label || "";
 
+  // Buka link bayar dari halaman ini. Kalau invoice gagal dibuat, arahkan ke WhatsApp admin
+  // supaya customer tidak buntu (dulu halaman ini cuma menyuruh buka menu lain).
+  async function openOnlinePayment() {
+    if (paying || !order) return;
+    setPaying(true);
+    try {
+      const url = order.payment_url || (await startOnlinePayment(String(order.order_number ?? "")));
+      if (url) {
+        window.location.href = url;
+        return;
+      }
+      window.location.href = confirmHref;
+    } catch {
+      window.location.href = confirmHref;
+    } finally {
+      setPaying(false);
+    }
+  }
+
   // Pesan konfirmasi otomatis — nomor pesanan & nominal supaya admin tahu pesanan mana.
   const confirmMessage =
     `Halo SAMAQU, saya sudah melakukan pembayaran.\n` +
@@ -178,9 +199,18 @@ export default function BayarPesananPage() {
                 label="Status"
                 value={<span style={{ color: "#b45309" }}>Belum dibayar</span>}
               />
-              <p className="mt-3 text-[12px] leading-relaxed text-slate-500">
-                Pembayaran online diproses di halaman pembayaran. Klik tombol di detail pesanan
-                untuk melanjutkan.
+              {/* Halaman ini bisa dibuka langsung (bukan hanya lewat tombol di daftar pesanan),
+                  jadi sediakan aksi yang benar-benar bisa diklik — bukan instruksi saja. */}
+              <button
+                type="button"
+                onClick={openOnlinePayment}
+                disabled={paying}
+                className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#B45309] px-4 text-[13px] font-extrabold text-white transition active:scale-[.99] disabled:opacity-70"
+              >
+                {paying ? "Membuka halaman bayar..." : "Lanjut ke Pembayaran"}
+              </button>
+              <p className="mt-2 text-[11.5px] leading-relaxed text-slate-500">
+                Halaman bayar dibuka di tab ini. Kalau belum terbuka, coba lagi atau hubungi admin.
               </p>
             </div>
           ) : (

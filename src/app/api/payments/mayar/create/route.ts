@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { createMayarInvoice, getMayarConfig, mayarPlaceholderEmail, mayarReady } from "@/lib/mayar";
+import { createMayarInvoice, getMayarConfig, mayarMobile, mayarPlaceholderEmail, mayarReady } from "@/lib/mayar";
 import { isPaymentMethodId } from "@/lib/payment-methods";
 
 /**
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     const invoice = await createMayarInvoice({
       name: order.customer_name || "Pelanggan SAMAQU",
       email: order.customer_email || mayarPlaceholderEmail(order.order_number),
-      mobile: order.customer_whatsapp || "08000000000",
+      mobile: mayarMobile(order.customer_whatsapp),
       amount: Number(order.total) || 0,
       description: `SAMAQU ${order.order_number}`,
       orderNumber: order.order_number,
