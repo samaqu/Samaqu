@@ -6,6 +6,7 @@ import { getResellerBalance } from "@/lib/reseller/saldo";
 import { normalizeBankValue } from "@/lib/reseller/banks";
 import { enrichResellerLedger } from "@/lib/reseller/ledger-enrich";
 import { parseResellerDiscount } from "@/lib/reseller/pricing";
+import { levelsForResellers } from "@/lib/reseller/level-server";
 
 /**
  * Detail satu reseller untuk drawer admin: profil + saldo + mutasi terakhir
@@ -43,10 +44,10 @@ export async function GET(
       .limit(10),
     supabase
       .from("orders")
-      .select("id, order_number, status, total, customer_name, created_at")
+      .select("id, order_number, status, total, customer_name, created_at, reseller_shortfall_status")
       .eq("reseller_id", id)
       .order("created_at", { ascending: false })
-      .limit(5),
+      .limit(8),
     supabase
       .from("reseller_withdrawals")
       .select("amount")
@@ -60,8 +61,11 @@ export async function GET(
     0
   );
 
+  const levels = await levelsForResellers([{ id, created_at: (reseller.created_at as string | null) ?? null }]);
+
   return NextResponse.json({
     reseller,
+    level: levels.get(id) ?? null,
     saldo: balance ?? { saldo_tersedia: 0, saldo_ditahan: 0, saldo_total: 0 },
     total_withdrawn: totalWithdrawn,
     ledger: enrichedLedger,

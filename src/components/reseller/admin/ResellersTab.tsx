@@ -14,6 +14,12 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   pending: { label: "Menunggu", cls: "bg-slate-100 text-slate-600" },
 };
 
+const LEVEL_BADGE: Record<string, string> = {
+  silver: "bg-slate-200 text-slate-700",
+  gold: "bg-amber-100 text-amber-800",
+  platinum: "bg-indigo-100 text-indigo-700",
+};
+
 export default function ResellersTab({
   rows,
   loading,
@@ -115,6 +121,7 @@ export default function ResellersTab({
                   <th className="px-4 py-2.5">Kota</th>
                   <th className="px-4 py-2.5 text-right">Saldo</th>
                   <th className="px-4 py-2.5">Diskon</th>
+                  <th className="px-4 py-2.5">Level</th>
                   <th className="px-4 py-2.5">Status</th>
                   <th className="px-4 py-2.5 text-right">Aksi</th>
                 </tr>
@@ -149,6 +156,18 @@ export default function ResellersTab({
                           <span className="inline-block px-2.5 py-1 rounded-lg text-[12px] font-extrabold bg-blue-100 text-blue-700">
                             {Number(row.discount_percent)}%
                           </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {row.level ? (
+                          <div>
+                            <span className={`inline-block px-2.5 py-1 rounded-lg text-[11px] font-extrabold ${LEVEL_BADGE[row.level.key]}`}>
+                              {row.level.label}
+                            </span>
+                            <div className="text-[10.5px] text-slate-400 mt-0.5">{rupiah(row.level.rata_rata)}/bln</div>
+                          </div>
+                        ) : (
+                          <span className="text-[12px] text-slate-400">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3">

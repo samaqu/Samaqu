@@ -207,6 +207,13 @@ export const base44 = {
         return json.items ?? [];
       },
 
+      /** Satu pesanan menurut nomornya, bentuk SAMA dengan baris daftar Transaksi (untuk drawer Detail). */
+      async orderByNumber(orderNumber: string) {
+        const params = new URLSearchParams({ order_number: orderNumber });
+        const json = await call<{ items: any[] }>("GET", `${TRANSAKSI}?${params.toString()}`);
+        return (json.items ?? [])[0] ?? null;
+      },
+
       /** Catat transaksi manual (langsung Lunas, stok langsung terpotong). */
       async createManual(data: any) {
         return call<{ order_number: string; total: number }>("POST", TRANSAKSI, data);

@@ -7,6 +7,7 @@ import { normalizeBankValue } from "@/lib/reseller/banks";
 import { getResellerBalance } from "@/lib/reseller/saldo";
 import { parseResellerDiscount } from "@/lib/reseller/pricing";
 import { getResellerSettings } from "@/lib/reseller/settings";
+import { levelsForResellers } from "@/lib/reseller/level-server";
 
 /**
  * Daftar reseller + saldo masing-masing (admin ops & panel admin).
@@ -25,9 +26,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Gagal memuat daftar reseller" }, { status: 500 });
   }
 
+  // Level (Silver/Gold/Platinum) per reseller — aturan sama dengan portal reseller.
+  const levels = await levelsForResellers(
+    (data ?? []).map((row) => ({ id: String(row.id), created_at: (row.created_at as string | null) ?? null }))
+  );
+
   const rows = await Promise.all(
     (data ?? []).map(async (row) => ({
       ...row,
+      level: levels.get(String(row.id)) ?? null,
       saldo: (await getResellerBalance(String(row.id))) ?? {
         saldo_tersedia: 0,
         saldo_ditahan: 0,

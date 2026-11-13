@@ -6,7 +6,9 @@ import { rupiah } from "@/lib/reseller/format";
 import QueueTab from "./QueueTab";
 import PriceTab from "./PriceTab";
 import ResellersTab from "./ResellersTab";
-import ResellerDrawer from "./ResellerDrawer";
+import ResellerDetailDrawer from "./ResellerDetailDrawer";
+import TransaksiDetailDrawer from "@/components/ops/transaksi/TransaksiDetailDrawer";
+import { base44 } from "@/lib/ops-api";
 import LedgerTab from "./LedgerTab";
 import SettingsTab from "./SettingsTab";
 
@@ -35,6 +37,27 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
   const [detail, setDetail] = useState<ResellerAdminRow | null>(null);
   const [openResellerId, setOpenResellerId] = useState("");
   const [error, setError] = useState("");
+  // Detail Transaksi (drawer yang sama dengan menu Transaksi) untuk satu pesanan reseller.
+  const [orderDetail, setOrderDetail] = useState<any>(null);
+  const transaksiBase = variant === "panel" ? "/panel-admin/transaksi" : "/ops/transaksi";
+
+  const openOrder = useCallback(async (orderNumber: string) => {
+    try {
+      const found = await base44.entities.Transaction.orderByNumber(orderNumber);
+      if (found) setOrderDetail(found);
+      else setError(`Pesanan ${orderNumber} tidak ditemukan di Transaksi.`);
+    } catch {
+      setError("Gagal membuka detail pesanan. Coba lagi.");
+    }
+  }, []);
+
+  // Aksi ubah/batalkan/hapus dikerjakan di menu Transaksi (di sana alur konfirmasinya lengkap).
+  const keTransaksi = useCallback(
+    (order: { order_number: string }) => {
+      window.location.assign(`${transaksiBase}?order=${encodeURIComponent(order.order_number)}`);
+    },
+    [transaksiBase]
+  );
 
   // Tab awal bisa dari URL (?tab=data) — dipakai kartu dashboard ops.
   useEffect(() => {
@@ -153,7 +176,7 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
       ) : null}
 
       {tab === "perlu-dicek" ? (
-        <QueueTab queue={queue} loading={loadingQueue} onChanged={refreshAll} />
+        <QueueTab queue={queue} loading={loadingQueue} onChanged={refreshAll} onOpenOrder={openOrder} />
       ) : tab === "harga" ? (
         <PriceTab />
       ) : tab === "data" ? (
@@ -170,7 +193,33 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
         <SettingsTab onChanged={loadStats} />
       )}
 
-      {detail ? <ResellerDrawer row={detail} onClose={() => setDetail(null)} /> : null}
+      {detail ? (
+        <ResellerDetailDrawer
+          row={detail}
+          defaultDiscount={defaultDiscount}
+          tema={variant === "panel" ? "warna" : "mono"}
+          onClose={() => setDetail(null)}
+          onOpenOrder={openOrder}
+        />
+      ) : null}
+
+      <TransaksiDetailDrawer
+        open={!!orderDetail}
+        order={orderDetail}
+        variant="panel"
+        owner={variant === "panel" ? "panel" : "ops"}
+        onResiCreated={async (patch: Record<string, unknown>, refreshFromServer = false) => {
+          if (refreshFromServer && orderDetail?.order_number) {
+            await openOrder(orderDetail.order_number);
+            return;
+          }
+          setOrderDetail((prev: any) => (prev ? { ...prev, ...patch } : prev));
+        }}
+        onClose={() => setOrderDetail(null)}
+        onEdit={keTransaksi}
+        onCancel={keTransaksi}
+        onDelete={keTransaksi}
+      />
     </div>
   );
 }

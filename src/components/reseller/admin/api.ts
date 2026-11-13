@@ -6,6 +6,7 @@
  */
 
 import { supabase } from "@/lib/supabase";
+import type { LevelSummary } from "@/lib/reseller/level";
 import type {
   LedgerOrderPaymentInfo,
   LedgerTopupInfo,
@@ -78,6 +79,8 @@ export interface ResellerAdminRow {
   /** Diskon khusus reseller (persen). null = ikut diskon default. */
   discount_percent?: number | string | null;
   saldo?: { saldo_tersedia: number; saldo_ditahan: number; saldo_total: number };
+  /** Level Silver/Gold/Platinum (null kalau gagal dihitung). */
+  level?: LevelSummary | null;
 }
 
 export interface QueueTopup {
@@ -177,7 +180,16 @@ export interface ResellerDetail {
   /** Jumlah penarikan berstatus paid (sudah ditransfer). */
   total_withdrawn: number;
   ledger: LedgerMutation[];
-  orders: { id: string; order_number: string; status: string; total: number; customer_name: string | null; created_at: string }[];
+  orders: {
+    id: string;
+    order_number: string;
+    status: string;
+    total: number;
+    customer_name: string | null;
+    created_at: string;
+    reseller_shortfall_status?: string | null;
+  }[];
+  level?: LevelSummary | null;
 }
 
 export interface ResellerSettings {

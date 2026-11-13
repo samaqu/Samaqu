@@ -66,10 +66,13 @@ export default function QueueTab({
   queue,
   loading,
   onChanged,
+  onOpenOrder,
 }: {
   queue: QueuePayload | null;
   loading: boolean;
   onChanged: () => void;
+  /** Buka Detail Transaksi untuk nomor pesanan di baris "Bayar kekurangan". */
+  onOpenOrder?: (orderNumber: string) => void;
 }) {
   const [chip, setChip] = useState<Chip>("semua");
   const [proof, setProof] = useState<string | null>(null);
@@ -202,7 +205,18 @@ export default function QueueTab({
                       </td>
                       <td className="px-4 py-3">{resellerCell(row)}</td>
                       <td className="px-4 py-3 text-[12px] text-slate-500">
-                        Pesanan {row.orders?.order_number || "—"}
+                        Pesanan{" "}
+                        {row.orders?.order_number && onOpenOrder ? (
+                          <button
+                            type="button"
+                            className="font-bold text-blue-700 underline underline-offset-2 hover:text-blue-800"
+                            onClick={() => onOpenOrder(row.orders!.order_number)}
+                          >
+                            {row.orders.order_number}
+                          </button>
+                        ) : (
+                          row.orders?.order_number || "—"
+                        )}
                         <div>{methodBadge(row.payment_method)}</div>
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-slate-900">{rupiah(row.amount)}</td>

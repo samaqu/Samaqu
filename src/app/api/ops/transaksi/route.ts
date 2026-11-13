@@ -553,6 +553,11 @@ export async function GET(req: NextRequest) {
   if (start) query = query.gte("created_at", wibDayStart(start));
   if (end) query = query.lt("created_at", wibDayStart(shiftDay(end, 1)));
 
+  // Opsional: satu pesanan menurut nomornya (dipakai menu Reseller untuk membuka Detail Transaksi
+  // pesanan lama tanpa menunggu daftar bulan berjalan). Tanpa parameter ini perilaku lama tidak berubah.
+  const orderNumberParam = String(sp.get("order_number") || "").trim();
+  if (orderNumberParam) query = query.eq("order_number", orderNumberParam);
+
   const { data: orders, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
