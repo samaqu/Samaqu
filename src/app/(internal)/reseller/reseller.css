@@ -886,3 +886,47 @@
   .rs-root .order-page .btn, .rs-root .ie-btn, .rs-root .add-line, .rs-root .ongkir-card, .rs-root .switch-row, .rs-root .seg button,
   .rs-root .size-pill, .rs-root .order-bar-back, .rs-root .ic-main, .rs-root .ic-del { transition: none; }
 }
+
+/* ── Level reseller (Silver / Gold / Platinum) di Beranda ── */
+.rs-root .level-card { background: #fff; border: 1px solid var(--rs-bd); border-radius: 20px; padding: 18px 20px; box-shadow: var(--rs-sh); display: flex; flex-direction: column; gap: 14px; }
+.rs-root .lv-top { display: flex; align-items: center; gap: 14px; }
+.rs-root .lv-badge { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; flex: none; }
+.rs-root .lv-silver .lv-badge { background: linear-gradient(135deg, #f1f5f9, #cbd5e1); color: #334155; }
+.rs-root .lv-gold .lv-badge { background: linear-gradient(135deg, #fef3c7, #f59e0b); color: #78350f; }
+.rs-root .lv-platinum .lv-badge { background: linear-gradient(135deg, #e0e7ff, #818cf8); color: #1e1b4b; }
+.rs-root .lv-head { flex: 1; min-width: 0; }
+.rs-root .lv-head small, .rs-root .lv-avg small { display: block; font-size: 11.5px; font-weight: 700; color: var(--rs-mut); text-transform: uppercase; letter-spacing: .06em; }
+.rs-root .lv-head b { display: block; font-size: 24px; font-weight: 800; color: var(--rs-ink); letter-spacing: -.02em; line-height: 1.15; margin-top: 2px; }
+.rs-root .lv-avg { text-align: right; min-width: 0; }
+.rs-root .lv-avg b { display: block; font-size: 17px; font-weight: 800; color: var(--rs-ink); letter-spacing: -.01em; margin-top: 3px; }
+.rs-root .lv-bar { height: 10px; border-radius: 999px; background: var(--rs-soft); overflow: hidden; }
+.rs-root .lv-bar > span { display: block; height: 100%; border-radius: 999px; min-width: 6px; transition: width .5s cubic-bezier(.2, .8, .2, 1); }
+.rs-root .lv-fill-silver > span { background: linear-gradient(90deg, #94a3b8, #64748b); }
+.rs-root .lv-fill-gold > span { background: linear-gradient(90deg, #fbbf24, #d97706); }
+.rs-root .lv-fill-platinum > span { background: linear-gradient(90deg, #818cf8, #4f46e5); }
+.rs-root .lv-msg { font-size: 14px; font-weight: 600; color: var(--rs-ink); line-height: 1.45; }
+.rs-root .lv-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rs-root .lv-steps li { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; border: 1px solid var(--rs-bd); border-radius: 12px; background: #fff; min-width: 0; }
+.rs-root .lv-steps li.now { border-color: var(--rs-ink); box-shadow: 0 0 0 1px var(--rs-ink) inset; }
+.rs-root .lv-steps li b { font-size: 13px; font-weight: 800; color: var(--rs-ink); }
+.rs-root .lv-steps li small { font-size: 11.5px; color: var(--rs-mut); }
+.rs-root .lv-steps li:not(.now):not(.done) b { color: var(--rs-mut); }
+.rs-root .lv-dot { width: 16px; height: 16px; border-radius: 999px; display: grid; place-items: center; color: #fff; margin-bottom: 4px; }
+.rs-root .lv-dot-silver { background: #94a3b8; }
+.rs-root .lv-dot-gold { background: #f59e0b; }
+.rs-root .lv-dot-platinum { background: #6366f1; }
+.rs-root .lv-steps li:not(.now):not(.done) .lv-dot { opacity: .45; }
+.rs-root .lv-note { font-size: 11.5px; color: var(--rs-mut); line-height: 1.45; }
+@media (max-width: 767px) {
+  .rs-root .level-card { padding: 16px; border-radius: 18px; gap: 12px; }
+  .rs-root .lv-top { flex-wrap: wrap; }
+  .rs-root .lv-badge { width: 46px; height: 46px; border-radius: 14px; }
+  .rs-root .lv-head b { font-size: 22px; }
+  .rs-root .lv-avg { flex-basis: 100%; text-align: left; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-top: 10px; border-top: 1px solid var(--rs-soft); }
+  .rs-root .lv-avg b { margin-top: 0; }
+  .rs-root .lv-steps { gap: 6px; }
+  .rs-root .lv-steps li { padding: 9px 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rs-root .lv-bar > span { transition: none; }
+}

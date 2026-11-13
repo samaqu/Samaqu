@@ -5,6 +5,8 @@
  * Token sesi disimpan di localStorage — reseller tidak memakai Supabase Auth.
  */
 
+import type { LevelSummary } from "./level";
+
 const TOKEN_KEY = "samaqu:reseller-token";
 
 export function getResellerToken(): string {
@@ -266,6 +268,8 @@ export interface StatsResponse {
   belanja_modal: number;
   estimasi_untung: number;
   pending_topup: number;
+  /** Level reseller (null kalau gagal dihitung). */
+  level: LevelSummary | null;
 }
 
 export interface ShippingOption {

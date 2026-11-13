@@ -130,5 +130,9 @@ declare module "lucide-react" {
   export const Building2: FC<IconProps>;
   export const Wrench: FC<IconProps>;
   export const Laptop: FC<IconProps>;
+  // Level reseller (Silver / Gold / Platinum)
+  export const Medal: FC<IconProps>;
+  export const Award: FC<IconProps>;
+  export const Gem: FC<IconProps>;
   export type LucideIcon = FC<IconProps>;
 }

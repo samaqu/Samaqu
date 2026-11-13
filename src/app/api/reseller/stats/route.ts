@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resellerSession, resellerUnauthorized } from "@/lib/reseller/auth";
+import { LEVEL_WINDOW_DAYS, bulanDihitung, hitungLevel, type LevelSummary } from "@/lib/reseller/level";
 
 /**
  * Statistik ringkas bulan ini untuk dashboard reseller (WIB):
@@ -69,7 +70,32 @@ export async function GET(req: NextRequest) {
     0
   );
 
+  // Level: rata-rata belanja modal per bulan dalam 90 hari terakhir (query terpisah supaya statistik
+  // bulan ini di atas tidak berubah; kalau gagal, level dikosongkan dan kartunya disembunyikan).
+  let level: LevelSummary | null = null;
+  const nowDate = new Date();
+  const windowStart = new Date(nowDate.getTime() - LEVEL_WINDOW_DAYS * 24 * 3600 * 1000);
+  const { data: windowOrders, error: windowError } = await supabase
+    .from("orders")
+    .select("status, order_items(quantity, price)")
+    .eq("reseller_id", resellerId)
+    .gte("created_at", windowStart.toISOString());
+  if (windowError) {
+    console.error("[RESELLER-STATS] Gagal membaca pesanan untuk level:", windowError.message);
+  } else {
+    let belanjaJendela = 0;
+    for (const order of windowOrders ?? []) {
+      if (order.status === "dibatalkan") continue;
+      const items = (order.order_items ?? []) as Array<{ quantity: number | null; price: number | null }>;
+      for (const item of items) {
+        belanjaJendela += (Number(item.price) || 0) * (Number(item.quantity) || 0);
+      }
+    }
+    level = hitungLevel(belanjaJendela, bulanDihitung(session.reseller.created_at, nowDate));
+  }
+
   return NextResponse.json({
+    level,
     bulan: monthKey,
     pesanan,
     pcs,

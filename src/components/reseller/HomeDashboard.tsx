@@ -14,6 +14,7 @@ import {
 import { rupiah } from "@/lib/reseller/format";
 import { useReseller } from "./ResellerShell";
 import { MutasiList, PesananList } from "./ListPanels";
+import LevelCard from "./LevelCard";
 import { Note, SkeletonCards } from "./ui";
 
 /** Dashboard reseller: saldo, statistik bulan ini, aktivitas terbaru. */
@@ -107,6 +108,8 @@ export default function HomeDashboard() {
           ))}
         </div>
       ) : null}
+
+      {stats?.level ? <LevelCard level={stats.level} /> : null}
 
       <section>
         <h2 className="bold" style={{ fontSize: 15, marginBottom: 12 }}>
