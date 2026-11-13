@@ -363,8 +363,25 @@
   .rs-root .grid-stats { grid-template-columns: repeat(2, 1fr); }
   .rs-root .grid2, .rs-root .grid3, .rs-root .form-grid { grid-template-columns: 1fr; }
 }
+/* ── Menu samping versi HP (drawer geser dari kiri; di desktop sidebar tetap tampil) ── */
+.rs-root .ovl { display: none; }
+.rs-root .sb-close {
+  margin-left: auto; width: 34px; height: 34px; border: 0; border-radius: 10px; background: none;
+  color: var(--rs-mut); cursor: pointer; align-items: center; justify-content: center; padding: 0;
+}
+.rs-root .sb-close:hover { background: var(--rs-soft); }
 @media (max-width: 767px) {
-  .rs-root .sb { display: none; }
+  .rs-root .sb {
+    width: min(82vw, 300px); z-index: 60; transform: translateX(-102%); visibility: hidden;
+    transition: transform .22s ease, visibility 0s linear .22s;
+  }
+  .rs-root .sb.open { transform: none; visibility: visible; transition: transform .22s ease; box-shadow: 18px 0 40px -18px rgba(17, 17, 17, .35); }
+  .rs-root .ovl {
+    display: block; position: fixed; inset: 0; z-index: 55; background: rgba(17, 17, 17, .4);
+    opacity: 0; pointer-events: none; transition: opacity .2s ease;
+  }
+  .rs-root .ovl.show { opacity: 1; pointer-events: auto; }
+  .rs-root .sbn-item { padding: 11px 12px; }
   .rs-root .main { margin-left: 0; }
   .rs-root .hd { padding: 12px 16px; }
   .rs-root .hd h1 { font-size: 16px; }

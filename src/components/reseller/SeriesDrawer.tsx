@@ -48,7 +48,6 @@ function DrawerBody({
 }) {
   const selected = group.rows.find((row) => row.id === selectedId) ?? group.rows[0];
   const pool = poolOfRow(group, selected);
-  const shares = pool.series.length > 1;
   const habis = stockOf(selected) < 1;
   const label = selected.series || "Standar";
   const minPrice = Math.min(...group.rows.map((row) => row.price));
@@ -106,14 +105,7 @@ function DrawerBody({
 
           <div className="rsk-sel">
             <div className="rsk-sel-top">
-              <div>
-                <div className="rsk-sel-name">{label}</div>
-                {shares ? (
-                  <div className="rso-sub">
-                    Stok bersama dengan {pool.series.filter((name) => name !== label).join(", ")}
-                  </div>
-                ) : null}
-              </div>
+              <div className="rsk-sel-name">{label}</div>
               <div className="rsk-sel-price">
                 <b>{rupiah(selected.buy_price)}</b>
                 <span>

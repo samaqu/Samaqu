@@ -61,8 +61,7 @@ export function StockTable({ pools }: { pools: StockPool[] }) {
                 <tr key={`${pool.key}|${color}`}>
                   <th scope="row">
                     {index === 0 ? <span className="rsk-series">{pool.series.join(" · ")}</span> : null}
-                    {index === 0 && pool.series.length > 1 ? <small>stok bersama</small> : null}
-                    {label ? <small className="rsk-color">{label}</small> : null}
+                    {label ?<small className="rsk-color">{label}</small> : null}
                   </th>
                   {sizes.map((size) => {
                     const stock = stockCell(pool, color, size);

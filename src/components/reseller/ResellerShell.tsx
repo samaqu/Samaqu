@@ -24,6 +24,8 @@ import {
   History,
   UserRound,
   LogOut,
+  Menu,
+  X,
 } from "lucide-react";
 import {
   ApiError,
@@ -62,7 +64,7 @@ const BOTTOM_NAV: { href: string; label: string; icon: ReactNode }[] = [
   { href: "/reseller/pesanan/baru", label: "Pesan", icon: <PackagePlus size={20} /> },
   { href: "/reseller/pesanan", label: "Pesanan", icon: <History size={20} /> },
   { href: "/reseller/saldo", label: "Saldo", icon: <Wallet size={20} /> },
-  { href: "/reseller/profil", label: "Akun", icon: <UserRound size={20} /> },
+  { href: "/reseller/stok", label: "Stok", icon: <Layers size={20} /> },
 ];
 
 const TITLES: [string, string][] = [
@@ -103,8 +105,23 @@ export default function ResellerShell({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "unauth" | "error">("loading");
   const loadedRef = useRef(false);
+  // Menu samping versi HP (drawer geser dari kiri). Di desktop sidebar selalu tampil.
+  const [drawer, setDrawer] = useState(false);
 
   const isLogin = pathname === "/reseller/login";
+
+  // Drawer menutup saat pindah halaman, dan bisa ditutup dengan tombol Esc.
+  useEffect(() => {
+    setDrawer(false);
+  }, [pathname]);
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDrawer(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawer]);
 
   /**
    * Ambil sesi reseller. Dipakai saat shell dimuat dan saat `refreshMe`.
@@ -251,9 +268,14 @@ export default function ResellerShell({ children }: { children: ReactNode }) {
     <ResellerContext.Provider value={value}>
       <div className="rs-root">
         <div className="app">
-          <aside className="sb">
+          <div className={`ovl${drawer ? " show" : ""}`} onClick={() => setDrawer(false)} aria-hidden="true" />
+
+          <aside className={`sb${drawer ? " open" : ""}`}>
             <div className="sb-head">
               <img src="/logo.svg" alt="SAMAQU" />
+              <button type="button" className="sb-close show-m" onClick={() => setDrawer(false)} aria-label="Tutup menu">
+                <X size={18} />
+              </button>
             </div>
             <p className="sb-kicker">Reseller Center</p>
             <nav className="sb-nav">
@@ -261,7 +283,12 @@ export default function ResellerShell({ children }: { children: ReactNode }) {
                 <div key={group.label}>
                   <p className="sb-label">{group.label}</p>
                   {group.items.map(([href, label, icon]) => (
-                    <Link key={href} href={href} className={`sbn-item ${isActive(pathname, href) ? "on" : ""}`}>
+                    <Link
+                      key={href}
+                      href={href}
+                      className={`sbn-item ${isActive(pathname, href) ? "on" : ""}`}
+                      onClick={() => setDrawer(false)}
+                    >
                       {icon}
                       <span>{label}</span>
                     </Link>
@@ -279,6 +306,15 @@ export default function ResellerShell({ children }: { children: ReactNode }) {
 
           <div className="main">
             <header className="hd">
+              <button
+                type="button"
+                className="iconbtn show-m"
+                onClick={() => setDrawer(true)}
+                aria-label="Buka menu"
+                aria-expanded={drawer}
+              >
+                <Menu size={18} />
+              </button>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="crumb hide-m">Reseller Center</div>
                 <h1>{titleFor(pathname)}</h1>
