@@ -2196,30 +2196,23 @@ export default function TambahProdukPage({
                   const refPrice = category === "Thobe" && activeSeriesTab && seriesBlocks[activeSeriesTab]
                     ? parseInt(seriesBlocks[activeSeriesTab].price) || 0
                     : parseInt(basePrice) || 0;
-                  // Thobe multi-series: HPP milik series pada tab aktif. Selain itu: satu HPP produk.
-                  const hppSeries = category === "Thobe" && activeSeriesTab && seriesBlocks[activeSeriesTab] ? activeSeriesTab : null;
-                  const hppValue = hppSeries ? seriesBlocks[hppSeries].hpp : hpp;
-                  const hppNum = parseInt(hppValue) || 0;
+                  // Thobe multi-series: HPP diisi per series di blok "[Series] — Harga" (dekat Harga Dasar),
+                  // jadi kotak ini tidak menampilkan HPP/margin lagi. Selain itu: satu HPP produk di sini.
+                  const hppPerSeries = category === "Thobe" && !!activeSeriesTab && !!seriesBlocks[activeSeriesTab];
+                  const hppNum = parseInt(hpp) || 0;
                   const profit = refPrice - hppNum;
                   const margin = refPrice > 0 ? Math.round((profit / refPrice) * 100) : 0;
                   return (
                     <div className="pf-panel">
                       <p className="text-sm font-semibold mb-3" style={{ color: "var(--espresso)" }}>Data Internal (Ops)</p>
                       <div className="grid sm:grid-cols-2 gap-4">
+                        {!hppPerSeries && (
                         <div>
-                          <label className="pf-label">HPP per Unit{hppSeries ? ` — ${hppSeries}` : ""} (Rp)</label>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={formatRupiah(hppValue)}
-                            onChange={(e) => (hppSeries ? updateSeriesBlock(hppSeries, { hpp: parseRupiah(e.target.value) }) : setHpp(parseRupiah(e.target.value)))}
-                            className="pf-input"
-                            placeholder="150.000"
-                          />
-                          <p className="pf-hint">
-                            {hppSeries ? `Modal per unit khusus series ${hppSeries}; tiap series punya HPP sendiri.` : "Modal per unit"} — dipakai laporan margin.
-                          </p>
+                          <label className="pf-label">HPP per Unit (Rp)</label>
+                          <input type="text" inputMode="numeric" value={formatRupiah(hpp)} onChange={(e) => setHpp(parseRupiah(e.target.value))} className="pf-input" placeholder="150.000" />
+                          <p className="pf-hint">Modal per unit — dipakai laporan margin.</p>
                         </div>
+                        )}
                         <div>
                           <label className="pf-label">Tipe Produk</label>
                           <div className="flex gap-2">
@@ -2228,7 +2221,9 @@ export default function TambahProdukPage({
                           </div>
                         </div>
                       </div>
-                      <p className="pf-hint mt-3">Margin otomatis: <b>{refPrice > 0 ? `${margin}%` : "—"}</b> · profit/unit {refPrice > 0 ? `Rp ${formatRupiah(String(profit))}` : "—"}</p>
+                      {!hppPerSeries && (
+                        <p className="pf-hint mt-3">Margin otomatis: <b>{refPrice > 0 ? `${margin}%` : "—"}</b> · profit/unit {refPrice > 0 ? `Rp ${formatRupiah(String(profit))}` : "—"}</p>
+                      )}
                     </div>
                   );
                 })()}
@@ -2454,6 +2449,26 @@ export default function TambahProdukPage({
                                 placeholder="389.000" />
                               {errors[`series_${sn}_price`] && <p className="pf-error">{errors[`series_${sn}_price`]}</p>}
                             </div>
+                            {/* HPP per series (mode ops) — di samping Harga Dasar supaya langsung terlihat. */}
+                            {isOps && (() => {
+                              const seriesPrice = parseInt(block.price) || 0;
+                              const seriesProfit = seriesPrice - (parseInt(block.hpp) || 0);
+                              return (
+                                <div>
+                                  <label className="pf-label">HPP per Unit (Rp)</label>
+                                  <input type="text" inputMode="numeric" value={formatRupiah(block.hpp)}
+                                    onChange={(e) => updateSeriesBlock(sn, { hpp: parseRupiah(e.target.value) })}
+                                    className="pf-input"
+                                    placeholder="150.000" />
+                                  <p className="pf-hint">
+                                    Modal per unit series {sn} — dipakai laporan margin.
+                                    {seriesPrice > 0 && (
+                                      <> Margin <b>{Math.round((seriesProfit / seriesPrice) * 100)}%</b> · profit/unit Rp {formatRupiah(String(seriesProfit))}</>
+                                    )}
+                                  </p>
+                                </div>
+                              );
+                            })()}
                           </div>
 
                           {/* CYP toggle */}
