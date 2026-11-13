@@ -1,11 +1,16 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { ChevronRight, Tag, Trash2 } from "lucide-react";
 import { rupiah } from "@/lib/reseller/format";
+import ProductPhoto from "../ProductPhoto";
 import ItemEditor from "./ItemEditor";
 import type { OrderLine } from "./types";
 
-/** Satu item pesanan: kartu terbuka (edit) atau baris ringkas saat tertutup. */
+/**
+ * Satu item pesanan: kartu terbuka (edit) atau, setelah Simpan, sel daftar ringkas ala app native.
+ * Sel ringkas memuat foto, nama, ukuran x jumlah, lencana diskon, dan harga jual; seluruh sel bisa diketuk
+ * untuk membuka lagi, sedangkan tombol hapus terpisah supaya tidak salah pencet.
+ */
 export default function ItemCard({
   line,
   open,
@@ -30,23 +35,28 @@ export default function ItemCard({
   if (!open) {
     return (
       <div className="item-compact" data-line-uid={line.uid}>
-        <div className="min-w-0">
-          <div className="bold" style={{ fontSize: 13.5 }}>
-            {title}
-          </div>
-          <div className="small muted">
-            {line.size || "Ukuran belum dipilih"} × {line.quantity}
-          </div>
-        </div>
-        <div className="ic-actions">
-          <b className="ic-price">{rupiah(line.sellPrice)}</b>
-          <button type="button" className="ic-btn" onClick={onToggle}>
-            Ubah
-          </button>
-          <button type="button" className="ic-btn danger" aria-label={`Hapus ${title}`} onClick={onRemove}>
-            <Trash2 size={14} />
-          </button>
-        </div>
+        <button type="button" className="ic-main" onClick={onToggle} aria-label={`Ubah ${title}`}>
+          <ProductPhoto src={line.product.image} name={line.product.name} series={line.product.series} className="ic-photo" />
+          <span className="ic-txt">
+            <span className="ic-name">{title}</span>
+            <span className="ic-meta">
+              <span>
+                {line.size || "Ukuran belum dipilih"} × {line.quantity}
+              </span>
+              <span className="ic-disc">
+                <Tag size={11} aria-hidden="true" />
+                Diskon {line.product.discount_percent}%
+              </span>
+            </span>
+            <span className="ic-price">
+              Harga jual <b>{rupiah(line.sellPrice)}</b>
+            </span>
+          </span>
+          <ChevronRight size={18} className="ic-chev" aria-hidden="true" />
+        </button>
+        <button type="button" className="ic-del" aria-label={`Hapus ${title}`} onClick={onRemove}>
+          <Trash2 size={17} />
+        </button>
       </div>
     );
   }

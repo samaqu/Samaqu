@@ -530,7 +530,6 @@
   cursor: pointer; transition: border-color .15s ease, background .15s ease;
 }
 .rs-root .add-line:hover { border-color: var(--rs-ink); background: var(--rs-soft); }
-.rs-root .item-compact { border-radius: 14px; padding: 11px 13px; min-height: 62px; }
 
 /* Langkah 2: penerima */
 .rs-root .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: var(--rs-soft); }
@@ -654,7 +653,6 @@
   .rs-root .ongkir-grid { grid-template-columns: 1fr; }
   .rs-root .ongkir-card { min-height: 0; padding: 14px 14px 14px 46px; }
   .rs-root .ongkir-card .cost { margin-top: 4px; }
-  .rs-root .item-compact .ic-btn { min-height: 44px; }
   .rs-root .prod-group-head { min-height: 64px; }
   .rs-root .paste-actions .btn { min-height: 48px; }
   .rs-root .order-bar {
@@ -701,20 +699,8 @@
 .rs-root .prod-group-head .ph-empty .wm, .rs-root .prod-group-head .ph-empty .sub { display: none; }
 .rs-root .prod-group-head .ph-empty .init { font-size: 16px; }
 
-.rs-root .item-compact {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  border: 1px solid var(--rs-bd); border-radius: 12px; background: #fff; padding: 9px 10px; min-height: 58px;
-}
-.rs-root .item-compact .ic-actions { display: flex; align-items: center; gap: 6px; flex: none; }
-.rs-root .item-compact .ic-price { font-size: 12.5px; font-weight: 800; color: var(--rs-ink); white-space: nowrap; }
-.rs-root .item-compact .ic-btn {
-  min-height: 36px; padding: 6px 10px; border-radius: 9px; border: 1px solid var(--rs-bd);
-  background: #fff; font-size: 11.5px; font-weight: 800; color: var(--rs-ink); cursor: pointer;
-}
-.rs-root .item-compact .ic-btn.danger { color: var(--rs-err); border-color: #fecaca; background: #fff7f7; }
 
 @media (max-width: 767px) {
-  .rs-root .item-compact .ic-btn { min-height: 44px; }
     .rs-root .prod-group-head { min-height: 64px; }
 }
 
@@ -856,3 +842,47 @@
 }
 
 .rs-root .orders-table td { overflow-wrap: anywhere; }
+
+/* ── Kartu item ringkas (setelah Simpan): sel daftar ala app native, seluruh kartu bisa diketuk ── */
+.rs-root .item-compact { display: flex; align-items: stretch; border: 1px solid var(--rs-bd); border-radius: 16px; background: #fff; box-shadow: var(--rs-sh); overflow: hidden; animation: rsPopIn .26s ease both; }
+.rs-root .ic-main { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 12px; border: 0; background: none; text-align: left; cursor: pointer; transition: background .15s ease; }
+.rs-root .ic-main:hover { background: #fafaf8; }
+.rs-root .ic-photo { width: 52px; height: 66px; border-radius: 10px; object-fit: cover; background: var(--rs-soft); flex: none; }
+.rs-root .ic-photo.ph-empty .wm, .rs-root .ic-photo.ph-empty .sub { display: none; }
+.rs-root .ic-photo.ph-empty .init { font-size: 15px; }
+.rs-root .ic-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.rs-root .ic-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; font-weight: 800; line-height: 1.3; color: var(--rs-ink); }
+.rs-root .ic-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--rs-mut); }
+.rs-root .ic-disc { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; background: var(--rs-ok); color: #fff; font-size: 11.5px; font-weight: 800; white-space: nowrap; }
+.rs-root .ic-price { font-size: 12.5px; font-weight: 600; color: var(--rs-mut); }
+.rs-root .ic-price b { font-size: 15px; font-weight: 800; color: var(--rs-ink); }
+.rs-root .ic-chev { flex: none; color: #9ca3af; }
+.rs-root .ic-del { flex: none; width: 54px; display: grid; place-items: center; border: 0; border-left: 1px solid var(--rs-bd); background: #fffafa; color: var(--rs-err); cursor: pointer; transition: background .15s ease; }
+.rs-root .ic-del:hover { background: #fef2f2; }
+@keyframes rsPopIn { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
+
+/* ── Rasa app native di layar sentuh (hanya form Buat Pesanan) ── */
+.rs-root .order-page button, .rs-root .order-page a, .rs-root .order-page label {
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.rs-root .order-page .btn, .rs-root .ie-btn, .rs-root .add-line, .rs-root .ongkir-card, .rs-root .switch-row, .rs-root .seg button,
+.rs-root .size-pill, .rs-root .order-bar-back, .rs-root .ic-main, .rs-root .ic-del {
+  transition: transform .12s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease;
+}
+@media (hover: none) and (pointer: coarse) {
+  .rs-root .order-page button:not(:disabled):active, .rs-root .order-page .btn:not(:disabled):active, .rs-root .switch-row:active { transform: scale(.97); }
+  .rs-root .ic-main:active { background: var(--rs-soft); transform: none; }
+  .rs-root .ic-del:active { background: #fee2e2; transform: none; }
+  .rs-root .order-page .ongkir-card:not(:disabled):active { transform: scale(.985); }
+}
+@media (max-width: 767px) {
+  /* 16px mencegah iPhone memperbesar layar otomatis saat kolom diketuk */
+  .rs-root .order-page input, .rs-root .order-page textarea, .rs-root .order-page .rs-wil-btn { font-size: 16px; }
+  .rs-root .ic-main { padding: 12px 10px 12px 12px; }
+  .rs-root .ic-del { width: 50px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rs-root .item-compact { animation: none; }
+  .rs-root .order-page .btn, .rs-root .ie-btn, .rs-root .add-line, .rs-root .ongkir-card, .rs-root .switch-row, .rs-root .seg button,
+  .rs-root .size-pill, .rs-root .order-bar-back, .rs-root .ic-main, .rs-root .ic-del { transition: none; }
+}
