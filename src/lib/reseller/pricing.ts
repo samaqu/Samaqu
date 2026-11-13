@@ -61,6 +61,19 @@ export function effectiveDiscountPercent(
 }
 
 /**
+ * Diskon DASAR yang dilihat reseller di Beranda (tanpa melihat series tertentu): diskon khusus reseller
+ * kalau diisi admin, selain itu diskon default. `sumber` memberi tahu apakah angkanya khusus untuk dia.
+ * Diskon khusus per series bisa menimpa angka ini di Katalog/pesanan (aturan di `effectiveDiscountPercent`).
+ */
+export function resellerBaseDiscount(
+  defaultPercent: number,
+  resellerPercent?: number | string | null
+): { persen: number; sumber: "khusus" | "standar" } {
+  const persen = effectiveDiscountPercent({ price: 0 }, defaultPercent, resellerPercent);
+  return { persen, sumber: isBlank(resellerPercent) ? "standar" : "khusus" };
+}
+
+/**
  * Baca isian diskon dari admin: kosong -> null (ikut default), angka 0-100 dibulatkan 2 desimal,
  * selain itu tidak valid.
  */

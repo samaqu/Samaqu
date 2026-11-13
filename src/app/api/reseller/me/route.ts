@@ -4,6 +4,7 @@ import { resellerSession, resellerUnauthorized } from "@/lib/reseller/auth";
 import { getResellerBalance } from "@/lib/reseller/saldo";
 import { getResellerSettings } from "@/lib/reseller/settings";
 import { isBsiBank, normalizeBankValue } from "@/lib/reseller/banks";
+import { resellerBaseDiscount } from "@/lib/reseller/pricing";
 
 /** Profil reseller + saldo + pengaturan (rekening BSI top up, biaya admin). */
 export async function GET(req: NextRequest) {
@@ -31,6 +32,8 @@ export async function GET(req: NextRequest) {
       status: reseller.status,
     },
     saldo: balance ?? { saldo_tersedia: 0, saldo_ditahan: 0, saldo_total: 0 },
+    // Diskon dasar reseller: khusus (diisi admin per reseller) atau default pengaturan.
+    diskon: resellerBaseDiscount(settings.defaultDiscountPercent, reseller.discount_percent),
     pengaturan: {
       admin_fee_non_bsi: settings.adminFeeNonBsi,
       bsi_bank_name: settings.bsiBankName,

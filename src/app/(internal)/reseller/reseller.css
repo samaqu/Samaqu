@@ -930,3 +930,44 @@
 @media (prefers-reduced-motion: reduce) {
   .rs-root .lv-bar > span { transition: none; }
 }
+
+/* ── Kartu "Diskon kamu" (tiket) di Beranda ── */
+.rs-root .disc-card {
+  display: flex; flex-direction: column; gap: 14px; padding: 16px 18px; border-radius: 20px;
+  border: 1px solid #bbf7d0; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); box-shadow: var(--rs-sh);
+}
+.rs-root .disc-main { display: flex; align-items: stretch; gap: 16px; }
+.rs-root .disc-num { flex: none; min-width: 96px; padding-right: 16px; border-right: 2px dashed #86efac; display: flex; flex-direction: column; justify-content: center; }
+.rs-root .disc-num small { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #166534; }
+.rs-root .disc-num b { font-size: 44px; line-height: 1; font-weight: 800; letter-spacing: -.04em; color: #15803d; margin-top: 2px; white-space: nowrap; }
+.rs-root .disc-num b span { font-size: 22px; letter-spacing: 0; margin-left: 1px; }
+.rs-root .disc-txt { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+.rs-root .disc-tag { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; background: #15803d; color: #fff; font-size: 11px; font-weight: 800; }
+.rs-root .disc-card.khusus .disc-tag { background: var(--rs-black); }
+.rs-root .disc-title { font-size: 15px; font-weight: 800; color: var(--rs-ink); line-height: 1.35; }
+.rs-root .disc-sub { font-size: 11.5px; color: #4b5563; line-height: 1.45; }
+.rs-root .disc-cta { justify-content: center; gap: 6px; }
+@media (min-width: 768px) {
+  .rs-root .disc-card { flex-direction: row; align-items: center; justify-content: space-between; gap: 20px; }
+  .rs-root .disc-main { flex: 1; min-width: 0; }
+  .rs-root .disc-cta { flex: none; }
+}
+
+/* ── Rapikan Beranda di HP ── */
+.rs-root .lv-bar > span { min-width: 10px; }
+@media (max-width: 767px) {
+  /* tiga tombol saldo sejajar, ikon di atas label */
+  .rs-root .saldo-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .rs-root .saldo-actions .btn { flex-direction: column; gap: 6px; padding: 11px 4px; font-size: 12.5px; line-height: 1.2; text-align: center; }
+  .rs-root .disc-card { padding: 14px; border-radius: 18px; gap: 12px; }
+  .rs-root .disc-main { gap: 12px; }
+  .rs-root .disc-num { min-width: 78px; padding-right: 12px; }
+  .rs-root .disc-num b { font-size: 36px; }
+  .rs-root .disc-title { font-size: 14px; }
+  .rs-root .disc-cta { width: 100%; }
+  .rs-root .lv-note { font-size: 11px; }
+}
+/* label bottom nav tidak terpotong; jarak bawah minimal walau tanpa safe-area */
+.rs-root .bnav { padding-bottom: max(env(safe-area-inset-bottom), 6px); }
+.rs-root .bnav a { min-width: 0; }
+.rs-root .bnav a span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

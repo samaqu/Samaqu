@@ -102,9 +102,16 @@ export interface ResellerSettingsView {
   rekening_bsi: boolean;
 }
 
+/** Diskon dasar reseller (persen) dan asalnya: diisi admin untuk dia ("khusus") atau default ("standar"). */
+export interface ResellerDiscountView {
+  persen: number;
+  sumber: "khusus" | "standar";
+}
+
 export interface MeResponse {
   reseller: ResellerProfile;
   saldo: ResellerBalanceView;
+  diskon: ResellerDiscountView;
   pengaturan: ResellerSettingsView;
 }
 

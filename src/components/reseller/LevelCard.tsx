@@ -26,10 +26,7 @@ export default function LevelCard({ level }: { level: LevelSummary }) {
     ? `Naik ke ${level.next.label} kalau rata-rata belanjamu ${ringkas(level.next.min)} per bulan. Kurang ${ringkas(level.sisa)} lagi.`
     : `Kamu di level tertinggi. Pertahankan rata-rata belanja ${ringkas(level.tiers[currentIndex].min)} per bulan.`;
 
-  const basis =
-    level.bulan_dihitung >= 3
-      ? "Dihitung dari rata-rata belanja modal per bulan selama 3 bulan terakhir."
-      : "Dihitung dari rata-rata belanja modal per bulan sejak kamu bergabung.";
+  const basis = level.bulan_dihitung >= 3 ? "Rata-rata belanja 3 bulan terakhir." : "Rata-rata belanja sejak kamu bergabung.";
 
   return (
     <section className={`level-card lv-${level.key}`} aria-label={`Level reseller: ${level.label}`}>
@@ -74,7 +71,7 @@ export default function LevelCard({ level }: { level: LevelSummary }) {
         ))}
       </ol>
 
-      <p className="lv-note">{basis} Pesanan yang dibatalkan tidak dihitung.</p>
+      <p className="lv-note">{basis} Pesanan batal tidak dihitung.</p>
     </section>
   );
 }
