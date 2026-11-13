@@ -1,6 +1,6 @@
 "use client";
 
-import { Repeat, Trash2, TrendingUp } from "lucide-react";
+import { AlertTriangle, Check, Repeat, Tag, Trash2, TrendingUp } from "lucide-react";
 import { rupiah } from "@/lib/reseller/format";
 import RupiahInput from "../RupiahInput";
 import ProductPhoto from "../ProductPhoto";
@@ -8,7 +8,8 @@ import type { OrderLine } from "./types";
 
 /**
  * Blok satu item terpilih: produk, ukuran, jumlah, harga jual, untung.
- * Urutan dibuat searah mata: apa yang dibeli -> ukuran -> berapa banyak & harga -> untungnya.
+ * Urutan dibuat searah mata: apa yang dibeli -> harga reseller & diskon -> ukuran -> berapa banyak & harga jual
+ * -> untungnya -> Simpan (kartu mengecil jadi satu baris ringkas).
  */
 export default function ItemEditor({
   line,
@@ -16,12 +17,15 @@ export default function ItemEditor({
   onVariant,
   onRemove,
   onReplace,
+  onSave,
 }: {
   line: OrderLine;
   onChange: (patch: Partial<OrderLine>) => void;
   onVariant: (patch: { color?: string; size?: string }) => void;
   onRemove: () => void;
   onReplace: () => void;
+  /** Simpan item: menutup kartu jadi baris ringkas (hanya tampilan). */
+  onSave: () => void;
 }) {
   const buy = line.product.buy_price;
   const minSell = line.product.min_sell_price;
@@ -33,6 +37,8 @@ export default function ItemEditor({
   const colors = [...new Set(line.product.variants.map((variant) => variant.color))];
   const sizes = line.product.variants.filter((variant) => variant.color === line.color);
   const title = line.product.series ? `${line.product.name} — ${line.product.series}` : line.product.name;
+  // Simpan aktif kalau ukuran sudah dipilih dan harga jual tidak di bawah batas minimal.
+  const canSave = Boolean(line.size) && sellValid;
 
   return (
     <div className="item-editor">
@@ -40,13 +46,10 @@ export default function ItemEditor({
         <ProductPhoto src={line.product.image} name={line.product.name} series={line.product.series} className="ie-photo" />
         <div className="ie-title">
           <div className="ie-name">{title}</div>
-          <div className="ie-meta">
-            Harga beli kamu <b>{rupiah(buy)}</b>
-            <span>
-              {" "}
-              · katalog <s>{rupiah(line.product.price)}</s> (−{line.product.discount_percent}%)
-            </span>
-          </div>
+          <span className="ie-disc">
+            <Tag size={13} aria-hidden="true" />
+            Diskon reseller {line.product.discount_percent}%
+          </span>
         </div>
         <div className="ie-acts">
           <button type="button" className="ie-btn" onClick={onReplace}>
@@ -56,6 +59,20 @@ export default function ItemEditor({
           <button type="button" className="iconbtn" aria-label={`Hapus ${title}`} onClick={onRemove}>
             <Trash2 size={15} />
           </button>
+        </div>
+      </div>
+
+      <div className="ie-price-box">
+        <div>
+          <span className="ie-price-label">Harga reseller kamu</span>
+          <div className="ie-price-main">
+            <b>{rupiah(buy)}</b>
+            <small>/ pcs</small>
+          </div>
+        </div>
+        <div className="ie-price-cat">
+          <span>Harga katalog</span>
+          <s>{rupiah(line.product.price)}</s>
         </div>
       </div>
 
@@ -145,6 +162,19 @@ export default function ItemEditor({
           Untung <b>{rupiah(profit)}</b> / pcs
         </span>
         <small>{profitPct}% dari harga jual</small>
+      </div>
+
+      <div className="ie-save">
+        {!line.size ? (
+          <span className="ie-save-hint">
+            <AlertTriangle size={14} aria-hidden="true" />
+            Pilih ukuran dulu.
+          </span>
+        ) : null}
+        <button type="button" className="btn ie-save-btn" disabled={!canSave} onClick={onSave}>
+          <Check size={16} strokeWidth={3} aria-hidden="true" />
+          Simpan
+        </button>
       </div>
     </div>
   );

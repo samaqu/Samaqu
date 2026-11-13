@@ -53,7 +53,14 @@ export default function ItemCard({
 
   return (
     <div data-line-uid={line.uid}>
-      <ItemEditor line={line} onChange={onChange} onVariant={onVariant} onRemove={onRemove} onReplace={onReplace} />
+      <ItemEditor
+        line={line}
+        onChange={onChange}
+        onVariant={onVariant}
+        onRemove={onRemove}
+        onReplace={onReplace}
+        onSave={onToggle}
+      />
     </div>
   );
 }
