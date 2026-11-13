@@ -259,9 +259,6 @@
 .rs-root .stk-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--rs-bd); }
 .rs-root .stk-head-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .rs-root .stk-head h2 { margin: 0; font-size: 15px; font-weight: 800; color: var(--rs-ink); }
-.rs-root .stk-thumb { width: 44px; height: 56px; border-radius: 8px; object-fit: cover; background: var(--rs-soft); flex: none; }
-.rs-root .stk-thumb.ph-empty .wm, .rs-root .stk-thumb.ph-empty .sub { display: none; }
-.rs-root .stk-thumb.ph-empty .init { font-size: 14px; }
 .rs-root .rsk-scroll { overflow-x: auto; }
 .rs-root .rsk-tbl { width: 100%; min-width: 460px; border-collapse: separate; border-spacing: 0; font-size: 13px; }
 .rs-root .rsk-tbl th, .rs-root .rsk-tbl td { padding: 10px 6px; text-align: center; border-bottom: 1px solid #f2f2ef; }

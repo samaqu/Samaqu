@@ -72,6 +72,19 @@ export function poolsOf(group: ProductGroup): StockPool[] {
   return pools;
 }
 
+/**
+ * Satu baris per SERIES, tanpa menggabungkan series yang berbagi stok. Dipakai tabel menu Stok:
+ * tiap series tampil sendiri dengan angka stok yang bisa dipesan lewat series itu.
+ */
+export function seriesPools(group: ProductGroup): StockPool[] {
+  return group.rows.map((row) => ({
+    key: row.id,
+    series: [row.series || "Standar"],
+    rows: [row],
+    total: stockOf(row),
+  }));
+}
+
 /** Stok fisik produk = jumlah stok tiap kolam (bukan jumlah tiap series). */
 export const groupStock = (group: ProductGroup): number =>
   poolsOf(group).reduce((sum, pool) => sum + pool.total, 0);

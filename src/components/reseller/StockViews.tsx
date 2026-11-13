@@ -55,12 +55,13 @@ export function StockTable({ pools }: { pools: StockPool[] }) {
         </thead>
         <tbody>
           {pools.flatMap((pool) =>
-            colorRows(pool).map(({ color, label }, index) => {
+            colorRows(pool).map(({ color, label }) => {
               const rowTotal = sizes.reduce((sum, size) => sum + (stockCell(pool, color, size) ?? 0), 0);
               return (
                 <tr key={`${pool.key}|${color}`}>
                   <th scope="row">
-                    {index === 0 ? <span className="rsk-series">{pool.series.join(" · ")}</span> : null}
+                    {/* Nama series tampil di SETIAP baris (juga baris warna) supaya tiap baris utuh dibaca sendiri. */}
+                    <span className="rsk-series">{pool.series.join(" · ")}</span>
                     {label ?<small className="rsk-color">{label}</small> : null}
                   </th>
                   {sizes.map((size) => {

@@ -3,15 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { resellerApi, type KatalogProduct } from "@/lib/reseller/client";
-import { filterGroups, groupProducts, groupStock, poolsOf } from "@/lib/reseller/stock-view";
-import ProductPhoto from "./ProductPhoto";
+import { filterGroups, groupProducts, seriesPools } from "@/lib/reseller/stock-view";
 import { StockTable } from "./StockViews";
 import { EmptyState, Note } from "./ui";
 
 /**
- * Menu Stok reseller: stok per produk, per series (series yang berbagi stok digabung), per ukuran,
- * dan per warna kalau produknya punya warna. Hanya membaca data katalog reseller yang sama dengan
- * menu Katalog; tidak ada data baru dan tidak ada aksi tulis.
+ * Menu Stok reseller: satu kartu per produk (= per warna), isinya tabel stok per series dan per ukuran
+ * (plus baris per warna kalau produknya punya beberapa warna). Setiap series tampil sendiri, tidak digabung.
+ * Hanya membaca data katalog reseller yang sama dengan menu Katalog; tidak ada data baru dan tidak ada aksi tulis.
  */
 export default function StokPanel() {
   const [products, setProducts] = useState<KatalogProduct[]>([]);
@@ -54,25 +53,19 @@ export default function StokPanel() {
         <EmptyState text="Belum ada produk yang bisa dijual reseller. Hubungi admin SAMAQU." />
       ) : (
         <div className="stk-list">
-          {groups.map((group) => {
-            const pools = poolsOf(group);
-            const total = groupStock(group);
-            return (
-              <section className="stk-card" key={group.key}>
-                <div className="stk-head">
-                  <ProductPhoto src={group.image} name={group.name} className="stk-thumb" />
-                  <div className="stk-head-txt">
-                    <h2>{group.name}</h2>
-                    <span className="muted small">
-                      {group.category} · {group.rows.length} series
-                    </span>
-                  </div>
-                  <span className={`badge ${total < 1 ? "err" : "muted"}`}>{total < 1 ? "Habis" : `${total} unit`}</span>
+          {groups.map((group) => (
+            <section className="stk-card" key={group.key}>
+              <div className="stk-head">
+                <div className="stk-head-txt">
+                  <h2>{group.name}</h2>
+                  <span className="muted small">
+                    {group.category} · {group.rows.length} series
+                  </span>
                 </div>
-                <StockTable pools={pools} />
-              </section>
-            );
-          })}
+              </div>
+              <StockTable pools={seriesPools(group)} />
+            </section>
+          ))}
         </div>
       )}
     </div>
