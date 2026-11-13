@@ -1035,3 +1035,85 @@
   /* tombol utama menempel di atas bottom nav */
   .rs-root .pay-cta { position: sticky; bottom: calc(56px + env(safe-area-inset-bottom) + 6px); z-index: 30; padding: 10px; margin: 0 -2px; border-radius: 16px; background: rgba(255,255,255,.96); border: 1px solid var(--rs-bd); box-shadow: 0 -8px 24px rgba(17,17,17,.08); }
 }
+
+/* ── Materi reseller ── */
+.rs-root .mt-page { display: flex; flex-direction: column; gap: 16px; }
+.rs-root .mt-hero {
+  position: relative; overflow: hidden; display: flex; align-items: flex-end; justify-content: space-between; gap: 18px;
+  padding: 24px; border-radius: 22px; color: #fff;
+  background: radial-gradient(120% 140% at 100% 0%, rgba(34, 197, 94, .28) 0%, rgba(34, 197, 94, 0) 55%), linear-gradient(135deg, #111 0%, #1f2937 100%);
+}
+.rs-root .mt-hero-txt { min-width: 0; max-width: 560px; }
+.rs-root .mt-hero-kick { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; background: rgba(255, 255, 255, .12); font-size: 11.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #bbf7d0; }
+.rs-root .mt-hero h1 { margin: 12px 0 6px; font-size: 26px; line-height: 1.15; font-weight: 800; letter-spacing: -.02em; color: #fff; text-wrap: balance; }
+.rs-root .mt-hero p { margin: 0; font-size: 13.5px; line-height: 1.55; color: rgba(255, 255, 255, .72); }
+.rs-root .mt-hero-stats { flex: none; display: flex; gap: 10px; }
+.rs-root .mt-hero-stats div { min-width: 84px; padding: 11px 14px; border-radius: 16px; background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .14); text-align: center; }
+.rs-root .mt-hero-stats b { display: block; font-size: 24px; font-weight: 800; line-height: 1.1; letter-spacing: -.02em; }
+.rs-root .mt-hero-stats span { font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, .7); text-transform: uppercase; letter-spacing: .06em; }
+
+.rs-root .mt-tools { display: flex; flex-direction: column; gap: 12px; }
+.rs-root .mt-search { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border-radius: 14px; background: #fff; border: 1px solid var(--rs-bd); color: var(--rs-mut); box-shadow: var(--rs-sh); }
+.rs-root .mt-search:focus-within { border-color: var(--rs-ink); box-shadow: 0 0 0 3px rgba(17, 17, 17, .08); }
+.rs-root .mt-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: var(--rs-ink); }
+.rs-root .mt-search button { display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 50%; background: var(--rs-soft); color: var(--rs-tx); cursor: pointer; }
+.rs-root .mt-chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; padding: 2px 2px 4px; margin: 0 -2px; }
+.rs-root .mt-chips::-webkit-scrollbar { display: none; }
+.rs-root .mt-chips button { flex: none; scroll-snap-align: start; display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 15px; border-radius: 999px; border: 1px solid var(--rs-bd); background: #fff; color: var(--rs-tx); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.rs-root .mt-chips button small { font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: var(--rs-soft); color: var(--rs-mut); }
+.rs-root .mt-chips button.on { background: var(--rs-black); border-color: var(--rs-black); color: #fff; }
+.rs-root .mt-chips button.on small { background: rgba(255, 255, 255, .18); color: #fff; }
+
+.rs-root .mt-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.rs-root .mt-sk { height: 270px; border-radius: 18px; }
+.rs-root .mt-card {
+  display: flex; flex-direction: column; width: 100%; min-width: 0; padding: 0; overflow: hidden; text-align: left; cursor: pointer;
+  border-radius: 18px; border: 1px solid var(--rs-bd); background: #fff; box-shadow: var(--rs-sh); color: inherit; font: inherit;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.rs-root .mt-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(17, 17, 17, .1); border-color: #d4d4cf; }
+.rs-root .mt-card:focus-visible { outline: 3px solid rgba(17, 17, 17, .35); outline-offset: 2px; }
+.rs-root .mt-card:active { transform: scale(.985); }
+.rs-root .mt-media { position: relative; display: block; width: 100%; background: #111; overflow: hidden; }
+.rs-root .mt-card.t-video .mt-media { aspect-ratio: 9 / 16; }
+.rs-root .mt-card.t-galeri .mt-media { aspect-ratio: 4 / 5; background: var(--rs-soft); }
+.rs-root .mt-card.t-artikel .mt-media, .rs-root .mt-card.t-teks .mt-media { aspect-ratio: 16 / 9; }
+.rs-root .mt-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.rs-root .mt-card.t-video .mt-media::after { content: ""; position: absolute; inset: auto 0 0 0; height: 40%; background: linear-gradient(to top, rgba(0, 0, 0, .5), rgba(0, 0, 0, 0)); }
+.rs-root .mt-card .mt-play { z-index: 1; width: 48px; height: 48px; margin: -24px 0 0 -24px; transition: transform .18s ease; }
+.rs-root .mt-card:hover .mt-play { transform: scale(1.08); }
+.rs-root .mt-ph { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; }
+.rs-root .mt-card.t-artikel .mt-media { background: linear-gradient(135deg, #14532d, #15803d); }
+.rs-root .mt-card.t-teks .mt-media { background: linear-gradient(135deg, #1e1b4b, #4f46e5); }
+.rs-root .mt-new { position: absolute; z-index: 2; top: 10px; left: 10px; padding: 3px 9px; border-radius: 999px; background: #22c55e; color: #052e16; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.rs-root .mt-count { position: absolute; z-index: 2; top: 10px; right: 10px; display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; background: rgba(17, 17, 17, .72); color: #fff; font-size: 11px; font-weight: 800; }
+.rs-root .mt-body { display: flex; flex-direction: column; gap: 5px; padding: 12px 12px 14px; min-width: 0; }
+.rs-root .mt-meta { display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--rs-mut); }
+.rs-root .mt-title { font-size: 14px; font-weight: 800; line-height: 1.3; color: var(--rs-ink); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.rs-root .mt-sum { font-size: 12px; line-height: 1.45; color: var(--rs-mut); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.rs-root .mt-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 40px 20px; border: 1.5px dashed var(--rs-bd); border-radius: 20px; background: #fff; }
+.rs-root .mt-empty-ic { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 16px; background: var(--rs-soft); color: var(--rs-ink); }
+.rs-root .mt-empty b { font-size: 16px; color: var(--rs-ink); }
+.rs-root .mt-empty p { margin: 0; max-width: 320px; font-size: 13px; line-height: 1.5; color: var(--rs-mut); }
+
+@media (min-width: 640px) {
+  .rs-root .mt-grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
+  .rs-root .mt-hero h1 { font-size: 30px; }
+}
+@media (max-width: 767px) {
+  .rs-root .mt-hero { flex-direction: column; align-items: stretch; padding: 20px; border-radius: 20px; gap: 16px; }
+  .rs-root .mt-hero h1 { font-size: 22px; }
+  .rs-root .mt-hero-stats { gap: 8px; }
+  .rs-root .mt-hero-stats div { flex: 1; min-width: 0; padding: 9px 10px; }
+  .rs-root .mt-hero-stats b { font-size: 20px; }
+  /* chip bisa digeser sampai ke tepi layar */
+  .rs-root .mt-chips { margin: 0 -16px; padding: 2px 16px 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rs-root .mt-card, .rs-root .mt-card .mt-play, .rs-root .mt-chips button { transition: none; }
+  .rs-root .mt-card:hover, .rs-root .mt-card:active { transform: none; }
+}
+
+/* tombol putar (kartu video di halaman Materi; drawer memakai gaya yang sama) */
+.rs-root .mt-play { position: absolute; left: 50%; top: 50%; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .94); color: #111; box-shadow: 0 6px 20px rgba(0, 0, 0, .35); }

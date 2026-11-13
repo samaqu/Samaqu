@@ -7,6 +7,7 @@
 
 import { supabase } from "@/lib/supabase";
 import type { LevelSummary, LevelTier } from "@/lib/reseller/level";
+import type { MateriRow } from "@/lib/reseller/materi";
 import type {
   LedgerOrderPaymentInfo,
   LedgerTopupInfo,
@@ -272,6 +273,18 @@ export const opsResellerApi = {
       method: "PATCH",
       body: JSON.stringify({ updates }),
     }),
+
+  /* Materi reseller */
+  materi: () => adminFetch<{ data: MateriRow[]; belum_siap?: boolean }>("/api/ops/reseller/materi"),
+  createMateri: (payload: Record<string, unknown>) =>
+    adminFetch<{ ok: true; data: MateriRow }>("/api/ops/reseller/materi", { method: "POST", body: JSON.stringify(payload) }),
+  updateMateri: (id: string, payload: Record<string, unknown>) =>
+    adminFetch<{ ok: true; data: MateriRow }>(`/api/ops/reseller/materi/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteMateri: (id: string) =>
+    adminFetch<{ ok: true }>(`/api/ops/reseller/materi/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
   updateSettings: (payload: Record<string, unknown>) =>
     adminFetch<{ ok: true }>("/api/ops/reseller/settings", {

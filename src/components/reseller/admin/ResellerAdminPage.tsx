@@ -12,14 +12,16 @@ import TransaksiDetailDrawer from "@/components/ops/transaksi/TransaksiDetailDra
 import { base44 } from "@/lib/ops-api";
 import LedgerTab from "./LedgerTab";
 import SettingsTab from "./SettingsTab";
+import MateriTab from "./MateriTab";
 
-type TabKey = "perlu-dicek" | "harga" | "data" | "mutasi" | "pengaturan";
+type TabKey = "perlu-dicek" | "harga" | "data" | "mutasi" | "materi" | "pengaturan";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "perlu-dicek", label: "Perlu Dicek" },
   { key: "harga", label: "Produk & Harga" },
   { key: "data", label: "Data Reseller" },
   { key: "mutasi", label: "Mutasi Saldo" },
+  { key: "materi", label: "Materi" },
   { key: "pengaturan", label: "Pengaturan" },
 ];
 
@@ -193,6 +195,8 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
         />
       ) : tab === "mutasi" ? (
         <LedgerTab resellers={resellers} onChanged={refreshAll} />
+      ) : tab === "materi" ? (
+        <MateriTab />
       ) : (
         <SettingsTab onChanged={refreshAll} />
       )}

@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  BookOpen,
   Layers,
   Home,
   ShoppingBag,
@@ -48,6 +49,7 @@ const NAV_GROUPS: { label: string; items: [string, string, ReactNode][] }[] = [
       ["/reseller/pesanan", "Pesanan", <ReceiptText key="i" size={17} />],
     ],
   },
+  { label: "Belajar", items: [["/reseller/materi", "Materi", <BookOpen key="i" size={17} />]] },
   {
     label: "Saldo",
     items: [
@@ -73,6 +75,7 @@ const TITLES: [string, string][] = [
   ["/reseller/pesanan", "Pesanan"],
   ["/reseller/katalog", "Katalog"],
   ["/reseller/stok", "Stok"],
+  ["/reseller/materi", "Materi"],
   ["/reseller/top-up", "Top Up"],
   ["/reseller/tarik-saldo", "Tarik Saldo"],
   ["/reseller/saldo", "Riwayat Saldo"],

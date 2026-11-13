@@ -6,6 +6,7 @@
  */
 
 import type { LevelSummary } from "./level";
+import type { MateriRow } from "./materi";
 
 const TOKEN_KEY = "samaqu:reseller-token";
 
@@ -306,6 +307,9 @@ export interface CreateOrderPayload {
 /* ── Pemanggil endpoint ── */
 
 export const resellerApi = {
+  /** Materi berstatus terbit. `belum_siap` = tabel belum dibuat (daftar kosong). */
+  materi: () => api<{ data: MateriRow[]; belum_siap?: boolean }>("/api/reseller/materi"),
+
   requestOtp: (whatsapp: string) =>
     api<{ ok: true; message: string }>("/api/reseller/auth/request-otp", {
       method: "POST",

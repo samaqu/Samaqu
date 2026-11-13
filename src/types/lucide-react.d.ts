@@ -130,6 +130,9 @@ declare module "lucide-react" {
   export const Building2: FC<IconProps>;
   export const Wrench: FC<IconProps>;
   export const Laptop: FC<IconProps>;
+  // Materi reseller
+  export const BookOpen: FC<IconProps>;
+  export const Images: FC<IconProps>;
   // Level reseller (Silver / Gold / Platinum)
   export const Medal: FC<IconProps>;
   export const Award: FC<IconProps>;
