@@ -185,7 +185,7 @@
 /* ── Katalog & pilih produk ── */
 .rs-root .prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
 .rs-root .prod-card { background: #fff; border: 1px solid var(--rs-bd); border-radius: var(--rs-r); overflow: hidden; display: flex; flex-direction: column; }
-.rs-root .prod-card .ph { aspect-ratio: 4/5; background: var(--rs-soft); object-fit: cover; width: 100%; }
+.rs-root .prod-card .ph { aspect-ratio: 3/4; background: var(--rs-soft); object-fit: cover; width: 100%; }
 .rs-root .prod-card .bd { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; }
 .rs-root .prod-card .nm { font-weight: 800; color: var(--rs-ink); font-size: 13.5px; line-height: 1.35; }
 /* Placeholder foto: jelas bukan gambar rusak — wordmark halus + inisial/nama series. */
@@ -197,6 +197,23 @@
 .rs-root .ph-empty .init { font-size: 28px; font-weight: 800; line-height: 1; letter-spacing: .04em; color: #a8a89f; }
 .rs-root .ph-empty .sub { font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .8; max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rs-root .price-strike { text-decoration: line-through; color: var(--rs-mut); font-size: 12px; }
+
+/* ── Katalog: satu kartu per produk, series dipilih lewat chip di dalam kartu ── */
+/* Kartu yang dibuka tidak boleh menarik tinggi kartu tetangganya. */
+.rs-root .prod-grid { align-items: start; }
+.rs-root .prod-card .bd > .nm { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.rs-root .prod-card .grp-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.rs-root .prod-card .grp-toggle svg { transition: transform .15s ease; }
+.rs-root .prod-card .grp-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+.rs-root .prod-card .grp-series { border-top: 1px solid var(--rs-bd); padding: 10px 14px 14px; }
+.rs-root .prod-card .grp-series .series-grid { grid-template-columns: 1fr; }
+.rs-root a.series-chip { text-decoration: none; color: inherit; }
+.rs-root a.series-chip:hover { border-color: var(--rs-ink); }
+@media (max-width: 767px) {
+  .rs-root .prod-card .bd { padding: 10px 10px 12px; }
+  .rs-root .prod-card .grp-series { padding: 8px 10px 10px; }
+  .rs-root .prod-card .grp-toggle { min-height: 40px; }
+}
 
 .rs-root .pick-row { display: flex; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--rs-bd); border-radius: 12px; background: #fff; cursor: pointer; width: 100%; text-align: left; }
 .rs-root .pick-row:hover { border-color: var(--rs-ink); }
