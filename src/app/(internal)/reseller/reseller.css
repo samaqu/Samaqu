@@ -198,21 +198,92 @@
 .rs-root .ph-empty .sub { font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .8; max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rs-root .price-strike { text-decoration: line-through; color: var(--rs-mut); font-size: 12px; }
 
-/* ── Katalog: satu kartu per produk, series dipilih lewat chip di dalam kartu ── */
-/* Kartu yang dibuka tidak boleh menarik tinggi kartu tetangganya. */
-.rs-root .prod-grid { align-items: start; }
+/* ── Katalog: satu kartu per produk; series dipilih di drawer; menu Stok ── */
 .rs-root .prod-card .bd > .nm { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.rs-root .prod-card .grp-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
-.rs-root .prod-card .grp-toggle svg { transition: transform .15s ease; }
-.rs-root .prod-card .grp-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
-.rs-root .prod-card .grp-series { border-top: 1px solid var(--rs-bd); padding: 10px 14px 14px; }
-.rs-root .prod-card .grp-series .series-grid { grid-template-columns: 1fr; }
-.rs-root a.series-chip { text-decoration: none; color: inherit; }
-.rs-root a.series-chip:hover { border-color: var(--rs-ink); }
+.rs-root .prod-card .grp-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 @media (max-width: 767px) {
   .rs-root .prod-card .bd { padding: 10px 10px 12px; }
-  .rs-root .prod-card .grp-series { padding: 8px 10px 10px; }
   .rs-root .prod-card .grp-toggle { min-height: 40px; }
+}
+
+/* Drawer "Pilih Series" (kerangka & gaya dasar: PanelDetailShell + RS_DRAWER_CSS) */
+.rs-root .rsk-sum { flex-direction: row; align-items: center; gap: 12px; }
+.rs-root .rsk-thumb { width: 64px; height: 80px; border-radius: 10px; object-fit: cover; background: #f3f3f0; flex: none; }
+.rs-root .rsk-thumb.ph-empty .wm, .rs-root .rsk-thumb.ph-empty .sub { display: none; }
+.rs-root .rsk-thumb.ph-empty .init { font-size: 18px; }
+.rs-root .rsk-sum-txt { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.rs-root .rsk-sum-price { display: flex; flex-direction: column; gap: 1px; font-size: 12px; color: #6b7280; }
+.rs-root .rsk-sum-price s { color: #9ca3af; }
+.rs-root .rsk-sum-price b { color: #111; font-weight: 800; font-size: 13px; }
+
+.rs-root .rsk-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.rs-root .rsk-pill {
+  padding: 7px 13px; border-radius: 999px; border: 1px solid #e4e4e0; background: #fff; color: #374151;
+  font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: background .12s, color .12s, border-color .12s;
+}
+.rs-root .rsk-pill:hover { border-color: #111; }
+.rs-root .rsk-pill.on { background: #111; border-color: #111; color: #fff; }
+.rs-root .rsk-pill.off { border-style: dashed; color: #9ca3af; }
+.rs-root .rsk-pill.off.on { background: #6b7280; border-color: #6b7280; border-style: solid; color: #fff; }
+
+.rs-root .rsk-sel { display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 14px; background: #f6f6f4; }
+.rs-root .rsk-sel-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.rs-root .rsk-sel-name { font-size: 16px; font-weight: 800; color: #111; line-height: 1.2; }
+.rs-root .rsk-sel-price { display: flex; flex-direction: column; gap: 1px; text-align: right; }
+.rs-root .rsk-sel-price b { font-size: 15px; font-weight: 800; color: #111; }
+.rs-root .rsk-sel-price span { font-size: 11px; color: #6b7280; }
+.rs-root .rsk-sel-stock { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rs-root .rsk-cta {
+  display: flex; align-items: center; justify-content: center; width: 100%; min-height: 46px; border: 0; border-radius: 12px;
+  background: #111; color: #fff; font: inherit; font-size: 13.5px; font-weight: 800; text-decoration: none; cursor: pointer;
+  box-shadow: 0 6px 16px -8px rgba(17, 17, 17, .5);
+}
+.rs-root .rsk-cta:hover { background: #242424; }
+.rs-root .rsk-cta:disabled { background: #d4d4d0; box-shadow: none; cursor: not-allowed; }
+
+/* Stok per ukuran (kotak) */
+.rs-root .rsk-strips { display: flex; flex-direction: column; gap: 10px; }
+.rs-root .rsk-strip-label { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #6b7280; margin-bottom: 5px; }
+.rs-root .rsk-strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+.rs-root .rsk-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 2px; border-radius: 10px; background: #fff; border: 1px solid #e4e4e0; }
+.rs-root .rsk-cell span { font-size: 10px; font-weight: 800; letter-spacing: .04em; color: #6b7280; }
+.rs-root .rsk-cell b { font-size: 15px; font-weight: 800; line-height: 1.1; color: #111; font-variant-numeric: tabular-nums; }
+.rs-root .rsk-cell.lo { background: #fffbeb; border-color: #f1d9a7; }
+.rs-root .rsk-cell.lo b { color: #b45309; }
+.rs-root .rsk-cell.z, .rs-root .rsk-cell.na { background: #fafafa; border-style: dashed; }
+.rs-root .rsk-cell.z b, .rs-root .rsk-cell.z span, .rs-root .rsk-cell.na b, .rs-root .rsk-cell.na span { color: #b4b4ab; }
+
+/* Menu Stok: kartu per produk + tabel stok */
+.rs-root .stk-list { display: flex; flex-direction: column; gap: 14px; }
+.rs-root .stk-card { background: #fff; border: 1px solid var(--rs-bd); border-radius: var(--rs-r); box-shadow: var(--rs-sh); overflow: hidden; }
+.rs-root .stk-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--rs-bd); }
+.rs-root .stk-head-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rs-root .stk-head h2 { margin: 0; font-size: 15px; font-weight: 800; color: var(--rs-ink); }
+.rs-root .stk-thumb { width: 44px; height: 56px; border-radius: 8px; object-fit: cover; background: var(--rs-soft); flex: none; }
+.rs-root .stk-thumb.ph-empty .wm, .rs-root .stk-thumb.ph-empty .sub { display: none; }
+.rs-root .stk-thumb.ph-empty .init { font-size: 14px; }
+.rs-root .rsk-scroll { overflow-x: auto; }
+.rs-root .rsk-tbl { width: 100%; min-width: 460px; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.rs-root .rsk-tbl th, .rs-root .rsk-tbl td { padding: 10px 6px; text-align: center; border-bottom: 1px solid #f2f2ef; }
+.rs-root .rsk-tbl thead th { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--rs-mut); background: #fafaf8; }
+.rs-root .rsk-tbl tbody tr:last-child > * { border-bottom: 0; }
+.rs-root .rsk-tbl th:first-child { position: sticky; left: 0; z-index: 1; min-width: 140px; padding-left: 16px; text-align: left; background: #fff; }
+.rs-root .rsk-tbl thead th:first-child { background: #fafaf8; }
+.rs-root .rsk-series { display: block; font-size: 13px; font-weight: 800; line-height: 1.3; color: var(--rs-ink); }
+.rs-root .rsk-tbl th small { display: block; font-size: 10.5px; font-weight: 600; color: var(--rs-mut); }
+.rs-root .rsk-tbl th small.rsk-color { font-weight: 800; color: var(--rs-ink); }
+.rs-root .rsk-tbl td { font-weight: 700; color: var(--rs-ink); font-variant-numeric: tabular-nums; }
+.rs-root .rsk-tbl td.lo { color: #b45309; background: #fffbeb; }
+.rs-root .rsk-tbl td.z, .rs-root .rsk-tbl td.na { color: #b4b4ab; }
+.rs-root .rsk-tbl td.tot { font-weight: 800; background: #fafaf8; }
+@media (max-width: 767px) {
+  .rs-root .stk-head { padding: 12px; }
+  /* Di HP semua ukuran harus muat tanpa geser: kolom series dipersempit (namanya boleh turun baris). */
+  .rs-root .rsk-tbl { min-width: 0; table-layout: fixed; }
+  .rs-root .rsk-tbl th, .rs-root .rsk-tbl td { padding: 10px 1px; }
+  .rs-root .rsk-tbl thead th { font-size: 9.5px; letter-spacing: 0; }
+  .rs-root .rsk-tbl th:first-child { width: 96px; min-width: 0; padding-left: 12px; box-shadow: 6px 0 8px -8px rgba(17, 17, 17, .25); }
+  .rs-root .rsk-series { font-size: 12px; }
 }
 
 .rs-root .pick-row { display: flex; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--rs-bd); border-radius: 12px; background: #fff; cursor: pointer; width: 100%; text-align: left; }

@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Layers,
   Home,
   ShoppingBag,
   PackagePlus,
@@ -41,6 +42,7 @@ const NAV_GROUPS: { label: string; items: [string, string, ReactNode][] }[] = [
     items: [
       ["/reseller/pesanan/baru", "Buat Pesanan", <PackagePlus key="i" size={17} />],
       ["/reseller/katalog", "Katalog", <ShoppingBag key="i" size={17} />],
+      ["/reseller/stok", "Stok", <Layers key="i" size={17} />],
       ["/reseller/pesanan", "Pesanan", <ReceiptText key="i" size={17} />],
     ],
   },
@@ -68,6 +70,7 @@ const TITLES: [string, string][] = [
   ["/reseller/pesanan/", "Detail Pesanan"],
   ["/reseller/pesanan", "Pesanan"],
   ["/reseller/katalog", "Katalog"],
+  ["/reseller/stok", "Stok"],
   ["/reseller/top-up", "Top Up"],
   ["/reseller/tarik-saldo", "Tarik Saldo"],
   ["/reseller/saldo", "Riwayat Saldo"],

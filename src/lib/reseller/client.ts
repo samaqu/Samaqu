@@ -125,6 +125,11 @@ export interface KatalogProduct {
   min_sell_price: number;
   min_sell_source: "catalog" | "configured" | "buy";
   min_sell_reason: string;
+  /**
+   * Penanda kolam stok. Series yang menumpang stok series lain (stok bersama) memakai id produk basisnya;
+   * selain itu id produk sendiri. Dua series dengan `stock_pool` sama = SATU stok fisik, jadi jangan dijumlahkan.
+   */
+  stock_pool: string;
   variants: KatalogVariant[];
 }
 

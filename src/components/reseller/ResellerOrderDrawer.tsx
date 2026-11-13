@@ -439,7 +439,7 @@ function AlamatTersembunyi({ alamat, catatan }: { alamat: string; catatan: strin
 
 /* Gaya isi drawer. Kerangka/overlay/animasi milik PanelDetailShell (DP_STYLE).
    Palet = token portal reseller (monokrom + hijau untuk untung). */
-const RS_DRAWER_CSS = `
+export const RS_DRAWER_CSS = `
 .rso{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;height:100%;background:#f6f6f4;color:#374151;font-family:var(--font-inter),system-ui,sans-serif}
 .rso-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px 12px;background:#111;color:#fff}
 .rso-kicker{display:block;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.6)}

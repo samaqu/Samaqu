@@ -39,6 +39,11 @@ export interface ResellerCatalogProduct {
   min_sell_price: number;
   min_sell_source: "catalog" | "configured" | "buy";
   min_sell_reason: string;
+  /**
+   * Kolam stok: id produk basis kalau series ini menumpang stok series lain (`base_product_id`),
+   * selain itu id produk sendiri. Tampilan memakai ini supaya stok bersama tidak dijumlahkan dua kali.
+   */
+  stock_pool: string;
   variants: ResellerVariant[];
 }
 
@@ -110,6 +115,22 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
 
   const variants = (rawVariants ?? []) as unknown as VariantRow[];
 
+  // Kolam stok bersama: view `product_variant_stock` tidak membawa `base_product_id`, jadi dibaca
+  // langsung (hanya baca). Gagal baca → tiap series dianggap kolam sendiri (stok tetap benar per series).
+  const { data: rawBases, error: baseError } = await supabase
+    .from("product_variants")
+    .select("product_id, base_product_id")
+    .in("product_id", ids)
+    .not("base_product_id", "is", null);
+  if (baseError) console.error("[RESELLER-KATALOG] Gagal membaca stok bersama:", baseError.message);
+  const poolByProduct = new Map<string, string>();
+  for (const row of (rawBases ?? []) as unknown as { product_id: string; base_product_id: string | null }[]) {
+    const productId = String(row.product_id);
+    if (row.base_product_id && !poolByProduct.has(productId)) {
+      poolByProduct.set(productId, String(row.base_product_id));
+    }
+  }
+
   // Foto cadangan tingkat grup — aturan yang sama dengan kartu katalog website
   // (`groupCatalogProducts`): satu grup = kategori + nama; foto grup diambil
   // dari anggota pertama yang punya gambar (urutan created_at).
@@ -161,6 +182,7 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
       min_sell_price: minSell.value,
       min_sell_source: minSell.source,
       min_sell_reason: minSell.reason,
+      stock_pool: poolByProduct.get(String(product.id)) ?? String(product.id),
       // Varian series turunan boleh dibeli, stoknya sudah efektif dari view.
       // Varian yang tidak dijual (is_sellable = false) tidak ditawarkan ke reseller.
       variants: own
