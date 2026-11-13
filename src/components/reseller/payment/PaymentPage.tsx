@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckCircle, Copy, Download, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle, Clock, Copy, Download, Landmark, Loader2, QrCode } from "lucide-react";
 import type { ResellerSettingsView } from "@/lib/reseller/client";
 import { rupiah, topupStatus } from "@/lib/reseller/format";
 import { ConfirmActionModal } from "../admin/Modal";
@@ -255,109 +255,148 @@ export default function PaymentPage({
   }
 
   // ── State: belum bayar ──
+  const deadlineDate = deadlineIso ? new Date(deadlineIso) : null;
+  // Tanggal + jam batas (dihitung setelah mount supaya HTML server & klien sama).
+  const deadlineText =
+    deadlineDate && countdown.mounted
+      ? `${deadlineDate.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "short" })}, ${deadlineDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`
+      : "";
+  const urgent = countdown.remainingMs !== null && countdown.remainingMs < 60 * 60 * 1000;
+  const bsiNumber = settings.bsi_account_number;
+  const steps = [
+    method === "qris" ? "Scan QRIS di aplikasi bank atau e-wallet." : "Transfer ke rekening BSI SAMAQU.",
+    `Bayar tepat ${rupiah(amount)}.`,
+    "Upload bukti pembayaran, lalu ketuk Saya sudah bayar.",
+  ];
+
   return (
-    <div className="stack" style={{ maxWidth: 560 }}>
-      <Link href={backHref} className="small bold" style={{ textDecoration: "underline" }}>
-        ← {title}
+    <div className="pay-page">
+      <Link href={backHref} className="pay-back">
+        <ArrowLeft size={15} /> {title}
       </Link>
 
-      <div className="note warn" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <span>
-          <b>Bayar sebelum</b>
-          {deadlineIso && countdown.mounted
-            ? ` ${new Date(deadlineIso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`
-            : ""}
-        </span>
-        <b style={{ fontSize: 18, fontVariantNumeric: "tabular-nums" }}>{countdown.label || "…"}</b>
-      </div>
+      <div className="pay-grid">
+        <div className="pay-col">
+          <section className={`pay-timer${urgent ? " urgent" : ""}`} aria-live="off">
+            <span className="pay-timer-ic" aria-hidden="true">
+              <Clock size={18} />
+            </span>
+            <div className="pay-timer-txt">
+              <small>Sisa waktu bayar</small>
+              <b>{countdown.label || "…"}</b>
+            </div>
+            {deadlineText ? (
+              <span className="pay-timer-due">
+                Batas bayar
+                <b>{deadlineText}</b>
+              </span>
+            ) : null}
+          </section>
 
-      <div className="card">
-        <div className="card-b stack" style={{ gap: 12 }}>
-          <div style={{ textAlign: "center" }}>
-            <p className="small muted">Total pembayaran</p>
-            <p className="bold" style={{ fontSize: 30, letterSpacing: "-0.02em" }}>{rupiah(amount)}</p>
+          <section className="card pay-total">
+            <p className="pay-lbl">Total pembayaran</p>
+            <p className="pay-amount">{rupiah(amount)}</p>
+            <p className="pay-hint">Bayar tepat jumlah ini supaya cepat dikonfirmasi.</p>
             <button className="btn ghost sm" type="button" onClick={() => copy("total", String(amount))}>
-              <Copy size={13} /> {copied === "total" ? "Tersalin" : "Salin jumlah"}
+              {copied === "total" ? <Check size={13} strokeWidth={3} /> : <Copy size={13} />}
+              {copied === "total" ? "Tersalin" : "Salin jumlah"}
             </button>
-          </div>
-
-          {method === "qris" ? (
-            <div className="note warn" style={{ textAlign: "center" }}>
-              <b>QRIS — SAMAQU</b>
-              <div style={{ margin: "10px auto" }}>
-                <img
-                  src={settings.qris_image_url || ""}
-                  alt="QRIS pembayaran SAMAQU"
-                  style={{ width: "100%", maxWidth: 300, borderRadius: 12, margin: "0 auto", display: "block" }}
-                />
+            {reference ? (
+              <div className="pay-ref">
+                <span>{referenceLabel}</span>
+                <b>{reference}</b>
               </div>
-              <div className="small">Merchant: SAMAQU</div>
-              {reference ? <div className="small">Kode: <b>{reference}</b></div> : null}
-              <a
-                className="btn ghost sm"
-                style={{ marginTop: 8 }}
-                href={settings.qris_image_url || "#"}
-                target="_blank"
-                rel="noreferrer"
-                download
-              >
-                <Download size={13} /> Simpan QRIS
-              </a>
-            </div>
-          ) : (
-            <div className="note warn">
-              <b>Transfer manual ke rekening BSI SAMAQU:</b>
-              <div style={{ marginTop: 6, fontWeight: 700 }}>{settings.bsi_bank_name}</div>
-              <div style={{ fontWeight: 800, fontSize: 18 }}>{settings.bsi_account_number || "(belum diatur admin)"}</div>
-              {settings.bsi_account_holder ? <div>a.n. {settings.bsi_account_holder}</div> : null}
-              {settings.bsi_account_number ? (
-                <button
-                  className="btn ghost sm"
-                  type="button"
-                  style={{ marginTop: 8 }}
-                  onClick={() => copy("rekening", `${settings.bsi_bank_name} ${settings.bsi_account_number}`)}
-                >
-                  <Copy size={13} /> {copied === "rekening" ? "Tersalin" : "Salin rekening"}
+            ) : null}
+          </section>
+
+          <section className="card pay-method">
+            <p className="pay-lbl">Metode pembayaran</p>
+            {hasQris ? (
+              <div className="pay-seg" role="tablist" aria-label="Pilih metode pembayaran">
+                <button type="button" role="tab" aria-selected={method === "bsi"} className={method === "bsi" ? "on" : ""} onClick={() => setMethod("bsi")}>
+                  <Landmark size={15} /> Transfer BSI
                 </button>
-              ) : null}
+                <button type="button" role="tab" aria-selected={method === "qris"} className={method === "qris" ? "on" : ""} onClick={() => setMethod("qris")}>
+                  <QrCode size={15} /> QRIS
+                </button>
+              </div>
+            ) : null}
+
+            {method === "qris" ? (
+              <div className="pay-qr">
+                <div className="pay-qr-frame">
+                  <img src={settings.qris_image_url || ""} alt="QRIS pembayaran SAMAQU" />
+                </div>
+                <p className="pay-qr-meta">
+                  Merchant: <b>SAMAQU</b>
+                  {reference ? (
+                    <>
+                      {" "}
+                      · Kode <b>{reference}</b>
+                    </>
+                  ) : null}
+                </p>
+                <a className="btn ghost sm" href={settings.qris_image_url || "#"} target="_blank" rel="noreferrer" download>
+                  <Download size={13} /> Simpan QRIS
+                </a>
+              </div>
+            ) : (
+              <div className="pay-bank">
+                <div className="pay-bank-top">
+                  <span className="pay-bank-ic" aria-hidden="true">
+                    <Landmark size={18} />
+                  </span>
+                  <div>
+                    <small>Transfer manual ke</small>
+                    <b>{settings.bsi_bank_name}</b>
+                  </div>
+                </div>
+                <div className="pay-acc-row">
+                  <span className="pay-acc">{bsiNumber || "(belum diatur admin)"}</span>
+                  {bsiNumber ? (
+                    <button className="btn ghost sm" type="button" onClick={() => copy("rekening", `${settings.bsi_bank_name} ${bsiNumber}`)}>
+                      {copied === "rekening" ? <Check size={13} strokeWidth={3} /> : <Copy size={13} />}
+                      {copied === "rekening" ? "Tersalin" : "Salin"}
+                    </button>
+                  ) : null}
+                </div>
+                {settings.bsi_account_holder ? <p className="pay-holder">a.n. {settings.bsi_account_holder}</p> : null}
+              </div>
+            )}
+          </section>
+        </div>
+
+        <div className="pay-col">
+          <section className="card pay-steps">
+            <p className="pay-lbl">Langkah singkat</p>
+            <ol>
+              {steps.map((text, index) => (
+                <li key={index}>
+                  <span className="pay-step-no">{index + 1}</span>
+                  <span>{text}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          <section className="card pay-proof">
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Bukti pembayaran</label>
+              <UploadBukti value={proof} onChange={setProof} onKeyChange={setProofKey} kind={proofKind} />
             </div>
-          )}
+            {localError ? <p className="err">{localError}</p> : null}
+          </section>
 
-          {hasQris ? (
-            <button
-              className="btn ghost sm"
-              type="button"
-              onClick={() => setMethod(method === "qris" ? "bsi" : "qris")}
-            >
-              {method === "qris" ? "Ganti ke Transfer BSI" : "Ganti ke QRIS"}
+          <div className="pay-cta">
+            <button className="btn blk" type="button" disabled={!proof || !proofKey || submitting || busy} onClick={submit}>
+              {submitting ? <Loader2 size={16} /> : null}
+              Saya sudah bayar
             </button>
-          ) : null}
-
-          <div className="stack" style={{ gap: 6 }}>
-            <p className="small bold">Langkah singkat</p>
-            <p className="small muted">1. Scan QRIS / transfer sesuai metode.</p>
-            <p className="small muted">2. Bayar tepat {rupiah(amount)}.</p>
-            <p className="small muted">3. Upload bukti pembayaran di bawah.</p>
+            {!proof ? <p className="pay-cta-hint">Upload bukti dulu supaya tombol ini aktif.</p> : null}
           </div>
 
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label>Bukti pembayaran</label>
-            <UploadBukti
-              value={proof}
-              onChange={setProof}
-              onKeyChange={setProofKey}
-              kind={proofKind}
-            />
-          </div>
-
-          {localError ? <p className="err">{localError}</p> : null}
-
-          <button className="btn blk" type="button" disabled={!proof || !proofKey || submitting || busy} onClick={submit}>
-            {submitting ? <Loader2 size={16} /> : null}
-            Saya sudah bayar
-          </button>
           {onCancel ? (
-            <button className="btn danger blk" type="button" onClick={() => setCancelOpen(true)} disabled={submitting}>
+            <button className="pay-cancel" type="button" onClick={() => setCancelOpen(true)} disabled={submitting}>
               Batalkan top up
             </button>
           ) : null}

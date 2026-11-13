@@ -115,6 +115,16 @@ export default function ResellerOrderDrawer({
         .join(", ")
     : "";
 
+  const kekuranganStatus: { label: string; tone: "ok" | "warn" | "err" } | null = shortfall
+    ? shortfall.status === "approved"
+      ? { label: "Dikonfirmasi", tone: "ok" }
+      : shortfall.status === "rejected"
+        ? { label: "Ditolak", tone: "err" }
+        : deadlinePassed
+          ? { label: "Waktu habis", tone: "err" }
+          : { label: "Menunggu pembayaran", tone: "warn" }
+    : null;
+
   const keHalamanBayar = () => {
     if (!order) return;
     router.push(`/reseller/pesanan/${encodeURIComponent(order.order_number)}/bayar`);
@@ -302,44 +312,55 @@ export default function ResellerOrderDrawer({
                 )}
               </section>
 
-              {/* 6. Ringkasan reseller */}
+              {/* 6. Untung & pembayaran */}
               <section className="rso-card">
-                <SectionHead icon={<Receipt size={13} />} title="Ringkasan Reseller" />
+                <SectionHead icon={<Receipt size={13} />} title="Untung & Pembayaran" />
+                <div className="rso-tiles">
+                  <div className="rso-tile ok">
+                    <span>Estimasi untung</span>
+                    <b>{rupiah(totals.untung)}</b>
+                  </div>
+                  <div className="rso-tile">
+                    <span>Dipotong dari saldo</span>
+                    <b>{rupiah(order.reseller_balance_deduction)}</b>
+                  </div>
+                </div>
                 <Row label="Harga beli produk" value={rupiah(totals.beli)} />
                 <Row label="Harga jual ke customer" value={rupiah(totals.jual)} />
-                <Row label="Estimasi untung" value={rupiah(totals.untung)} tone="ok" />
-                <Row label="Dipotong dari saldo" value={rupiah(order.reseller_balance_deduction)} tone="ok" />
                 {Number(order.reseller_shortfall_amount) > 0 ? (
                   <Row label="Kekurangan pembayaran" value={rupiah(order.reseller_shortfall_amount)} />
                 ) : null}
-                {shortfall ? (
-                  <Row
-                    label="Status kekurangan"
-                    value={
-                      shortfall.status === "approved"
-                        ? "Dikonfirmasi"
-                        : shortfall.status === "rejected"
-                          ? "Ditolak"
-                          : deadlinePassed
-                            ? "Waktu habis"
-                            : "Menunggu"
-                    }
-                  />
+                {kekuranganStatus ? (
+                  <div className="rso-row">
+                    <span className="rso-row-label">Status kekurangan</span>
+                    <span className="rso-row-value">
+                      <span className={`rso-st ${kekuranganStatus.tone}`}>{kekuranganStatus.label}</span>
+                    </span>
+                  </div>
                 ) : null}
               </section>
 
-              {waitingShortfall && shortfall ? (
-                <button type="button" className="rso-pay" onClick={keHalamanBayar}>
-                  Bayar kekurangan {rupiah(shortfall.amount)}
-                </button>
-              ) : (
+              {!(waitingShortfall && shortfall) ? (
                 <button type="button" className="rso-back" onClick={onClose}>
                   Kembali ke daftar
                 </button>
-              )}
+              ) : null}
             </>
           )}
         </div>
+
+        {/* Bar bayar menempel di dasar drawer (di luar area scroll), supaya selalu terlihat. */}
+        {!loading && order && waitingShortfall && shortfall ? (
+          <div className="rso-foot">
+            <div className="rso-foot-amt">
+              <small>Kekurangan</small>
+              <b>{rupiah(shortfall.amount)}</b>
+            </div>
+            <button type="button" className="rso-pay" onClick={keHalamanBayar}>
+              Bayar sekarang
+            </button>
+          </div>
+        ) : null}
       </div>
     </PanelDetailShell>
   );
@@ -489,12 +510,28 @@ export const RS_DRAWER_CSS = `
 .rso-tl{display:flex;gap:8px;align-items:flex-start}
 .rso-dot{flex:none;width:7px;height:7px;margin-top:5px;border-radius:999px;background:#111}
 .rso-tl-t{font-size:11.5px;font-weight:800;color:#111}
-.rso-pay{width:100%;min-height:44px;border:0;border-radius:12px;background:#111;color:#fff;font:inherit;font-size:13px;font-weight:800;cursor:pointer}
-.rso-pay:hover{background:#242424}
+.rso-tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rso-tile{display:flex;flex-direction:column;gap:3px;background:#f6f6f4;border-radius:12px;padding:10px 12px;min-width:0}
+.rso-tile span{font-size:10.5px;font-weight:700;color:#6b7280}
+.rso-tile b{font-size:16px;font-weight:800;color:#111;letter-spacing:-.01em;overflow-wrap:anywhere}
+.rso-tile.ok{background:#ecfdf3}
+.rso-tile.ok b{color:#15803d}
+.rso-st{display:inline-block;padding:2px 9px;border-radius:999px;font-size:10.5px;font-weight:800;background:#f3f3f0;color:#374151}
+.rso-st.warn{background:#fffbeb;color:#b45309}
+.rso-st.ok{background:#ecfdf3;color:#15803d}
+.rso-st.err{background:#fef2f2;color:#b91c1c}
+.rso-foot{flex:none;display:flex;align-items:center;gap:12px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #e4e4e0;box-shadow:0 -10px 24px rgba(17,17,17,.07)}
+.rso-foot-amt{flex:none;display:flex;flex-direction:column;gap:1px;min-width:0}
+.rso-foot-amt small{font-size:10.5px;font-weight:700;color:#6b7280}
+.rso-foot-amt b{font-size:17px;font-weight:800;color:#111;letter-spacing:-.01em;white-space:nowrap}
+/* Teks tombol dikunci putih (selector lebih spesifik + text-fill) supaya tidak bisa terlihat pudar. */
+.rso .rso-pay{flex:1 1 auto;min-height:48px;border:0;border-radius:12px;background:#111;color:#fff;-webkit-text-fill-color:#fff;opacity:1;font:inherit;font-size:14px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.rso .rso-pay:hover,.rso .rso-pay:focus-visible{background:#242424;color:#fff;-webkit-text-fill-color:#fff}
 .rso-back{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:40px;border:1px solid #e4e4e0;border-radius:12px;background:#fff;color:#374151;font:inherit;font-size:12px;font-weight:800;cursor:pointer}
 .rso-back:hover{background:#fafaf8}
 @media (max-width:767px){
-  .rso-row-label{flex-basis:92px}
+  .rso-row-label{flex:0 0 42%}
+  .rso-tile b{font-size:15px}
   .rso-body{padding:8px 8px 20px}
 }
 `;

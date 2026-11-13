@@ -324,7 +324,7 @@ export default function PesananDetailPanel({ orderNumber }: { orderNumber: strin
 
       <div className="card">
         <div className="card-h">
-          <h2>Ringkasan Reseller</h2>
+          <h2>Untung &amp; Pembayaran</h2>
         </div>
         <div className="card-b">
           <div className="kv">
