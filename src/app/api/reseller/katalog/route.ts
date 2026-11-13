@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   if (!session) return resellerUnauthorized();
 
   try {
-    const products = await getResellerCatalog();
+    const products = await getResellerCatalog(session.reseller.discount_percent);
     return NextResponse.json({ data: products });
   } catch (error) {
     console.error("[RESELLER-KATALOG] Gagal memuat katalog:", error);

@@ -5,6 +5,7 @@ import { normalizeWhatsappTarget } from "@/lib/fonnte";
 import { getResellerBalance } from "@/lib/reseller/saldo";
 import { normalizeBankValue } from "@/lib/reseller/banks";
 import { enrichResellerLedger } from "@/lib/reseller/ledger-enrich";
+import { parseResellerDiscount } from "@/lib/reseller/pricing";
 
 /**
  * Detail satu reseller untuk drawer admin: profil + saldo + mutasi terakhir
@@ -99,6 +100,15 @@ export async function PATCH(
       return NextResponse.json({ error: "Nomor WhatsApp tidak valid." }, { status: 400 });
     }
     patch.whatsapp = target;
+  }
+
+  // Diskon khusus reseller: kosong/null = ikut diskon default; angka 0-100. Hanya berlaku untuk pesanan baru.
+  if ("discount_percent" in body) {
+    const discount = parseResellerDiscount(body.discount_percent);
+    if (!discount.ok) {
+      return NextResponse.json({ error: "Diskon reseller harus angka 0 sampai 100 (kosongkan untuk ikut default)." }, { status: 400 });
+    }
+    patch.discount_percent = discount.value;
   }
 
   const status = typeof body.status === "string" ? body.status.trim() : "";

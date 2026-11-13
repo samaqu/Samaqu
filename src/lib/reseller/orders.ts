@@ -194,8 +194,9 @@ export async function createResellerOrder(
       };
     }
 
-    const buyPrice = resellerBuyPrice(product, defaultDiscount);
-    const minSell = resellerMinSellInfo(product, defaultDiscount);
+    // Diskon khusus reseller (kalau diisi admin) ikut dihitung di server, bukan dari browser.
+    const buyPrice = resellerBuyPrice(product, defaultDiscount, reseller.discount_percent);
+    const minSell = resellerMinSellInfo(product, defaultDiscount, reseller.discount_percent);
     const sellPrice = Math.round(Number(raw?.sellPrice));
     if (!Number.isFinite(sellPrice) || sellPrice < minSell.value) {
       return {

@@ -70,7 +70,13 @@ type VariantRow = {
   hex: string | null;
 };
 
-export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
+/**
+ * `resellerDiscount` = `resellers.discount_percent` reseller yang sedang login (null = ikut default),
+ * supaya harga beli & diskon yang tampil sama persis dengan yang dihitung saat pesanan dibuat.
+ */
+export async function getResellerCatalog(
+  resellerDiscount?: number | string | null
+): Promise<ResellerCatalogProduct[]> {
   const supabase = getSupabaseAdmin();
 
   const settings = await getResellerSettings();
@@ -166,7 +172,7 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
 
   return products.map((product) => {
     const own = variants.filter((v) => v.product_id === product.id);
-    const minSell = resellerMinSellInfo(product, defaultDiscount);
+    const minSell = resellerMinSellInfo(product, defaultDiscount, resellerDiscount);
     return {
       id: product.id,
       name: product.name,
@@ -177,8 +183,8 @@ export async function getResellerCatalog(): Promise<ResellerCatalogProduct[]> {
         groupPhotoByKey.get(catalogGroupKey(product)) ||
         null,
       price: Math.round(Number(product.price) || 0),
-      discount_percent: effectiveDiscountPercent(product, defaultDiscount),
-      buy_price: resellerBuyPrice(product, defaultDiscount),
+      discount_percent: effectiveDiscountPercent(product, defaultDiscount, resellerDiscount),
+      buy_price: resellerBuyPrice(product, defaultDiscount, resellerDiscount),
       min_sell_price: minSell.value,
       min_sell_source: minSell.source,
       min_sell_reason: minSell.reason,

@@ -4,8 +4,9 @@
  *
  * - Produk/series hanya dijual kalau `products.reseller_enabled = true`
  *   (penyaringan baris dilakukan query, bukan di sini).
- * - Diskon efektif = diskon KHUSUS per series (`reseller_discount_percent`)
- *   kalau diisi, selain itu diskon DEFAULT pengaturan reseller.
+ * - Diskon efektif, urut prioritas: diskon KHUSUS per series (`products.reseller_discount_percent`)
+ *   kalau diisi -> diskon KHUSUS reseller (`resellers.discount_percent`) kalau diisi -> diskon DEFAULT
+ *   pengaturan reseller. Kosong/null di tiap tingkat berarti turun ke tingkat berikutnya.
  * - Harga beli = harga katalog × (1 − diskon efektif/100), dibulatkan ke rupiah.
  * - Batas harga jual (SATU sumber, `resellerMinSellInfo`):
  *   · `reseller_min_sell_price` kosong/null → harga katalog SAMAQU.
@@ -42,19 +43,42 @@ export function discountPercent(value?: number | string | null): number {
   return clampDiscount(Number(value));
 }
 
-/** Diskon yang benar-benar dipakai: khusus series kalau ada, selain itu default. */
-export function effectiveDiscountPercent(product: ResellerPriceable, defaultPercent: number): number {
+const isBlank = (value: unknown): boolean => value === null || value === undefined || String(value).trim() === "";
+
+/**
+ * Diskon yang benar-benar dipakai: khusus series kalau ada, lalu khusus reseller kalau ada, selain itu default.
+ * `resellerPercent` = `resellers.discount_percent` (null/kosong = ikut default).
+ */
+export function effectiveDiscountPercent(
+  product: ResellerPriceable,
+  defaultPercent: number,
+  resellerPercent?: number | string | null
+): number {
   const raw = product?.reseller_discount_percent;
-  if (raw === null || raw === undefined || String(raw).trim() === "") {
-    return clampDiscount(Number(defaultPercent));
-  }
-  return clampDiscount(Number(raw));
+  if (!isBlank(raw)) return clampDiscount(Number(raw));
+  if (!isBlank(resellerPercent)) return clampDiscount(Number(resellerPercent));
+  return clampDiscount(Number(defaultPercent));
+}
+
+/**
+ * Baca isian diskon dari admin: kosong -> null (ikut default), angka 0-100 dibulatkan 2 desimal,
+ * selain itu tidak valid.
+ */
+export function parseResellerDiscount(input: unknown): { ok: true; value: number | null } | { ok: false } {
+  if (input === null || input === undefined || String(input).trim() === "") return { ok: true, value: null };
+  const value = Number(String(input).trim().replace(",", "."));
+  if (!Number.isFinite(value) || value < 0 || value > 100) return { ok: false };
+  return { ok: true, value: Math.round(value * 100) / 100 };
 }
 
 /** Harga beli reseller = harga katalog dipotong diskon efektif, dibulatkan. */
-export function resellerBuyPrice(product: ResellerPriceable, defaultPercent: number): number {
+export function resellerBuyPrice(
+  product: ResellerPriceable,
+  defaultPercent: number,
+  resellerPercent?: number | string | null
+): number {
   const base = Math.round(Number(product.price) || 0);
-  return Math.round(base * (1 - effectiveDiscountPercent(product, defaultPercent) / 100));
+  return Math.round(base * (1 - effectiveDiscountPercent(product, defaultPercent, resellerPercent) / 100));
 }
 
 const MIN_SELL_REASON: Record<ResellerMinSellSource, string> = {
@@ -69,9 +93,10 @@ const MIN_SELL_REASON: Record<ResellerMinSellSource, string> = {
  */
 export function resellerMinSellInfo(
   product: ResellerPriceable,
-  defaultPercent: number
+  defaultPercent: number,
+  resellerPercent?: number | string | null
 ): ResellerMinSellInfo {
-  const buyPrice = resellerBuyPrice(product, defaultPercent);
+  const buyPrice = resellerBuyPrice(product, defaultPercent, resellerPercent);
   const catalogPrice = Math.round(Number(product.price) || 0);
   const stored = Math.round(Number(product.reseller_min_sell_price) || 0);
 
@@ -97,6 +122,10 @@ export function resellerMinSellInfo(
 }
 
 /** Batas bawah harga jual reseller (angka saja) — lihat `resellerMinSellInfo`. */
-export function resellerMinSellPrice(product: ResellerPriceable, defaultPercent: number): number {
-  return resellerMinSellInfo(product, defaultPercent).value;
+export function resellerMinSellPrice(
+  product: ResellerPriceable,
+  defaultPercent: number,
+  resellerPercent?: number | string | null
+): number {
+  return resellerMinSellInfo(product, defaultPercent, resellerPercent).value;
 }

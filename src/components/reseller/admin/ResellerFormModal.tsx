@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { AdminApiError, opsResellerApi, type ResellerAdminRow } from "./api";
 import BankSelect from "@/components/reseller/BankSelect";
+import { rupiah } from "@/lib/reseller/format";
+import { parseResellerDiscount } from "@/lib/reseller/pricing";
 import { Modal } from "./Modal";
 
 const FIELDS: { key: keyof ResellerFormState; label: string; required?: boolean; placeholder?: string; textarea?: boolean; kind?: "bank" }[] = [
@@ -27,6 +29,8 @@ type ResellerFormState = {
   bank_name: string;
   bank_number: string;
   bank_holder: string;
+  /** Diskon khusus reseller (persen) sebagai teks isian; kosong = ikut diskon default. */
+  discount_percent: string;
 };
 
 function initialState(initial?: ResellerAdminRow | null): ResellerFormState {
@@ -40,16 +44,21 @@ function initialState(initial?: ResellerAdminRow | null): ResellerFormState {
     bank_name: initial?.bank_name || "",
     bank_number: initial?.bank_number || "",
     bank_holder: initial?.bank_holder || "",
+    discount_percent:
+      initial?.discount_percent === null || initial?.discount_percent === undefined ? "" : String(Number(initial.discount_percent)),
   };
 }
 
 /** Form tambah / ubah reseller. Tambah = langsung active + kirim WA akun dibuat. */
 export default function ResellerFormModal({
   initial,
+  defaultDiscount,
   onClose,
   onSaved,
 }: {
   initial?: ResellerAdminRow | null;
+  /** Diskon default pengaturan reseller (persen), ditampilkan sebagai petunjuk. */
+  defaultDiscount: number;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -65,6 +74,10 @@ export default function ResellerFormModal({
     setError("");
     if (!form.store_name.trim() || !form.owner_name.trim() || form.whatsapp.replace(/\D/g, "").length < 9) {
       setError("Nama toko, nama pemilik, dan nomor WhatsApp wajib diisi.");
+      return;
+    }
+    if (!parseResellerDiscount(form.discount_percent).ok) {
+      setError("Diskon reseller harus angka 0 sampai 100, atau kosongkan untuk ikut diskon default.");
       return;
     }
     setBusy(true);
@@ -121,6 +134,11 @@ export default function ResellerFormModal({
             </div>
           ))}
         </div>
+        <DiscountField
+          value={form.discount_percent}
+          defaultDiscount={defaultDiscount}
+          onChange={(value) => set("discount_percent", value)}
+        />
         {!initial ? (
           <p className="text-[12px] text-slate-500">
             Reseller langsung aktif dan menerima notifikasi WhatsApp bahwa akunnya dibuat.
@@ -137,5 +155,60 @@ export default function ResellerFormModal({
         </div>
       </form>
     </Modal>
+  );
+}
+
+/**
+ * Isian diskon khusus reseller. Kosong = ikut diskon default pengaturan; diisi = diskon reseller ini.
+ * Berlaku untuk pesanan BARU (harga pesanan lama sudah tersimpan). Ada contoh harga supaya hasilnya jelas.
+ */
+function DiscountField({
+  value,
+  defaultDiscount,
+  onChange,
+}: {
+  value: string;
+  defaultDiscount: number;
+  onChange: (value: string) => void;
+}) {
+  const parsed = parseResellerDiscount(value);
+  const custom = parsed.ok && parsed.value !== null;
+  const percent = parsed.ok ? (parsed.value ?? defaultDiscount) : null;
+  const sample = 359000;
+  return (
+    <div className="rounded-xl border-2 border-slate-200 bg-slate-50 p-3">
+      <label htmlFor="reseller-discount" className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">
+        Diskon reseller (%)
+      </label>
+      <div className="flex items-center gap-2">
+        <input
+          id="reseller-discount"
+          className="w-28 px-3 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-sm font-extrabold text-slate-900"
+          inputMode="decimal"
+          placeholder={String(defaultDiscount)}
+          value={value}
+          onChange={(e) => onChange(e.target.value.replace(/[^0-9.,]/g, ""))}
+        />
+        <span className="text-sm font-bold text-slate-500">%</span>
+        {value.trim() ? (
+          <button type="button" onClick={() => onChange("")} className="ml-auto text-[12px] font-bold text-blue-600 hover:underline">
+            Pakai default ({defaultDiscount}%)
+          </button>
+        ) : null}
+      </div>
+      <p className="text-[12px] text-slate-500 mt-2">
+        {custom
+          ? "Diskon khusus reseller ini."
+          : `Kosong = ikut diskon default (${defaultDiscount}%). Isi untuk memberi diskon berbeda, mis. 25, 13, atau 17.5.`}
+        {" "}Berlaku untuk pesanan baru; pesanan lama tidak berubah.
+      </p>
+      {percent !== null ? (
+        <p className="text-[12px] font-semibold text-slate-700 mt-1">
+          Contoh: harga katalog {rupiah(sample)} &rarr; harga reseller {rupiah(Math.round(sample * (1 - percent / 100)))}
+        </p>
+      ) : (
+        <p className="text-[12px] font-semibold text-red-600 mt-1">Isi angka 0 sampai 100.</p>
+      )}
+    </div>
   );
 }

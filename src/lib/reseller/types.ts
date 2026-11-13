@@ -46,6 +46,8 @@ export interface ResellerRow {
   rejected_by: string | null;
   created_at: string;
   updated_at: string;
+  /** Diskon khusus reseller (persen). null = ikut diskon default pengaturan reseller. */
+  discount_percent?: number | string | null;
 }
 
 export interface ResellerLedgerRow {

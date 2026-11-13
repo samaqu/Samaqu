@@ -75,6 +75,8 @@ export interface ResellerAdminRow {
   status: string;
   reject_reason: string | null;
   created_at: string;
+  /** Diskon khusus reseller (persen). null = ikut diskon default. */
+  discount_percent?: number | string | null;
   saldo?: { saldo_tersedia: number; saldo_ditahan: number; saldo_total: number };
 }
 
@@ -194,7 +196,8 @@ export const opsResellerApi = {
 
   queue: () => adminFetch<QueuePayload>("/api/ops/reseller/queue"),
 
-  resellers: () => adminFetch<{ data: ResellerAdminRow[] }>("/api/ops/reseller/resellers"),
+  resellers: () =>
+    adminFetch<{ data: ResellerAdminRow[]; default_discount_percent?: number }>("/api/ops/reseller/resellers"),
 
   resellerDetail: (id: string) => adminFetch<ResellerDetail>(`/api/ops/reseller/resellers/${encodeURIComponent(id)}`),
 

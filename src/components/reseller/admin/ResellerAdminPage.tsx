@@ -29,6 +29,7 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
   const [stats, setStats] = useState<ResellerStats | null>(null);
   const [queue, setQueue] = useState<QueuePayload | null>(null);
   const [resellers, setResellers] = useState<ResellerAdminRow[]>([]);
+  const [defaultDiscount, setDefaultDiscount] = useState(25);
   const [loadingQueue, setLoadingQueue] = useState(true);
   const [loadingList, setLoadingList] = useState(true);
   const [detail, setDetail] = useState<ResellerAdminRow | null>(null);
@@ -80,6 +81,7 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
     try {
       const res = await opsResellerApi.resellers();
       setResellers(res.data);
+      if (typeof res.default_discount_percent === "number") setDefaultDiscount(res.default_discount_percent);
     } catch {
       setError("Gagal memuat daftar reseller.");
     } finally {
@@ -155,7 +157,13 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
       ) : tab === "harga" ? (
         <PriceTab />
       ) : tab === "data" ? (
-        <ResellersTab rows={resellers} loading={loadingList} onChanged={refreshAll} onOpenDetail={setDetail} />
+        <ResellersTab
+          rows={resellers}
+          loading={loadingList}
+          defaultDiscount={defaultDiscount}
+          onChanged={refreshAll}
+          onOpenDetail={setDetail}
+        />
       ) : tab === "mutasi" ? (
         <LedgerTab resellers={resellers} onChanged={refreshAll} />
       ) : (

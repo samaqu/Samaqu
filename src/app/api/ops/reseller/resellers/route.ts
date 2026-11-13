@@ -5,6 +5,8 @@ import { normalizeWhatsappTarget } from "@/lib/fonnte";
 import { notifyResellerAccountCreated } from "@/lib/reseller/notify";
 import { normalizeBankValue } from "@/lib/reseller/banks";
 import { getResellerBalance } from "@/lib/reseller/saldo";
+import { parseResellerDiscount } from "@/lib/reseller/pricing";
+import { getResellerSettings } from "@/lib/reseller/settings";
 
 /**
  * Daftar reseller + saldo masing-masing (admin ops & panel admin).
@@ -34,7 +36,9 @@ export async function GET(req: NextRequest) {
     }))
   );
 
-  return NextResponse.json({ data: rows });
+  // Diskon default ikut dikirim supaya tabel bisa menulis "25% (default)" untuk reseller tanpa diskon khusus.
+  const settings = await getResellerSettings();
+  return NextResponse.json({ data: rows, default_discount_percent: settings.defaultDiscountPercent });
 }
 
 /** Tambah reseller baru (langsung active) + kirim notifikasi WA akun dibuat. */
@@ -52,6 +56,10 @@ export async function POST(req: NextRequest) {
   const bankName = normalizeBankValue(String(body.bank_name ?? ""));
   const bankNumber = String(body.bank_number ?? "").trim();
   const bankHolder = String(body.bank_holder ?? "").trim();
+  const discount = parseResellerDiscount(body.discount_percent);
+  if (!discount.ok) {
+    return NextResponse.json({ error: "Diskon reseller harus angka 0 sampai 100 (kosongkan untuk ikut default)." }, { status: 400 });
+  }
 
   if (!storeName || !ownerName || whatsapp.replace(/\D/g, "").length < 9) {
     return NextResponse.json(
@@ -83,6 +91,7 @@ export async function POST(req: NextRequest) {
       bank_name: bankName || null,
       bank_number: bankNumber || null,
       bank_holder: bankHolder || null,
+      discount_percent: discount.value,
       status: "active",
       approved_at: now,
       approved_by: identity?.email || "admin",
