@@ -244,3 +244,50 @@ export function unduhUrl(url: string): string {
   if (!url.includes("res.cloudinary.com") || !url.includes(marker) || url.includes("fl_attachment")) return url;
   return url.replace(marker, `${marker}fl_attachment/`);
 }
+
+/* ── Tampilan daftar materi ── */
+
+/** Nama warna aksen tiap kategori (gayanya ada di CSS: kelas `tone-<nama>`). */
+export type MateriNada = "green" | "amber" | "blue" | "violet" | "rose" | "slate";
+export const MATERI_NADA: Record<MateriKategori, MateriNada> = {
+  panduan: "green",
+  produk: "amber",
+  jualan: "blue",
+  teks: "violet",
+  konten: "rose",
+  faq: "slate",
+};
+
+/** Perkiraan waktu baca (menit) dengan 200 kata per menit; minimal 1. */
+export function waktuBacaMenit(body: string | null | undefined): number {
+  const kata = String(body ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+  return Math.max(1, Math.round(kata / 200));
+}
+
+/** Keterangan singkat isi materi untuk kartu/baris: "Video", "±3 menit baca", "4 pilihan teks", "6 foto". */
+export function infoMateri(row: Pick<MateriRow, "type" | "body" | "images">): string {
+  if (row.type === "video") return "Video";
+  if (row.type === "galeri") return `${row.images.length} foto`;
+  if (row.type === "teks") {
+    const jumlah = pisahVarianTeks(row.body).length;
+    return jumlah > 1 ? `${jumlah} pilihan teks` : "Teks siap salin";
+  }
+  return `±${waktuBacaMenit(row.body)} menit baca`;
+}
+
+/**
+ * Materi yang diberi lencana "Baru": yang dibuat dalam 14 hari terakhir, tapi paling banyak `max` yang
+ * terbaru. Kalau semua materi dibuat bersamaan, lencananya tidak dipasang ke semuanya.
+ */
+export function pilihBaru<T extends Pick<MateriRow, "id" | "created_at">>(rows: T[], max = 3, now: Date = new Date()): Set<string> {
+  return new Set(
+    rows
+      .filter((row) => isMateriBaru(row.created_at, now))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .slice(0, max)
+      .map((row) => row.id)
+  );
+}

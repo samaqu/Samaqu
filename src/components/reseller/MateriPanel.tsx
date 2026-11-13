@@ -1,13 +1,32 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, Check, Copy, Download, FileText, Images, Play, Search, Sparkles, X } from "lucide-react";
+import {
+  BookOpen,
+  Camera,
+  Check,
+  ChevronRight,
+  Copy,
+  Download,
+  FileText,
+  HelpCircle,
+  Images,
+  LayoutDashboard,
+  MessageCircle,
+  Play,
+  Search,
+  Shirt,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { resellerApi } from "@/lib/reseller/client";
 import {
   MATERI_KATEGORI,
-  isMateriBaru,
+  MATERI_NADA,
+  infoMateri,
   parseBodyMateri,
   parseYoutubeId,
+  pilihBaru,
   pisahVarianTeks,
   unduhUrl,
   youtubeEmbedUrl,
@@ -19,11 +38,37 @@ import { PanelDetailShell } from "@/components/ops/transaksi/PanelDetailPesanan"
 import { RS_DRAWER_CSS } from "./ResellerOrderDrawer";
 import { Note } from "./ui";
 
-const TIPE_LABEL: Record<MateriRow["type"], string> = { video: "Video", artikel: "Artikel", teks: "Teks siap salin", galeri: "Foto" };
 const TIPE_ICON = { video: Play, artikel: BookOpen, teks: FileText, galeri: Images } as const;
+const KATEGORI_ICON = {
+  panduan: LayoutDashboard,
+  produk: Shirt,
+  jualan: MessageCircle,
+  teks: FileText,
+  konten: Camera,
+  faq: HelpCircle,
+} as const;
 const kategoriLabel = (key: string) => MATERI_KATEGORI.find((item) => item.key === key)?.label ?? key;
 
-/** Halaman Materi reseller: banner, pencarian, filter kategori, kartu per materi, dan drawer detail. */
+/* Penanda "sudah dibaca": hanya di browser reseller (tanpa database). */
+const DIBACA_KEY = "samaqu:reseller-materi-dibaca";
+function bacaDibaca(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(DIBACA_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(list) ? list.filter((item: unknown): item is string => typeof item === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+function simpanDibaca(ids: Set<string>) {
+  try {
+    window.localStorage.setItem(DIBACA_KEY, JSON.stringify([...ids].slice(-500)));
+  } catch {
+    /* penyimpanan diblokir — penanda tidak tersimpan, halaman tetap jalan */
+  }
+}
+
+/** Halaman Materi reseller: banner + progres baca, "Mulai dari sini", bagian per kategori, dan drawer detail. */
 export default function MateriPanel() {
   const [rows, setRows] = useState<MateriRow[] | null>(null);
   const [error, setError] = useState("");
@@ -47,27 +92,81 @@ export default function MateriPanel() {
 }
 
 /** Tampilan halaman (tanpa pemuatan data) — dipisah supaya bisa dirender/dites langsung. `rows` null = memuat. */
-export function MateriView({ rows, error, onRetry }: { rows: MateriRow[] | null; error: string; onRetry: () => void }) {
+export function MateriView({
+  rows,
+  error,
+  onRetry,
+  dibacaAwal,
+}: {
+  rows: MateriRow[] | null;
+  error: string;
+  onRetry: () => void;
+  /** Untuk tes/pratinjau: id materi yang dianggap sudah dibaca saat pertama tampil. */
+  dibacaAwal?: string[];
+}) {
   const [kategori, setKategori] = useState<"semua" | MateriKategori>("semua");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<MateriRow | null>(null);
+  const [dibaca, setDibaca] = useState<Set<string>>(() => new Set(dibacaAwal ?? []));
 
+  useEffect(() => {
+    setDibaca((prev) => new Set([...prev, ...bacaDibaca()]));
+  }, []);
+
+  const buka = (row: MateriRow) => {
+    setOpen(row);
+    setDibaca((prev) => {
+      if (prev.has(row.id)) return prev;
+      const next = new Set(prev);
+      next.add(row.id);
+      simpanDibaca(next);
+      return next;
+    });
+  };
+
+  const semua = rows ?? [];
+  const baruIds = useMemo(() => pilihBaru(semua), [semua]);
   const counts = useMemo(() => {
     const map = new Map<string, number>();
-    for (const row of rows ?? []) map.set(row.category, (map.get(row.category) ?? 0) + 1);
+    for (const row of semua) map.set(row.category, (map.get(row.category) ?? 0) + 1);
     return map;
-  }, [rows]);
+  }, [semua]);
 
-  const shown = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return (rows ?? []).filter((row) => {
-      if (kategori !== "semua" && row.category !== kategori) return false;
-      if (!needle) return true;
-      return `${row.title} ${row.summary ?? ""} ${kategoriLabel(row.category)}`.toLowerCase().includes(needle);
-    });
-  }, [rows, kategori, query]);
+  const needle = query.trim().toLowerCase();
+  const filtering = kategori !== "semua" || needle !== "";
+  const shown = useMemo(
+    () =>
+      semua.filter((row) => {
+        if (kategori !== "semua" && row.category !== kategori) return false;
+        if (!needle) return true;
+        return `${row.title} ${row.summary ?? ""} ${kategoriLabel(row.category)}`.toLowerCase().includes(needle);
+      }),
+    [semua, kategori, needle]
+  );
 
-  const videoCount = (rows ?? []).filter((row) => row.type === "video").length;
+  const videoCount = semua.filter((row) => row.type === "video").length;
+  const dibacaCount = semua.filter((row) => dibaca.has(row.id)).length;
+  // "Mulai dari sini": tiga panduan pertama (urutan dari admin); hanya saat tidak sedang mencari/memfilter.
+  const mulai = !filtering ? semua.filter((row) => row.category === "panduan").slice(0, 3) : [];
+  const mulaiIds = new Set(mulai.map((row) => row.id));
+
+  const sections: { key: string; label: string; desc: string; kat: MateriKategori | null; items: MateriRow[] }[] = filtering
+    ? [
+        {
+          key: "hasil",
+          label: kategori === "semua" ? `Hasil untuk "${query.trim()}"` : kategoriLabel(kategori),
+          desc: kategori === "semua" ? "" : MATERI_KATEGORI.find((item) => item.key === kategori)?.desc ?? "",
+          kat: kategori === "semua" ? null : kategori,
+          items: shown,
+        },
+      ]
+    : MATERI_KATEGORI.map((item) => ({
+        key: item.key,
+        label: item.label,
+        desc: item.desc,
+        kat: item.key as MateriKategori,
+        items: semua.filter((row) => row.category === item.key && !mulaiIds.has(row.id)),
+      })).filter((section) => section.items.length > 0);
 
   return (
     <div className="mt-page">
@@ -77,17 +176,35 @@ export function MateriView({ rows, error, onRetry }: { rows: MateriRow[] | null;
             <Sparkles size={13} /> Materi reseller
           </span>
           <h1>Belajar jualan SAMAQU, lebih cepat.</h1>
-          <p>Panduan portal, pengetahuan produk, teks siap pakai, dan foto untuk postinganmu. Semuanya di satu tempat.</p>
+          <p>Panduan portal, pengetahuan produk, teks siap pakai, dan foto untuk postinganmu.</p>
         </div>
-        {rows ? (
-          <div className="mt-hero-stats" aria-label="Ringkasan materi">
-            <div>
-              <b>{rows.length}</b>
-              <span>Materi</span>
+        {rows && rows.length > 0 ? (
+          <div className="mt-hero-side">
+            <div className="mt-hero-stats" aria-label="Ringkasan materi">
+              <div>
+                <b>{rows.length}</b>
+                <span>Materi</span>
+              </div>
+              <div>
+                <b>{videoCount}</b>
+                <span>Video</span>
+              </div>
+              <div>
+                <b>
+                  {dibacaCount}/{rows.length}
+                </b>
+                <span>Dibaca</span>
+              </div>
             </div>
-            <div>
-              <b>{videoCount}</b>
-              <span>Video</span>
+            <div
+              className="mt-progress"
+              role="progressbar"
+              aria-label="Progres membaca materi"
+              aria-valuemin={0}
+              aria-valuemax={rows.length}
+              aria-valuenow={dibacaCount}
+            >
+              <span style={{ width: `${Math.round((dibacaCount / rows.length) * 100)}%` }} />
             </div>
           </div>
         ) : null}
@@ -96,13 +213,7 @@ export function MateriView({ rows, error, onRetry }: { rows: MateriRow[] | null;
       <div className="mt-tools">
         <label className="mt-search">
           <Search size={16} aria-hidden="true" />
-          <input
-            type="search"
-            placeholder="Cari materi…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Cari materi"
-          />
+          <input type="search" placeholder="Cari materi…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Cari materi" />
           {query ? (
             <button type="button" onClick={() => setQuery("")} aria-label="Hapus pencarian">
               <X size={14} />
@@ -112,7 +223,7 @@ export function MateriView({ rows, error, onRetry }: { rows: MateriRow[] | null;
 
         <div className="mt-chips" role="tablist" aria-label="Kategori materi">
           <button type="button" role="tab" aria-selected={kategori === "semua"} className={kategori === "semua" ? "on" : ""} onClick={() => setKategori("semua")}>
-            Semua <small>{rows?.length ?? 0}</small>
+            Semua <small>{semua.length}</small>
           </button>
           {MATERI_KATEGORI.filter((item) => (counts.get(item.key) ?? 0) > 0 || kategori === item.key).map((item) => (
             <button
@@ -139,41 +250,115 @@ export function MateriView({ rows, error, onRetry }: { rows: MateriRow[] | null;
       ) : null}
 
       {rows === null ? (
-        <div className="mt-grid" aria-hidden="true">
+        <div className="mt-vgrid" aria-hidden="true">
           {Array.from({ length: 6 }).map((_, index) => (
             <div key={index} className="sk mt-sk" />
           ))}
         </div>
-      ) : shown.length === 0 && !error ? (
+      ) : semua.length === 0 && !error ? (
         <div className="mt-empty">
           <span className="mt-empty-ic">
             <BookOpen size={26} />
           </span>
-          <b>{rows.length === 0 ? "Materi belum tersedia" : "Tidak ada materi yang cocok"}</b>
-          <p>
-            {rows.length === 0
-              ? "Admin SAMAQU sedang menyiapkan materi. Cek lagi nanti ya."
-              : "Coba kata kunci lain atau pilih kategori Semua."}
-          </p>
-          {rows.length > 0 ? (
-            <button
-              type="button"
-              className="btn ghost sm"
-              onClick={() => {
-                setQuery("");
-                setKategori("semua");
-              }}
-            >
-              Lihat semua materi
-            </button>
-          ) : null}
+          <b>Materi belum tersedia</b>
+          <p>Admin SAMAQU sedang menyiapkan materi. Cek lagi nanti ya.</p>
         </div>
       ) : (
-        <div className="mt-grid">
-          {shown.map((row) => (
-            <MateriCard key={row.id} row={row} onOpen={() => setOpen(row)} />
-          ))}
-        </div>
+        <>
+          {mulai.length > 0 ? (
+            <section className="mt-start" aria-labelledby="mt-start-h">
+              <div className="mt-start-h">
+                <h2 id="mt-start-h">Mulai dari sini</h2>
+                <p>Tiga materi pertama untuk reseller baru. Baca berurutan.</p>
+              </div>
+              <ol className="mt-steps">
+                {mulai.map((row, index) => {
+                  const sudah = dibaca.has(row.id);
+                  return (
+                    <li key={row.id}>
+                      <button type="button" className={`mt-step${sudah ? " done" : ""}`} onClick={() => buka(row)}>
+                        {row.type === "video" && parseYoutubeId(row.video_url) ? (
+                          <span className="mt-step-thumb" aria-hidden="true">
+                            <img src={youtubeThumb(parseYoutubeId(row.video_url) as string)} alt="" loading="lazy" />
+                            <i>{sudah ? <Check size={11} strokeWidth={3} /> : index + 1}</i>
+                            <Play size={16} fill="currentColor" className="mt-step-play" />
+                          </span>
+                        ) : (
+                          <span className="mt-step-no" aria-hidden="true">
+                            {sudah ? <Check size={16} strokeWidth={3} /> : index + 1}
+                          </span>
+                        )}
+                        <span className="mt-step-txt">
+                          <b>{row.title}</b>
+                          <small>{row.summary || infoMateri(row)}</small>
+                          <em>{infoMateri(row)}</em>
+                        </span>
+                        <ChevronRight size={18} className="mt-go" aria-hidden="true" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          ) : null}
+
+          {sections.length === 0 || (filtering && shown.length === 0) ? (
+            <div className="mt-empty">
+              <span className="mt-empty-ic">
+                <Search size={24} />
+              </span>
+              <b>Tidak ada materi yang cocok</b>
+              <p>Coba kata kunci lain atau pilih kategori Semua.</p>
+              <button
+                type="button"
+                className="btn ghost sm"
+                onClick={() => {
+                  setQuery("");
+                  setKategori("semua");
+                }}
+              >
+                Lihat semua materi
+              </button>
+            </div>
+          ) : (
+            sections.map((section) => {
+              const visual = section.items.filter((row) => row.type === "video" || row.type === "galeri");
+              const teks = section.items.filter((row) => row.type !== "video" && row.type !== "galeri");
+              const nada = section.kat ? MATERI_NADA[section.kat] : "slate";
+              const SectionIcon = section.kat ? KATEGORI_ICON[section.kat] : Search;
+              return (
+                <section className="mt-sec" key={section.key}>
+                  <header className={`mt-sec-h tone-${nada}`}>
+                    <span className="mt-sec-ic" aria-hidden="true">
+                      <SectionIcon size={18} />
+                    </span>
+                    <div className="mt-sec-txt">
+                      <h2>{section.label}</h2>
+                      {section.desc ? <p>{section.desc}</p> : null}
+                    </div>
+                    <span className="mt-sec-n">{section.items.length}</span>
+                  </header>
+
+                  {visual.length > 0 ? (
+                    <div className="mt-vgrid">
+                      {visual.map((row) => (
+                        <MateriCard key={row.id} row={row} baru={baruIds.has(row.id)} sudah={dibaca.has(row.id)} onOpen={() => buka(row)} />
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {teks.length > 0 ? (
+                    <div className="mt-rows">
+                      {teks.map((row) => (
+                        <MateriRowItem key={row.id} row={row} baru={baruIds.has(row.id)} sudah={dibaca.has(row.id)} onOpen={() => buka(row)} />
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              );
+            })
+          )}
+        </>
       )}
 
       <MateriDrawer row={open} onClose={() => setOpen(null)} />
@@ -181,11 +366,11 @@ export function MateriView({ rows, error, onRetry }: { rows: MateriRow[] | null;
   );
 }
 
-function MateriCard({ row, onOpen }: { row: MateriRow; onOpen: () => void }) {
-  const Icon = TIPE_ICON[row.type];
+/** Kartu visual (video & foto): thumbnail sungguhan. */
+function MateriCard({ row, baru, sudah, onOpen }: { row: MateriRow; baru: boolean; sudah: boolean; onOpen: () => void }) {
   const ytId = row.type === "video" ? parseYoutubeId(row.video_url) : null;
-  const baru = isMateriBaru(row.created_at);
   const foto = row.type === "galeri" ? row.images[0] : null;
+  const Icon = TIPE_ICON[row.type];
 
   return (
     <button type="button" className={`mt-card t-${row.type}`} onClick={onOpen}>
@@ -213,11 +398,45 @@ function MateriCard({ row, onOpen }: { row: MateriRow; onOpen: () => void }) {
       </span>
       <span className="mt-body">
         <span className="mt-meta">
-          <Icon size={12} aria-hidden="true" /> {kategoriLabel(row.category)}
+          <Icon size={12} aria-hidden="true" /> {infoMateri(row)}
+          {sudah ? (
+            <span className="mt-pill read">
+              <Check size={11} strokeWidth={3} /> Dibaca
+            </span>
+          ) : null}
         </span>
         <span className="mt-title">{row.title}</span>
         {row.summary ? <span className="mt-sum">{row.summary}</span> : null}
       </span>
+    </button>
+  );
+}
+
+/** Baris ringkas (artikel & teks siap salin): ikon berwarna kategori, judul, ringkasan, dan keterangan isi. */
+function MateriRowItem({ row, baru, sudah, onOpen }: { row: MateriRow; baru: boolean; sudah: boolean; onOpen: () => void }) {
+  const KategoriIcon = KATEGORI_ICON[row.category];
+  const TipeIcon = TIPE_ICON[row.type];
+  return (
+    <button type="button" className={`mt-row tone-${MATERI_NADA[row.category]}${sudah ? " done" : ""}`} onClick={onOpen}>
+      <span className="mt-row-ic" aria-hidden="true">
+        <KategoriIcon size={20} />
+      </span>
+      <span className="mt-row-txt">
+        <span className="mt-row-t">{row.title}</span>
+        {row.summary ? <span className="mt-row-s">{row.summary}</span> : null}
+        <span className="mt-row-m">
+          <span className="mt-info">
+            <TipeIcon size={12} aria-hidden="true" /> {infoMateri(row)}
+          </span>
+          {baru ? <span className="mt-pill new">Baru</span> : null}
+          {sudah ? (
+            <span className="mt-pill read">
+              <Check size={11} strokeWidth={3} /> Dibaca
+            </span>
+          ) : null}
+        </span>
+      </span>
+      <ChevronRight size={18} className="mt-go" aria-hidden="true" />
     </button>
   );
 }
