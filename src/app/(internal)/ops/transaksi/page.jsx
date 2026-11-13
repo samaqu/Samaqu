@@ -264,11 +264,17 @@ export default function Transaksi({ variant = "ops" }) {
     const counts = stageCounts(orders);
     return {
       total: saleCount(orders),
-      revenue: sold.reduce((sum, order) => sum + orderRevenue(order), 0),
+      // Hanya kartu OMSET yang mengikuti filter tanggal (permintaan pemilik 2026-11-13): saat
+      // satu tanggal dipilih, omset = penjualan tanggal itu (`date_wib`, basis WIB yang sama
+      // dengan pengelompokan bulan). Tanpa tanggal, tetap omset sebulan. Kartu lain tidak berubah.
+      revenue: (selectedDate ? sold.filter((order) => order.date_wib === selectedDate) : sold).reduce(
+        (sum, order) => sum + orderRevenue(order),
+        0,
+      ),
       unpaid: counts.belum_bayar,
       toProcess: counts.perlu_diproses,
     };
-  }, [orders]);
+  }, [orders, selectedDate]);
 
   // Tab = TAHAP resmi aplikasi (`ORDER_STAGE_TABS_VISIBLE` order-flow — SAMA dengan halaman
   // Pesanan admin). "Belum di Packing" SENGAJA tidak jadi tab: ia sub-status dari `diproses`
@@ -375,7 +381,7 @@ export default function Transaksi({ variant = "ops" }) {
             <i>{SALE_BASIS_NOTE}</i>
           </div>
           <div className="card k">
-            <small>Omset bulan ini</small>
+            <small>{selectedDate ? "Omset tanggal ini" : "Omset bulan ini"}</small>
             <b><AnimatedNumber value={isLoading ? 0 : panelKpis.revenue} format={(n) => `Rp ${formatRupiah(n)}`} /></b>
             <i>Tidak termasuk dibatalkan</i>
           </div>
