@@ -124,6 +124,10 @@ interface SeriesBlock {
   baseSize: string;        // size mapping (e.g., "M" → pulls from base product's M stock)
   /** id baris `products` tersimpan (mode edit) — dipakai saat update agar tidak bikin duplikat. */
   productId: string;
+  /** HPP per unit series ini (mode ops). Tiap series punya HPP sendiri, bukan satu angka bersama. */
+  hpp: string;
+  /** HPP series ini saat form dimuat — dipakai supaya HPP hanya ditulis kalau benar-benar diubah. */
+  hppInitial: string;
 }
 
 type SizeRow = { size: string; stock: number; priceOverride: string; sku: string; weight?: string; /** ID baris `product_variants` lama (dipakai mode Edit supaya ID tidak putus). */ id?: string;
@@ -851,7 +855,7 @@ export default function TambahProdukPage({
         if (product.category === "Thobe" && product.name) {
           const { data: siblings } = await supabase
             .from("products")
-            .select("id, name, series, price, minimum_price, recommended_price, create_your_price_enabled, cyp_microcopy_override, open_order_price, open_order_minimum_price, open_order_recommended_price, open_order_cyp_enabled, open_order_cyp_microcopy, image, images")
+            .select("id, name, series, hpp, price, minimum_price, recommended_price, create_your_price_enabled, cyp_microcopy_override, open_order_price, open_order_minimum_price, open_order_recommended_price, open_order_cyp_enabled, open_order_cyp_microcopy, image, images")
             .eq("category", "Thobe")
             .eq("name", product.name)
             .order("created_at", { ascending: true });
@@ -893,6 +897,8 @@ export default function TambahProdukPage({
               activeColor: varList[0]?.color || "default",
               baseProductId,
               baseSize,
+              hpp: sib.hpp ? String(sib.hpp) : "",
+              hppInitial: sib.hpp ? String(sib.hpp) : "",
             };
           }
           if (seriesNames.length > 0) {
@@ -1256,6 +1262,9 @@ export default function TambahProdukPage({
             baseProductId: "",
             baseSize: "",
             productId: "",
+            // Series baru memulai dari HPP series yang sedang dibuka (bisa diubah per series).
+            hpp: (activeSeriesTab && blocks[activeSeriesTab]?.hpp) || hpp || "",
+            hppInitial: "",
           },
         }));
         setActiveSeriesTab(seriesName);
@@ -1698,9 +1707,13 @@ export default function TambahProdukPage({
     try {
       // Field khusus ops (dipakai laporan internal): tipe produk, HPP, dan
       // penanda "belum tampil" — produk baru dari ops tidak langsung masuk katalog.
-      const opsProductFields = isOps
-        ? { product_type: productType, hpp: parseInt(hpp) || 0, ...(isEdit ? {} : { is_published: false }) }
+      // HPP sengaja TIDAK ada di `opsCommonFields`: pada Thobe multi-series tiap series menulis HPP-nya
+      // sendiri (lihat `block.hpp` di loop series); menyimpan satu angka bersama ke semua series
+      // dulu menimpa HPP series lain.
+      const opsCommonFields = isOps
+        ? { product_type: productType, ...(isEdit ? {} : { is_published: false }) }
         : {};
+      const opsProductFields = isOps ? { ...opsCommonFields, hpp: parseInt(hpp) || 0 } : {};
       // Kolom harga: katalog biasa ATAU harga khusus Open Order (lihat `priceTarget`). Dipisah
       // supaya menyimpan dari menu Open Order TIDAK mengubah harga di menu Produk.
       const priceFieldsFor = (p: { price: number; minimum: string; recommended: string; cyp: boolean; microcopy: string; microcopyOn: boolean }): Record<string, number | string | boolean | null> =>
@@ -1776,7 +1789,12 @@ export default function TambahProdukPage({
             catatan_harga: catatanHarga.trim() || null,
             badge_type: badgeType || null,
             open_order_enabled: openOrderEnabled,
-            ...opsProductFields,
+            ...opsCommonFields,
+            // HPP milik series ini. Baris lama hanya ditulis kalau HPP-nya diubah, jadi menyimpan form
+            // tanpa menyentuh HPP tidak pernah mengubah HPP series mana pun (termasuk hasil Barang Masuk).
+            ...(isOps && (!isEdit || !block.productId || block.hpp !== block.hppInitial)
+              ? { hpp: parseInt(block.hpp) || 0 }
+              : {}),
             sku: productSku || null,
           };
           // Mode harga Open Order: baris produk SUDAH ada → pakai `update`, bukan `upsert`.
@@ -2178,7 +2196,10 @@ export default function TambahProdukPage({
                   const refPrice = category === "Thobe" && activeSeriesTab && seriesBlocks[activeSeriesTab]
                     ? parseInt(seriesBlocks[activeSeriesTab].price) || 0
                     : parseInt(basePrice) || 0;
-                  const hppNum = parseInt(hpp) || 0;
+                  // Thobe multi-series: HPP milik series pada tab aktif. Selain itu: satu HPP produk.
+                  const hppSeries = category === "Thobe" && activeSeriesTab && seriesBlocks[activeSeriesTab] ? activeSeriesTab : null;
+                  const hppValue = hppSeries ? seriesBlocks[hppSeries].hpp : hpp;
+                  const hppNum = parseInt(hppValue) || 0;
                   const profit = refPrice - hppNum;
                   const margin = refPrice > 0 ? Math.round((profit / refPrice) * 100) : 0;
                   return (
@@ -2186,9 +2207,18 @@ export default function TambahProdukPage({
                       <p className="text-sm font-semibold mb-3" style={{ color: "var(--espresso)" }}>Data Internal (Ops)</p>
                       <div className="grid sm:grid-cols-2 gap-4">
                         <div>
-                          <label className="pf-label">HPP per Unit (Rp)</label>
-                          <input type="text" inputMode="numeric" value={formatRupiah(hpp)} onChange={(e) => setHpp(parseRupiah(e.target.value))} className="pf-input" placeholder="150.000" />
-                          <p className="pf-hint">Modal per unit — dipakai laporan margin.</p>
+                          <label className="pf-label">HPP per Unit{hppSeries ? ` — ${hppSeries}` : ""} (Rp)</label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={formatRupiah(hppValue)}
+                            onChange={(e) => (hppSeries ? updateSeriesBlock(hppSeries, { hpp: parseRupiah(e.target.value) }) : setHpp(parseRupiah(e.target.value)))}
+                            className="pf-input"
+                            placeholder="150.000"
+                          />
+                          <p className="pf-hint">
+                            {hppSeries ? `Modal per unit khusus series ${hppSeries}; tiap series punya HPP sendiri.` : "Modal per unit"} — dipakai laporan margin.
+                          </p>
                         </div>
                         <div>
                           <label className="pf-label">Tipe Produk</label>
