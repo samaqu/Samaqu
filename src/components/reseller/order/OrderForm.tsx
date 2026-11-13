@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, Plus } from "lucide-react";
 import { ApiError, resellerApi, type KatalogProduct, type ShippingOption } from "@/lib/reseller/client";
+import { rupiah } from "@/lib/reseller/format";
 import { useReseller } from "../ResellerShell";
 import { Note } from "../ui";
 import ItemCard from "./ItemCard";
@@ -314,11 +315,29 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
     );
   }
 
-  const complete = {
-    products: productsComplete,
-    recipient: recipientComplete,
-    shipping: shippingComplete,
-  };
+  const stepDone = [productsComplete, recipientComplete, shippingComplete];
+  const stepHints = [
+    lines.length ? `${lines.length} item` : "Belum ada",
+    address.name.trim() ? address.name.trim() : "Belum diisi",
+    shipping
+      ? `${String(shipping.serviceCode || "").toUpperCase() === "ECO" ? "ECO" : "EZ"} · ${rupiah(shipping.cost)}`
+      : "Pilih layanan",
+  ];
+  // Tombol "Lanjut" aktif kalau langkah sekarang sudah lengkap (aturan sama dengan bar bawah HP).
+  const nextDisabled = step === 0 ? !productsComplete : !recipientComplete;
+
+  const stepHead = (index: number, title: string, desc: string) => (
+    <div className="order-step-h">
+      <div>
+        <h2>{title}</h2>
+        <p>{desc}</p>
+      </div>
+      <span className={`step-pill${stepDone[index] ? " ok" : ""}`}>
+        {stepDone[index] ? <Check size={13} strokeWidth={3} aria-hidden="true" /> : null}
+        {stepDone[index] ? "Lengkap" : "Belum lengkap"}
+      </span>
+    </div>
+  );
 
   const selectedRows = (
     <div className="selected-rows">
@@ -353,29 +372,23 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
 
   return (
     <div className="order-page">
-      <OrderStepper step={step} onStep={setStep} />
+      <OrderStepper step={step} onStep={setStep} done={stepDone} hints={stepHints} />
 
       <div className="form-grid">
         <div className="stack">
           <section className={`card order-step ${step === 0 ? "on" : ""}`}>
-            <div className="card-h">
-              <h2>Produk</h2>
-              <span className="small muted">
-                {picker
-                  ? picker.mode === "replace"
-                    ? "Pilih produk pengganti"
-                    : "Pilih series dulu"
-                  : `${lines.length} item dipilih`}
-              </span>
-            </div>
+            {stepHead(
+              0,
+              "Pilih produk",
+              picker
+                ? picker.mode === "replace"
+                  ? "Pilih produk pengganti untuk item ini."
+                  : "Pilih series dulu, lalu atur ukuran dan harga."
+                : "Atur ukuran, jumlah, dan harga jual ke customer."
+            )}
             <div className="card-b stack" style={{ gap: 12 }}>
               {picker ? (
                 <div className="stack" style={{ gap: 10 }}>
-                  {picker.mode === "replace" ? (
-                    <p className="small bold" style={{ color: "var(--rs-ink)" }}>
-                      Pilih series pengganti untuk item ini.
-                    </p>
-                  ) : null}
                   <ProdukPicker products={products} lines={lines} onPick={pickProduct} />
                   {lines.length > 0 ? (
                     <button type="button" className="btn ghost sm" onClick={() => setPicker(null)}>
@@ -384,7 +397,7 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
                   ) : null}
                 </div>
               ) : (
-                <div className="stack" style={{ gap: 10 }}>
+                <div className="stack" style={{ gap: 12 }}>
                   {lines.map((line) => (
                     <ItemCard
                       key={line.uid}
@@ -397,12 +410,9 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
                       onReplace={() => setPicker({ mode: "replace", uid: line.uid })}
                     />
                   ))}
-                  <button
-                    type="button"
-                    className="btn ghost sm blk"
-                    onClick={() => setPicker({ mode: "add" })}
-                  >
-                    + Tambah produk
+                  <button type="button" className="add-line" onClick={() => setPicker({ mode: "add" })}>
+                    <Plus size={16} aria-hidden="true" />
+                    Tambah produk lain
                   </button>
                 </div>
               )}
@@ -410,9 +420,7 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
           </section>
 
           <section className={`card order-step ${step === 1 ? "on" : ""}`}>
-            <div className="card-h">
-              <h2>Penerima</h2>
-            </div>
+            {stepHead(1, "Data penerima", "Tempel alamat dari chat customer, atau isi manual.")}
             <div className="card-b stack" style={{ gap: 14 }}>
               <div className="only-m">{selectedRows}</div>
               <PenerimaForm value={address} onChange={patchAddress} />
@@ -420,9 +428,7 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
           </section>
 
           <section className={`card order-step ${step === 2 ? "on" : ""}`}>
-            <div className="card-h">
-              <h2>Pengiriman</h2>
-            </div>
+            {stepHead(2, "Pengiriman", "Pilih layanan J&T. Ongkir dihitung dari berat pesanan.")}
             <div className="card-b stack" style={{ gap: 14 }}>
               <div className="only-m">{selectedRows}</div>
               <OngkirCards
@@ -432,21 +438,24 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
                 selected={shipping}
                 onSelect={setShipping}
               />
-              <label className="row" style={{ gap: 8, cursor: "pointer", minHeight: 44 }}>
+              <label className="switch-row">
+                <span className="switch-txt">
+                  <b>Tampilkan nama toko saya di label</b>
+                  <small>Nama tokomu ikut tercetak di label paket.</small>
+                </span>
                 <input
                   type="checkbox"
+                  role="switch"
+                  className="switch"
                   checked={showLabel}
                   onChange={(e) => setShowLabel(e.target.checked)}
-                  style={{ accentColor: "#111", width: 18, height: 18 }}
                 />
-                <span className="small">Tampilkan nama toko saya di label</span>
               </label>
               <div className="only-m" style={{ marginTop: 4 }}>
                 <RingkasanPesanan
                   lines={lines}
                   shipping={shipping}
                   saldoTersedia={me.saldo.saldo_tersedia}
-                  complete={complete}
                   disabled={!canSubmit}
                   disabledReason={reason}
                   submitting={submitting}
@@ -457,6 +466,31 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
               </div>
             </div>
           </section>
+
+          <div className="step-nav only-d">
+            {step > 0 ? (
+              <button type="button" className="btn ghost" onClick={() => setStep((current) => Math.max(0, current - 1))}>
+                <ArrowLeft size={16} aria-hidden="true" />
+                Kembali
+              </button>
+            ) : (
+              <span />
+            )}
+            {step < 2 ? (
+              <div className="step-nav-next">
+                {nextDisabled && stepReason ? <span className="step-nav-hint">{stepReason}</span> : null}
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={nextDisabled}
+                  onClick={() => setStep((current) => Math.min(2, current + 1))}
+                >
+                  Lanjut
+                  <ArrowRight size={16} aria-hidden="true" />
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <div className="only-d">
@@ -464,7 +498,6 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
             lines={lines}
             shipping={shipping}
             saldoTersedia={me.saldo.saldo_tersedia}
-            complete={complete}
             disabled={!canSubmit}
             disabledReason={reason}
             submitting={submitting}
@@ -481,6 +514,7 @@ export default function OrderForm({ preselectProductId }: { preselectProductId?:
         disabled={step === 0 ? !productsComplete : step === 1 ? !recipientComplete : !canSubmit}
         reason={stepReason}
         submitting={submitting}
+        onBack={() => setStep((current) => Math.max(0, current - 1))}
         onNext={() => setStep((current) => Math.min(2, current + 1))}
         onSubmit={submit}
       />

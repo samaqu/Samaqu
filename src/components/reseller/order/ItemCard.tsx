@@ -31,7 +31,7 @@ export default function ItemCard({
     return (
       <div className="item-compact" data-line-uid={line.uid}>
         <div className="min-w-0">
-          <div className="bold" style={{ fontSize: 12.5 }}>
+          <div className="bold" style={{ fontSize: 13.5 }}>
             {title}
           </div>
           <div className="small muted">
@@ -53,20 +53,7 @@ export default function ItemCard({
 
   return (
     <div data-line-uid={line.uid}>
-      <ItemEditor
-        line={line}
-        onChange={onChange}
-        onVariant={onVariant}
-        onRemove={onRemove}
-      />
-      <div className="item-card-actions">
-        <button type="button" className="btn ghost sm" onClick={onReplace}>
-          Ganti produk
-        </button>
-        <button type="button" className="btn ghost sm" onClick={onToggle}>
-          Tutup
-        </button>
-      </div>
+      <ItemEditor line={line} onChange={onChange} onVariant={onVariant} onRemove={onRemove} onReplace={onReplace} />
     </div>
   );
 }

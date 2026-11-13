@@ -1,22 +1,27 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { Repeat, Trash2, TrendingUp } from "lucide-react";
 import { rupiah } from "@/lib/reseller/format";
 import RupiahInput from "../RupiahInput";
 import ProductPhoto from "../ProductPhoto";
 import type { OrderLine } from "./types";
 
-/** Blok satu item terpilih: varian, ukuran, qty, harga jual, untung. */
+/**
+ * Blok satu item terpilih: produk, ukuran, jumlah, harga jual, untung.
+ * Urutan dibuat searah mata: apa yang dibeli -> ukuran -> berapa banyak & harga -> untungnya.
+ */
 export default function ItemEditor({
   line,
   onChange,
   onVariant,
   onRemove,
+  onReplace,
 }: {
   line: OrderLine;
   onChange: (patch: Partial<OrderLine>) => void;
   onVariant: (patch: { color?: string; size?: string }) => void;
   onRemove: () => void;
+  onReplace: () => void;
 }) {
   const buy = line.product.buy_price;
   const minSell = line.product.min_sell_price;
@@ -31,20 +36,27 @@ export default function ItemEditor({
 
   return (
     <div className="item-editor">
-      <div className="item-head">
-        <ProductPhoto src={line.product.image} name={line.product.name} series={line.product.series} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="bold" style={{ fontSize: 13.5 }}>
-            {title}
-          </div>
-          <div className="small muted">
-            <span className="price-strike">{rupiah(line.product.price)}</span> · beli{" "}
-            <b style={{ color: "var(--rs-ink)" }}>{rupiah(buy)}</b> (−{line.product.discount_percent}%)
+      <div className="ie-head">
+        <ProductPhoto src={line.product.image} name={line.product.name} series={line.product.series} className="ie-photo" />
+        <div className="ie-title">
+          <div className="ie-name">{title}</div>
+          <div className="ie-meta">
+            Harga beli kamu <b>{rupiah(buy)}</b>
+            <span>
+              {" "}
+              · katalog <s>{rupiah(line.product.price)}</s> (−{line.product.discount_percent}%)
+            </span>
           </div>
         </div>
-        <button type="button" className="iconbtn" aria-label={`Hapus ${title}`} onClick={onRemove}>
-          <Trash2 size={15} />
-        </button>
+        <div className="ie-acts">
+          <button type="button" className="ie-btn" onClick={onReplace}>
+            <Repeat size={14} aria-hidden="true" />
+            Ganti
+          </button>
+          <button type="button" className="iconbtn" aria-label={`Hapus ${title}`} onClick={onRemove}>
+            <Trash2 size={15} />
+          </button>
+        </div>
       </div>
 
       {colors.length > 1 ? (
@@ -66,8 +78,8 @@ export default function ItemEditor({
       ) : null}
 
       <div>
-        <div className="item-label">Ukuran</div>
-        <div className="size-grid">
+        <div className="item-label">Pilih ukuran</div>
+        <div className="size-pills" role="group" aria-label="Ukuran">
           {sizes.map((variant) => {
             const habis = variant.stock < 1;
             const active = line.size === variant.size;
@@ -75,25 +87,26 @@ export default function ItemEditor({
               <button
                 key={variant.size}
                 type="button"
-                className={`size-box ${active ? "on" : ""} ${habis ? "off" : ""}`}
+                className={`size-pill ${active ? "on" : ""} ${habis ? "off" : ""}`}
                 disabled={habis}
                 aria-pressed={active}
                 onClick={() => onVariant({ size: variant.size })}
               >
                 <span className="sz">{variant.size}</span>
-                <span className="st">{habis ? "Habis" : `${variant.stock}`}</span>
+                <span className="st">{habis ? "Habis" : `Stok ${variant.stock}`}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="item-bottom">
+      <div className="ie-row">
         <div>
           <div className="item-label">Jumlah</div>
           <div className="qty qty-lg">
             <button
               type="button"
+              aria-label="Kurangi jumlah"
               disabled={line.quantity <= 1}
               onClick={() => onChange({ quantity: Math.max(1, line.quantity - 1) })}
             >
@@ -102,6 +115,7 @@ export default function ItemEditor({
             <span>{line.quantity}</span>
             <button
               type="button"
+              aria-label="Tambah jumlah"
               disabled={line.quantity >= line.stock}
               onClick={() => onChange({ quantity: Math.min(line.stock, line.quantity + 1) })}
             >
@@ -120,14 +134,17 @@ export default function ItemEditor({
           <div className="min-hint">
             Minimal {rupiah(minSell)} · {line.product.min_sell_reason}
           </div>
-          {!sellValid ? <span className="err">Harga jual di bawah batas minimal.</span> : null}
         </div>
-        <div className={`profit-chip ${profit > 0 ? "" : "flat"}`}>
-          <span>Untung / pcs</span>
-          <b>
-            {rupiah(profit)} · {profitPct}%
-          </b>
-        </div>
+      </div>
+
+      {!sellValid ? <p className="err">Harga jual di bawah batas minimal.</p> : null}
+
+      <div className={`ie-profit ${profit > 0 ? "" : "flat"}`}>
+        <TrendingUp size={16} aria-hidden="true" />
+        <span>
+          Untung <b>{rupiah(profit)}</b> / pcs
+        </span>
+        <small>{profitPct}% dari harga jual</small>
       </div>
     </div>
   );

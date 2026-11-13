@@ -74,14 +74,17 @@ export default function OngkirCards({
   if (!city || !district) {
     return (
       <div className="ongkir-empty">
-        <Truck size={16} />
-        <span>Isi alamat dulu untuk melihat ongkir.</span>
+        <Truck size={18} />
+        <span>
+          <b>Ongkir belum bisa dihitung.</b> Lengkapi provinsi, kota, dan kecamatan penerima di langkah{" "}
+          <b>Penerima</b> dulu.
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="stack" style={{ gap: 10 }}>
+    <div className="stack" style={{ gap: 12 }}>
       <p className="small muted">
         <Truck size={14} style={{ verticalAlign: -2, marginRight: 6 }} />
         Ongkir dari berat pesanan
@@ -107,7 +110,8 @@ export default function OngkirCards({
                 aria-pressed={active}
                 onClick={() => option && onSelect(option)}
               >
-                <span className="row" style={{ justifyContent: "space-between", gap: 8 }}>
+                <span className="radio" aria-hidden="true" />
+                <span className="row" style={{ justifyContent: "space-between", gap: 8, width: "100%" }}>
                   <span className="svc">{service.code}</span>
                   <span className="tag">{service.tag}</span>
                 </span>

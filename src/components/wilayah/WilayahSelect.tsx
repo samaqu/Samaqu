@@ -28,8 +28,8 @@ export interface WilayahSelectProps {
   error?: string;
   /** Keterangan tambahan di bawah isian (mis. penanda hasil tebakan otomatis). */
   hint?: string;
-  /** "ops" untuk dashboard internal, "store" untuk halaman customer. */
-  variant?: "ops" | "store";
+  /** "ops" untuk dashboard internal, "store" untuk halaman customer, "reseller" untuk portal reseller. */
+  variant?: "ops" | "store" | "reseller";
   required?: boolean;
 }
 
@@ -81,10 +81,16 @@ export default function WilayahSelect({
   };
 
   const isStore = variant === "store";
-  const labelClass = isStore
-    ? "block text-[13px] sm:text-sm font-ui mb-1.5"
-    : "text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1.5";
-  const buttonClass = isStore
+  // Portal reseller: gaya dari `reseller.css` (`rs-wil-*`) supaya sama dengan kolom isian lainnya.
+  const isReseller = variant === "reseller";
+  const labelClass = isReseller
+    ? "rs-wil-label"
+    : isStore
+      ? "block text-[13px] sm:text-sm font-ui mb-1.5"
+      : "text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1.5";
+  const buttonClass = isReseller
+    ? "rs-wil-btn"
+    : isStore
     ? "w-full flex items-center justify-between gap-2 rounded-lg px-4 py-3 text-left text-sm font-ui transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
     : `w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border-2 bg-gray-50 dark:bg-slate-900 text-left text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
         error ? "border-red-300 dark:border-red-900/60" : "border-gray-200 dark:border-slate-700"
@@ -114,7 +120,10 @@ export default function WilayahSelect({
         className={buttonClass}
         style={buttonStyle}
       >
-        <span className="truncate" style={value || !isStore ? undefined : { color: "var(--text-muted, #6b7280)" }}>
+        <span
+          className={`truncate${isReseller && !value ? " rs-wil-ph" : ""}`}
+          style={value || !isStore ? undefined : { color: "var(--text-muted, #6b7280)" }}
+        >
           {value || (loading ? "Memuat…" : placeholder)}
         </span>
         <ChevronDown size={15} className="shrink-0 opacity-60" />

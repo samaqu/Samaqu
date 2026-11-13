@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Pencil, Wand2 } from "lucide-react";
+import { CheckCircle, Loader2, Pencil, Wand2 } from "lucide-react";
 import WilayahSelect from "@/components/wilayah/WilayahSelect";
 import { resellerApi } from "@/lib/reseller/client";
 import { Note } from "../ui";
 import type { AddressValue } from "./types";
 
-/** Form penerima & alamat: tempel → ringkasan 3 baris; isian manual hanya saat perlu. */
+/**
+ * Form penerima & alamat. Dua cara yang jelas dipisah dengan tab:
+ *  - "Tempel alamat" (cepat): tempel teks dari chat customer -> terisi otomatis -> cek ringkasan;
+ *  - "Isi manual": kolom berurutan dari nama sampai kode pos.
+ * Logika baca-alamat & validasi sama seperti sebelumnya; hanya tampilannya yang dirapikan.
+ */
 
 async function fetchWilayah(params: { province?: string; city?: string } = {}): Promise<string[]> {
   const q = new URLSearchParams();
@@ -51,6 +56,10 @@ export default function PenerimaForm({
   const [editName, setEditName] = useState(false);
   const [editContact, setEditContact] = useState(false);
   const [editAddress, setEditAddress] = useState(false);
+  // Sudah ada isian (mis. kembali ke langkah ini) -> langsung tampilkan tab manual.
+  const [mode, setMode] = useState<"tempel" | "manual">(
+    value.name || value.address || value.city ? "manual" : "tempel"
+  );
 
   useEffect(() => {
     fetchWilayah().then(setProvinceList).catch(() => setProvinceList([]));
@@ -132,168 +141,198 @@ export default function PenerimaForm({
   const showContactInput = !auto || editContact || !waValid(value.whatsapp);
   const showAddressInput = !auto || editAddress || addressMissing(value);
 
-  return (
-    <div className="stack" style={{ gap: 14 }}>
-      <div className="paste-box">
-        <label htmlFor="rs-tempel" className="item-label">
-          Tempel alamat penerima
-        </label>
-        <textarea
-          id="rs-tempel"
+  const wilayahFields = (
+    <div className="fgrid c3">
+      <WilayahSelect
+        label="Provinsi"
+        variant="reseller"
+        value={value.province}
+        options={provinceList}
+        onChange={(province) => onChange({ province, city: "", district: "" })}
+      />
+      <WilayahSelect
+        label="Kota / Kabupaten"
+        variant="reseller"
+        value={value.city}
+        options={cityList}
+        disabled={!value.province}
+        onChange={(city) => onChange({ city, district: "" })}
+      />
+      <WilayahSelect
+        label="Kecamatan"
+        variant="reseller"
+        value={value.district}
+        options={districtList}
+        disabled={!value.city}
+        onChange={(district) => onChange({ district })}
+      />
+    </div>
+  );
+
+  const postalNotes = (
+    <div className="fgrid c2">
+      <div className="field">
+        <label htmlFor="rs-kodepos">Kode pos</label>
+        <input
+          id="rs-kodepos"
           className="in"
-          rows={3}
-          placeholder="Nama, nomor HP, alamat, kecamatan, kota, provinsi, kode pos…"
-          value={paste}
-          onChange={(e) => setPaste(e.target.value)}
+          inputMode="numeric"
+          placeholder="5 angka"
+          value={value.postalCode}
+          onChange={(e) => onChange({ postalCode: e.target.value.replace(/\D/g, "").slice(0, 5) })}
         />
-        <div className="row" style={{ marginTop: 8 }}>
-          <button type="button" className="btn sm" disabled={detecting} onClick={detect}>
-            {detecting ? <Loader2 size={14} /> : <Wand2 size={14} />}
-            Isi otomatis
-          </button>
-          <button type="button" className="btn ghost sm" onClick={reset}>
-            Reset
-          </button>
-        </div>
-        {hint ? (
-          <p className="hint" style={{ marginTop: 8 }}>
-            {hint}
-          </p>
-        ) : null}
-        {error ? (
-          <div style={{ marginTop: 8 }}>
-            <Note tone="err">{error}</Note>
-          </div>
-        ) : null}
+      </div>
+      <div className="field">
+        <label htmlFor="rs-catatan">Catatan (opsional)</label>
+        <input
+          id="rs-catatan"
+          className="in"
+          placeholder="Mis. titip ke satpam"
+          value={value.notes}
+          onChange={(e) => onChange({ notes: e.target.value })}
+        />
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="stack" style={{ gap: 16 }}>
+      <div className="seg" role="tablist" aria-label="Cara mengisi data penerima">
+        <button type="button" role="tab" aria-selected={mode === "tempel"} className={mode === "tempel" ? "on" : ""} onClick={() => setMode("tempel")}>
+          Tempel alamat <small>Cepat</small>
+        </button>
+        <button type="button" role="tab" aria-selected={mode === "manual"} className={mode === "manual" ? "on" : ""} onClick={() => setMode("manual")}>
+          Isi manual
+        </button>
       </div>
 
-      {auto ? (
-        <div className="addr-summary">
-          <div className="addr-row">
-            <div>
-              <div className="item-label">Nama penerima</div>
-              {showNameInput ? (
-                <input
-                  className="in"
-                  autoFocus={editName}
-                  placeholder="Nama lengkap"
-                  value={value.name}
-                  onChange={(e) => onChange({ name: e.target.value })}
-                />
-              ) : (
-                <div className="addr-val">{value.name}</div>
-              )}
-            </div>
-            {!showNameInput ? (
-              <button type="button" className="link-btn" onClick={() => setEditName(true)}>
-                <Pencil size={12} /> Ubah
+      {mode === "tempel" ? (
+        <div className="stack" style={{ gap: 14 }}>
+          <div className="paste-box">
+            <label htmlFor="rs-tempel" className="paste-title">
+              Tempel alamat dari chat customer
+            </label>
+            <textarea
+              id="rs-tempel"
+              className="in"
+              rows={4}
+              placeholder={"Contoh:\nBudi Santoso\n0812xxxxxxxx\nJl. Mawar No. 3, Kec. Coblong, Bandung, Jawa Barat 40132"}
+              value={paste}
+              onChange={(e) => setPaste(e.target.value)}
+            />
+            <div className="paste-actions">
+              <button type="button" className="btn" disabled={detecting} onClick={detect}>
+                {detecting ? <Loader2 size={16} /> : <Wand2 size={16} />}
+                Isi otomatis
               </button>
-            ) : null}
+              <button type="button" className="btn ghost" onClick={reset}>
+                Reset
+              </button>
+            </div>
+            {hint ? <p className="paste-tip">{hint}</p> : null}
+            {error ? <Note tone="err">{error}</Note> : null}
           </div>
 
-          <div className="addr-row">
-            <div>
-              <div className="item-label">WhatsApp</div>
-              {showContactInput ? (
-                <input
-                  className="in"
-                  inputMode="tel"
-                  autoFocus={editContact}
-                  placeholder="08xxxxxxxxxx"
-                  value={value.whatsapp}
-                  onChange={(e) => onChange({ whatsapp: e.target.value })}
-                />
-              ) : (
-                <div className="addr-val">{value.whatsapp}</div>
-              )}
-            </div>
-            {!showContactInput ? (
-              <button type="button" className="link-btn" onClick={() => setEditContact(true)}>
-                <Pencil size={12} /> Ubah
-              </button>
-            ) : null}
-          </div>
-
-          <div className="addr-row">
-            <div style={{ minWidth: 0 }}>
-              <div className="item-label">Alamat</div>
-              {showAddressInput ? (
-                <div className="stack" style={{ gap: 10, marginTop: 4 }}>
-                  <textarea
-                    className="in"
-                    rows={2}
-                    placeholder="Jalan, nomor rumah, RT/RW, kelurahan, patokan…"
-                    value={value.address}
-                    onChange={(e) => onChange({ address: e.target.value })}
-                  />
-                  <div className="grid3" style={{ gap: 10 }}>
-                    <WilayahSelect
-                      label="Provinsi"
-                      variant="store"
-                      value={value.province}
-                      options={provinceList}
-                      onChange={(province) => onChange({ province, city: "", district: "" })}
+          {auto ? (
+            <div className="addr-summary">
+              <div className="addr-head">
+                <CheckCircle size={15} aria-hidden="true" />
+                Terisi otomatis — cek datanya
+              </div>
+              <div className="addr-row">
+                <div>
+                  <div className="item-label">Nama penerima</div>
+                  {showNameInput ? (
+                    <input
+                      className="in"
+                      autoFocus={editName}
+                      placeholder="Nama lengkap"
+                      value={value.name}
+                      onChange={(e) => onChange({ name: e.target.value })}
                     />
-                    <WilayahSelect
-                      label="Kota / Kabupaten"
-                      variant="store"
-                      value={value.city}
-                      options={cityList}
-                      disabled={!value.province}
-                      onChange={(city) => onChange({ city, district: "" })}
-                    />
-                    <WilayahSelect
-                      label="Kecamatan"
-                      variant="store"
-                      value={value.district}
-                      options={districtList}
-                      disabled={!value.city}
-                      onChange={(district) => onChange({ district })}
-                    />
-                  </div>
-                  <div className="grid2" style={{ gap: 10 }}>
-                    <div className="field" style={{ marginBottom: 0 }}>
-                      <label>Kode pos</label>
-                      <input
-                        className="in"
-                        inputMode="numeric"
-                        value={value.postalCode}
-                        onChange={(e) =>
-                          onChange({ postalCode: e.target.value.replace(/\D/g, "").slice(0, 5) })
-                        }
-                      />
-                    </div>
-                    <div className="field" style={{ marginBottom: 0 }}>
-                      <label>Catatan (opsional)</label>
-                      <input
-                        className="in"
-                        value={value.notes}
-                        onChange={(e) => onChange({ notes: e.target.value })}
-                      />
-                    </div>
-                  </div>
+                  ) : (
+                    <div className="addr-val">{value.name}</div>
+                  )}
                 </div>
-              ) : (
-                <div className="addr-val">{addressLine(value)}</div>
-              )}
+                {!showNameInput ? (
+                  <button type="button" className="link-btn" onClick={() => setEditName(true)}>
+                    <Pencil size={12} /> Ubah
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="addr-row">
+                <div>
+                  <div className="item-label">WhatsApp</div>
+                  {showContactInput ? (
+                    <input
+                      className="in"
+                      inputMode="tel"
+                      autoFocus={editContact}
+                      placeholder="08xxxxxxxxxx"
+                      value={value.whatsapp}
+                      onChange={(e) => onChange({ whatsapp: e.target.value })}
+                    />
+                  ) : (
+                    <div className="addr-val">{value.whatsapp}</div>
+                  )}
+                </div>
+                {!showContactInput ? (
+                  <button type="button" className="link-btn" onClick={() => setEditContact(true)}>
+                    <Pencil size={12} /> Ubah
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="addr-row">
+                <div style={{ minWidth: 0 }}>
+                  <div className="item-label">Alamat</div>
+                  {showAddressInput ? (
+                    <div className="stack" style={{ gap: 12, marginTop: 4 }}>
+                      <textarea
+                        className="in"
+                        rows={2}
+                        placeholder="Jalan, nomor rumah, RT/RW, kelurahan, patokan…"
+                        value={value.address}
+                        onChange={(e) => onChange({ address: e.target.value })}
+                      />
+                      {wilayahFields}
+                      {postalNotes}
+                    </div>
+                  ) : (
+                    <div className="addr-val">{addressLine(value)}</div>
+                  )}
+                </div>
+                {!showAddressInput ? (
+                  <button type="button" className="link-btn" onClick={() => setEditAddress(true)}>
+                    <Pencil size={12} /> Ubah
+                  </button>
+                ) : null}
+              </div>
             </div>
-            {!showAddressInput ? (
-              <button type="button" className="link-btn" onClick={() => setEditAddress(true)}>
-                <Pencil size={12} /> Ubah
-              </button>
-            ) : null}
-          </div>
+          ) : null}
         </div>
       ) : (
-        <div className="stack" style={{ gap: 12 }}>
-          <div className="grid2" style={{ gap: 12 }}>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label>Nama penerima</label>
-              <input className="in" value={value.name} onChange={(e) => onChange({ name: e.target.value })} />
-            </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label>WhatsApp penerima</label>
+        <div className="stack" style={{ gap: 14 }}>
+          <div className="fgrid c2">
+            <div className="field">
+              <label htmlFor="rs-nama">
+                Nama penerima <span className="req">*</span>
+              </label>
               <input
+                id="rs-nama"
+                className="in"
+                placeholder="Nama lengkap"
+                value={value.name}
+                onChange={(e) => onChange({ name: e.target.value })}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="rs-wa">
+                WhatsApp penerima <span className="req">*</span>
+              </label>
+              <input
+                id="rs-wa"
                 className="in"
                 inputMode="tel"
                 placeholder="08xxxxxxxxxx"
@@ -303,57 +342,22 @@ export default function PenerimaForm({
             </div>
           </div>
 
-          <div className="grid3" style={{ gap: 12 }}>
-            <WilayahSelect
-              label="Provinsi"
-              variant="store"
-              value={value.province}
-              options={provinceList}
-              onChange={(province) => onChange({ province, city: "", district: "" })}
-            />
-            <WilayahSelect
-              label="Kota / Kabupaten"
-              variant="store"
-              value={value.city}
-              options={cityList}
-              disabled={!value.province}
-              onChange={(city) => onChange({ city, district: "" })}
-            />
-            <WilayahSelect
-              label="Kecamatan"
-              variant="store"
-              value={value.district}
-              options={districtList}
-              disabled={!value.city}
-              onChange={(district) => onChange({ district })}
-            />
-          </div>
-
-          <div className="grid2" style={{ gap: 12 }}>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label>Kode pos</label>
-              <input
-                className="in"
-                inputMode="numeric"
-                value={value.postalCode}
-                onChange={(e) => onChange({ postalCode: e.target.value.replace(/\D/g, "").slice(0, 5) })}
-              />
-            </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label>Catatan (opsional)</label>
-              <input className="in" value={value.notes} onChange={(e) => onChange({ notes: e.target.value })} />
-            </div>
-          </div>
-
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label>Alamat lengkap</label>
+          <div className="field">
+            <label htmlFor="rs-alamat">
+              Alamat lengkap <span className="req">*</span>
+            </label>
             <textarea
+              id="rs-alamat"
               className="in"
+              rows={3}
               placeholder="Jalan, nomor rumah, RT/RW, kelurahan, patokan…"
               value={value.address}
               onChange={(e) => onChange({ address: e.target.value })}
             />
           </div>
+
+          {wilayahFields}
+          {postalNotes}
         </div>
       )}
     </div>

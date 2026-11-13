@@ -1,9 +1,9 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { ChevronLeft, AlertTriangle, Loader2 } from "lucide-react";
 import { rupiah } from "@/lib/reseller/format";
 
-/** Bar bawah mobile untuk Buat Pesanan: total + satu tombol aksi. */
+/** Bar bawah HP untuk Buat Pesanan: total, tombol kembali, dan satu tombol aksi utama. */
 export default function OrderBottomBar({
   step,
   total,
@@ -11,6 +11,7 @@ export default function OrderBottomBar({
   disabled,
   reason,
   submitting,
+  onBack,
   onNext,
   onSubmit,
 }: {
@@ -20,6 +21,7 @@ export default function OrderBottomBar({
   disabled: boolean;
   reason: string;
   submitting: boolean;
+  onBack: () => void;
   onNext: () => void;
   onSubmit: () => void;
 }) {
@@ -32,18 +34,23 @@ export default function OrderBottomBar({
 
   return (
     <div className="order-bar">
-      {disabled && reason ? <p className="order-bar-hint">{reason}</p> : null}
+      {disabled && reason ? (
+        <p className="order-bar-hint">
+          <AlertTriangle size={14} aria-hidden="true" />
+          <span>{reason}</span>
+        </p>
+      ) : null}
       <div className="order-bar-main">
-        <div>
-          <div className="small muted">Total bayar</div>
-          <b style={{ fontSize: 17 }}>{rupiah(total)}</b>
+        {step > 0 ? (
+          <button type="button" className="order-bar-back" onClick={onBack} aria-label="Kembali ke langkah sebelumnya">
+            <ChevronLeft size={20} />
+          </button>
+        ) : null}
+        <div className="order-bar-total">
+          <span>Total bayar</span>
+          <b>{rupiah(total)}</b>
         </div>
-        <button
-          className="btn"
-          type="button"
-          disabled={disabled || submitting}
-          onClick={last ? onSubmit : onNext}
-        >
+        <button className="btn" type="button" disabled={disabled || submitting} onClick={last ? onSubmit : onNext}>
           {submitting ? <Loader2 size={16} /> : null}
           {label}
         </button>
