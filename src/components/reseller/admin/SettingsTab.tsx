@@ -6,6 +6,7 @@ import { AdminApiError, opsResellerApi, type ResellerSettings } from "./api";
 import { supabase } from "@/lib/supabase";
 import { MEDIA_LIMITS, uploadToCloudinary } from "@/lib/cloudinary";
 import RupiahInput from "@/components/reseller/RupiahInput";
+import LevelSettingsCard from "./LevelSettingsCard";
 
 /**
  * Pengaturan reseller: biaya admin non-BSI, rekening BSI tujuan top up, dan
@@ -98,6 +99,7 @@ export default function SettingsTab({ onChanged }: { onChanged: () => void }) {
   };
 
   return (
+    <div className="space-y-4">
     <form onSubmit={save} className="bg-white rounded-2xl border border-slate-200 p-5 max-w-2xl space-y-4">
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
@@ -206,5 +208,8 @@ export default function SettingsTab({ onChanged }: { onChanged: () => void }) {
         {busy ? "Menyimpan…" : "Simpan pengaturan"}
       </button>
     </form>
+
+    <LevelSettingsCard levels={form.levels} onChanged={onChanged} />
+    </div>
   );
 }

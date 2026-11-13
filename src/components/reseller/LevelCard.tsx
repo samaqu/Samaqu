@@ -71,7 +71,10 @@ export default function LevelCard({ level }: { level: LevelSummary }) {
         ))}
       </ol>
 
-      <p className="lv-note">{basis} Pesanan batal tidak dihitung.</p>
+      <p className="lv-note">
+        {level.manual ? "Level ini ditetapkan oleh admin SAMAQU. " : ""}
+        {basis} Pesanan batal tidak dihitung.
+      </p>
     </section>
   );
 }

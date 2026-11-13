@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { opsResellerApi, type QueuePayload, type ResellerAdminRow, type ResellerStats } from "./api";
 import { rupiah } from "@/lib/reseller/format";
+import { LEVELS, type LevelTier } from "@/lib/reseller/level";
 import QueueTab from "./QueueTab";
 import PriceTab from "./PriceTab";
 import ResellersTab from "./ResellersTab";
@@ -32,6 +33,7 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
   const [queue, setQueue] = useState<QueuePayload | null>(null);
   const [resellers, setResellers] = useState<ResellerAdminRow[]>([]);
   const [defaultDiscount, setDefaultDiscount] = useState(25);
+  const [levelTiers, setLevelTiers] = useState<LevelTier[]>([...LEVELS]);
   const [loadingQueue, setLoadingQueue] = useState(true);
   const [loadingList, setLoadingList] = useState(true);
   const [detail, setDetail] = useState<ResellerAdminRow | null>(null);
@@ -105,6 +107,7 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
       const res = await opsResellerApi.resellers();
       setResellers(res.data);
       if (typeof res.default_discount_percent === "number") setDefaultDiscount(res.default_discount_percent);
+      if (Array.isArray(res.levels) && res.levels.length === 3) setLevelTiers(res.levels);
     } catch {
       setError("Gagal memuat daftar reseller.");
     } finally {
@@ -184,13 +187,14 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
           rows={resellers}
           loading={loadingList}
           defaultDiscount={defaultDiscount}
+          levels={levelTiers}
           onChanged={refreshAll}
           onOpenDetail={setDetail}
         />
       ) : tab === "mutasi" ? (
         <LedgerTab resellers={resellers} onChanged={refreshAll} />
       ) : (
-        <SettingsTab onChanged={loadStats} />
+        <SettingsTab onChanged={refreshAll} />
       )}
 
       {detail ? (

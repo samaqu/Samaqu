@@ -1,18 +1,22 @@
 /**
- * Level reseller di sisi server untuk panel admin: satu query pesanan 90 hari terakhir untuk
- * SEMUA reseller yang diminta, lalu aturan yang sama dengan portal reseller (`level.ts`).
- * Gagal membaca = peta kosong (kolom/drawer level disembunyikan, bukan membuat halaman error).
+ * Level reseller di sisi server (portal reseller + panel admin): satu query pesanan 90 hari terakhir untuk
+ * SEMUA reseller yang diminta, lalu aturan yang sama (`level.ts`) dengan batas buatan admin
+ * (`getResellerLevels`) dan level manual per reseller (`level_override`) bila ada.
+ * Gagal membaca pesanan = peta kosong (kolom/drawer level disembunyikan, bukan membuat halaman error).
  */
 
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { LEVEL_WINDOW_DAYS, bulanDihitung, hitungLevel, type LevelSummary } from "./level";
+import { LEVEL_WINDOW_DAYS, applyLevelOverride, bulanDihitung, hitungLevel, type LevelSummary, type LevelTier } from "./level";
+import { getResellerLevels } from "./settings";
 
 export async function levelsForResellers(
-  resellers: { id: string; created_at?: string | null }[]
+  resellers: { id: string; created_at?: string | null; level_override?: string | null }[],
+  tiers?: readonly LevelTier[]
 ): Promise<Map<string, LevelSummary>> {
   const result = new Map<string, LevelSummary>();
   if (resellers.length === 0) return result;
 
+  const batas = tiers ?? (await getResellerLevels());
   const now = new Date();
   const windowStart = new Date(now.getTime() - LEVEL_WINDOW_DAYS * 24 * 3600 * 1000);
 
@@ -41,7 +45,8 @@ export async function levelsForResellers(
   }
 
   for (const row of resellers) {
-    result.set(row.id, hitungLevel(belanja.get(row.id) ?? 0, bulanDihitung(row.created_at, now)));
+    const hitung = hitungLevel(belanja.get(row.id) ?? 0, bulanDihitung(row.created_at, now), batas);
+    result.set(row.id, applyLevelOverride(hitung, row.level_override));
   }
   return result;
 }

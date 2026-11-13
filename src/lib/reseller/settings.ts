@@ -5,6 +5,7 @@
  */
 
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { normalizeLevels, type LevelTier } from "./level";
 
 export const DEFAULT_ADMIN_FEE_NON_BSI = 2500;
 
@@ -49,5 +50,20 @@ export async function getResellerSettings(): Promise<ResellerSettingsValue> {
       bsiAccountHolder: "",
       qrisImageUrl: null,
     };
+  }
+}
+
+/**
+ * Batas level reseller (Silver/Gold/Platinum) buatan admin, dari `store_settings.reseller_levels` (jsonb).
+ * Dibaca TERPISAH dari pengaturan lain: kolom ini baru dibuat migrasi 20261114_reseller_levels.sql, jadi
+ * kalau belum ada (atau isinya tidak valid) hasilnya level STANDAR dan pengaturan lain tidak ikut terpengaruh.
+ */
+export async function getResellerLevels(): Promise<LevelTier[]> {
+  try {
+    const { data, error } = await getSupabaseAdmin().from("store_settings").select("reseller_levels").eq("id", 1).maybeSingle();
+    if (error) return normalizeLevels(null);
+    return normalizeLevels((data as { reseller_levels?: unknown } | null)?.reseller_levels ?? null);
+  } catch {
+    return normalizeLevels(null);
   }
 }

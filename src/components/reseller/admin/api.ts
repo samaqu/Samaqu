@@ -6,7 +6,7 @@
  */
 
 import { supabase } from "@/lib/supabase";
-import type { LevelSummary } from "@/lib/reseller/level";
+import type { LevelSummary, LevelTier } from "@/lib/reseller/level";
 import type {
   LedgerOrderPaymentInfo,
   LedgerTopupInfo,
@@ -81,6 +81,8 @@ export interface ResellerAdminRow {
   saldo?: { saldo_tersedia: number; saldo_ditahan: number; saldo_total: number };
   /** Level Silver/Gold/Platinum (null kalau gagal dihitung). */
   level?: LevelSummary | null;
+  /** Level manual dari admin ("silver" | "gold" | "platinum"); kosong = otomatis dari belanja. */
+  level_override?: string | null;
 }
 
 export interface QueueTopup {
@@ -199,6 +201,8 @@ export interface ResellerSettings {
   bsiAccountNumber: string;
   bsiAccountHolder: string;
   qrisImageUrl: string | null;
+  /** Batas level reseller (Silver/Gold/Platinum) yang berlaku sekarang. */
+  levels: LevelTier[];
 }
 
 /* ── Pemanggil endpoint ── */
@@ -209,7 +213,7 @@ export const opsResellerApi = {
   queue: () => adminFetch<QueuePayload>("/api/ops/reseller/queue"),
 
   resellers: () =>
-    adminFetch<{ data: ResellerAdminRow[]; default_discount_percent?: number }>("/api/ops/reseller/resellers"),
+    adminFetch<{ data: ResellerAdminRow[]; default_discount_percent?: number; levels?: LevelTier[] }>("/api/ops/reseller/resellers"),
 
   resellerDetail: (id: string) => adminFetch<ResellerDetail>(`/api/ops/reseller/resellers/${encodeURIComponent(id)}`),
 

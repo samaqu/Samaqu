@@ -48,6 +48,8 @@ export interface ResellerRow {
   updated_at: string;
   /** Diskon khusus reseller (persen). null = ikut diskon default pengaturan reseller. */
   discount_percent?: number | string | null;
+  /** Level manual dari admin ("silver" | "gold" | "platinum"). null/kosong = otomatis dari belanja. */
+  level_override?: string | null;
 }
 
 export interface ResellerLedgerRow {

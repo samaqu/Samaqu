@@ -7,6 +7,7 @@ import { normalizeBankValue } from "@/lib/reseller/banks";
 import { enrichResellerLedger } from "@/lib/reseller/ledger-enrich";
 import { parseResellerDiscount } from "@/lib/reseller/pricing";
 import { levelsForResellers } from "@/lib/reseller/level-server";
+import { isLevelKey } from "@/lib/reseller/level";
 
 /**
  * Detail satu reseller untuk drawer admin: profil + saldo + mutasi terakhir
@@ -61,7 +62,13 @@ export async function GET(
     0
   );
 
-  const levels = await levelsForResellers([{ id, created_at: (reseller.created_at as string | null) ?? null }]);
+  const levels = await levelsForResellers([
+    {
+      id,
+      created_at: (reseller.created_at as string | null) ?? null,
+      level_override: (reseller as { level_override?: string | null }).level_override ?? null,
+    },
+  ]);
 
   return NextResponse.json({
     reseller,
@@ -115,6 +122,18 @@ export async function PATCH(
     patch.discount_percent = discount.value;
   }
 
+  // Level manual: kosong/null = otomatis dari belanja; silver/gold/platinum = ditetapkan admin.
+  if ("level_override" in body) {
+    const raw = body.level_override;
+    if (raw === null || raw === undefined || raw === "") {
+      patch.level_override = null;
+    } else if (isLevelKey(raw)) {
+      patch.level_override = raw;
+    } else {
+      return NextResponse.json({ error: "Level harus silver, gold, atau platinum (atau kosong untuk otomatis)." }, { status: 400 });
+    }
+  }
+
   const status = typeof body.status === "string" ? body.status.trim() : "";
   if (status) {
     if (!["active", "suspended", "rejected"].includes(status)) {
@@ -139,6 +158,12 @@ export async function PATCH(
   const { error } = await getSupabaseAdmin().from("resellers").update(patch).eq("id", id);
   if (error) {
     console.error("[OPS-RESELLER] Gagal update:", error.message);
+    if (/level_override/.test(error.message)) {
+      return NextResponse.json(
+        { error: "Kolom level manual belum dibuat di database (migrasi 20261114_reseller_levels.sql belum dijalankan)." },
+        { status: 500 }
+      );
+    }
     return NextResponse.json({ error: "Gagal menyimpan perubahan" }, { status: 500 });
   }
 

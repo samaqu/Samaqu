@@ -75,13 +75,21 @@ function LevelKartu({ level }: { level: LevelSummary }) {
           <Icon size={18} />
         </span>
         <div className="rsd-level-txt">
-          <b>{level.label}</b>
+          <b>
+            {level.label} {level.manual ? <span className="rsd-pill warn">Manual</span> : null}
+          </b>
           <small>Rata-rata belanja {rupiah(level.rata_rata)} / bulan</small>
         </div>
       </div>
       <div className="rsd-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={level.progress}>
         <span className={level.next ? level.next.key : level.key} style={{ width: `${level.progress}%` }} />
       </div>
+      {level.manual ? (
+        <p className="rsd-level-note">
+          Level ditetapkan admin. Menurut belanja: <b>{level.tiers.find((tier) => tier.key === level.computed_key)?.label ?? "—"}</b>. Ubah lewat
+          tombol Ubah di daftar reseller.
+        </p>
+      ) : null}
       <p className="rsd-level-note">
         {level.next
           ? `Naik ke ${level.next.label} di rata-rata ${ringkas(level.next.min)} / bulan. Kurang ${ringkas(level.sisa)}.`

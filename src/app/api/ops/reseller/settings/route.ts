@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
-import { getResellerSettings } from "@/lib/reseller/settings";
+import { getResellerLevels, getResellerSettings } from "@/lib/reseller/settings";
+import { validateLevels } from "@/lib/reseller/level";
 
 /**
  * Pengaturan reseller: biaya admin penarikan non-BSI dan rekening BSI
@@ -9,8 +10,8 @@ import { getResellerSettings } from "@/lib/reseller/settings";
  */
 export async function GET(req: NextRequest) {
   if (!(await isOpsAdmin(req))) return unauthorized();
-  const settings = await getResellerSettings();
-  return NextResponse.json({ data: settings });
+  const [settings, levels] = await Promise.all([getResellerSettings(), getResellerLevels()]);
+  return NextResponse.json({ data: { ...settings, levels } });
 }
 
 export async function PATCH(req: NextRequest) {
@@ -41,6 +42,17 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  // Batas level (Silver/Gold/Platinum). null = kembali ke batas standar.
+  if (body.levels !== undefined) {
+    if (body.levels === null) {
+      patch.reseller_levels = null;
+    } else {
+      const checked = validateLevels(body.levels);
+      if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 });
+      patch.reseller_levels = checked.value;
+    }
+  }
+
   if (Object.keys(patch).length === 1) {
     return NextResponse.json({ error: "Tidak ada perubahan." }, { status: 400 });
   }
@@ -48,6 +60,12 @@ export async function PATCH(req: NextRequest) {
   const { error } = await getSupabaseAdmin().from("store_settings").update(patch).eq("id", 1);
   if (error) {
     console.error("[OPS-RESELLER] Gagal menyimpan pengaturan:", error.message);
+    if (/reseller_levels/.test(error.message)) {
+      return NextResponse.json(
+        { error: "Kolom batas level belum dibuat di database (migrasi 20261114_reseller_levels.sql belum dijalankan)." },
+        { status: 500 }
+      );
+    }
     return NextResponse.json({ error: "Gagal menyimpan pengaturan" }, { status: 500 });
   }
 

@@ -6,7 +6,7 @@ import { notifyResellerAccountCreated } from "@/lib/reseller/notify";
 import { normalizeBankValue } from "@/lib/reseller/banks";
 import { getResellerBalance } from "@/lib/reseller/saldo";
 import { parseResellerDiscount } from "@/lib/reseller/pricing";
-import { getResellerSettings } from "@/lib/reseller/settings";
+import { getResellerLevels, getResellerSettings } from "@/lib/reseller/settings";
 import { levelsForResellers } from "@/lib/reseller/level-server";
 
 /**
@@ -27,8 +27,14 @@ export async function GET(req: NextRequest) {
   }
 
   // Level (Silver/Gold/Platinum) per reseller — aturan sama dengan portal reseller.
+  const levelTiers = await getResellerLevels();
   const levels = await levelsForResellers(
-    (data ?? []).map((row) => ({ id: String(row.id), created_at: (row.created_at as string | null) ?? null }))
+    (data ?? []).map((row) => ({
+      id: String(row.id),
+      created_at: (row.created_at as string | null) ?? null,
+      level_override: (row as { level_override?: string | null }).level_override ?? null,
+    })),
+    levelTiers
   );
 
   const rows = await Promise.all(
@@ -45,7 +51,7 @@ export async function GET(req: NextRequest) {
 
   // Diskon default ikut dikirim supaya tabel bisa menulis "25% (default)" untuk reseller tanpa diskon khusus.
   const settings = await getResellerSettings();
-  return NextResponse.json({ data: rows, default_discount_percent: settings.defaultDiscountPercent });
+  return NextResponse.json({ data: rows, default_discount_percent: settings.defaultDiscountPercent, levels: levelTiers });
 }
 
 /** Tambah reseller baru (langsung active) + kirim notifikasi WA akun dibuat. */

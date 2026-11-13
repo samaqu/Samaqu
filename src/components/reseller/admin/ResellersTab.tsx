@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { AdminApiError, opsResellerApi, type ResellerAdminRow } from "./api";
 import { rupiah } from "@/lib/reseller/format";
+import type { LevelTier } from "@/lib/reseller/level";
 import { ConfirmActionModal } from "./Modal";
 import ResellerFormModal from "./ResellerFormModal";
 
@@ -24,6 +25,7 @@ export default function ResellersTab({
   rows,
   loading,
   defaultDiscount,
+  levels,
   onChanged,
   onOpenDetail,
 }: {
@@ -31,6 +33,8 @@ export default function ResellersTab({
   loading: boolean;
   /** Diskon default pengaturan reseller (persen), untuk reseller tanpa diskon khusus. */
   defaultDiscount: number;
+  /** Tiga level yang berlaku (nama + batas), untuk pilihan level manual di form. */
+  levels: LevelTier[];
   onChanged: () => void;
   onOpenDetail: (row: ResellerAdminRow) => void;
 }) {
@@ -164,7 +168,10 @@ export default function ResellersTab({
                             <span className={`inline-block px-2.5 py-1 rounded-lg text-[11px] font-extrabold ${LEVEL_BADGE[row.level.key]}`}>
                               {row.level.label}
                             </span>
-                            <div className="text-[10.5px] text-slate-400 mt-0.5">{rupiah(row.level.rata_rata)}/bln</div>
+                            <div className="text-[10.5px] text-slate-400 mt-0.5">
+                              {row.level.manual ? "manual · " : ""}
+                              {rupiah(row.level.rata_rata)}/bln
+                            </div>
                           </div>
                         ) : (
                           <span className="text-[12px] text-slate-400">—</span>
@@ -206,6 +213,7 @@ export default function ResellersTab({
         <ResellerFormModal
           initial={form.initial}
           defaultDiscount={defaultDiscount}
+          levels={levels}
           onClose={() => setForm({ open: false, initial: null })}
           onSaved={onChanged}
         />
