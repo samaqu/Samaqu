@@ -87,6 +87,20 @@ export function readableJntStatus(text?: string | null): string {
   return String(text ?? "").replace(SITE_CODE_PATTERN, (code) => readableSiteCode(code));
 }
 
+/** Teks tampilan untuk event "Manifes" (kode 101). Situs resmi J&T tidak menampilkannya sama sekali. */
+export const JNT_MANIFEST_LABEL = "Resi dibuat";
+
+/**
+ * Teks status untuk TAMPILAN. "Manifes" (kode 101) dicatat J&T otomatis begitu resi terbit — istilah
+ * internal yang tidak berarti bagi customer — jadi ditampilkan sebagai "Resi dibuat". Selain itu teks J&T
+ * dipertahankan (dengan label lokasi dari kamus). Teks asli J&T tetap tersimpan di `statusRaw`.
+ */
+export function displayStatus(statusRaw: string, statusCode?: number | null): string {
+  const text = String(statusRaw ?? "").trim();
+  if (Number(statusCode) === JNT_MANIFEST_CODE || text.toLowerCase() === "manifes") return JNT_MANIFEST_LABEL;
+  return readableJntStatus(text);
+}
+
 /** Entri riwayat yang boleh tampil sebagian (hanya field yang kita pakai). */
 export interface TrackScan {
   status?: string | null;
@@ -145,7 +159,7 @@ export interface TrackingRow {
 
 export function trackingRow(item: TrackScan | null | undefined): TrackingRow {
   const statusRaw = String(item?.status ?? "").trim();
-  const status = readableJntStatus(statusRaw);
+  const status = displayStatus(statusRaw, item?.status_code);
   const rawNote = String(item?.note ?? "").trim();
   // `storeName` diberi label yang sama, dan disembunyikan kalau teks status sudah memuat
   // kodenya (mis. "Paket telah sampai di DPK_GATEWAY" + storeName "DPK_GATEWAY" → cukup sekali).
@@ -181,7 +195,10 @@ export function parseJntTime(value?: string | null): Date | null {
 
 const WIB_MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
-/** Waktu pemindaian dalam WIB, mis. "15 Okt 2026, 07:05". */
+/**
+ * Waktu pemindaian dalam WIB, mis. "15 Okt 2026, 07:05:12" (detik ikut tampil seperti situs resmi J&T).
+ * Kalau sumber waktunya tidak membawa detik, detik tidak ditulis (supaya tidak menampilkan ":00" palsu).
+ */
 export function formatTrackingTime(value?: string | null): string {
   const d = parseJntTime(value);
   if (!d) return value ? String(value) : "";
@@ -191,7 +208,9 @@ export function formatTrackingTime(value?: string | null): string {
   const year = wib.getUTCFullYear();
   const hh = String(wib.getUTCHours()).padStart(2, "0");
   const mm = String(wib.getUTCMinutes()).padStart(2, "0");
-  return `${day} ${month} ${year}, ${hh}:${mm}`;
+  const hasSeconds = /\d{1,2}:\d{2}:\d{2}/.test(String(value));
+  const ss = hasSeconds ? `:${String(wib.getUTCSeconds()).padStart(2, "0")}` : "";
+  return `${day} ${month} ${year}, ${hh}:${mm}${ss}`;
 }
 
 /**
@@ -222,7 +241,7 @@ export function trackingSummary(history: TrackHistoryItem[] | null | undefined):
   const latest = desc[0];
   const statusRaw = String(latest?.status ?? "").trim();
   return {
-    status: readableJntStatus(statusRaw),
+    status: displayStatus(statusRaw, latest?.status_code),
     statusRaw,
     note: String(latest?.note ?? "").trim() || null,
     receiver: String(latest?.receiver ?? "").trim() || null,
