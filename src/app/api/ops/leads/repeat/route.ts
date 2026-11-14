@@ -3,12 +3,9 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin } from "@/lib/ops-auth";
 import { SALE_STATUSES } from "@/lib/transaksi";
 import { normalizeLeadPhone } from "@/lib/ops-lead-sync";
-import {
-  buildLeadHistories,
-  buildRepeatOrders,
-  describeOrderItems,
-  type HistoryOrderInput,
-} from "@/lib/leads-repeat";
+import { buildLeadHistories, buildRepeatOrders, type HistoryOrderInput } from "@/lib/leads-repeat";
+import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
+import { resolveItemPhotos } from "@/lib/order-photo";
 
 /**
  * GET /api/ops/leads/repeat?start=YYYY-MM-DD&end=YYYY-MM-DD
@@ -26,15 +23,12 @@ import {
 const PAGE = 1000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-type OrderRow = {
-  id: string;
-  order_number: string;
-  customer_whatsapp: string | null;
-  total: number | null;
-  status: string | null;
-  created_at: string;
-  order_items?: Array<{ product_name: string | null; series: string | null; kain: string | null; color: string | null; quantity: number | null }> | null;
-};
+type OrderRow = Omit<HistoryOrderInput, "items"> & { order_items?: HistoryOrderInput["items"] | null };
+
+const ORDER_COLUMNS =
+  "id, order_number, customer_name, customer_whatsapp, total, subtotal, shipping_cost, discount, status, created_at, " +
+  "shipping_address, shipping_kecamatan, shipping_city, shipping_province, shipping_postal_code, shipping_notes, " +
+  "order_items(product_id, product_name, series, kain, color, size, quantity, price, product_image)";
 
 export async function GET(req: NextRequest) {
   if (!(await isOpsAdmin(req))) return NextResponse.json({ error: "Tidak diizinkan" }, { status: 401 });
@@ -68,7 +62,7 @@ export async function GET(req: NextRequest) {
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await admin
       .from("orders")
-      .select("id, order_number, customer_whatsapp, total, status, created_at, order_items(product_name, series, kain, color, quantity)")
+      .select(ORDER_COLUMNS)
       .in("status", SALE_STATUSES)
       .order("created_at", { ascending: true })
       .range(from, from + PAGE - 1);
@@ -77,18 +71,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     for (const row of (data || []) as unknown as OrderRow[]) {
-      orders.push({
-        id: row.id,
-        order_number: row.order_number,
-        customer_whatsapp: row.customer_whatsapp,
-        total: row.total,
-        status: row.status,
-        created_at: row.created_at,
-        items: describeOrderItems(row.order_items),
-      });
+      const { order_items, ...order } = row;
+      orders.push({ ...order, items: order_items || [] });
     }
     if (!data || data.length < PAGE) break;
   }
+
+  // Foto item: snapshot di baris pesanan sering kosong, jadi dilengkapi dari katalog — aturan yang SAMA
+  // dengan menu Transaksi (`resolveItemPhotos`), supaya foto di detail lead identik.
+  const photoLookup = await loadOrderPhotoLookup(itemProductIds(orders.flatMap((order) => order.items)), [], admin);
+  for (const order of orders) order.items = resolveItemPhotos(order.items, photoLookup);
 
   const inWindow = allLeads.filter((lead) => lead.tanggal && lead.tanggal >= start && lead.tanggal <= end);
   const leadPhones = new Set(allLeads.map((lead) => normalizeLeadPhone(lead.kontak)).filter(Boolean));
