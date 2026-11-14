@@ -45,7 +45,9 @@ export interface AiProfile {
 /** Nilai default customer — dipakai apa adanya oleh `/api/chat` (perilaku tidak berubah). */
 const CUSTOMER_DEFAULTS = {
   temperature: 0.4,
-  maxTokens: 450,
+  // Batas ATAS, bukan target (panjang jawaban diatur prompt). Model reasoning menghabiskan token
+  // berpikir dari batas yang sama; terlalu kecil membuat jawaban kosong (finish=length).
+  maxTokens: 1500,
   maxToolRounds: 4,
   maxMessages: 12,
   maxChars: 2000,
@@ -55,7 +57,7 @@ const CUSTOMER_DEFAULTS = {
 /** Nilai default asisten admin — boleh beda, tidak memengaruhi customer. */
 const ADMIN_DEFAULTS = {
   temperature: 0.2,
-  maxTokens: 900,
+  maxTokens: 1500,
   maxToolRounds: 5,
   maxMessages: 16,
   maxChars: 2000,
