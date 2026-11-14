@@ -13,6 +13,7 @@ import {
 } from "@/lib/shipping-weight";
 import { jntServiceCodeFromShippingMethod } from "@/lib/jnt/layanan";
 import { labelItemName } from "@/lib/item-label";
+import { gosendCaption, isGosend } from "@/lib/gosend";
 
 interface OrderData {
   order_number: string;
@@ -152,7 +153,11 @@ export default function LabelPage() {
       // Resi yang sudah di-void tidak boleh dicetak: label mati yang ditempel ke paket bisa
       // menyangkut di sortir J&T. Nomor resinya tetap tersimpan sebagai jejak audit.
       if (data.status === "dibatalkan" || data.jnt_void_status === "voided") {
-        setError("Resi pesanan ini sudah dibatalkan di J&T, jadi labelnya tidak bisa dicetak lagi.");
+        setError(
+          isGosend(data.shipping_method)
+            ? "Pesanan ini sudah dibatalkan, jadi labelnya tidak bisa dicetak lagi."
+            : "Resi pesanan ini sudah dibatalkan di J&T, jadi labelnya tidak bisa dicetak lagi."
+        );
         setLoading(false);
         return;
       }
@@ -195,7 +200,10 @@ export default function LabelPage() {
   }, [orderNumber]);
 
   useEffect(() => {
-    if (!order?.awb_no || !barcodeRef.current) return;
+    // Pesanan GoSend tidak punya nomor resi: barcode dibuat dari nomor pesanan supaya label
+    // tetap bisa discan/dicocokkan. Pesanan J&T dan label retur tetap memakai nomor resi.
+    const barcodeValue = order ? (isGosend(order.shipping_method) ? order.order_number : order.awb_no) : null;
+    if (!barcodeValue || !barcodeRef.current) return;
     barcodeRef.current.innerHTML = "";
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     barcodeRef.current.appendChild(svg);
@@ -219,12 +227,12 @@ export default function LabelPage() {
         // dihitung dari lebar area cetak sebenarnya (78mm dikurangi padding kiri-kanan
         // 2.5mm) supaya barcode berada penuh di dalam label, tidak terpotong.
         const availPx = ((dims.w - 5) / 25.4) * 96;
-        JsBarcode(svg, order.awb_no!, { ...base, width: 1 });
+        JsBarcode(svg, barcodeValue, { ...base, width: 1 });
         const measured = Number(svg.getAttribute("width")) || svg.getBoundingClientRect().width || 0;
         const barWidth = measured > 0 ? Math.min(2.5, (availPx * 0.98) / measured) : 1.5;
-        JsBarcode(svg, order.awb_no!, { ...base, width: barWidth });
+        JsBarcode(svg, barcodeValue, { ...base, width: barWidth });
       } else {
-        JsBarcode(svg, order.awb_no!, { ...base, width: 2.5 });
+        JsBarcode(svg, barcodeValue, { ...base, width: 2.5 });
       }
     });
   }, [order, size]);
@@ -255,6 +263,12 @@ export default function LabelPage() {
   const printDate = new Date().toLocaleString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
   const serviceCode = trackedService || jntServiceCodeFromShippingMethod(order.shipping_method) || "EZ";
   const serviceLabel = `Service ${serviceCode}`;
+  // GoSend: header "GOSEND", HP penerima LENGKAP (driver perlu menghubungi), ongkir tidak dicatat.
+  const isGo = isGosend(order.shipping_method);
+  const goCaption = gosendCaption(order.shipping_method);
+  const phoneText = isGo ? String(order.customer_whatsapp || "") : maskPhoneLast4(order.customer_whatsapp);
+  const layananText = isGo ? `GoSend · ${goCaption}` : serviceLabel;
+  const ongkirText = isGo ? "-" : `Rp ${order.shipping_cost.toLocaleString("id-ID")}`;
   // Label reseller: pengirim = nama toko + WA reseller (resi tetap atas nama SAMAQU).
   const resellerSender =
     order.show_reseller_name_on_label === true && order.reseller?.store_name ? order.reseller : null;
@@ -328,6 +342,14 @@ export default function LabelPage() {
               </>
             )}
           </div>
+          {isGo ? (
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: "14px", fontWeight: "900", letterSpacing: "1px" }}>GOSEND</div>
+              <div style={{ marginTop: "1px" }}>
+                <span style={{ fontSize: "7.5px", fontWeight: "700", background: "#000", color: "#fff", padding: "0.4mm 2mm", borderRadius: "1.2mm" }}>{goCaption}</span>
+              </div>
+            </div>
+          ) : (
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: "14px", fontWeight: "900" }}>J&T <span style={{ fontSize: "9px", fontWeight: "400" }}>EXPRESS</span></div>
             <div style={{ marginTop: "1px" }}>
@@ -335,6 +357,7 @@ export default function LabelPage() {
               <span style={{ fontSize: "7px", marginLeft: "2px", fontWeight: "600" }}>REGULAR SERVICE</span>
             </div>
           </div>
+          )}
         </div>
 
         {/* Barcode */}
@@ -346,7 +369,7 @@ export default function LabelPage() {
         <div style={{ padding: "2mm 3.5mm", border: "2px solid #000", margin: "1.5mm 3.5mm", borderRadius: "1.5mm" }}>
           <div style={{ display: "inline-block", fontSize: "7.5px", fontWeight: "800", background: "#000", color: "#fff", padding: "0.4mm 2mm", borderRadius: "1mm", marginBottom: "1.5mm", textTransform: "uppercase" }}>Penerima</div>
           <div style={{ fontSize: "14px", fontWeight: "800", marginBottom: "1mm" }}>{order.customer_name}</div>
-          <div style={{ fontSize: "10px", fontWeight: "700", marginBottom: "1mm" }}>{maskPhoneLast4(order.customer_whatsapp)}</div>
+          <div style={{ fontSize: "10px", fontWeight: "700", marginBottom: "1mm" }}>{phoneText}</div>
           <div style={{ fontSize: "9px", fontWeight: "600", wordBreak: "break-word", lineHeight: "1.35" }}>
             {order.shipping_address}, {order.shipping_city}{order.shipping_postal_code ? ` ${order.shipping_postal_code}` : ""}
           </div>
@@ -412,11 +435,11 @@ export default function LabelPage() {
           </div>
           <div style={{ padding: "1.5mm 0 1.5mm 3mm" }}>
             <div style={{ fontSize: "7px", fontWeight: "700", color: "#333", textTransform: "uppercase", letterSpacing: "0.3px" }}>Layanan</div>
-            <div style={{ fontSize: "9px", fontWeight: "800" }}>{serviceLabel}</div>
+            <div style={{ fontSize: "9px", fontWeight: "800" }}>{layananText}</div>
           </div>
           <div style={{ padding: "1.5mm 3mm 1.5mm 0", borderRight: "1.5px solid #000", borderTop: "1.5px solid #000" }}>
             <div style={{ fontSize: "7px", fontWeight: "700", color: "#333", textTransform: "uppercase", letterSpacing: "0.3px" }}>Biaya (Ongkir)</div>
-            <div style={{ fontSize: "9px", fontWeight: "800" }}>Rp {order.shipping_cost.toLocaleString("id-ID")}</div>
+            <div style={{ fontSize: "9px", fontWeight: "800" }}>{ongkirText}</div>
           </div>
           <div style={{ padding: "1.5mm 0 1.5mm 3mm", borderTop: "1.5px solid #000" }}>
             <div style={{ fontSize: "7px", fontWeight: "700", color: "#333", textTransform: "uppercase", letterSpacing: "0.3px" }}>Tanggal Cetak</div>
@@ -450,10 +473,17 @@ export default function LabelPage() {
           ) : (
             <div style={{ fontSize: "12px", fontWeight: "900", letterSpacing: "1px" }}>SAMAQU</div>
           )}
+          {isGo ? (
+            <div style={{ textAlign: "right", lineHeight: "1.12" }}>
+              <div style={{ fontSize: "8px", fontWeight: "900", letterSpacing: "0.5px" }}>GOSEND</div>
+              <div style={{ fontSize: "6px", fontWeight: "700", marginTop: "0.1mm" }}>{goCaption}</div>
+            </div>
+          ) : (
           <div style={{ textAlign: "right", lineHeight: "1.12" }}>
             <div style={{ fontSize: "8px", fontWeight: "900" }}>J&amp;T <span style={{ fontSize: "6px", fontWeight: "400" }}>EXPRESS</span></div>
             <div style={{ fontSize: "6px", fontWeight: "700", marginTop: "0.1mm" }}>{serviceLabel} · REGULAR SERVICE</div>
           </div>
+          )}
         </div>
 
         {/* Barcode + nomor resi */}
@@ -465,7 +495,7 @@ export default function LabelPage() {
         <div style={{ padding: "1.1mm 2.5mm", border: "1.5px solid #000", margin: "1mm 2.5mm", borderRadius: "1mm" }}>
           <div style={{ display: "inline-block", fontSize: "6px", fontWeight: "800", background: "#000", color: "#fff", padding: "0.25mm 1.5mm", borderRadius: "0.8mm", marginBottom: "0.6mm", textTransform: "uppercase" }}>Penerima</div>
           <div style={{ fontSize: "11px", fontWeight: "800", lineHeight: "1.15", wordBreak: "break-word" }}>{order.customer_name}</div>
-          <div style={{ fontSize: "9px", fontWeight: "700", marginTop: "0.3mm" }}>{maskPhoneLast4(order.customer_whatsapp)}</div>
+          <div style={{ fontSize: "9px", fontWeight: "700", marginTop: "0.3mm" }}>{phoneText}</div>
           <div style={{ fontSize: "8px", fontWeight: "600", marginTop: "0.3mm", lineHeight: "1.2", wordBreak: "break-word" }}>
             {order.shipping_address}, {order.shipping_city}{order.shipping_postal_code ? ` ${order.shipping_postal_code}` : ""}
           </div>
@@ -526,11 +556,11 @@ export default function LabelPage() {
           </div>
           <div style={{ padding: "0.8mm 0 0.8mm 2mm", borderBottom: "1.5px solid #000" }}>
             <div style={{ fontSize: "5.5px", fontWeight: "700", color: "#333", textTransform: "uppercase", letterSpacing: "0.3px" }}>Layanan</div>
-            <div style={{ fontSize: "7.5px", fontWeight: "800" }}>{serviceLabel}</div>
+            <div style={{ fontSize: "7.5px", fontWeight: "800" }}>{layananText}</div>
           </div>
           <div style={{ padding: "0.8mm 2mm 0.8mm 0", borderRight: "1px solid #000" }}>
             <div style={{ fontSize: "5.5px", fontWeight: "700", color: "#333", textTransform: "uppercase", letterSpacing: "0.3px" }}>Biaya (Ongkir)</div>
-            <div style={{ fontSize: "7.5px", fontWeight: "800" }}>Rp {order.shipping_cost.toLocaleString("id-ID")}</div>
+            <div style={{ fontSize: "7.5px", fontWeight: "800" }}>{ongkirText}</div>
           </div>
           <div style={{ padding: "0.8mm 0 0.8mm 2mm" }}>
             <div style={{ fontSize: "5.5px", fontWeight: "700", color: "#333", textTransform: "uppercase", letterSpacing: "0.3px" }}>Tanggal Cetak</div>
