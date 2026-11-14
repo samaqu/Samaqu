@@ -1,4 +1,5 @@
 import type { TrackHistoryItem } from "./types";
+import { SITE_DIRECTORY } from "./site-labels";
 
 /**
  * Paket dianggap **sudah diterima** bila J&T mengirim `status_code` 200
@@ -55,22 +56,10 @@ export function isShipped(data: { history?: TrackHistoryItem[] | null } | null |
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tampilan riwayat — teks J&T ditampilkan apa adanya, dengan satu pengecualian:
-// kode site yang dikenal (mis. PLM_GATEWAY / TCBAO121) diberi label manusiawi, dan kode
-// aslinya tetap ditulis dalam kurung. Kode yang tidak dikenal dibiarkan apa adanya.
+// kode site yang ada di kamus `site-labels.ts` (mis. SUB_GATEWAY → "Transit Center Sidoarjo")
+// diberi nama seperti situs resmi J&T, dan kode aslinya tetap ditulis dalam kurung. Kode yang
+// tidak ada di kamus (mis. DC_/CP_/DP_) dibiarkan apa adanya.
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** Label untuk kode site/gateway J&T yang sudah dikenal. Kode asli selalu ikut ditampilkan. */
-const SITE_LABELS: Record<string, string> = {
-  DPK_GATEWAY: "Gateway Depok",
-  JKT_GATEWAY: "Gateway Jakarta",
-  PLM_GATEWAY: "Gateway Palembang",
-  BDG_GATEWAY: "Gateway Bandung",
-  SBY_GATEWAY: "Gateway Surabaya",
-  MDN_GATEWAY: "Gateway Medan",
-  MKS_GATEWAY: "Gateway Makassar",
-  SMG_GATEWAY: "Gateway Semarang",
-  YOG_GATEWAY: "Gateway Yogyakarta",
-};
 
 /**
  * Kode site → teks yang lebih enak dibaca. Kode yang tidak dikenal dikembalikan apa adanya.
@@ -79,17 +68,23 @@ const SITE_LABELS: Record<string, string> = {
 export function readableSiteCode(code?: string | null): string {
   const clean = String(code ?? "").trim();
   if (!clean) return "";
-  const label = SITE_LABELS[clean];
+  const label = SITE_DIRECTORY[clean];
   if (label) return `${label} (${clean})`;
   if (/^TC[A-Z0-9]{2,}$/.test(clean)) return `Transit Center (${clean})`;
   return clean;
 }
 
+/** Pola kode lokasi yang diganti: semua kode di kamus + TC… (aturan lama). Yang terpanjang dulu supaya tidak terpotong. */
+const SITE_CODE_PATTERN = new RegExp(
+  `\\b(${Object.keys(SITE_DIRECTORY)
+    .sort((a, b) => b.length - a.length)
+    .join("|")}|TC[A-Z0-9]{2,})\\b`,
+  "g",
+);
+
 /** Ganti kode site yang muncul di teks status J&T dengan labelnya; kode asli tetap di kurung. */
 export function readableJntStatus(text?: string | null): string {
-  return String(text ?? "").replace(/\b([A-Z0-9]{2,}_GATEWAY|TC[A-Z0-9]{2,})\b/g, (code) =>
-    readableSiteCode(code),
-  );
+  return String(text ?? "").replace(SITE_CODE_PATTERN, (code) => readableSiteCode(code));
 }
 
 /** Entri riwayat yang boleh tampil sebagian (hanya field yang kita pakai). */
@@ -111,11 +106,13 @@ export interface TrackScan {
 }
 
 /**
- * Paket diterima lewat perantara (J&T `presenter = "FALSE"`), bukan oleh penerima di waybill.
- * Termasuk kalau `presentername` terisi: yang menerima adalah pihak ketiga.
+ * J&T mengisi `presentername` pada scan serah terima → nama pihak yang menerima ikut ditampilkan.
+ *
+ * `presenter = "FALSE"` TIDAK dipakai sebagai tanda "dititipkan": dari 60 paket terkirim, 58 membawa
+ * `FALSE` (termasuk paket yang jelas diterima penerimanya sendiri), jadi itu nilai bawaan J&T, bukan
+ * bukti paket dititipkan. Aturan lama dibuat dari satu kasus saja (docs/temuan-resi-JO0330297434.md).
  */
 export function isLeftWithThirdParty(item?: TrackScan | null): boolean {
-  if (String(item?.presenter ?? "").trim().toUpperCase() === "FALSE") return true;
   return !!String(item?.presentername ?? "").trim();
 }
 
@@ -166,9 +163,8 @@ export function trackingRow(item: TrackScan | null | undefined): TrackingRow {
     receivedByThirdParty: isLeftWithThirdParty(item)
       ? String(item?.presentername ?? "").trim() || null
       : null,
-    handoverNote: isLeftWithThirdParty(item)
-      ? "Tidak diserahkan langsung ke penerima (dititipkan)"
-      : null,
+    // Tidak ada klaim "dititipkan": J&T tidak menyediakan penanda yang bisa dipercaya untuk itu.
+    handoverNote: null,
     dateTime: item?.date_time ?? "",
   };
 }
@@ -233,9 +229,7 @@ export function trackingSummary(history: TrackHistoryItem[] | null | undefined):
     receivedByThirdParty: isLeftWithThirdParty(latest)
       ? String(latest?.presentername ?? "").trim() || null
       : null,
-    handoverNote: isLeftWithThirdParty(latest)
-      ? "Tidak diserahkan langsung ke penerima (dititipkan)"
-      : null,
+    handoverNote: null,
     updatedAt: latest?.date_time ?? null,
   };
 }
