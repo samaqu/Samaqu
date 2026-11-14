@@ -269,6 +269,8 @@ export default function PanelDetailPesanan({
 }) {
   const info = TAHAP[tahap] || TAHAP.belum_dipacking;
   const level = levelLangkah(tahap);
+  // GoSend: tanpa resi dan tanpa scan kurir — lencana hijau, teks status default berbeda.
+  const kurirGosend = /gosend/i.test(kurir);
 
   // Hitung mundur berjalan per detik, hanya untuk pesanan yang belum dibayar.
   const [sekarang, setSekarang] = useState(() => Date.now());
@@ -346,7 +348,7 @@ export default function PanelDetailPesanan({
               <span className="dp-kepala-judul">Informasi Pengiriman</span>
             </div>
             <div className="dp-lencana-grup">
-              <span className="dp-lencana kurir">{kurir}</span>
+              <span className={`dp-lencana kurir${kurirGosend ? " gosend" : ""}`}>{kurir}</span>
               {layanan ? <span className="dp-lencana layanan">{layanan}</span> : null}
             </div>
           </div>
@@ -382,8 +384,8 @@ export default function PanelDetailPesanan({
             </span>
             <span className="dp-baris-label">Status Terbaru</span>
             <span className="dp-baris-nilai">
-              {statusKirim || "Menunggu pickup kurir"}
-              <i className="dp-baris-sub">{statusKirimMeta || "Belum ada scan J&T"}</i>
+              {statusKirim || (kurirGosend ? "Menunggu dikirim" : "Menunggu pickup kurir")}
+              <i className="dp-baris-sub">{statusKirimMeta || (kurirGosend ? "Tanpa tracking, status ditandai admin" : "Belum ada scan J&T")}</i>
             </span>
           </div>
           <div className="dp-baris">
@@ -771,6 +773,7 @@ const DP_CSS = `
 /* Badge kurir: J&T tetap MERAH di semua tema. */
 .dp-lencana{font-size:10.5px;font-weight:900;padding:3px 8px;border-radius:999px;white-space:nowrap}
 .dp-lencana.kurir{background:#c8102e;color:#fff}
+.dp-lencana.kurir.gosend{background:#00880d;color:#fff}
 .dp-lencana.layanan{background:#e8f3fb;color:#2774a8;font-weight:800}
 
 /* 3. Baris grid: ikon | label 92 | nilai | aksi. */

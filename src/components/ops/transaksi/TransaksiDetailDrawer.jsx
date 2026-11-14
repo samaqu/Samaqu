@@ -23,6 +23,7 @@ import { formatWeightExact } from "@/lib/shipping-weight";
 import { waNumber } from "@/lib/whatsapp";
 import { formatTrackingTime, sortHistoryDesc, trackingRow, trackingSummary } from "@/lib/jnt/track-status";
 import { jntServiceTag } from "@/lib/jnt/layanan";
+import { gosendCaption, isGosend } from "@/lib/gosend";
 import JntBadge from "@/components/JntBadge";
 import { SOURCE_STYLES, STATUS_STYLES, formatRupiah, formatTanggalJamID } from "@/components/ops/transaksi/transaksi-format";
 import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
@@ -226,7 +227,9 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
     const panelWa = waNumber(order.customer_whatsapp || "");
     const canHubungiPanel = /^628[1-9][0-9]{6,10}$/.test(panelWa);
     const canDelete = (!order.awb_no || order.status === "dibatalkan") && order.source !== "website";
-    const canPrint = Boolean(awb) && order.status !== "dibatalkan";
+    // GoSend tidak punya resi, tapi tetap punya label (barcode dari nomor pesanan).
+    const orderGosend = isGosend(order.shipping_method);
+    const canPrint = (Boolean(awb) || orderGosend) && order.status !== "dibatalkan";
     const isSelesai = order.status === "selesai" || order.shipping_status === "selesai";
     const customerWa = waNumber(order.customer_whatsapp || "");
     const canHubungiCustomer = /^628[1-9][0-9]{6,10}$/.test(customerWa);
@@ -315,7 +318,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
         },
       });
     } else if (canPrint) {
-      aksi.push({ key: "cetak", label: "Cetak Resi", jenis: "utama", onClick: () => resiPanelRef.current?.print() });
+      aksi.push({ key: "cetak", label: orderGosend ? "Cetak Label" : "Cetak Resi", jenis: "utama", onClick: () => resiPanelRef.current?.print() });
     } else if (order.status !== "dibatalkan") {
       // Resi belum ada: tombol tetap ditampilkan (mati) supaya admin tidak mengira fiturnya
       // hilang — alasannya muncul sebagai tooltip.
@@ -373,17 +376,33 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
           nama={order.customer_name}
           telepon={order.customer_whatsapp || ""}
           alamat={[order.shipping_address, region].filter(Boolean).join(", ")}
-          kurir="J&T Express"
-          layanan={jntServiceTag(track.serviceCode || order.shipping_method).replace(/^Service\s+/i, "")}
+          kurir={orderGosend ? "GoSend" : "J&T Express"}
+          layanan={
+            orderGosend
+              ? gosendCaption(order.shipping_method)
+              : jntServiceTag(track.serviceCode || order.shipping_method).replace(/^Service\s+/i, "")
+          }
           resi={awb}
-          resiKosong={resiKosong}
+          resiKosong={orderGosend && stage !== "belum_bayar" && stage !== "dibatalkan" ? "Tanpa resi (GoSend)" : resiKosong}
           onLacak={openTrackModal}
           onSalinResi={copyResi}
           resiTersalin={copied === "resi"}
           berat={totalWeight > 0 ? formatWeightExact(totalWeight) : "-"}
-          statusKirim={lastScan?.status}
+          statusKirim={
+            orderGosend
+              ? order.status === "selesai" || order.shipping_status === "selesai"
+                ? "Diterima (ditandai admin)"
+                : order.status === "dikirim" || order.shipping_status === "dikirim"
+                  ? "Dikirim lewat GoSend"
+                  : undefined
+              : lastScan?.status
+          }
           statusKirimMeta={
-            lastScan ? [lastScan.location, lastScan.dateTime ? formatTrackingTime(lastScan.dateTime) : ""].filter(Boolean).join(" · ") : ""
+            orderGosend
+              ? ""
+              : lastScan
+                ? [lastScan.location, lastScan.dateTime ? formatTrackingTime(lastScan.dateTime) : ""].filter(Boolean).join(" · ")
+                : ""
           }
           items={itemsTampilan}
           subtotal={order.subtotal}
@@ -568,7 +587,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
               {/* Pengiriman & resi J&T (murni tampilan + aksi resi) */}
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                  Pengiriman J&T
+                  {isGosend(order.shipping_method) ? "Pengiriman GoSend" : "Pengiriman J&T"}
                 </p>
                 <div className="rounded-xl border border-slate-200 dark:border-slate-800 px-3.5 py-3 space-y-2.5">
                   {/* Nomor resi + tombol cetak + tombol Buat Resi — komponen bersama dengan

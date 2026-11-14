@@ -25,6 +25,7 @@ import { formatWeightExact } from "@/lib/shipping-weight";
 import { formatRupiah } from "@/components/ops/transaksi/transaksi-format";
 import { formatTrackingTime } from "@/lib/jnt/track-status";
 import { jntServiceCodeFromShippingMethod } from "@/lib/jnt/layanan";
+import { gosendCaption, isGosend } from "@/lib/gosend";
 
 /** Label status kirim yang dipakai layar (nilainya dari `orders.shipping_status`). */
 const SHIPPING_STATUS_LABEL = { menunggu_pickup: "Menunggu pickup", dikirim: "Dikirim", selesai: "Selesai" };
@@ -89,11 +90,19 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
   const [packagingWarning, setPackagingWarning] = useState(false);
   const [manualError, setManualError] = useState("");
   const [shippingBusy, setShippingBusy] = useState(false);
+  // ── GoSend (tanpa resi J&T): konfirmasi "ship" / "done", hasil terbaru, dan pesan galat ──
+  const [goBusy, setGoBusy] = useState(false);
+  const [goError, setGoError] = useState("");
+  const [goConfirm, setGoConfirm] = useState("");
+  const [goPatch, setGoPatch] = useState(null);
 
   const awb = createdAwb || order?.awb_no || "";
   const cancelled = order?.status === "dibatalkan";
   /** Resi sudah di-void di J&T (`orders.jnt_void_status`) — labelnya tidak boleh dicetak lagi. */
   const voided = cancelled || order?.jnt_void_status === "voided";
+  /** Pesanan GoSend: tidak ada resi, tapi tetap ada label (barcode dari nomor pesanan). */
+  const isGo = isGosend(order?.shipping_method);
+  const goPrintable = isGo && !cancelled;
   /** Baris kecil di bawah status: lokasi + waktu scan terakhir dari J&T. */
   const trackingMeta = latestTracking
     ? [latestTracking.location, formatTrackingTime(latestTracking.dateTime)].filter(Boolean).join(" · ")
@@ -103,11 +112,19 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
   // dipanggil dari luar lewat ref, supaya dialog pilih ukuran tetap satu sumber di sini.
   useImperativeHandle(ref, () => ({
     print: () => {
-      if (awb && !voided) setPrintSize(labelSize);
+      if ((awb && !voided) || goPrintable) setPrintSize(labelSize);
     },
-  }), [awb, voided, labelSize]);
+  }), [awb, voided, labelSize, goPrintable]);
 
   if (!order) return null;
+
+  // Status GoSend terkini: hasil aksi barusan menang atas data pesanan yang dibawa dari induk.
+  const goStatus = goPatch?.status ?? order.status;
+  const goShip = goPatch?.shipping_status ?? order.shipping_status ?? "";
+  const goSelesai = goStatus === "selesai" || goShip === "selesai";
+  const goSudahKirim = goSelesai || goStatus === "dikirim" || goShip === "dikirim";
+  const goBisaKirim = isGo && !cancelled && goStatus === "diproses" && !goSudahKirim;
+  const goBisaSelesai = isGo && !cancelled && goSudahKirim && !goSelesai;
 
   const shippingStatus = createdAwb ? "menunggu_pickup" : order.shipping_status || "";
   /** Layanan tersimpan — HBO = pesanan dibuat manual di J&T VIP, resinya diinput admin. */
@@ -307,6 +324,42 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
     }
   };
 
+  /** GoSend: buka dialog konfirmasi. "ship" memuat paket kemasan dulu (dipotong saat ditandai dikirim). */
+  const openGoConfirm = (kind) => {
+    if (goBusy) return;
+    setGoError("");
+    setGoConfirm(kind);
+    if (kind === "ship") void loadPackaging();
+  };
+
+  /** GoSend: "Tandai Dikirim" / "Tandai Selesai". Server idempoten: klik ulang tidak mengulang efek samping. */
+  const submitGo = async () => {
+    if (goBusy || resiLock.current) return;
+    resiLock.current = true;
+    setGoBusy(true);
+    setGoError("");
+    try {
+      if (goConfirm === "ship") {
+        const result = await base44.entities.Transaction.gosendShip(order.order_number, getPackagingPayload());
+        setPackagingWarning(Boolean(result?.packagingWarning));
+        const patch = { status: result?.status || "dikirim", shipping_status: result?.shippingStatus || "dikirim" };
+        setGoPatch(patch);
+        onResiCreated?.(patch);
+      } else if (goConfirm === "done") {
+        const result = await base44.entities.Transaction.gosendDone(order.order_number);
+        const patch = { status: result?.status || "selesai", shipping_status: result?.shippingStatus || "selesai" };
+        setGoPatch(patch);
+        onResiCreated?.(patch);
+      }
+      setGoConfirm("");
+    } catch (error) {
+      setGoError(error instanceof Error ? error.message : "Gagal memperbarui status. Coba lagi.");
+    } finally {
+      setGoBusy(false);
+      resiLock.current = false;
+    }
+  };
+
   const inputClass =
     "mt-1 w-full px-3 py-2 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold text-slate-900 dark:text-white focus:border-slate-400 dark:focus:border-slate-500 focus:outline-none disabled:opacity-60";
 
@@ -443,7 +496,54 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
         </div>
       ) : null}
 
-      {awb ? (
+      {isGo ? (
+        /* GoSend: tanpa resi J&T. "Buat Resi" dan input resi HBO sengaja TIDAK ada di sini (server juga menolaknya). */
+        <div className="space-y-2.5" data-testid="gosend-panel">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            {cancelled
+              ? "Pesanan ini sudah dibatalkan."
+              : goSelesai
+                ? "Status: Selesai. Paket sudah ditandai diterima."
+                : goSudahKirim
+                  ? "Status: Dikirim lewat GoSend. Tandai selesai kalau paket sudah diterima."
+                  : goStatus === "pending"
+                    ? "Pesanan belum lunas. Tandai dikirim baru bisa setelah pesanan Lunas."
+                    : `${gosendCaption(order.shipping_method)}. Tanpa resi J&T: setelah driver mengambil paket, tandai dikirim.`}
+          </p>
+
+          {goPrintable && !hidePrintButton ? (
+            <button
+              type="button"
+              onClick={() => setPrintSize(labelSize)}
+              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+            >
+              Cetak Label
+            </button>
+          ) : null}
+
+          {goBisaKirim ? (
+            <button
+              type="button"
+              onClick={() => openGoConfirm("ship")}
+              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl text-sm hover:bg-slate-800 dark:hover:bg-slate-100 transition-all"
+            >
+              <Truck size={15} /> Tandai Dikirim
+            </button>
+          ) : null}
+
+          {goBisaSelesai ? (
+            <button
+              type="button"
+              onClick={() => openGoConfirm("done")}
+              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl text-sm hover:bg-slate-800 dark:hover:bg-slate-100 transition-all"
+            >
+              Tandai Selesai
+            </button>
+          ) : null}
+
+          {goError && !goConfirm ? <p className="text-xs font-semibold text-red-600 dark:text-red-400">{goError}</p> : null}
+        </div>
+      ) : awb ? (
         <>
           {compact ? null : (
             <>
@@ -704,6 +804,81 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
         )}
       </AnimatePresence>
 
+      {/* GoSend: konfirmasi "Tandai Dikirim" / "Tandai Selesai" — aksi ini memotong kemasan dan mengirim WA ke customer. */}
+      <AnimatePresence>
+        {goConfirm ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[10000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-5"
+            onClick={() => {
+              if (!goBusy) setGoConfirm("");
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="w-full max-w-md max-h-full overflow-y-auto no-scrollbar rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a1d28] p-5 shadow-xl"
+              onClick={(event) => event.stopPropagation()}
+              data-testid="gosend-confirm"
+            >
+              <h4 className="font-heading font-bold text-slate-900 dark:text-white">
+                {goConfirm === "ship" ? "Tandai pesanan dikirim?" : "Tandai pesanan selesai?"}
+              </h4>
+
+              <div className="mt-3 rounded-xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+                <div className="px-3.5 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Penerima</p>
+                  <p className="font-bold text-slate-900 dark:text-white">{order.customer_name || "-"}</p>
+                </div>
+                <div className="px-3.5 py-2 flex items-center justify-between gap-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">No. Order</p>
+                  <p className="font-mono text-xs font-bold text-slate-900 dark:text-white">{order.order_number}</p>
+                </div>
+                <div className="px-3.5 py-2 flex items-center justify-between gap-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Kurir</p>
+                  <p className="text-xs font-bold text-slate-900 dark:text-white">{order.shipping_method}</p>
+                </div>
+              </div>
+
+              {goConfirm === "ship" ? <div className="mt-3">{packagingForm}</div> : null}
+
+              <p className="mt-3 flex items-start gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300">
+                <AlertCircle size={14} className="mt-px shrink-0" />
+                <span>
+                  {goConfirm === "ship"
+                    ? "Kemasan akan dipotong dari stok, status jadi Dikirim, dan customer menerima WhatsApp bahwa pesanan dikirim lewat GoSend. Pastikan driver sudah mengambil paket."
+                    : "Status jadi Selesai dan customer menerima WhatsApp bahwa paket sudah diterima (dengan ajakan ulasan). Pastikan paket benar-benar sudah sampai."}
+                </span>
+              </p>
+
+              {goError ? <p className="mt-2 text-xs font-semibold text-red-600 dark:text-red-400">{goError}</p> : null}
+
+              <div className="flex gap-2 mt-4">
+                <button
+                  type="button"
+                  onClick={() => setGoConfirm("")}
+                  disabled={goBusy}
+                  className="flex-1 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60 transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={submitGo}
+                  disabled={goBusy}
+                  className="flex-1 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-60 transition-all"
+                >
+                  {goBusy ? "Memproses…" : goConfirm === "ship" ? "Ya, tandai dikirim" : "Ya, tandai selesai"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
       {/* Konfirmasi cetak resi — alurnya sengaja SAMA dengan "Buat Resi": pilih dulu, baru cetak. */}
       <AnimatePresence>
         {printSize ? (
@@ -721,7 +896,9 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
               className="w-full max-w-md max-h-full overflow-y-auto no-scrollbar rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a1d28] p-5 shadow-xl"
               onClick={(event) => event.stopPropagation()}
             >
-              <h4 className="font-heading font-bold text-slate-900 dark:text-white">Cetak label J&T?</h4>
+              <h4 className="font-heading font-bold text-slate-900 dark:text-white">
+                {isGo ? "Cetak label GoSend?" : "Cetak label J&T?"}
+              </h4>
 
               {/* Irama dialog sengaja sama dengan dialog "Buat resi J&T?": info di atas,
                   peringatan kecil, lalu dua tombol di bawah. */}
@@ -731,8 +908,8 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
                   <p className="font-bold text-slate-900 dark:text-white">{order.customer_name || "-"}</p>
                 </div>
                 <div className="px-3.5 py-2 flex items-center justify-between gap-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nomor Resi</p>
-                  <p className="font-mono text-xs font-bold text-slate-900 dark:text-white">{awb || "-"}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{isGo ? "Kurir" : "Nomor Resi"}</p>
+                  <p className="font-mono text-xs font-bold text-slate-900 dark:text-white">{isGo ? order.shipping_method : awb || "-"}</p>
                 </div>
                 <div className="px-3.5 py-2 flex items-center justify-between gap-3">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">No. Order</p>

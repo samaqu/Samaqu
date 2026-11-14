@@ -37,6 +37,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Check, Clock, Info, Lightbulb, Loader2, Pencil, Plus, RotateCcw, Save, Shirt, Trash2, Truck, Wand2, X } from "lucide-react";
 import { base44 } from "@/lib/ops-api";
+import { GOSEND_CUSTOMER, GOSEND_SAMAQU, isGosend } from "@/lib/gosend";
 import { MANUAL_PRICE_MAX, MANUAL_PRICE_MIN, MANUAL_SOURCE_KEYS, SOURCE_LABEL, manualPrice } from "@/lib/transaksi";
 import { PAKET_SIZE, isPaketKategori, variantName } from "@/lib/item-label";
 import {
@@ -949,7 +950,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     { grams: 0, missingQty: 0 },
   );
   const discountValue = Number(digits(form?.discount)) || 0;
-  const shippingValue = Number(digits(form?.shipping_cost)) || 0;
+  // GoSend: ongkir tidak dicatat (diurus di luar sistem) → selalu 0, juga di total yang tampil.
+  const gosendOn = isGosend(form?.shipping_method);
+  const shippingValue = gosendOn ? 0 : Number(digits(form?.shipping_cost)) || 0;
   const total = Math.max(0, subtotal - Math.min(discountValue, subtotal)) + shippingValue;
 
   /**
@@ -1596,6 +1599,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         status: initialData?.status || "diproses",
         awb_no: initialData?.awb_no || "",
         shipping_status: initialData?.shipping_status || "",
+        // Dipakai panel "Transaksi tercatat" untuk memilih aksi: resi J&T atau tombol GoSend.
+        shipping_method: form?.shipping_method || initialData?.shipping_method || "",
         customer_name: form?.customer_name || initialData?.customer_name || "",
         isEdit,
       });
@@ -1649,7 +1654,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       source: form.source,
       created_at: createdAt,
       shipping_cost: shippingValue,
-      ...(form.shipping_method === "J&T HBO" ? { shipping_method: "J&T HBO" } : {}),
+      ...(form.shipping_method === "J&T HBO" || gosendOn ? { shipping_method: form.shipping_method } : {}),
       discount: Math.min(discountValue, subtotal),
       // "Belum Lunas" → server menyimpan status `pending` (di luar SALE_STATUSES, jadi tidak
       // ikut omset) dan otomatis mengirim invoice berisi nomor rekening ke WA pembeli.
@@ -1876,7 +1881,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
 
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                      Pengiriman J&T
+                      {isGosend(savedOrder.shipping_method) ? "Pengiriman GoSend" : "Pengiriman J&T"}
                     </p>
                     <div className="rounded-xl border border-slate-200 dark:border-slate-800 px-3.5 py-3 space-y-2.5">
                       <TransaksiResiPanel order={savedOrder} onResiCreated={handleResiCreated} />
@@ -3465,14 +3470,15 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                       <input
                         type="text"
                         inputMode="numeric"
-                        value={form.shipping_cost}
+                        value={gosendOn ? "0" : form.shipping_cost}
+                        disabled={gosendOn}
                         onChange={(event) => {
                           // Edit manual = pilihan layanan dilepas (tarif bisa sama antar layanan).
                           setSelectedService("");
                           updateForm({ shipping_cost: digits(event.target.value) });
                         }}
                         placeholder="0"
-                        className={`${inputClass} pl-10`}
+                        className={`${inputClass} pl-10 disabled:opacity-60`}
                       />
                     </div>
                     <button
@@ -3492,6 +3498,52 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                       )}
                       {ongkir.status === "loading" ? "Menghitung ongkir…" : "Cek Ongkir J&T"}
                     </button>
+
+                    {/* Kurir GoSend: tanpa resi J&T. Ongkir tidak dicatat (dikunci 0). Klik pilihan yang
+                        sedang aktif untuk melepasnya; memilih layanan J&T dari hasil Cek Ongkir juga
+                        melepasnya. Server memaksa ongkir 0 untuk GoSend, jadi tidak bergantung pada layar. */}
+                    <div className="mt-3" data-testid="gosend-picker">
+                      <p className={labelClass}>Atau kirim lewat GoSend</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { value: GOSEND_SAMAQU, label: "GoSend SAMAQU", hint: "Admin yang booking driver" },
+                          { value: GOSEND_CUSTOMER, label: "GoSend Customer", hint: "Customer booking sendiri" },
+                        ].map((option) => {
+                          const active = form.shipping_method === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => {
+                                setTouched(true);
+                                setSelectedService("");
+                                updateForm(
+                                  active
+                                    ? { shipping_method: "" }
+                                    : { shipping_method: option.value, shipping_cost: "" },
+                                );
+                              }}
+                              className={`rounded-xl border-2 px-3 py-2 text-left transition-colors ${
+                                active
+                                  ? isPanelForm
+                                    ? "border-[#c2255c] bg-[#fdf3f7] dark:bg-rose-900/20"
+                                    : "border-slate-900 bg-slate-100 dark:border-white dark:bg-slate-800"
+                                  : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                              }`}
+                            >
+                              <span className="block text-sm font-bold text-slate-900 dark:text-white">{option.label}</span>
+                              <span className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400">{option.hint}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {gosendOn ? (
+                        <p className="mt-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                          Ongkir GoSend tidak dicatat, jadi dikunci Rp 0. Tidak ada resi J&T untuk pesanan ini.
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
                   <div>
                     <label className={labelClass}>Diskon (opsional)</label>
