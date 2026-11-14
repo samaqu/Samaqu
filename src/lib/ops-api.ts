@@ -104,6 +104,14 @@ export const base44 = {
         const json = await call<{ items: any[]; next_cursor: string | null }>("GET", `${LEADS}?${params.toString()}`);
         return { items: json.items ?? [], next_cursor: json.next_cursor ?? null };
       },
+      /** Info customer repeat + riwayat order per lead (read-only; gagal tidak mengganggu daftar). */
+      async repeat(start: string, end: string) {
+        const params = new URLSearchParams({ start, end });
+        return call<{
+          histories: Record<string, any>;
+          repeat_orders: Array<{ date: string; total: number; phone: string }>;
+        }>("GET", `${LEADS}/repeat?${params.toString()}`);
+      },
       async create(data: any) {
         const json = await call<{ items: any[] }>("POST", LEADS, { rows: [data], blockDuplicates: true });
         return json.items?.[0] ?? null;

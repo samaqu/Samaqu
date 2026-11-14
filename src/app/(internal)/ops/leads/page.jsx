@@ -19,6 +19,7 @@ import {
   Wallet,
   UserPlus,
   Database,
+  Repeat,
   ClipboardPaste,
   Search,
   X
@@ -27,6 +28,8 @@ import { useToast } from "@/components/ops/ui/use-toast";
 import LeadFormModal from "@/components/ops/leads/LeadFormModal";
 import PasteImportModal from "@/components/ops/leads/PasteImportModal";
 import ConfirmDeleteModal from "@/components/ops/ConfirmDeleteModal";
+import LeadDetailDrawer from "@/components/ops/leads/LeadDetailDrawer";
+import { normalizeLeadPhone } from "@/lib/ops-lead-sync";
 
 const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 
@@ -59,7 +62,26 @@ const formatDateID = (d) => {
  */
 const todayWib = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
 
-export default function Leads() {
+/** Lencana kecil di samping kontak: customer sudah transaksi sah >= 2 kali. */
+function RepeatBadge({ count }) {
+  return (
+    <span
+      className="mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+      title={`${count} transaksi sah`}
+    >
+      <Repeat size={10} aria-hidden="true" /> Repeat ×{count}
+    </span>
+  );
+}
+
+const REPEAT_FILTERS = [
+  { key: 'semua', label: 'Semua' },
+  { key: 'repeat', label: 'Repeat' },
+  { key: 'belum', label: 'Belum repeat' },
+];
+
+export default function Leads({ variant = "ops" }) {
+  const isPanel = variant === "panel";
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth());
   const [year, setYear] = useState(now.getFullYear());
@@ -104,11 +126,40 @@ export default function Leads() {
     },
   });
 
-  // Yang tampil = hasil pencarian (dari server) + filter tanggal; kartu ringkasan ikut keduanya.
-  const visibleLeads = useMemo(
+  // Info customer repeat + riwayat order (read-only). Query terpisah dari daftar: kalau gagal,
+  // tabel tetap tampil apa adanya. Key diawali 'leads' supaya ikut menyegar saat lead diubah.
+  const { data: repeatData } = useQuery({
+    queryKey: ['leads', 'repeat', start, end],
+    queryFn: () => base44.entities.Lead.repeat(start, end),
+    staleTime: 60_000,
+    retry: false,
+  });
+  const histories = useMemo(() => repeatData?.histories || {}, [repeatData]);
+  const [repeatFilter, setRepeatFilter] = useState('semua');
+
+  // Hasil pencarian (dari server) + filter tanggal.
+  const dateLeads = useMemo(
     () => (selectedDate ? leads.filter((l) => l.tanggal === selectedDate) : leads),
     [leads, selectedDate]
   );
+  const repeatCount = useMemo(() => dateLeads.filter((l) => histories[l.id]?.repeat).length, [dateLeads, histories]);
+  // Yang tampil = di atas + filter repeat; kartu ringkasan ikut semuanya.
+  const visibleLeads = useMemo(() => {
+    if (repeatFilter === 'repeat') return dateLeads.filter((l) => histories[l.id]?.repeat);
+    if (repeatFilter === 'belum') return dateLeads.filter((l) => !histories[l.id]?.repeat);
+    return dateLeads;
+  }, [dateLeads, repeatFilter, histories]);
+
+  // Omzet repeat: transaksi sah SESUDAH transaksi pertama sebuah nomor (nomor dengan >= 2 transaksi
+  // yang ada di tabel leads), pada rentang yang sedang dilihat (bulan, atau satu tanggal).
+  const repeatSummary = useMemo(() => {
+    const list = repeatData?.repeat_orders;
+    if (!list || list.length === 0) return null;
+    const phones = search ? new Set(dateLeads.map((l) => normalizeLeadPhone(l.kontak))) : null;
+    const rows = list.filter((o) => (!selectedDate || o.date === selectedDate) && (!phones || phones.has(o.phone)));
+    if (rows.length === 0) return null;
+    return { orders: rows.length, omzet: rows.reduce((sum, o) => sum + (o.total || 0), 0) };
+  }, [repeatData, selectedDate, search, dateLeads]);
 
   const stats = useMemo(() => {
     const closing = visibleLeads.filter((l) => l.status === 'closing');
@@ -133,6 +184,7 @@ export default function Leads() {
   const [formOpen, setFormOpen] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [detailLead, setDetailLead] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -160,7 +212,12 @@ export default function Leads() {
     { label: "Closing", value: stats.closing, icon: CheckCircle2 },
     { label: "Belum Closing", value: stats.belum, icon: Clock },
     { label: "Konversi", value: `${stats.rate.toFixed(1)}%`, icon: Target },
-    { label: "Nominal Closing", value: `Rp ${formatRupiah(stats.nominal)}`, icon: Wallet },
+    {
+      label: "Nominal Closing",
+      value: `Rp ${formatRupiah(stats.nominal)}`,
+      icon: Wallet,
+      sub: repeatSummary ? `+ Repeat Rp ${formatRupiah(repeatSummary.omzet)} · ${repeatSummary.orders} order` : null,
+    },
   ];
 
   return (
@@ -212,6 +269,9 @@ export default function Leads() {
               {/* Ukuran nilai ikut lebar layar + tidak boleh membungkus, supaya "Rp" dan nominalnya
                   selalu sebaris (dulu `text-2xl` tetap sehingga "Rp 8.343.000" pindah baris). */}
               <p className="text-[clamp(1rem,1.35vw,1.5rem)] font-black font-heading text-slate-900 dark:text-white mt-0.5 tracking-tight whitespace-nowrap">{c.value}</p>
+              {c.sub ? (
+                <p className="mt-1 truncate text-[11px] font-bold text-emerald-700 dark:text-emerald-400" title={c.sub}>{c.sub}</p>
+              ) : null}
             </div>
           );
         })}
@@ -221,6 +281,7 @@ export default function Leads() {
       <p className="text-xs text-slate-500 dark:text-slate-400 px-1 -mt-3">
         Cakupan: <span className="font-bold text-slate-900 dark:text-white">{coverageLabel}</span>
         {search ? ` · pencarian "${search}"` : ""}
+        {repeatFilter === 'repeat' ? " · hanya customer repeat" : repeatFilter === 'belum' ? " · tanpa repeat" : ""}
       </p>
 
       {/* Table */}
@@ -272,6 +333,32 @@ export default function Leads() {
             markedDates={markedDates}
           />
         </div>
+
+        {repeatData && (repeatCount > 0 || repeatFilter !== 'semua') ? (
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-5 py-2.5 dark:border-slate-800">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Customer</span>
+            {REPEAT_FILTERS.map((f) => {
+              const active = repeatFilter === f.key;
+              return (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setRepeatFilter(f.key)}
+                  aria-pressed={active}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
+                    active
+                      ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  {f.key === 'repeat' ? <Repeat size={11} aria-hidden="true" /> : null}
+                  {f.label}
+                  {f.key === 'repeat' ? <span className="opacity-70">{repeatCount}</span> : null}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
 
         {isLoading ? (
           <div className="p-12 flex items-center justify-center">
@@ -348,11 +435,17 @@ export default function Leads() {
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: Math.min(idx * 0.02, 0.3) }}
-                    className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                    className="cursor-pointer border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                    onClick={() => setDetailLead(lead)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) setDetailLead(lead); }}
+                    tabIndex={0}
                   >
                     <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white whitespace-nowrap truncate">{formatDateID(lead.tanggal)}</td>
                     <td className="px-3 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">{lead.jam || '-'}</td>
-                    <td className="px-3 py-3 font-bold text-slate-900 dark:text-white">{lead.kontak}</td>
+                    <td className="px-3 py-3 font-bold text-slate-900 dark:text-white">
+                      <span className="block truncate">{lead.kontak}</span>
+                      {histories[lead.id]?.repeat ? <RepeatBadge count={histories[lead.id].count} /> : null}
+                    </td>
                     <td className="px-3 py-3">
                       <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${SUMBER_STYLES[lead.sumber] || 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
                         {lead.sumber}
@@ -383,14 +476,14 @@ export default function Leads() {
                     <td className="px-5 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => { setEditing(lead); setFormOpen(true); }}
+                          onClick={(e) => { e.stopPropagation(); setEditing(lead); setFormOpen(true); }}
                           className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                           aria-label="Edit lead"
                         >
                           <Pencil size={15} />
                         </button>
                         <button
-                          onClick={() => setDeleteTarget(lead)}
+                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(lead); }}
                           className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                           aria-label="Hapus lead"
                         >
@@ -412,7 +505,8 @@ export default function Leads() {
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(idx * 0.02, 0.3) }}
-                className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-[0_8px_20px_-18px_rgba(15,23,42,0.55)] dark:border-slate-800 dark:bg-[#1a1d28]"
+                className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-3.5 shadow-[0_8px_20px_-18px_rgba(15,23,42,0.55)] dark:border-slate-800 dark:bg-[#1a1d28]"
+                onClick={() => setDetailLead(lead)}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -422,6 +516,7 @@ export default function Leads() {
                     <p className="mt-0.5 truncate text-base font-extrabold text-slate-900 dark:text-white">
                       {lead.kontak}
                     </p>
+                    {histories[lead.id]?.repeat ? <RepeatBadge count={histories[lead.id].count} /> : null}
                   </div>
                   <span className={`shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-bold ${SUMBER_STYLES[lead.sumber] || "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
                     {lead.sumber}
@@ -440,14 +535,14 @@ export default function Leads() {
                 <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
                   <button
                     type="button"
-                    onClick={() => { setEditing(lead); setFormOpen(true); }}
+                    onClick={(e) => { e.stopPropagation(); setEditing(lead); setFormOpen(true); }}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     <Pencil size={14} /> Ubah
                   </button>
                   <button
                     type="button"
-                    onClick={() => setDeleteTarget(lead)}
+                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(lead); }}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 px-3 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20"
                   >
                     <Trash2 size={14} /> Hapus
@@ -459,6 +554,15 @@ export default function Leads() {
           </>
         )}
       </div>
+
+      <LeadDetailDrawer
+        open={!!detailLead}
+        lead={detailLead}
+        history={detailLead ? histories[detailLead.id] : null}
+        tema={isPanel ? 'warna' : 'mono'}
+        onClose={() => setDetailLead(null)}
+        onEdit={(l) => { setDetailLead(null); setEditing(l); setFormOpen(true); }}
+      />
 
       <PasteImportModal
         isOpen={pasteOpen}
