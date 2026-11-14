@@ -532,7 +532,9 @@ async function makeAiReply(input: {
     body: JSON.stringify({
       model: config.model,
       temperature: 0.4,
-      max_tokens: 260,
+      // Batas ATAS, bukan target (balasan tetap 2-3 kalimat lewat prompt). Model reasoning (MiMo/Inkling)
+      // menghabiskan token berpikir dari batas yang sama; 260 membuat jawaban kosong ("finish=length").
+      max_tokens: 1500,
       messages: [{ role: "user", content: prompt }],
     }),
   });

@@ -1009,6 +1009,11 @@ export function ChatSection() {
               type={showKey ? "text" : "password"}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
+              name="chat-ai-api-key"
+              autoComplete="new-password"
+              spellCheck={false}
+              data-1p-ignore
+              data-lpignore="true"
               className="w-full rounded-xl px-4 py-2.5 pr-10 bg-white text-sm outline-none font-mono"
               style={{ border: "1px solid #e4e4e7" }}
               placeholder={keyLabel ? "Masukkan API key baru untuk mengganti" : `Masukkan API key ${provider.label}`}
