@@ -17,6 +17,7 @@ import { jntServiceCodeFromShippingMethod } from "@/lib/jnt/layanan";
 import { useSafeTranslations } from "@/lib/safe-i18n";
 import { PaymentMethodValue } from "@/components/admin/PaymentMethodsManager";
 import OrderDetailPanel from "@/components/ops/transaksi/OrderDetailPanel";
+import { gosendCaption, isGosend } from "@/lib/gosend";
 import { RINCIAN_CSS } from "@/components/akun/RincianPesanan";
 import { NEUTRAL_ITEM_PHOTO, resolveItemPhotos, type OrderPhotoLookup } from "@/lib/order-photo";
 import { variantName } from "@/lib/item-label";
@@ -281,7 +282,9 @@ export default function OrderDetailContent({
   // boleh menerbitkan resi. Selama proses, tombolnya dikunci supaya admin tidak menekan dua
   // kali (dua kali klik = dua pesanan J&T).
   const [arranging, setArranging] = useState(false);
-  const canArrange = !resi && !!onArrangeOrder && order.status === "diproses";
+  // GoSend tidak pernah memakai resi J&T: tombol "Atur Pesanan" disembunyikan (server juga menolak).
+  const orderGosend = isGosend(order.shipping_method);
+  const canArrange = !resi && !!onArrangeOrder && order.status === "diproses" && !orderGosend;
 
   async function handleArrange() {
     if (!onArrangeOrder || arranging) return;
@@ -660,10 +663,10 @@ export default function OrderDetailContent({
           if (canHubungiCustomer) window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
         },
       });
-    } else if (resi && !resiVoided) {
+    } else if ((resi && !resiVoided) || (orderGosend && order.status !== "dibatalkan")) {
       list.push({
         key: "cetak",
-        label: "Cetak Resi",
+        label: orderGosend ? "Cetak Label" : "Cetak Resi",
         jenis: "utama",
         onClick: () => window.open(`/admin/label/${order.order_number}`, "_blank", "noopener,noreferrer"),
       });
@@ -746,10 +749,10 @@ export default function OrderDetailContent({
     nama: order.customer_name || "Tanpa nama",
     telepon: order.customer_whatsapp || "",
     alamat,
-    kurir: "J&T Express",
-    layanan: (serviceCode || "").toUpperCase() || "—",
+    kurir: orderGosend ? "GoSend" : "J&T Express",
+    layanan: orderGosend ? gosendCaption(order.shipping_method) : (serviceCode || "").toUpperCase() || "—",
     resi,
-    resiKosong: resi ? "" : "Resi belum dibuat",
+    resiKosong: resi ? "" : orderGosend ? "Tanpa resi (GoSend)" : "Resi belum dibuat",
     onLacak: () => openTrack(),
     trackAktif: showTrack,
     onSalinResi: () => salin("resi", resi),

@@ -14,7 +14,13 @@
  * Dikirim (J&T sudah memindai/menjemput); `selesai`; `dibatalkan`.
  *
  * Modul ini murni lapisan tampilan: tidak menulis status apa pun ke database.
+ *
+ * GoSend: tidak punya resi J&T dan tidak ada scan kurir, jadi `dikirim`/`selesai`-nya ditandai
+ * admin (`gosendShip`/`gosendDone` di `/api/admin/orders`). Tahap daftarnya tetap turunan dari
+ * `orders.status`; yang dibedakan hanya teks resi di `shippingLine`.
  */
+
+import { isGosend } from "./gosend";
 
 export type OrderStage = "belum_bayar" | "belum_dipacking" | "sudah_dipacking" | "dikirim" | "selesai" | "dibatalkan";
 
@@ -208,12 +214,16 @@ export function shippingLine(
   const cancelled = stage === "dibatalkan";
   const awaiting = stage === "belum_dipacking";
   const ss = shippingStatusOf(order);
+  // GoSend memang tanpa resi: jangan tampil "Resi belum dibuat" / "menunggu diproses" yang menyesatkan.
+  const gosend = isGosend(order.shipping_method);
   return {
     courier: order.shipping_method || "Pengiriman",
     // Pesanan batal: resi ditampilkan apa adanya (kalau ada), atau "-" — bukan "Tanpa resi".
-    resi: order.awb_no || (cancelled ? "-" : awaiting ? "Resi belum dibuat" : "Tanpa resi"),
+    resi:
+      order.awb_no ||
+      (cancelled ? "-" : gosend ? "Tanpa resi (GoSend)" : awaiting ? "Resi belum dibuat" : "Tanpa resi"),
     status: ss ? SHIPPING_STATUS_LABEL[ss] : null,
-    awaiting,
+    awaiting: awaiting && !gosend,
     cancelled,
   };
 }

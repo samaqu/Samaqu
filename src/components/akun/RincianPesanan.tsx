@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useSafeLocale, useSafeTranslations } from "@/lib/safe-i18n";
 import { strukStatus, strukSteps, tglJamID, rupiah } from "@/lib/akun-format";
 import { orderStatusKey } from "@/lib/order-flow";
+import { isGosend } from "@/lib/gosend";
 import CopyButton from "@/components/ui/CopyButton";
 import { isPaketItem, itemVariantLabel } from "@/lib/item-label";
 import {
@@ -456,7 +457,9 @@ export default function RincianPesanan({ order }: { order: RincianOrder }) {
                 <span>
                   {resi
                     ? "Belum ada update dari J&T. Riwayat muncul setelah kurir memindai paket."
-                    : "Resi belum tersedia. Kami kabari begitu paket diserahkan ke J&T."}
+                    : isGosend(order.shipping_method)
+                      ? "Pesanan ini dikirim lewat GoSend, tanpa nomor resi. Kami kabari lewat WhatsApp begitu paket dikirim."
+                      : "Resi belum tersedia. Kami kabari begitu paket diserahkan ke J&T."}
                 </span>
               </div>
             )}
