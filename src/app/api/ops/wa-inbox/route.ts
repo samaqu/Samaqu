@@ -130,7 +130,9 @@ export async function GET(req: NextRequest) {
   for (const row of claimed) {
     const { data: history } = await admin
       .from("wa_inbox")
-      .select("created_at, message, reply_text, media_key")
+      // `id` ikut dikirim supaya bot bisa merujuk pesan bukti transfer yang dikirim customer SEBELUMNYA
+      // (inbox_id untuk catat_closing). Hanya menambah kolom; pemakai lama mengabaikannya.
+      .select("id, created_at, message, reply_text, media_key")
       .eq("sender", row.sender)
       .neq("id", row.id)
       .order("created_at", { ascending: false })
