@@ -216,7 +216,7 @@ export default function Leads({ variant = "ops" }) {
       label: "Nominal Closing",
       value: `Rp ${formatRupiah(stats.nominal)}`,
       icon: Wallet,
-      sub: repeatSummary ? `+ Repeat Rp ${formatRupiah(repeatSummary.omzet)} · ${repeatSummary.orders} order` : null,
+      sub: repeatSummary ? { main: `+ Repeat Rp ${formatRupiah(repeatSummary.omzet)}`, extra: `${repeatSummary.orders} order` } : null,
     },
   ];
 
@@ -270,7 +270,11 @@ export default function Leads({ variant = "ops" }) {
                   selalu sebaris (dulu `text-2xl` tetap sehingga "Rp 8.343.000" pindah baris). */}
               <p className="text-[clamp(1rem,1.35vw,1.5rem)] font-black font-heading text-slate-900 dark:text-white mt-0.5 tracking-tight whitespace-nowrap">{c.value}</p>
               {c.sub ? (
-                <p className="mt-1 truncate text-[11px] font-bold text-emerald-700 dark:text-emerald-400" title={c.sub}>{c.sub}</p>
+                // Boleh turun baris saat kartu sempit (menu samping terbuka) — tidak dipotong "…".
+                <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-[11px] font-bold leading-snug text-emerald-700 dark:text-emerald-400" title={`${c.sub.main} · ${c.sub.extra}`}>
+                  <span className="whitespace-nowrap">{c.sub.main}</span>
+                  <span className="whitespace-nowrap font-semibold text-slate-500 dark:text-slate-400">{c.sub.extra}</span>
+                </p>
               ) : null}
             </div>
           );
