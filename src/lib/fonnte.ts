@@ -25,6 +25,7 @@ import { SITE_URL } from "./site-config";
 import { formatWhatsAppProductLine } from "./item-label";
 import { buildNotifikasi } from "./notifikasi-template";
 import { greetingName } from "./greeting";
+import { GOSEND_SAMAQU, gosendDriverInfo } from "./gosend";
 
 const FONNTE_ENDPOINT = "https://api.fonnte.com/send";
 const REQUEST_TIMEOUT_MS = 8000;
@@ -448,6 +449,15 @@ export interface DeliveredNotification {
   customerWhatsapp: string;
 }
 
+/** Pesanan GoSend ditandai dikirim (tanpa nomor resi). */
+export interface GosendShippedNotification {
+  orderNumber: string;
+  customerName: string;
+  customerWhatsapp: string;
+  /** Teks `orders.shipping_method` ("GoSend SAMAQU" / "GoSend Customer") — menentukan info driver. */
+  shippingMethod: string;
+}
+
 export interface ReviewReminderNotification {
   orderNumber: string;
   customerName: string;
@@ -672,6 +682,41 @@ export function buildOrderDeliveredMessage(order: DeliveredNotification): string
   ].join("\n");
 }
 
+/** Pesan "pesanan dikirim lewat GoSend" — tanpa nomor resi; info driver berbeda per mode. */
+export function buildGosendShippedMessage(order: GosendShippedNotification): string {
+  const ka = greetingName(order.customerName);
+  return [
+    `Halo ${ka},`,
+    "",
+    `Pesanan ${ka} telah dikirim melalui GoSend.`,
+    "",
+    `Nomor Pesanan: ${order.orderNumber}`,
+    "",
+    gosendDriverInfo(order.shippingMethod, ka),
+    "",
+    "Terima kasih telah mempercayakan pesanan ini kepada SAMAQU.",
+  ].join("\n");
+}
+
+/** Pesan "paket sudah diterima" untuk GoSend (ditandai admin, bukan dari tracking J&T). */
+export function buildGosendDeliveredMessage(order: DeliveredNotification): string {
+  const ka = greetingName(order.customerName);
+  return [
+    `Halo ${ka},`,
+    "",
+    `Paket pesanan ${ka} sudah kami tandai telah diterima.`,
+    "",
+    `Nomor Pesanan: ${order.orderNumber}`,
+    "",
+    `Semoga produk yang ${ka} terima sesuai dengan harapan dan bermanfaat.`,
+    "",
+    "Kalau berkenan, bantu kami dengan ulasan singkat:",
+    `${SITE_URL}/id/akun/ulasan`,
+    "",
+    "Terima kasih telah berbelanja di SAMAQU.",
+  ].join("\n");
+}
+
 /** Pesan pengingat ulasan (2 hari setelah paket diterima, maksimal sekali per pesanan). */
 export function buildReviewReminderMessage(order: ReviewReminderNotification): string {
   const ka = greetingName(order.customerName);
@@ -830,6 +875,30 @@ export async function notifyCustomerOrderDelivered(order: DeliveredNotification)
   });
   // Template custom dari admin mungkin belum memuat tautan ulasan. Pastikan tetap ada,
   // tanpa menggandakannya kalau template sudah memuat.
+  const finalMessage = message.includes(reviewLink)
+    ? message
+    : `${message}\n\nBantu kami dengan ulasan singkat:\n${reviewLink}`;
+  return sendToCustomer(order.customerWhatsapp, finalMessage);
+}
+
+/** WA "pesanan dikirim" untuk GoSend. Tidak ada nomor resi dan tidak ada link lacak J&T. */
+export async function notifyCustomerOrderShippedGosend(order: GosendShippedNotification): Promise<boolean> {
+  const message = await buildNotifikasi("pesanan-dikirim-gosend", buildGosendShippedMessage(order), {
+    nama: greetingName(order.customerName),
+    nomor: order.orderNumber,
+    info_driver: gosendDriverInfo(order.shippingMethod, greetingName(order.customerName)),
+  });
+  return sendToCustomer(order.customerWhatsapp, message);
+}
+
+/** WA "paket diterima" untuk GoSend (admin menekan Tandai Selesai). */
+export async function notifyCustomerOrderDeliveredGosend(order: DeliveredNotification): Promise<boolean> {
+  const reviewLink = `${SITE_URL}/id/akun/ulasan`;
+  const message = await buildNotifikasi("pesanan-sampai-gosend", buildGosendDeliveredMessage(order), {
+    nama: greetingName(order.customerName),
+    nomor: order.orderNumber,
+    tautan_ulasan: reviewLink,
+  });
   const finalMessage = message.includes(reviewLink)
     ? message
     : `${message}\n\nBantu kami dengan ulasan singkat:\n${reviewLink}`;
@@ -1253,6 +1322,25 @@ export function templateBawaanNotifikasi(): Record<string, string> {
     { [`${SITE_URL}/id/akun/ulasan`]: p("tautan_ulasan") },
   );
 
+  hasil["pesanan-dikirim-gosend"] = gantiDenganPenanda(
+    buildGosendShippedMessage({
+      orderNumber: p("nomor"),
+      customerName: p("nama"),
+      customerWhatsapp: p("wa"),
+      shippingMethod: GOSEND_SAMAQU,
+    }),
+    { [gosendDriverInfo(GOSEND_SAMAQU, greetingName(p("nama")))]: p("info_driver") },
+  );
+
+  hasil["pesanan-sampai-gosend"] = gantiDenganPenanda(
+    buildGosendDeliveredMessage({
+      orderNumber: p("nomor"),
+      customerName: p("nama"),
+      customerWhatsapp: p("wa"),
+    }),
+    { [`${SITE_URL}/id/akun/ulasan`]: p("tautan_ulasan") },
+  );
+
   hasil["pengingat-ulasan"] = gantiDenganPenanda(
     buildReviewReminderMessage({
       orderNumber: p("nomor"),
@@ -1452,6 +1540,22 @@ export function katalogNotifikasi(): NotifikasiInfo[] {
       aktif: true,
       kapan: "Saat tracking J&T menandai paket terkirim",
       isi: buildOrderDeliveredMessage({ ...pembeli }),
+    },
+    {
+      key: "pesanan-dikirim-gosend",
+      label: "Pesanan dikirim lewat GoSend",
+      ke: "Pembeli",
+      aktif: true,
+      kapan: "Saat admin menekan Tandai Dikirim pada pesanan GoSend (tanpa nomor resi; penanda {info_driver} berbeda untuk GoSend SAMAQU dan GoSend Customer)",
+      isi: buildGosendShippedMessage({ ...pembeli, shippingMethod: GOSEND_SAMAQU }),
+    },
+    {
+      key: "pesanan-sampai-gosend",
+      label: "Pesanan sampai (GoSend)",
+      ke: "Pembeli",
+      aktif: true,
+      kapan: "Saat admin menekan Tandai Selesai pada pesanan GoSend",
+      isi: buildGosendDeliveredMessage({ ...pembeli }),
     },
     {
       key: "pengingat-ulasan",

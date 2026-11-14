@@ -4,7 +4,13 @@ import { createJntOrderForOrder } from "@/lib/jnt/order-from-order";
 import { trackShipment } from "@/lib/jnt/track";
 import { applyTrackingToOrder } from "@/lib/jnt/tracking-sync";
 import { cancelOrderCompletely } from "@/lib/cancel-order";
-import { notifyCustomerOrderPaid, notifyCustomerOrderShipped } from "@/lib/fonnte";
+import {
+  notifyCustomerOrderDeliveredGosend,
+  notifyCustomerOrderPaid,
+  notifyCustomerOrderShipped,
+  notifyCustomerOrderShippedGosend,
+} from "@/lib/fonnte";
+import { isGosend } from "@/lib/gosend";
 import { claimOrderNotification, recordShippedNotifyStatus, sendOnce } from "@/lib/order-notify";
 import { notifyResellerOrderPaid, notifyResellerOrderShipped } from "@/lib/reseller/notify";
 import { isCodOrderPayment } from "@/lib/payment-methods";
@@ -50,6 +56,33 @@ async function notifyShippedOnce(
     });
   } catch (e) {
     console.error("[ADMIN] Notifikasi 'dikirim' error:", order.order_number, e);
+  }
+  await recordShippedNotifyStatus(order.id, sent);
+}
+
+/**
+ * Notifikasi "dikirim" untuk pesanan GoSend (tanpa nomor resi). Memakai klaim atomik
+ * `orders.shipped_notified_at` yang sama dengan jalur J&T, jadi menekan tombol berulang tidak
+ * pernah mengirim pesan dobel. Kegagalan kirim tidak menggagalkan aksi.
+ */
+async function notifyGosendShippedOnce(order: {
+  id: string;
+  order_number?: string | null;
+  customer_name?: string | null;
+  customer_whatsapp?: string | null;
+  shipping_method?: string | null;
+}) {
+  if (!(await claimOrderNotification(order.id, "shipped"))) return;
+  let sent = false;
+  try {
+    sent = await notifyCustomerOrderShippedGosend({
+      orderNumber: order.order_number || "",
+      customerName: order.customer_name || "",
+      customerWhatsapp: order.customer_whatsapp || "",
+      shippingMethod: order.shipping_method || "",
+    });
+  } catch (e) {
+    console.error("[ADMIN] Notifikasi 'dikirim' GoSend error:", order.order_number, e);
   }
   await recordShippedNotifyStatus(order.id, sent);
 }
@@ -154,6 +187,12 @@ export async function PATCH(request: NextRequest) {
 
       if (fetchError || !order) {
         return NextResponse.json({ error: "Pesanan tidak ditemukan" }, { status: 404 });
+      }
+
+      // GoSend tidak pernah memakai resi J&T. Ditolak di SERVER (bukan cuma tombol disembunyikan)
+      // supaya tidak ada order J&T sungguhan yang terbuat untuk pesanan GoSend.
+      if (isGosend(order.shipping_method)) {
+        return NextResponse.json({ error: "Pesanan GoSend tidak memakai resi J&T." }, { status: 400 });
       }
 
       if (order.awb_no) {
@@ -277,6 +316,12 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: "Pesanan sudah dibatalkan, resi tidak bisa disimpan." }, { status: 400 });
       }
 
+      // Aksi ini menulis paksa kurir "J&T HBO" dan mengisi awb_no. Untuk GoSend itu merusak kurirnya
+      // dan membuat pembatalan ditolak J&T, jadi ditolak di server.
+      if (isGosend(order.shipping_method)) {
+        return NextResponse.json({ error: "Pesanan GoSend tidak memakai nomor resi." }, { status: 400 });
+      }
+
       // Paket sudah diterima → resi bersifat final. Jangan izinkan ganti/input resi manual,
       // supaya pesanan selesai tidak berubah jadi "HBO" karena salah klik.
       if (order.status === "selesai" || order.shipping_status === "selesai") {
@@ -374,6 +419,142 @@ export async function PATCH(request: NextRequest) {
         serviceCode: "HBO",
         packagingWarning: packResult.warning,
       });
+    }
+
+    // ── GoSend: "Tandai Dikirim" & "Tandai Selesai" ──
+    // Pesanan GoSend tidak punya resi J&T (awb_no SELALU kosong) dan tidak ada scan kurir, jadi
+    // admin yang menandai. Efek sampingnya disamakan dengan jalur J&T: kemasan terpotong
+    // (idempoten), WA ke customer (klaim atomik, tidak pernah dobel), dan komisi affiliate
+    // diselaraskan. Menekan ulang tidak mengulang efek samping apa pun.
+    if (action === "gosendShip" || action === "gosendDone") {
+      const { data: order, error: fetchError } = await supabaseAdmin
+        .from("orders")
+        .select(
+          "id, order_number, status, awb_no, shipping_status, shipping_method, customer_name, customer_whatsapp, reseller_id"
+        )
+        .eq("order_number", identifier)
+        .single();
+
+      if (fetchError || !order) {
+        return NextResponse.json({ error: "Pesanan tidak ditemukan" }, { status: 404 });
+      }
+      if (!isGosend(order.shipping_method)) {
+        return NextResponse.json({ error: "Pesanan ini bukan GoSend." }, { status: 400 });
+      }
+      if (order.reseller_id) {
+        return NextResponse.json({ error: "Pesanan reseller belum didukung untuk GoSend." }, { status: 400 });
+      }
+      if (order.status === "dibatalkan") {
+        return NextResponse.json({ error: "Pesanan sudah dibatalkan." }, { status: 400 });
+      }
+      if (order.awb_no) {
+        return NextResponse.json(
+          { error: "Pesanan GoSend tidak boleh punya nomor resi. Hubungi admin sistem." },
+          { status: 400 }
+        );
+      }
+
+      if (action === "gosendShip") {
+        // Sudah jalan → hasil yang sama tanpa mengulang efek samping.
+        if (order.status === "dikirim" || order.status === "selesai") {
+          return NextResponse.json({
+            success: true,
+            status: order.status,
+            shippingStatus: order.shipping_status || "dikirim",
+            alreadyDone: true,
+          });
+        }
+        if (order.status !== "diproses") {
+          return NextResponse.json(
+            { error: "Pesanan harus Lunas (Diproses) dulu sebelum ditandai dikirim." },
+            { status: 400 }
+          );
+        }
+
+        let packResult: { packed: boolean; warning: boolean } = { packed: false, warning: false };
+        try {
+          packResult = await packOrderForResi(supabaseAdmin, order.id, packaging, actor);
+        } catch (packError) {
+          console.error("[ADMIN] packaging GoSend gagal, tetap lanjut:", identifier, packError);
+          packResult = { packed: false, warning: true };
+        }
+
+        // Bersyarat `status = diproses`: kalau proses lain sudah memajukannya, update ini tidak kena.
+        const { data: moved, error: updateError } = await supabaseAdmin
+          .from("orders")
+          .update({ status: "dikirim", shipping_status: "dikirim", updated_at: new Date().toISOString() })
+          .eq("id", order.id)
+          .eq("status", "diproses")
+          .select("id");
+
+        if (updateError) {
+          if (packResult.packed) {
+            try {
+              await supabaseAdmin.rpc("production_return_order_packaging", {
+                p_order_id: order.id,
+                p_reason: "Gagal menandai GoSend dikirim",
+                p_actor: actor,
+              });
+            } catch (returnError) {
+              console.error("[ADMIN] retur kemasan saat tandai GoSend gagal:", identifier, returnError);
+            }
+          }
+          console.error("[ADMIN] Gagal menandai GoSend dikirim:", identifier, updateError);
+          return NextResponse.json({ error: "Gagal menandai pesanan dikirim. Coba lagi." }, { status: 500 });
+        }
+
+        if (!moved || moved.length === 0) {
+          return NextResponse.json({ success: true, status: "dikirim", shippingStatus: "dikirim", alreadyDone: true });
+        }
+
+        await notifyGosendShippedOnce(order);
+        await syncCommissionStatusSafe(supabaseAdmin, order.id);
+
+        console.log("[ADMIN] GoSend ditandai dikirim:", identifier);
+        return NextResponse.json({
+          success: true,
+          status: "dikirim",
+          shippingStatus: "dikirim",
+          packagingWarning: packResult.warning,
+        });
+      }
+
+      // gosendDone
+      if (order.status === "selesai") {
+        return NextResponse.json({ success: true, status: "selesai", shippingStatus: "selesai", alreadyDone: true });
+      }
+      if (order.status !== "dikirim") {
+        return NextResponse.json({ error: "Tandai dikirim dulu sebelum menandai selesai." }, { status: 400 });
+      }
+
+      const { data: finished, error: finishError } = await supabaseAdmin
+        .from("orders")
+        .update({ status: "selesai", shipping_status: "selesai", updated_at: new Date().toISOString() })
+        .eq("id", order.id)
+        .eq("status", "dikirim")
+        .select("id");
+
+      if (finishError) {
+        console.error("[ADMIN] Gagal menandai GoSend selesai:", identifier, finishError);
+        return NextResponse.json({ error: "Gagal menandai pesanan selesai. Coba lagi." }, { status: 500 });
+      }
+      if (!finished || finished.length === 0) {
+        return NextResponse.json({ success: true, status: "selesai", shippingStatus: "selesai", alreadyDone: true });
+      }
+
+      if (order.customer_name) {
+        await sendOnce(order.id, "delivered", "WA paket diterima (GoSend)", () =>
+          notifyCustomerOrderDeliveredGosend({
+            orderNumber: order.order_number || "",
+            customerName: order.customer_name || "",
+            customerWhatsapp: order.customer_whatsapp || "",
+          })
+        );
+      }
+      await syncCommissionStatusSafe(supabaseAdmin, order.id);
+
+      console.log("[ADMIN] GoSend ditandai selesai:", identifier);
+      return NextResponse.json({ success: true, status: "selesai", shippingStatus: "selesai" });
     }
 
     // ── "Tandai Dikirim" untuk resi HBO yang sebelumnya "belum dijemput" ──

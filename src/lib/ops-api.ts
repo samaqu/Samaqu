@@ -309,6 +309,29 @@ export const base44 = {
         );
       },
 
+      /**
+       * GoSend: "Tandai Dikirim". Tanpa resi J&T. Server memotong kemasan (idempoten), mengirim WA
+       * khusus GoSend sekali saja, dan menyelaraskan komisi. `alreadyDone` true = sudah pernah
+       * ditandai (tidak ada efek samping yang diulang).
+       * Memakai route admin: `PATCH /api/admin/orders { action: "gosendShip" }`.
+       */
+      async gosendShip(orderNumber: string, packaging?: any) {
+        return call<{ success: boolean; status: string; shippingStatus: string; packagingWarning?: boolean; alreadyDone?: boolean }>(
+          "PATCH",
+          ADMIN_ORDERS,
+          { orderNumber, action: "gosendShip", packaging },
+        );
+      },
+
+      /** GoSend: "Tandai Selesai" (paket sudah diterima). Hanya dari status dikirim. */
+      async gosendDone(orderNumber: string) {
+        return call<{ success: boolean; status: string; shippingStatus: string; alreadyDone?: boolean }>(
+          "PATCH",
+          ADMIN_ORDERS,
+          { orderNumber, action: "gosendDone" },
+        );
+      },
+
       /** Detail pesanan + item (dipakai form pengajuan retur). */
       async getOrder(orderNumber: string) {
         const params = new URLSearchParams({ order_number: orderNumber });

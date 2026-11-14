@@ -10,6 +10,7 @@ import { kotaFromShipping } from "@/lib/kota";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { resolveItemPhotos } from "@/lib/order-photo";
 import { cleanErrorMessage, recordAnomalyFromError, recordStockAnomaly, resolveFailureReason, stockFailureMessage } from "@/lib/stock-guard";
+import { isGosend, normalizeOpsShippingMethod, shippingMethodForEdit } from "@/lib/gosend";
 import {
   productWeightMapFromRows,
   resolveLineWeight,
@@ -781,7 +782,10 @@ export async function POST(req: NextRequest) {
     const customerId = String(body?.customer_id || "").trim() || null;
     const source = String(body?.source || "").trim().toLowerCase();
     const notes = String(body?.notes || "").trim();
-    const shippingCost = Math.max(0, Math.round(Number(body?.shipping_cost) || 0));
+    // Kurir yang boleh tersimpan: "J&T HBO", "GoSend SAMAQU", "GoSend Customer"; selain itu dikosongkan
+    // (perilaku lama). GoSend: ongkir tidak dicatat (diurus di luar sistem), jadi dipaksa 0.
+    const shippingMethod = normalizeOpsShippingMethod(body?.shipping_method);
+    const shippingCost = isGosend(shippingMethod) ? 0 : Math.max(0, Math.round(Number(body?.shipping_cost) || 0));
     const discount = Math.max(0, Math.round(Number(body?.discount) || 0));
     const createdAt = new Date(String(body?.created_at || ""));
     const inputItems: ItemInput[] = Array.isArray(body?.items) ? body.items : [];
@@ -843,7 +847,7 @@ export async function POST(req: NextRequest) {
       shipping_postal_code: shipping.postal_code,
       shipping_notes: notes || null,
       shipping_cost: shippingCost,
-      ...(String(body?.shipping_method || "").trim() === "J&T HBO" ? { shipping_method: "J&T HBO" } : {}),
+      ...(shippingMethod ? { shipping_method: shippingMethod } : {}),
       payment_method: paymentMethod,
       payment_status: paid ? "paid" : "unpaid",
       paid_at: paid ? createdAt.toISOString() : null,
@@ -977,7 +981,7 @@ export async function PATCH(req: NextRequest) {
     const admin = getSupabaseAdmin();
     const { data: order, error } = await admin
       .from("orders")
-      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, promo_bonus_given, customer_name, customer_whatsapp, customer_id, shipping_status, weight, subtotal, total, discount, shipping_cost, paid_at, reseller_id")
+      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, promo_bonus_given, customer_name, customer_whatsapp, customer_id, shipping_status, weight, subtotal, total, discount, shipping_cost, paid_at, reseller_id, shipping_method")
       .eq("order_number", orderNumber)
       .maybeSingle();
 
@@ -1173,7 +1177,10 @@ export async function PATCH(req: NextRequest) {
       customerId = String(body?.customer_id || "").trim() || order.customer_id || null;
       source = String(body?.source || "").trim().toLowerCase();
       notes = String(body?.notes || "").trim();
-      shippingCost = Math.max(0, Math.round(Number(body?.shipping_cost) || 0));
+      // GoSend: ongkir tidak dicatat → 0, berapa pun yang dikirim form.
+      shippingCost = isGosend(normalizeOpsShippingMethod(body?.shipping_method))
+        ? 0
+        : Math.max(0, Math.round(Number(body?.shipping_cost) || 0));
       discount = Math.max(0, Math.round(Number(body?.discount) || 0));
       const parsedCreatedAt = new Date(String(body?.created_at || ""));
       if (!customerName) return bad("Nama pelanggan wajib diisi");
@@ -1316,7 +1323,9 @@ export async function PATCH(req: NextRequest) {
           shipping_postal_code: shipping?.postal_code ?? "",
           shipping_notes: notes,
           shipping_cost: shippingCost,
-          shipping_method: String(body?.shipping_method || "").trim() === "J&T HBO" ? "J&T HBO" : "",
+          // Fungsi DB hanya menimpa kolom ini kalau nilainya TIDAK kosong; pindah dari GoSend ke J&T
+          // harus kirim nilai eksplisit ("reguler"), kalau tidak GoSend tetap menempel.
+          shipping_method: shippingMethodForEdit(body?.shipping_method, order.shipping_method),
           discount: finalDiscount,
           created_at: createdAt?.toISOString() ?? "",
         }
