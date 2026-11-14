@@ -63,6 +63,46 @@ const CHAT_MODEL_OPTIONS = [
   { value: "mimo-v2.5-pro", label: "mimo-v2.5-pro — generasi lama (pensiun 21 Okt 2026)" },
 ];
 
+// Pilihan cepat provider untuk Live Chat AI & "Minta AI susun" (sama-sama membaca `chat_settings`).
+// Hanya mengisi Base URL + saran model di form; logika server tidak berubah, semua tetap OpenAI-compatible.
+const CHAT_PROVIDER_PRESETS = [
+  {
+    id: "xiaomi",
+    label: "Xiaomi langsung",
+    baseUrl: "https://api.xiaomimimo.com/v1",
+    keyHint: "Ambil di platform.xiaomimimo.com → API Keys. Saldo mengikuti akun Xiaomi.",
+    modelHint: "Xiaomi langsung memakai nama tanpa awalan, mis. mimo-v2.6-flash.",
+    models: CHAT_MODEL_OPTIONS,
+  },
+  {
+    id: "commandcode",
+    label: "Command Code",
+    baseUrl: "https://api.commandcode.ai/provider/v1",
+    keyHint: "Ambil di Studio Command Code → API keys. Jatah mengikuti paket Command Code.",
+    modelHint: "Command Code wajib memakai awalan penyedia, mis. xiaomi/mimo-v2.6-flash. Nama tanpa awalan ditolak.",
+    models: [
+      { value: "xiaomi/mimo-v2.6-flash", label: "xiaomi/mimo-v2.6-flash — murah & cepat (rekomendasi)" },
+      { value: "xiaomi/mimo-v2.6-pro", label: "xiaomi/mimo-v2.6-pro — paling pintar (lebih lambat)" },
+    ],
+  },
+  {
+    id: "custom",
+    label: "Custom",
+    baseUrl: "",
+    keyHint: "Kunci dari penyedia pilihanmu (API kompatibel OpenAI).",
+    modelHint: "Isi id model persis seperti di dokumentasi penyedia.",
+    models: [] as { value: string; label: string }[],
+  },
+];
+
+/** Provider yang cocok dengan Base URL sekarang; URL lain/kosong dianggap Custom. */
+function detectChatProvider(baseUrl: string) {
+  const url = baseUrl.toLowerCase();
+  if (url.includes("commandcode.ai")) return CHAT_PROVIDER_PRESETS[1];
+  if (url.includes("xiaomimimo.com")) return CHAT_PROVIDER_PRESETS[0];
+  return CHAT_PROVIDER_PRESETS[2];
+}
+
 function StoreInfoSection() {
   const [form, setForm] = useState({ store_name: "", tagline: "", email: "", whatsapp: "", cyp_microcopy: "" });
   const [original, setOriginal] = useState({ store_name: "", tagline: "", email: "", whatsapp: "", cyp_microcopy: "" });
@@ -885,6 +925,17 @@ export function ChatSection() {
   if (loading) return <div className="card p-6 max-w-2xl"><Loader2 size={20} className="animate-spin" style={{ color: "var(--gold)" }} /></div>;
 
   const keyLabel = keyPreview || (envKey ? "(dari environment variable)" : "");
+  const provider = detectChatProvider(baseUrl);
+  // Base URL berubah tapi kunci belum diisi: kunci lama milik provider sebelumnya, tidak laku di provider baru.
+  const providerChanged = baseUrl.trim() !== original.baseUrl.trim();
+
+  function pickProvider(next: (typeof CHAT_PROVIDER_PRESETS)[number]) {
+    // Sudah di Custom: jangan hapus URL kustom yang sedang diketik.
+    if (next.id === "custom" && provider.id === "custom") return;
+    setBaseUrl(next.baseUrl);
+    // Model lama belum tentu valid di provider baru (mis. Command Code butuh awalan "xiaomi/").
+    if (next.models.length && !next.models.some((m) => m.value === model)) setModel(next.models[0].value);
+  }
 
   return (
     <SettingsCard
@@ -918,6 +969,38 @@ export function ChatSection() {
         </div>
       )}
 
+      {editing && (
+        <div>
+          <label className="block text-sm font-semibold" style={{ color: "var(--espresso)" }}>Provider AI</label>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {CHAT_PROVIDER_PRESETS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => pickProvider(p)}
+                aria-pressed={provider.id === p.id}
+                className="rounded-xl px-3.5 py-2 text-sm font-medium transition-colors"
+                style={
+                  provider.id === p.id
+                    ? { background: "var(--espresso)", color: "#fff", border: "1px solid var(--espresso)" }
+                    : { background: "#fff", color: "var(--text-secondary)", border: "1px solid #e4e4e7" }
+                }
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
+            Memilih provider hanya mengisi Base URL dan saran model. Pengaturan ini dipakai live chat di website dan tombol &quot;Minta AI susun&quot; di Perlu Review.
+          </p>
+          {providerChanged && !apiKey.trim() && (
+            <p className="text-[11px] mt-2 rounded-xl px-3 py-2" style={{ background: "#fff7ed", color: "#9a3412" }}>
+              Provider berubah: isi juga API Key milik provider ini. Kunci lama tidak berlaku di provider baru.
+            </p>
+          )}
+        </div>
+      )}
+
       {editing ? (
         <div>
           <label className="block text-sm font-semibold" style={{ color: "var(--espresso)" }}>API Key AI</label>
@@ -928,14 +1011,14 @@ export function ChatSection() {
               onChange={(e) => setApiKey(e.target.value)}
               className="w-full rounded-xl px-4 py-2.5 pr-10 bg-white text-sm outline-none font-mono"
               style={{ border: "1px solid #e4e4e7" }}
-              placeholder={keyLabel ? "Masukkan API key baru untuk mengganti" : "Masukkan API key Xiaomi MiMo"}
+              placeholder={keyLabel ? "Masukkan API key baru untuk mengganti" : `Masukkan API key ${provider.label}`}
             />
             <button type="button" onClick={() => setShowKey(!showKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--text-muted)" }}>
               {showKey ? "🙈" : "👁️"}
             </button>
           </div>
           <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
-            {keyLabel ? `Key tersimpan saat ini: ${keyLabel}` : "Belum ada key tersimpan."} Ambil di platform.xiaomimimo.com → API Keys.
+            {keyLabel ? `Key tersimpan saat ini: ${keyLabel}` : "Belum ada key tersimpan."} {provider.keyHint}
           </p>
         </div>
       ) : (
@@ -946,19 +1029,44 @@ export function ChatSection() {
         {editing ? (
           <div>
             <label className="block text-sm font-semibold" style={{ color: "var(--espresso)" }}>Model</label>
-            <select
+            {/* Kolom ketik bebas + saran per provider (dulu <select> tetap sehingga model Command Code tak bisa dipilih). */}
+            <input
+              type="text"
+              list="chat-model-suggestions"
               value={model}
               onChange={(e) => setModel(e.target.value)}
+              placeholder="Ketik id model atau pilih dari saran"
+              autoComplete="off"
+              spellCheck={false}
               className="mt-1.5 w-full rounded-xl px-3 py-2.5 bg-white text-sm outline-none font-mono"
               style={{ border: "1px solid #e4e4e7" }}
-            >
-              {CHAT_MODEL_OPTIONS.map((opt) => (
+            />
+            <datalist id="chat-model-suggestions">
+              {provider.models.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
-              {model && !CHAT_MODEL_OPTIONS.some((o) => o.value === model) && (
-                <option value={model}>{model} (nilai tersimpan)</option>
-              )}
-            </select>
+            </datalist>
+            {provider.models.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {provider.models.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setModel(opt.value)}
+                    title={opt.label}
+                    className="rounded-lg px-2 py-1 text-[11px] font-mono"
+                    style={
+                      model === opt.value
+                        ? { background: "var(--espresso)", color: "#fff", border: "1px solid var(--espresso)" }
+                        : { background: "#fff", color: "var(--text-secondary)", border: "1px solid #e4e4e7" }
+                    }
+                  >
+                    {opt.value}
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>{provider.modelHint}</p>
             {envModel && <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>Default env: {envModel}</p>}
           </div>
         ) : (
