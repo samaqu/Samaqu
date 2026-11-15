@@ -424,6 +424,72 @@ export default function ProductsCatalog({
     return sorted;
   }, [items, cats, fabrics, buckets, availability, sort]);
 
+  /* ── foto: produk tanpa foto dikelompokkan terpisah (urutan di dalam tiap kelompok tetap mengikuti sort) ── */
+  const hasPhoto = (p: CatalogCard) => !!(thumbnails[p.id] || p.image);
+  const withPhoto = rows.filter(hasPhoto);
+  const noPhoto = rows.filter((p) => !hasPhoto(p));
+
+  /** Kartu/baris produk. `noImg` = kelompok "Belum ada foto": penampung foto dipendekkan + ikon. */
+  const renderItems = (list: CatalogCard[], noImg: boolean) =>
+    view === "list" ? (
+      <div className="space-y-3">
+        {list.map((p) => (
+          <div key={p.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-4" style={{ background: "var(--card)", border: "1px solid var(--bd)", borderRadius: "var(--rad3)" }}>
+            <div className={`w-16 ${noImg ? "h-16" : "h-20"} rounded-xl overflow-hidden shrink-0 flex items-center justify-center`} style={{ background: "var(--sub)" }}>
+              {noImg ? (
+                <Package size={22} strokeWidth={1.6} style={{ color: "var(--fg3)" }} />
+              ) : (
+                <img src={thumbnails[p.id] || p.image || ""} alt={p.name} className="w-full h-full object-cover object-top" loading="lazy" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <CardBody p={p} maxStock={facets.maxStock} openOrder={!!openOrder} />
+            </div>
+            <div className={openOrder ? "sm:w-72 shrink-0" : "sm:w-44 shrink-0"}>
+              {openOrder
+                ? <OpenOrderAction p={p} openOrder={openOrder} onDetail={onDetail} />
+                : <CardActions p={p} onDelete={onDelete} onDetail={onDetail} />}
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {list.map((p) => {
+          const tone = stockTone(p.totalStock ?? 0);
+          return (
+            <div key={p.id} className="overflow-hidden flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--bd)", borderRadius: "var(--rad3)" }}>
+              {/* Foto produk potret (3:4): rata atas supaya kepala model tidak terpotong. */}
+              <div className={`relative ${noImg ? "h-28" : "aspect-[3/4]"}`} style={{ background: "var(--sub)" }}>
+                {noImg ? (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Package size={26} strokeWidth={1.6} style={{ color: "var(--fg3)" }} />
+                  </div>
+                ) : (
+                  <img src={thumbnails[p.id] || p.image || ""} alt={p.name} className="w-full h-full object-cover object-top" loading="lazy" />
+                )}
+                <span
+                  className="absolute top-3 left-3 inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold"
+                  style={{ background: tone.bg, color: tone.color }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full mr-1.5" style={{ background: tone.dot }} />
+                  {tone.label}
+                </span>
+              </div>
+              <div className="p-4 flex flex-col flex-1">
+                <CardBody p={p} maxStock={facets.maxStock} openOrder={!!openOrder} />
+                <div className="mt-auto">
+                  {openOrder
+                    ? <OpenOrderAction p={p} openOrder={openOrder} onDetail={onDetail} />
+                    : <CardActions p={p} onDelete={onDelete} onDetail={onDetail} />}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+
   return (
     <div className="space-y-5 lg:space-y-6">
       {/* ── Baris judul: katalog-style, tanpa kartu statistik (sesuai wireframe) ── */}
@@ -656,51 +722,21 @@ export default function ProductsCatalog({
                 </button>
               )}
             </div>
-          ) : view === "list" ? (
-            <div className="space-y-3">
-              {rows.map((p) => (
-                <div key={p.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-4" style={{ background: "var(--card)", border: "1px solid var(--bd)", borderRadius: "var(--rad3)" }}>
-                  <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0" style={{ background: "var(--sub)" }}>
-                    <img src={thumbnails[p.id] || p.image || ""} alt={p.name} className="w-full h-full object-cover" loading="lazy" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <CardBody p={p} maxStock={facets.maxStock} openOrder={!!openOrder} />
-                  </div>
-                  <div className={openOrder ? "sm:w-72 shrink-0" : "sm:w-44 shrink-0"}>
-                    {openOrder
-                      ? <OpenOrderAction p={p} openOrder={openOrder} onDetail={onDetail} />
-                      : <CardActions p={p} onDelete={onDelete} onDetail={onDetail} />}
-                  </div>
-                </div>
-              ))}
-            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {rows.map((p) => {
-                const tone = stockTone(p.totalStock ?? 0);
-                return (
-                  <div key={p.id} className="overflow-hidden flex flex-col" style={{ background: "var(--card)", border: "1px solid var(--bd)", borderRadius: "var(--rad3)" }}>
-                    <div className="relative h-40" style={{ background: "var(--sub)" }}>
-                      <img src={thumbnails[p.id] || p.image || ""} alt={p.name} className="w-full h-full object-cover" loading="lazy" />
-                      <span
-                        className="absolute top-3 left-3 inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold"
-                        style={{ background: tone.bg, color: tone.color }}
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full mr-1.5" style={{ background: tone.dot }} />
-                        {tone.label}
-                      </span>
-                    </div>
-                    <div className="p-4 flex flex-col flex-1">
-                      <CardBody p={p} maxStock={facets.maxStock} openOrder={!!openOrder} />
-                      <div className="mt-auto">
-                        {openOrder
-                          ? <OpenOrderAction p={p} openOrder={openOrder} onDetail={onDetail} />
-                          : <CardActions p={p} onDelete={onDelete} onDetail={onDetail} />}
-                      </div>
-                    </div>
+            <div className="space-y-8">
+              {withPhoto.length > 0 ? renderItems(withPhoto, false) : null}
+              {/* Produk tanpa foto dikelompokkan di bawah supaya grid utama tetap rapi. */}
+              {noPhoto.length > 0 ? (
+                <section aria-label="Produk belum ada foto">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-3">
+                    <h3 className="text-sm font-extrabold" style={{ color: "var(--fg)" }}>Belum ada foto</h3>
+                    <span className="text-[11px] font-bold" style={{ color: "var(--fg3)" }}>
+                      {noPhoto.length} produk · tambahkan foto lewat tombol Edit
+                    </span>
                   </div>
-                );
-              })}
+                  {renderItems(noPhoto, true)}
+                </section>
+              ) : null}
             </div>
           )}
         </div>
