@@ -52,6 +52,7 @@ import { categoryRank, seriesRank, variantSortKey } from "@/lib/ops-order";
 import { formatWeightExact } from "@/lib/shipping-weight";
 import { formatRupiah, isoToWibInput, itemSummaryLabel, itemSummaryParts, wibNow, wibToIso } from "@/components/ops/transaksi/transaksi-format";
 import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
+import DuplicateOrderWarning from "@/components/ops/transaksi/DuplicateOrderWarning";
 import WilayahSelect from "@/components/ops/transaksi/WilayahSelect";
 import { useToast } from "@/components/ops/ui/use-toast";
 
@@ -252,6 +253,10 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
   const [form, setForm] = useState(null);
   const [items, setItems] = useState([emptyRow()]);
   const [saveError, setSaveError] = useState("");
+  /** Pesanan terbuka yang mirip (pengaman order dobel); null = tidak ada peringatan. */
+  const [dupMatches, setDupMatches] = useState(null);
+  /** Data terakhir yang dikirim, dipakai ulang dengan `confirm_duplicate` saat admin memilih "Tetap simpan". */
+  const lastPayloadRef = useRef(null);
   const [touched, setTouched] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [saveAttempted, setSaveAttempted] = useState(false);
@@ -482,6 +487,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       return;
     }
     setSaveError("");
+    setDupMatches(null);
     setTouched(false);
     setSaveAttempted(false);
     // Panel "Transaksi tercatat" milik simpan sebelumnya harus hilang saat drawer dibuka lagi
@@ -1631,8 +1637,15 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         isEdit,
       });
     },
-    onError: (error) =>
-      setSaveError(error instanceof Error ? error.message : "Gagal menyimpan transaksi. Coba lagi."),
+    onError: (error) => {
+      // Server menahan transaksi karena mirip pesanan yang masih terbuka: tampilkan peringatan
+      // (bukan pesan error biasa) supaya admin bisa memeriksa atau memilih "Tetap simpan".
+      if (error?.code === "possible_duplicate" && Array.isArray(error?.data?.matches)) {
+        setDupMatches(error.data.matches);
+        return;
+      }
+      setSaveError(error instanceof Error ? error.message : "Gagal menyimpan transaksi. Coba lagi.");
+    },
   });
 
   const save = () => {
@@ -1673,7 +1686,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     const createdAt = wibToIso(form.date, form.time);
     if (!createdAt) return setSaveError("Tanggal/jam transaksi tidak valid.");
 
-    mutation.mutate({
+    setDupMatches(null);
+    const payload = {
       customer_id: form.customer_mode === "existing" ? form.customer_id || null : null,
       customer_name: form.customer_name.trim(),
       customer_whatsapp: form.customer_whatsapp.trim(),
@@ -1705,7 +1719,16 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         if (row.priceManual) item.price = Number(digits(row.price)) || 0;
         return item;
       }),
-    });
+    };
+    lastPayloadRef.current = payload;
+    mutation.mutate(payload);
+  };
+
+  /** "Tetap simpan" di peringatan order dobel: kirim ulang data yang sama dengan konfirmasi admin. */
+  const saveAnyway = () => {
+    if (!lastPayloadRef.current) return;
+    setDupMatches(null);
+    mutation.mutate({ ...lastPayloadRef.current, confirm_duplicate: true });
   };
 
   const requestClose = () => {
@@ -1719,13 +1742,14 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     if (!isOpen) return undefined;
     const onKey = (event) => {
       if (event.key !== "Escape") return;
-      if (confirmClose) setConfirmClose(false);
+      if (dupMatches) setDupMatches(null);
+      else if (confirmClose) setConfirmClose(false);
       else requestClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, confirmClose, touched, mutation.isPending]);
+  }, [isOpen, confirmClose, dupMatches, touched, mutation.isPending]);
 
   /**
    * Selama drawer terbuka, scroll halaman dikunci. Kalau tidak, scrollbar halaman tampak
@@ -4182,6 +4206,51 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
               </div>
             </div>
             )}
+
+            {/* Pengaman order dobel: ada pesanan terbuka dengan nomor HP/nama yang sama. Hanya peringatan —
+                admin boleh lanjut. Tidak ada yang tersimpan dan stok belum dipotong selama dialog ini tampil. */}
+            <AnimatePresence>
+              {dupMatches && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-10 bg-white/80 dark:bg-[#1a1d28]/80 backdrop-blur-sm flex items-center justify-center p-5"
+                  onClick={() => setDupMatches(null)}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="w-full max-w-md max-h-full overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1a1d28] p-5 shadow-xl"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <DuplicateOrderWarning matches={dupMatches} />
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
+                      Belum ada yang tersimpan dan stok belum dipotong. Pilih "Tetap simpan" kalau ini memang pesanan baru.
+                    </p>
+                    <div className="flex gap-2 mt-4">
+                      <button
+                        type="button"
+                        onClick={() => setDupMatches(null)}
+                        data-testid="duplicate-cancel"
+                        className="flex-1 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl hover:bg-slate-800 dark:hover:bg-slate-100 transition-all"
+                      >
+                        Periksa dulu
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveAnyway}
+                        disabled={mutation.isPending}
+                        data-testid="duplicate-confirm"
+                        className="flex-1 px-4 py-2.5 border-2 border-amber-300 dark:border-amber-700/60 text-amber-800 dark:text-amber-200 font-bold rounded-xl hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all disabled:opacity-50"
+                      >
+                        Tetap simpan
+                      </button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Konfirmasi tutup: isian belum disimpan tidak hilang karena salah klik */}
             <AnimatePresence>

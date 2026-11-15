@@ -39,6 +39,13 @@ import {
 } from "@/lib/open-order-config";
 import { openOrderEffectivePrice } from "@/lib/open-order-offering";
 import { syncLeadOnOrderSaved } from "@/lib/ops-lead-sync";
+import {
+  DUPLICATE_OPEN_STATUSES,
+  POSSIBLE_DUPLICATE_CODE,
+  duplicateMessage,
+  duplicateSinceIso,
+  findPossibleDuplicates,
+} from "@/lib/duplicate-order";
 
 /**
  * Menu "Transaksi" dashboard internal.
@@ -826,6 +833,32 @@ export async function POST(req: NextRequest) {
     const wantsPreorder = body?.is_preorder === true;
     if (wantsPreorder && String(body?.payment_status || "paid").trim().toLowerCase() === "unpaid") {
       return bad(PREORDER_MUST_BE_PAID_MESSAGE);
+    }
+
+    // Pengaman order dobel: nomor HP / nama yang sama dengan pesanan yang masih terbuka (14 hari).
+    // Hanya PERINGATAN (409) — admin boleh lanjut dengan `confirm_duplicate: true`. Diperiksa SEBELUM
+    // stok dipotong, jadi penolakan di sini tidak menyentuh stok. Kegagalan pengecekan tidak boleh
+    // menghalangi pencatatan (fail-open, hanya dicatat di log).
+    if (body?.confirm_duplicate !== true) {
+      try {
+        const { data: openOrders, error: dupError } = await admin
+          .from("orders")
+          .select("order_number, customer_name, customer_whatsapp, status, total, created_at, is_preorder")
+          .in("status", [...DUPLICATE_OPEN_STATUSES])
+          .gte("created_at", duplicateSinceIso())
+          .order("created_at", { ascending: false })
+          .limit(2000);
+        if (dupError) throw new Error(dupError.message);
+        const matches = findPossibleDuplicates(openOrders || [], { phone: customerWhatsapp, name: customerName });
+        if (matches.length) {
+          return NextResponse.json(
+            { error: duplicateMessage(matches), code: POSSIBLE_DUPLICATE_CODE, matches },
+            { status: 409 },
+          );
+        }
+      } catch (dupCheckError) {
+        console.error("[OPS] cek order dobel gagal (dilewati):", dupCheckError);
+      }
     }
 
     // Stok dipotong sebelum pesanan disimpan — kalau ada yang kurang, tidak ada yang tersimpan.

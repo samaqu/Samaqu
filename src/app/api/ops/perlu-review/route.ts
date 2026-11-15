@@ -783,7 +783,11 @@ export async function POST(req: NextRequest) {
       txRes = await fetch(new URL("/api/ops/transaksi", req.url), {
         method: "POST",
         headers: { Authorization: token, "Content-Type": "application/json" },
-        body: JSON.stringify(applyCoverDiscount(draftPayload)),
+        // `confirm_duplicate` dari admin (dialog "Tetap setujui") diteruskan ke pengaman order dobel.
+        body: JSON.stringify({
+          ...applyCoverDiscount(draftPayload),
+          ...(body?.confirm_duplicate === true ? { confirm_duplicate: true } : {}),
+        }),
       });
     } catch (err) {
       await releaseDraftClaim(admin, id);
@@ -793,6 +797,13 @@ export async function POST(req: NextRequest) {
     if (!txRes.ok) {
       // Gagal bikin order: draft kembali ke antrean supaya bisa diperbaiki admin.
       await releaseDraftClaim(admin, id);
+      // Kemungkinan order dobel: teruskan kode + daftar pesanan mirip supaya dialog bisa menampilkannya.
+      if (txRes.status === 409 && txJson?.code === "possible_duplicate") {
+        return NextResponse.json(
+          { error: txJson.error, code: "possible_duplicate", matches: txJson.matches || [] },
+          { status: 409 },
+        );
+      }
       return bad(txJson?.error || `Gagal membuat transaksi (${txRes.status})`);
     }
     await admin

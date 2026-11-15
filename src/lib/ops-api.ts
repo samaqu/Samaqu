@@ -24,7 +24,19 @@ async function call<T = any>(method: string, path: string, body?: unknown): Prom
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const json = await res.json().catch(() => null);
-  if (!res.ok) throw new Error((json as any)?.error || `Request gagal (${res.status})`);
+  if (!res.ok) {
+    // Pesan tetap sama seperti dulu; `status`/`code`/`data` ditambahkan supaya pemanggil bisa
+    // mengenali kasus khusus (mis. 409 `possible_duplicate` dari pengaman order dobel).
+    const error = new Error((json as any)?.error || `Request gagal (${res.status})`) as Error & {
+      status?: number;
+      code?: string;
+      data?: any;
+    };
+    error.status = res.status;
+    error.code = (json as any)?.code;
+    error.data = json;
+    throw error;
+  }
   return json as T;
 }
 

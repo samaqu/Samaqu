@@ -16,6 +16,8 @@ import { supabase } from "@/lib/supabase";
 import { PERLU_REVIEW_EVENT } from "@/lib/use-pending-drafts";
 import { isPotongPanjangLine } from "@/lib/layanan";
 import { toast } from "@/components/ops/ui/use-toast";
+import DuplicateOrderWarning from "@/components/ops/transaksi/DuplicateOrderWarning";
+import type { DuplicateMatch } from "@/lib/duplicate-order";
 import DraftEditor from "./DraftEditor";
 import DraftList from "./DraftList";
 import DraftDetailHeader from "./DraftDetailHeader";
@@ -106,7 +108,12 @@ async function api(body?: Record<string, unknown>) {
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const json = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(json?.error || `Request gagal (${res.status})`);
+  if (!res.ok) {
+    const error = new Error(json?.error || `Request gagal (${res.status})`) as Error & { code?: string; data?: any };
+    error.code = json?.code;
+    error.data = json;
+    throw error;
+  }
   return json;
 }
 
@@ -139,6 +146,8 @@ export default function PerluReviewView() {
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const [dialog, setDialog] = useState<{ kind: "approve" | "reject" | "delete"; draft: Draft } | null>(null);
+  /** Pesanan terbuka yang mirip dengan draft yang mau disetujui (pengaman order dobel). */
+  const [dupMatches, setDupMatches] = useState<DuplicateMatch[] | null>(null);
   const [rejectReason, setRejectReason] = useState("Data belum sesuai");
   const [proofOpen, setProofOpen] = useState(false);
   const [proofError, setProofError] = useState(false);
@@ -194,6 +203,10 @@ export default function PerluReviewView() {
       await load();
       return json;
     } catch (e) {
+      // Kemungkinan order dobel: bukan error — kembalikan daftar pesanan mirip supaya dialog Setujui
+      // menampilkannya dan admin memilih "Tetap setujui". Draft sudah dikembalikan ke antrean oleh server.
+      const dup = e as { code?: string; data?: { matches?: DuplicateMatch[] } };
+      if (dup?.code === "possible_duplicate") return { duplicate: true, matches: dup.data?.matches || [] };
       const message = e instanceof Error ? e.message : "Aksi gagal.";
       setError(message);
       toast({ title: "Aksi gagal", description: message, variant: "destructive" });
@@ -225,6 +238,11 @@ export default function PerluReviewView() {
     notify("Balasan terkirim", "Instruksi disimpan sebagai pelajaran untuk AI.");
   };
 
+  // Peringatan order dobel hanya berlaku untuk dialog yang sedang terbuka.
+  useEffect(() => {
+    setDupMatches(null);
+  }, [dialog]);
+
   const askApprove = () => {
     if (selectedDraft) setDialog({ kind: "approve", draft: selectedDraft });
   };
@@ -243,7 +261,11 @@ export default function PerluReviewView() {
   const confirmDialog = async () => {
     if (!dialog) return;
     if (dialog.kind === "approve") {
-      const json = await run("draft_approve", { id: dialog.draft.id });
+      const json = await run("draft_approve", { id: dialog.draft.id, ...(dupMatches ? { confirm_duplicate: true } : {}) });
+      if (json?.duplicate) {
+        setDupMatches(json.matches);
+        return; // dialog tetap terbuka: admin memeriksa lalu memilih "Tetap setujui" atau Batal
+      }
       if (json?.order_number) notify(`Order ${json.order_number} dibuat`, "Stok sudah dipotong dan transaksi masuk.");
     } else if (dialog.kind === "delete") {
       setSelectedDraftId("");
@@ -599,8 +621,15 @@ export default function PerluReviewView() {
             </div>
 
             {dialog.kind === "approve" ? (
-              <div className="mx-5 rounded-xl border px-3 py-2.5 text-xs" style={{ background: "#FBF6EA", borderColor: "#E8D4A4", color: "#6B4D12" }}>
-                Stok akan dipotong, order dibuat, dan status menjadi <b>Lunas</b>. Pastikan bukti transfer dan alamat sudah benar.
+              <div className="space-y-2.5">
+                {dupMatches ? (
+                  <div className="mx-5">
+                    <DuplicateOrderWarning matches={dupMatches} />
+                  </div>
+                ) : null}
+                <div className="mx-5 rounded-xl border px-3 py-2.5 text-xs" style={{ background: "#FBF6EA", borderColor: "#E8D4A4", color: "#6B4D12" }}>
+                  Stok akan dipotong, order dibuat, dan status menjadi <b>Lunas</b>. Pastikan bukti transfer dan alamat sudah benar.
+                </div>
               </div>
             ) : dialog.kind === "delete" ? (
               <div className="mx-5 rounded-xl border px-3 py-2.5 text-xs" style={{ background: "#FCE8E8", borderColor: "#F3CFCB", color: "#9B2C2C" }}>
@@ -639,7 +668,7 @@ export default function PerluReviewView() {
                 className="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold text-white disabled:opacity-50"
                 style={{ background: dialog.kind === "approve" ? "#1F7A4D" : "#9B2C2C" }}
               >
-                {busy ? "Memproses..." : dialog.kind === "approve" ? "Setujui & Proses" : dialog.kind === "delete" ? "Hapus draft" : "Tolak draft"}
+                {busy ? "Memproses..." : dialog.kind === "approve" ? (dupMatches ? "Tetap setujui" : "Setujui & Proses") : dialog.kind === "delete" ? "Hapus draft" : "Tolak draft"}
               </button>
             </div>
           </div>
