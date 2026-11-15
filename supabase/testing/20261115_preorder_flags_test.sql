@@ -77,6 +77,25 @@ begin
     case when v_total = 370000 and (select preorder_estimate from orders where id = v_order) = '10 hari kerja' then 'PASS' else 'FAIL' end,
     v_total, (select preorder_estimate from orders where id = v_order));
 
+  -- 4b. (setelah 20261115_preorder_edit_header_fix.sql) header ikut menulis source dan created_at,
+  --     dan header tanpa kunci itu TIDAK menimpa nilai lama.
+  perform public.samaqu_edit_preorder_items(
+    v_order, 'uji',
+    '[{"product_id":"thobe-grey-indigo-nahawand","product_name":"Thobe Grey Indigo","color":"default","size":"S","quantity":1,"price":359000}]'::jsonb,
+    '[]'::jsonb, 0, 1000,
+    '{"shipping_cost":20000,"discount":9000,"source":"instagram","created_at":"2026-11-10T01:00:00Z"}'::jsonb, null);
+  v_res := v_res || format(E'\n%s header: source=%s created_at=%s',
+    case when (select source from orders where id = v_order) = 'instagram'
+          and (select created_at from orders where id = v_order) = '2026-11-10T01:00:00Z'::timestamptz then 'PASS' else 'FAIL' end,
+    (select source from orders where id = v_order), (select created_at from orders where id = v_order));
+  perform public.samaqu_edit_preorder_items(
+    v_order, 'uji',
+    '[{"product_id":"thobe-grey-indigo-nahawand","product_name":"Thobe Grey Indigo","color":"default","size":"S","quantity":1,"price":359000}]'::jsonb,
+    '[]'::jsonb, 0, 1000, '{"shipping_cost":20000,"discount":9000}'::jsonb, null);
+  v_res := v_res || format(E'\n%s header tanpa source/created_at: nilai lama tidak tertimpa',
+    case when (select source from orders where id = v_order) = 'instagram'
+          and (select created_at from orders where id = v_order) = '2026-11-10T01:00:00Z'::timestamptz then 'PASS' else 'FAIL' end);
+
   -- 5. Penjaga: tiap kondisi terlarang harus menolak dengan error.
   -- 5a. stok sudah dipotong
   update orders set stock_reserved = true where id = v_order;

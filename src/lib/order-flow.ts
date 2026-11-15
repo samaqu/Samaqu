@@ -21,12 +21,29 @@
  */
 
 import { isGosend } from "./gosend";
+import { isPreorderWaiting } from "./preorder";
 
-export type OrderStage = "belum_bayar" | "belum_dipacking" | "sudah_dipacking" | "dikirim" | "selesai" | "dibatalkan";
+/**
+ * `menunggu_stok` = pre-order yang sudah Lunas tapi stoknya belum ready (`orders.is_preorder` dan
+ * `preorder_ready_at` kosong). Bukan antrean packing: tidak masuk "perlu diproses", dan pill-nya
+ * tetap "diproses" untuk layar lama (lihat `orderStatusKey`). Pesanan reguler tidak pernah masuk tahap ini.
+ */
+export type OrderStage =
+  | "belum_bayar"
+  | "menunggu_stok"
+  | "belum_dipacking"
+  | "sudah_dipacking"
+  | "dikirim"
+  | "selesai"
+  | "dibatalkan";
 
 /** Field minimum untuk menentukan tahap: status pesanan + bukti pengiriman. */
 export interface StageSource {
   status: string;
+  /** Penanda pre-order (`orders.is_preorder`). Kosong/false = pesanan reguler (perilaku lama). */
+  is_preorder?: boolean | null;
+  /** Terisi saat stok PO sudah ready (`orders.preorder_ready_at`). */
+  preorder_ready_at?: string | null;
   /** Nomor resi J&T — pembeda "Belum di Packing" (belum dibuat) vs "Menunggu Pickup". */
   awb_no?: string | null;
   /** `menunggu_pickup` | `dikirim` | `selesai` — bukti paket benar-benar berjalan. */
@@ -52,6 +69,8 @@ function hasMovingScan(order: StageSource): boolean {
  * pengiriman yang belum tuntas, tahap diturunkan ke posisi paket yang sebenarnya.
  */
 export function orderStage(order: StageSource): OrderStage {
+  // PO yang sudah Lunas tapi stoknya belum ready: bukan antrean packing dan belum bisa dikirim.
+  if (order.status === "diproses" && isPreorderWaiting(order)) return "menunggu_stok";
   switch (order.status) {
     case "pending":
       return "belum_bayar";
@@ -105,6 +124,7 @@ export function orderStatusKey(order: StageSource): OrderStatusKey {
   switch (orderStage(order)) {
     case "belum_bayar":
       return "pending";
+    case "menunggu_stok":
     case "belum_dipacking":
     case "sudah_dipacking":
       return "diproses";
@@ -119,6 +139,7 @@ export function orderStatusKey(order: StageSource): OrderStatusKey {
 
 export const ORDER_STAGE_LABEL: Record<OrderStage, string> = {
   belum_bayar: "Belum Bayar",
+  menunggu_stok: "Menunggu Stok (Pre-Order)",
   belum_dipacking: "Belum di Packing",
   sudah_dipacking: "Menunggu Pickup",
   dikirim: "Dikirim",
@@ -158,6 +179,7 @@ export function stageNeedsAdminAction(stage: OrderStageFilter): boolean {
 /** Warna pill tahap — daftar pesanan memakainya supaya tab dan baris memakai istilah yang sama. */
 export const ORDER_STAGE_STYLE: Record<OrderStage, { bg: string; color: string; border: string }> = {
   belum_bayar: { bg: "#fffbeb", color: "#b45309", border: "#fef3c7" },
+  menunggu_stok: { bg: "#faf5ff", color: "#7e22ce", border: "#f3e8ff" },
   belum_dipacking: { bg: "#fff7ed", color: "#c2410c", border: "#ffedd5" },
   sudah_dipacking: { bg: "#eff6ff", color: "#1d4ed8", border: "#dbeafe" },
   dikirim: { bg: "#f5f3ff", color: "#6d28d9", border: "#ede9fe" },
@@ -216,12 +238,21 @@ export function shippingLine(
   const ss = shippingStatusOf(order);
   // GoSend memang tanpa resi: jangan tampil "Resi belum dibuat" / "menunggu diproses" yang menyesatkan.
   const gosend = isGosend(order.shipping_method);
+  const waitingStock = stage === "menunggu_stok";
   return {
     courier: order.shipping_method || "Pengiriman",
     // Pesanan batal: resi ditampilkan apa adanya (kalau ada), atau "-" — bukan "Tanpa resi".
     resi:
       order.awb_no ||
-      (cancelled ? "-" : gosend ? "Tanpa resi (GoSend)" : awaiting ? "Resi belum dibuat" : "Tanpa resi"),
+      (cancelled
+        ? "-"
+        : waitingStock
+          ? "Menunggu stok (pre-order)"
+          : gosend
+            ? "Tanpa resi (GoSend)"
+            : awaiting
+              ? "Resi belum dibuat"
+              : "Tanpa resi"),
     status: ss ? SHIPPING_STATUS_LABEL[ss] : null,
     awaiting: awaiting && !gosend,
     cancelled,

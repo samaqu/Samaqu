@@ -104,6 +104,7 @@ function orderStatusKey(value: unknown): string | null {
     // Tahap → status tersimpan. Tahap packing & "Belum Bayar" bukan kolom status di database.
     const map: Record<OrderStage, string | null> = {
       belum_bayar: "pending",
+      menunggu_stok: "diproses",
       belum_dipacking: "diproses",
       sudah_dipacking: "diproses",
       dikirim: "dikirim",

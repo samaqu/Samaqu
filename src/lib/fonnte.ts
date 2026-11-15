@@ -435,6 +435,16 @@ export interface OrderPaidNotification {
   total: number;
 }
 
+/** WA saat pre-order (PO) yang sudah Lunas dicatat. Satu pesan; tidak ada pesan "stok ready" terpisah. */
+export interface PreorderCreatedNotification {
+  orderNumber: string;
+  customerName: string;
+  customerWhatsapp: string;
+  items: NewOrderNotificationItem[];
+  /** Teks estimasi, mis. "7-10 hari kerja" (bisa diedit per pesanan). */
+  estimate: string;
+}
+
 export interface ShippedNotification {
   orderNumber: string;
   customerName: string;
@@ -627,6 +637,31 @@ export function buildOrderPaidMessage(order: OrderPaidNotification): string {
     `Pesanan ${ka} akan segera kami proses. Kami akan mengirimkan informasi nomor resi setelah pesanan dikirim.`,
     "",
     "Terima kasih telah berbelanja di SAMAQU.",
+  ].join("\n");
+}
+
+/**
+ * Pesan "pre-order sudah dicatat". Kalimat penutup SENGAJA tanpa sapaan "Ka" (permintaan owner).
+ * Estimasi memakai teks bebas (bukan tanggal hitungan) karena jadwal produksi belum pasti.
+ */
+export function buildPreorderCreatedMessage(order: PreorderCreatedNotification): string {
+  const ka = greetingName(order.customerName);
+  return [
+    `Halo ${ka},`,
+    "",
+    "Terima kasih, pembayaran pre-order Ka sudah kami terima.",
+    "",
+    `Nomor Pesanan: ${order.orderNumber}`,
+    "Pesanan:",
+    whatsAppItemLines(order.items),
+    "",
+    `Estimasi barang siap: ${order.estimate}`,
+    "",
+    "Pesanan akan kami proses dan kirim setelah barangnya tersedia, dan semua item dikirim sekaligus.",
+    "",
+    "Mohon diperhatikan, pesanan pre-order tidak dapat dibatalkan.",
+    "",
+    "Terima kasih telah mempercayakan pesanan ini kepada SAMAQU.",
   ].join("\n");
 }
 
@@ -849,6 +884,19 @@ export async function notifyCustomerOrderPaid(order: OrderPaidNotification): Pro
       nama: greetingName(order.customerName),
       nomor: order.orderNumber,
       total: rupiah(order.total),
+    }),
+  );
+}
+
+/** WA "pre-order dicatat" (sekali, lewat klaim `notify_created_at` di pemanggil). */
+export async function notifyCustomerPreorderCreated(order: PreorderCreatedNotification): Promise<boolean> {
+  return sendToCustomer(
+    order.customerWhatsapp,
+    await buildNotifikasi("pre-order-dicatat", buildPreorderCreatedMessage(order), {
+      nama: greetingName(order.customerName),
+      nomor: order.orderNumber,
+      daftar_produk: whatsAppItemLines(order.items),
+      estimasi: order.estimate,
     }),
   );
 }
@@ -1291,6 +1339,17 @@ export function templateBawaanNotifikasi(): Record<string, string> {
     [rupiah(589000)]: p("total"),
   });
 
+  const preorder = buildPreorderCreatedMessage({
+    orderNumber: p("nomor"),
+    customerName: p("nama"),
+    customerWhatsapp: p("wa"),
+    items: SAMPEL_ITEM,
+    estimate: p("estimasi"),
+  });
+  hasil["pre-order-dicatat"] = gantiDenganPenanda(preorder, {
+    [whatsAppItemLines(SAMPEL_ITEM)]: p("daftar_produk"),
+  });
+
   const reminder = buildPaymentReminderMessage({
     orderNumber: p("nomor"),
     customerName: p("nama"),
@@ -1516,6 +1575,14 @@ export function katalogNotifikasi(): NotifikasiInfo[] {
       aktif: true,
       kapan: "Setelah pembayaran terverifikasi (webhook Mayar atau verifikasi admin)",
       isi: buildOrderPaidMessage({ ...pembeli, total: 589000 }),
+    },
+    {
+      key: "pre-order-dicatat",
+      label: "Pre-order dicatat",
+      ke: "Pembeli",
+      aktif: true,
+      kapan: "Admin mencatat pre-order (sudah Lunas) di menu Transaksi atau Pre-Order; dikirim sekali",
+      isi: buildPreorderCreatedMessage({ ...pembeli, items: SAMPEL_ITEM, estimate: "7-10 hari kerja" }),
     },
     {
       key: "pengingat-bayar",

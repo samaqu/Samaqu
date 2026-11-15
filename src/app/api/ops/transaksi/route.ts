@@ -4,7 +4,15 @@ import { isOpsAdmin, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { cancelOrderCompletely, type CancelableOrder } from "@/lib/cancel-order";
 import { MANUAL_PRICE_MAX, MANUAL_PRICE_MIN, MANUAL_SOURCE_KEYS, RESELLER_SOURCE_KEY, hasManualPrice, itemSummary, manualPrice, orderSourceKey, orderSourceLabel, sourceKey, statusLabel } from "@/lib/transaksi";
 import { localPhone } from "@/lib/whatsapp";
-import { notifyCustomerInvoice } from "@/lib/fonnte";
+import { notifyCustomerInvoice, notifyCustomerPreorderCreated } from "@/lib/fonnte";
+import { sendOnce } from "@/lib/order-notify";
+import {
+  PREORDER_MUST_BE_PAID_MESSAGE,
+  isPreorder,
+  isPreorderWaiting,
+  normalizePreorderEstimate,
+  parsePreorderCancelReason,
+} from "@/lib/preorder";
 import { isLayananCategory } from "@/lib/layanan";
 import { kotaFromShipping } from "@/lib/kota";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
@@ -545,7 +553,7 @@ export async function GET(req: NextRequest) {
   let query = admin
     .from("orders")
     .select(
-      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, stock_reserved, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel, reseller_id, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label",
+      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, stock_reserved, is_preorder, preorder_estimate, preorder_ready_at, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel, reseller_id, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -764,6 +772,11 @@ export async function GET(req: NextRequest) {
       items_edited_at: null,
       items_edited_after_resi: editedAfterResi.get(String(order.id)) || false,
       can_cancel: status === "pending" || status === "diproses",
+      // Pre-order: penanda dipakai tabel, kartu, dan drawer. Pesanan reguler selalu false/null.
+      is_preorder: order.is_preorder === true,
+      preorder_estimate: order.preorder_estimate || null,
+      preorder_ready_at: order.preorder_ready_at || null,
+      preorder_waiting: isPreorderWaiting(order),
     };
   });
 
@@ -808,14 +821,26 @@ export async function POST(req: NextRequest) {
     const finalDiscount = Math.min(discount, subtotal);
     const total = subtotal - finalDiscount + shippingCost;
 
+    // Pre-order: customer transfer dulu, ukuran boleh kosong. Stok TIDAK dipotong saat dicatat
+    // (dipotong saat admin menekan "stok sudah ready"), dan wajib Lunas. Pesanan reguler: tidak berubah.
+    const wantsPreorder = body?.is_preorder === true;
+    if (wantsPreorder && String(body?.payment_status || "paid").trim().toLowerCase() === "unpaid") {
+      return bad(PREORDER_MUST_BE_PAID_MESSAGE);
+    }
+
     // Stok dipotong sebelum pesanan disimpan — kalau ada yang kurang, tidak ada yang tersimpan.
     // `orderId` dibuat DI SINI (sebelum potong) supaya bisa dipakai sebagai ref komponen.
     // Saat insert nanti hanya `order_number` yang boleh berubah karena bentrok; id tetap.
     const orderId = crypto.randomUUID();
-    const deducted = await deductStock(admin, items, orderId);
-    if (!deducted.ok) {
-      await restoreStock(admin, deducted.done, orderId);
-      return bad(deducted.message);
+    // Barang yang benar-benar terpotong stoknya di request ini — dasar rollback. PO: kosong
+    // (tidak ada yang dipotong, jadi tidak ada yang boleh "dikembalikan").
+    const stockHeld: Snapshot[] = wantsPreorder ? [] : items;
+    if (!wantsPreorder) {
+      const deducted = await deductStock(admin, items, orderId);
+      if (!deducted.ok) {
+        await restoreStock(admin, deducted.done, orderId);
+        return bad(deducted.message);
+      }
     }
 
     // Status bayar dipilih admin di drawer ("Lunas" bawaan, atau "Belum Lunas"). Belum lunas
@@ -855,8 +880,11 @@ export async function POST(req: NextRequest) {
       discount: finalDiscount,
       total,
       status: paid ? "diproses" : "pending",
-      // Stok sudah dipotong di atas → pembatalan wajib mengembalikannya.
-      stock_reserved: true,
+      // Stok sudah dipotong di atas → pembatalan wajib mengembalikannya. PO: belum dipotong.
+      stock_reserved: !wantsPreorder,
+      ...(wantsPreorder
+        ? { is_preorder: true, preorder_estimate: normalizePreorderEstimate(body?.preorder_estimate) }
+        : {}),
       source,
       created_at: createdAt.toISOString(),
       updated_at: createdAt.toISOString(),
@@ -879,7 +907,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!order) {
-      await restoreStock(admin, items, orderId);
+      await restoreStock(admin, stockHeld, orderId);
       console.error("[OPS] transaksi insert:", insertError?.message);
       return bad("Gagal menyimpan transaksi. Coba lagi.");
     }
@@ -900,7 +928,7 @@ export async function POST(req: NextRequest) {
 
     if (itemsError) {
       await admin.from("orders").delete().eq("id", order.id);
-      await restoreStock(admin, items, order.id);
+      await restoreStock(admin, stockHeld, order.id);
       console.error("[OPS] transaksi items:", itemsError.message);
       return bad("Gagal menyimpan produk transaksi. Coba lagi.");
     }
@@ -955,7 +983,29 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ order_number: order.order_number, total });
+    // Pre-order dicatat → SATU WA ke pembeli (estimasi + "tidak dapat dibatalkan"). Klaim
+    // `notify_created_at` membuatnya tidak pernah dobel; kegagalan kirim tidak membatalkan PO.
+    if (wantsPreorder) {
+      await sendOnce(order.id, "created", "WA pre-order dicatat", () =>
+        notifyCustomerPreorderCreated({
+          orderNumber: order!.order_number,
+          customerName,
+          customerWhatsapp,
+          items: items.map((item) => ({
+            name: item.product_name,
+            series: item.series,
+            kain: item.kain,
+            color: item.color,
+            size: item.size,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+          estimate: normalizePreorderEstimate(body?.preorder_estimate),
+        }),
+      );
+    }
+
+    return NextResponse.json({ order_number: order.order_number, total, ...(wantsPreorder ? { is_preorder: true } : {}) });
   } catch (e) {
     console.error("[OPS] transaksi POST:", e);
     return NextResponse.json({ error: "Gagal menyimpan transaksi" }, { status: 500 });
@@ -981,7 +1031,7 @@ export async function PATCH(req: NextRequest) {
     const admin = getSupabaseAdmin();
     const { data: order, error } = await admin
       .from("orders")
-      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, promo_bonus_given, customer_name, customer_whatsapp, customer_id, shipping_status, weight, subtotal, total, discount, shipping_cost, paid_at, reseller_id, shipping_method")
+      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, promo_bonus_given, customer_name, customer_whatsapp, customer_id, shipping_status, weight, subtotal, total, discount, shipping_cost, paid_at, reseller_id, shipping_method, is_preorder, preorder_ready_at")
       .eq("order_number", orderNumber)
       .maybeSingle();
 
@@ -992,6 +1042,14 @@ export async function PATCH(req: NextRequest) {
       // "Dibatalkan sebelum dikirim" — pesanan yang sudah jalan tidak bisa dibatalkan di sini.
       if (order.status !== "pending" && order.status !== "diproses") {
         return bad("Pesanan yang sudah dikirim atau sudah dibatalkan tidak bisa dibatalkan di sini");
+      }
+      // Pre-order tidak bisa dibatalkan ke customer; admin hanya boleh membatalkan dengan alasan
+      // wajib, yang tersimpan di `orders.cancel_reason` (terbaca di riwayat). Reguler: tidak berubah.
+      let cancelRemark = "Dibatalkan dari menu Transaksi";
+      if (isPreorder(order)) {
+        const reason = parsePreorderCancelReason({ reason: body?.reason, note: body?.reason_note });
+        if (!reason.ok) return bad(reason.error);
+        cancelRemark = reason.text;
       }
       const result = await cancelOrderCompletely(
         {
@@ -1004,8 +1062,9 @@ export async function PATCH(req: NextRequest) {
           promo_bonus_given: order.promo_bonus_given,
           customer_name: order.customer_name,
           customer_whatsapp: order.customer_whatsapp,
+          is_preorder: order.is_preorder === true,
         } as CancelableOrder,
-        "Dibatalkan dari menu Transaksi",
+        cancelRemark,
       );
       if (!result.success) return bad(result.message);
       return NextResponse.json({
@@ -1021,6 +1080,8 @@ export async function PATCH(req: NextRequest) {
     if (!guard.canEdit) return bad(guard.reason);
     const group = guard.sourceGroup;
     const isManual = group === "manual";
+    // Pre-order yang menunggu stok: diedit lewat fungsi khusus yang TIDAK menyentuh stok.
+    const isPoEdit = guard.preorder === true;
 
     const inputItems: ItemInput[] = Array.isArray(body?.items) ? body.items : [];
     if (inputItems.length === 0) return bad("Minimal satu produk harus diisi");
@@ -1271,7 +1332,9 @@ export async function PATCH(req: NextRequest) {
         .maybeSingle();
       newWeight += resolveAddonWeight(addonSetting?.open_order_addon_weight);
     }
-    const weightError = weightEditError(order.weight, newWeight);
+    // PO menunggu stok belum punya resi, jadi berat boleh bertambah (batas berat hanya untuk pesanan
+    // yang resinya mungkin sudah terbit).
+    const weightError = isPoEdit ? "" : weightEditError(order.weight, newWeight);
     if (weightError) return bad(weightError);
 
     // Snapshot HPP dihitung SEBELUM RPC, lalu ditulis di transaksi yang sama. Index tetap
@@ -1328,22 +1391,37 @@ export async function PATCH(req: NextRequest) {
           shipping_method: shippingMethodForEdit(body?.shipping_method, order.shipping_method),
           discount: finalDiscount,
           created_at: createdAt?.toISOString() ?? "",
+          // Estimasi PO hanya ikut kalau form mengirimnya (tidak menimpa estimasi khusus tanpa sengaja).
+          ...(isPoEdit && body?.preorder_estimate !== undefined
+            ? { preorder_estimate: normalizePreorderEstimate(body.preorder_estimate) }
+            : {}),
         }
       : null;
 
-    const { data: rpcResult, error: rpcError } = await admin.rpc("samaqu_edit_order_items", {
-      p_order_id: order.id,
-      p_actor: String((await opsIdentity(req))?.email || "ops"),
-      p_items: rpcItems,
-      p_hpp_items: hpp.items,
-      p_hpp_goods: hpp.hpp_goods,
-      p_new_weight: Math.round(newWeight),
-      p_addon_product_id: withAddon ? OPEN_ORDER_ADDON.id : "",
-      p_addon_stocked_product_id:
-        withAddon && stockedAddonPresent ? OPEN_ORDER_ADDON_TARGET_ID : "",
-      p_header: manualHeader,
-      p_note: order.awb_no ? "Item diubah setelah resi terbit; label internal perlu dicetak ulang." : null,
-    });
+    const { data: rpcResult, error: rpcError } = isPoEdit
+      ? await admin.rpc("samaqu_edit_preorder_items", {
+          p_order_id: order.id,
+          p_actor: String((await opsIdentity(req))?.email || "ops"),
+          p_items: rpcItems,
+          p_hpp_items: hpp.items,
+          p_hpp_goods: hpp.hpp_goods,
+          p_new_weight: Math.round(newWeight),
+          p_header: manualHeader,
+          p_note: "Item pre-order diubah (stok belum dipotong).",
+        })
+      : await admin.rpc("samaqu_edit_order_items", {
+          p_order_id: order.id,
+          p_actor: String((await opsIdentity(req))?.email || "ops"),
+          p_items: rpcItems,
+          p_hpp_items: hpp.items,
+          p_hpp_goods: hpp.hpp_goods,
+          p_new_weight: Math.round(newWeight),
+          p_addon_product_id: withAddon ? OPEN_ORDER_ADDON.id : "",
+          p_addon_stocked_product_id:
+            withAddon && stockedAddonPresent ? OPEN_ORDER_ADDON_TARGET_ID : "",
+          p_header: manualHeader,
+          p_note: order.awb_no ? "Item diubah setelah resi terbit; label internal perlu dicetak ulang." : null,
+        });
     if (rpcError) {
       console.error("[OPS] transaksi PATCH rpc:", rpcError.message);
       // Transaksi SQL sudah rollback → catat anomali dari penanda STOCK_ANOMALY di luar transaksi.
@@ -1401,12 +1479,20 @@ export async function DELETE(req: NextRequest) {
     const admin = getSupabaseAdmin();
     const { data: order, error } = await admin
       .from("orders")
-      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved")
+      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, is_preorder")
       .eq("order_number", orderNumber)
       .maybeSingle();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!order) return NextResponse.json({ error: "Pesanan tidak ditemukan" }, { status: 404 });
+
+    // Pre-order tidak bisa dibuang diam-diam: hapus butuh alasan, sama seperti batal. Barisnya hilang,
+    // jadi alasannya dicatat di log server (pembatalan menyimpan alasan di `orders.cancel_reason`).
+    if (isPreorder(order)) {
+      const reason = parsePreorderCancelReason({ reason: body?.reason, note: body?.reason_note });
+      if (!reason.ok) return bad(reason.error);
+      console.warn("[PREORDER] hapus:", order.order_number, "|", reason.text, "|", String((await opsIdentity(req))?.email || "ops"));
+    }
 
     if ((order.awb_no || order.jnt_order_id) && order.status !== "dibatalkan") {
       return bad(

@@ -17,6 +17,7 @@ import { isCodOrderPayment } from "@/lib/payment-methods";
 import { isOpsAdmin, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { syncCommissionStatus } from "@/lib/affiliate/commission";
 import { computeOrderPackaging, packagingItemsForRpc } from "@/lib/produksi-order-hpp";
+import { PREORDER_NOT_READY_MESSAGE, isPreorderWaiting, parsePreorderCancelReason } from "@/lib/preorder";
 
 /**
  * Notifikasi "pesanan dikirim" untuk resi yang disimpan manual (HBO) — memakai klaim atomik
@@ -129,7 +130,7 @@ async function packOrderForResi(
 export async function PATCH(request: NextRequest) {
   if (!(await isOpsAdmin(request))) return unauthorized();
   try {
-    const { orderId, orderNumber, status, action, awbNo, shipped, packaging } = await request.json();
+    const { orderId, orderNumber, status, action, awbNo, shipped, packaging, reason, reasonNote } = await request.json();
     const identity = await opsIdentity(request);
     const actor = identity?.email || "admin";
     const identifier = orderNumber || orderId;
@@ -140,6 +141,34 @@ export async function PATCH(request: NextRequest) {
     }
 
     const supabaseAdmin = getSupabaseAdmin();
+
+    // ── Pre-order: SATU penjaga untuk semua aksi admin di bawah ──
+    // PO yang masih menunggu stok belum boleh dibuatkan resi, ditandai dikirim, atau diubah statusnya
+    // (barangnya belum ada). PO yang dibatalkan wajib membawa alasan. Pesanan reguler lolos tanpa efek.
+    let poCancelRemark: string | null = null;
+    {
+      const { data: poRow } = await supabaseAdmin
+        .from("orders")
+        .select("is_preorder, preorder_ready_at, status")
+        .eq("order_number", identifier)
+        .maybeSingle();
+      if (poRow && poRow.is_preorder === true) {
+        const act = String(action || "");
+        const blockedWhileWaiting = ["createJnt", "manualResi", "gosendShip", "gosendDone", "markShipped"];
+        const isStatusChip = !act && Boolean(status);
+        if (
+          isPreorderWaiting(poRow) &&
+          (blockedWhileWaiting.includes(act) || (isStatusChip && status !== "dibatalkan"))
+        ) {
+          return NextResponse.json({ error: PREORDER_NOT_READY_MESSAGE }, { status: 400 });
+        }
+        if (act === "cancelJnt" || (isStatusChip && status === "dibatalkan")) {
+          const parsed = parsePreorderCancelReason({ reason, note: reasonNote });
+          if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+          poCancelRemark = parsed.text;
+        }
+      }
+    }
 
     // Cancel J&T order before updating status
     if (action === "cancelJnt") {
@@ -159,7 +188,7 @@ export async function PATCH(request: NextRequest) {
 
       // Void resi di J&T dulu, stok website dikembalikan, baru status `dibatalkan` — satu jalur
       // bersama dengan chip status & cron auto-cancel (lihat src/lib/cancel-order.ts).
-      const result = await cancelOrderCompletely(order, "Dibatalkan oleh admin");
+      const result = await cancelOrderCompletely(order, poCancelRemark ?? "Dibatalkan oleh admin");
       if (!result.success) {
         return result.stage === "jnt"
           ? NextResponse.json({ error: `Gagal batalkan J&T: ${result.message}` }, { status: 400 })
@@ -662,7 +691,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       if (status === "dibatalkan" && order) {
-        const result = await cancelOrderCompletely(order, "Dibatalkan oleh admin");
+        const result = await cancelOrderCompletely(order, poCancelRemark ?? "Dibatalkan oleh admin");
         if (!result.success) {
           return result.stage === "jnt"
             ? NextResponse.json({ error: `Gagal batalkan J&T: ${result.message}` }, { status: 400 })
@@ -771,9 +800,18 @@ export async function DELETE(request: NextRequest) {
     // Fetch order status + items before deletion for stock restoration
     const { data: fullOrder } = await supabaseAdmin
       .from("orders")
-      .select("status, stock_reserved")
+      .select("status, stock_reserved, is_preorder")
       .eq("id", uuidId)
       .single();
+
+    // Pre-order tidak boleh dihapus dari sini (tanpa alasan). Hapus PO lewat menu Transaksi/Pre-Order
+    // dengan alasan wajib; PO yang batal tetap tersimpan sebagai riwayat.
+    if (fullOrder?.is_preorder === true) {
+      return NextResponse.json(
+        { error: "Pre-order tidak bisa dihapus dari sini. Gunakan Hapus di menu Transaksi/Pre-Order (alasan wajib)." },
+        { status: 400 },
+      );
+    }
 
     const { data: orderItems } = await supabaseAdmin
       .from("order_items")

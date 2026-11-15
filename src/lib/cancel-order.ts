@@ -7,6 +7,7 @@ import { claimResellerNotification, notifyResellerOrderCancelled } from "@/lib/r
 import { refundResellerOnCancel } from "@/lib/reseller/refund";
 import { revertLeadOnOrderCancelled } from "@/lib/ops-lead-sync";
 import { isPotongPanjangLine } from "@/lib/layanan";
+import { PREORDER_CANCEL_NEEDS_REASON_MESSAGE, isPreorderCancelRemark } from "@/lib/preorder";
 
 /**
  * Satu jalur pembatalan pesanan untuk semua pemanggil: customer (`/api/orders/cancel`),
@@ -41,6 +42,12 @@ export interface CancelableOrder {
   reseller_id?: string | null;
   /** Potongan saldo yang harus dikembalikan saat pesanan reseller dibatalkan. */
   reseller_balance_deduction?: number | null;
+  /**
+   * Penanda pre-order. Kalau tidak diisi pemanggil, dibaca dari database. PO hanya boleh dibatalkan
+   * dengan alasan dari `parsePreorderCancelReason`, dan customer TIDAK dikirimi WA "pesanan dibatalkan"
+   * otomatis (PO memang tidak dibatalkan ke customer; alasan internal seperti "data uji" tidak untuk customer).
+   */
+  is_preorder?: boolean | null;
 }
 
 export type CancelOrderResult =
@@ -62,6 +69,21 @@ export async function cancelOrderCompletely(
 ): Promise<CancelOrderResult> {
   const supabase = getSupabaseAdmin();
   const cancelId = order.jnt_order_id || order.awb_no;
+
+  // Pre-order: penjaga pusat. Pemanggil yang tidak menyebut penandanya dicek ke database; kalau
+  // gagal dibaca dianggap bukan PO (perilaku pesanan reguler tidak berubah).
+  let isPreorderOrder = order.is_preorder === true;
+  if (order.is_preorder === undefined) {
+    try {
+      const { data: flag } = await supabase.from("orders").select("is_preorder").eq("id", order.id).maybeSingle();
+      isPreorderOrder = (flag as { is_preorder?: boolean | null } | null)?.is_preorder === true;
+    } catch {
+      isPreorderOrder = false;
+    }
+  }
+  if (isPreorderOrder && !isPreorderCancelRemark(remark)) {
+    return { success: false, stage: "status", message: PREORDER_CANCEL_NEEDS_REASON_MESSAGE };
+  }
 
   if (cancelId) {
     const result = await cancelOrder({ orderId: cancelId, remark });
@@ -290,6 +312,17 @@ export async function cancelOrderCompletely(
           ]
         : []),
     ]);
+  } else if (isPreorderOrder) {
+    // PO: hanya admin yang dikabari. Customer tidak dikirimi WA "pesanan dibatalkan" otomatis.
+    if (await claimOrderNotification(order.id, "cancelled")) {
+      await Promise.allSettled([
+        notifyAdminOrderCancelled({
+          orderNumber: order.order_number,
+          customerName: order.customer_name ?? null,
+          reason: remark,
+        }),
+      ]);
+    }
   } else if (await claimOrderNotification(order.id, "cancelled")) {
     // Jalur lama (customer + admin) — perilaku tidak berubah untuk non-reseller.
     await Promise.allSettled([

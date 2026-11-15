@@ -9,6 +9,7 @@
  */
 
 import { MANUAL_SOURCE_KEYS, PROMO_FCH_SOURCE_KEY, RESELLER_SOURCE_KEY, orderSourceKey } from "@/lib/transaksi";
+import { isPreorderWaiting } from "@/lib/preorder";
 
 export type EditSourceGroup = "manual" | "website" | "open_order" | "promo_fch" | "reseller" | "unknown";
 
@@ -26,10 +27,15 @@ export type EditableOrder = {
   weight?: number | null;
   total?: number | null;
   paid_at?: string | null;
+  /** Penanda pre-order. PO yang menunggu stok boleh diedit walau stoknya belum dipotong. */
+  is_preorder?: boolean | null;
+  preorder_ready_at?: string | null;
 };
 
 export type EditGuard = {
   canEdit: boolean;
+  /** true = PO menunggu stok: edit lewat fungsi khusus PO (tanpa menyentuh stok). */
+  preorder?: boolean;
   sourceGroup: EditSourceGroup;
   /** Alasan singkat untuk UI; kosong kalau boleh diedit. */
   reason: string;
@@ -57,6 +63,30 @@ export function orderEditGuard(order?: EditableOrder | null): EditGuard {
   if (sourceGroup === "unknown") {
     return deny("Sumber pesanan tidak dikenali. Untuk koreksi gunakan batal atau retur.");
   }
+
+  // Pre-order yang masih menunggu stok: stoknya BELUM dipotong, jadi item boleh diubah selama barang
+  // belum ready. Hanya transaksi manual ops (PO tidak ada di website/reseller). Edit lewat
+  // `samaqu_edit_preorder_items` yang tidak menyentuh stok. Setelah ready, aturan reguler berlaku.
+  if (isPreorderWaiting(order)) {
+    if (sourceGroup !== "manual") return deny("Pre-order hanya untuk transaksi manual ops.");
+    if (order?.status !== "pending" && order?.status !== "diproses") {
+      return deny("Item hanya bisa diubah saat status Belum Bayar atau Lunas. Untuk koreksi gunakan batal.");
+    }
+    const shipping = String(order?.shipping_status || "").trim().toLowerCase();
+    if (shipping && shipping !== "menunggu_pickup") {
+      return deny("Item terkunci karena pengiriman sudah berjalan.");
+    }
+    return {
+      canEdit: true,
+      preorder: true,
+      sourceGroup,
+      reason: "",
+      warning: order?.paid_at
+        ? "Pre-order sudah lunas. Kalau total berubah, selisih harus diselesaikan manual (tagih atau kembalikan); sistem tidak menyesuaikan uang masuk."
+        : "",
+    };
+  }
+
   if (order?.stock_reserved !== true) {
     return deny("Item terkunci karena stok pesanan ini tidak dipotong sistem. Untuk koreksi gunakan batal atau retur.");
   }

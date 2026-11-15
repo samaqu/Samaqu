@@ -42,6 +42,8 @@ const STOCK_IN = "/api/ops/stock-in";
 const TRANSACTIONS = "/api/ops/transactions";
 /** Menu Transaksi: daftar per pesanan + pencatatan transaksi manual. */
 const TRANSAKSI = "/api/ops/transaksi";
+/** Menu Pre-Order: ringkasan antrean PO + aksi "stok sudah ready". */
+const PREORDER = "/api/ops/preorder";
 /** Retur & Tukar Size (tabel returns/return_items). */
 const RETURNS = "/api/ops/returns";
 /** Buku alamat pelanggan (tabel `saved_addresses` yang sama dengan checkout website). */
@@ -201,6 +203,49 @@ export const base44 = {
       },
     },
 
+    /** Menu Pre-Order: antrean PO yang menunggu stok dan tombol "stok sudah ready". */
+    Preorder: {
+      async summary() {
+        return call<{
+          waiting_count: number;
+          ready_now_count: number;
+          orders: Array<{
+            id: string;
+            order_number: string;
+            created_at: string;
+            customer_name: string;
+            preorder_estimate: string | null;
+            can_ready: boolean;
+            short: Array<{ key: string; need: number; have: number }>;
+          }>;
+          demand: Array<{
+            key: string;
+            product_id: string;
+            product_name: string;
+            series: string | null;
+            color: string;
+            size: string;
+            needed: number;
+            orders: number;
+            stock: number;
+          }>;
+        }>("GET", PREORDER);
+      },
+      /** Tandai satu PO "stok sudah ready" (potong stok, lalu ikut alur reguler). */
+      async ready(orderNumber: string) {
+        return call<{ ok: boolean; order_number: string }>("POST", PREORDER, { action: "ready", order_number: orderNumber });
+      },
+      /** Proses semua PO yang stoknya cukup, urut siapa transfer duluan; yang belum cukup dilewati. */
+      async readyAll() {
+        return call<{
+          ok: boolean;
+          readied: string[];
+          failed: Array<{ order_number: string; message: string }>;
+          skipped: Array<{ order_number: string; short: Array<{ key: string; need: number; have: number }> }>;
+        }>("POST", PREORDER, { action: "ready_all" });
+      },
+    },
+
     Transaction: {
       async list(sort?: string, opts: any = {}) {
         const params = new URLSearchParams({ sort: sortParam(sort), limit: String(opts?.limit ?? 2000) });
@@ -222,9 +267,12 @@ export const base44 = {
         return (json.items ?? [])[0] ?? null;
       },
 
-      /** Catat transaksi manual (langsung Lunas, stok langsung terpotong). */
+      /**
+       * Catat transaksi manual (langsung Lunas, stok langsung terpotong). Dengan `is_preorder: true`
+       * dicatat sebagai pre-order: stok TIDAK dipotong, wajib Lunas, dan estimasi (`preorder_estimate`).
+       */
       async createManual(data: any) {
-        return call<{ order_number: string; total: number }>("POST", TRANSAKSI, data);
+        return call<{ order_number: string; total: number; is_preorder?: boolean }>("POST", TRANSAKSI, data);
       },
 
       /** Simpan perubahan transaksi manual. */
@@ -233,10 +281,12 @@ export const base44 = {
       },
 
       /** Batalkan transaksi (stok dikembalikan lewat jalur pembatalan yang sama dengan admin). */
-      async cancel(orderNumber: string) {
+      async cancel(orderNumber: string, why?: { reason?: string; reason_note?: string }) {
+        // `why` wajib untuk pre-order (server menolak tanpa alasan); pesanan reguler mengabaikannya.
         return call<{ order_number: string; cancelled: boolean }>("PATCH", TRANSAKSI, {
           action: "cancel",
           order_number: orderNumber,
+          ...(why || {}),
         });
       },
 
@@ -264,8 +314,12 @@ export const base44 = {
        * Hapus transaksi manual (untuk membuang data uji). Server menolak kalau pesanan sudah
        * punya resi J&T atau kalau itu pesanan website, dan mengembalikan stok lebih dulu.
        */
-      async deleteOrder(orderNumber: string) {
-        return call<{ order_number: string; deleted: boolean }>("DELETE", TRANSAKSI, { order_number: orderNumber });
+      async deleteOrder(orderNumber: string, why?: { reason?: string; reason_note?: string }) {
+        // `why` wajib untuk pre-order (server menolak tanpa alasan); pesanan reguler mengabaikannya.
+        return call<{ order_number: string; deleted: boolean }>("DELETE", TRANSAKSI, {
+          order_number: orderNumber,
+          ...(why || {}),
+        });
       },
 
       /**
