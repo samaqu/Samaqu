@@ -128,26 +128,36 @@ type NavItem = { label: string; href: string; icon: IconName; soon?: boolean; ba
 
 const NAV: { section: string; items: NavItem[] }[] = [
   {
-    section: "Operasional",
+    section: "Ringkasan",
     items: [
       { label: "Beranda", href: "/panel-admin", icon: "home" },
       { label: "AI Performance", href: "/panel-admin/ai-performance", icon: "spark" },
+    ],
+  },
+  {
+    section: "Penjualan",
+    items: [
       { label: "Perlu Review", href: "/panel-admin/perlu-review", icon: "alert", badge: "drafts" },
       { label: "Transaksi", href: "/panel-admin/transaksi", icon: "card" },
       { label: "Pre-Order", href: "/panel-admin/preorder", icon: "box" },
-      { label: "Reseller", href: "/panel-admin/reseller", icon: "reseller", badge: "reseller" },
       { label: "Return", href: "/panel-admin/retur", icon: "return" },
+    ],
+  },
+  {
+    section: "Pelanggan & Promosi",
+    items: [
+      { label: "Leads", href: "/panel-admin/leads", icon: "users" },
+      { label: "Reseller", href: "/panel-admin/reseller", icon: "reseller", badge: "reseller" },
       { label: "Promo", href: "/panel-admin/promo", icon: "tag" },
       { label: "Ulasan Pelanggan", href: "/panel-admin/ulasan", icon: "star", badge: "reviews" },
     ],
   },
   {
-    section: "Katalog & Data",
+    section: "Produk & Stok",
     items: [
       { label: "Produk", href: "/panel-admin/produk", icon: "box" },
       { label: "Stok Opname", href: "/panel-admin/stok-opname", icon: "box" },
       { label: "Anomali Stok", href: "/panel-admin/anomali-stok", icon: "alert" },
-      { label: "Leads", href: "/panel-admin/leads", icon: "users" },
     ],
   },
   {
