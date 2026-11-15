@@ -48,7 +48,7 @@ const THEME_SWATCH_CLASS: Record<PanelTheme, string> = {
 };
 const themeLabel = (id: PanelTheme) => THEMES.find((option) => option.id === id)?.label ?? "Berry";
 
-type IconName = "home" | "card" | "box" | "users" | "spark" | "return" | "star" | "reseller" | "tag" | "alert";
+type IconName = "home" | "card" | "box" | "users" | "spark" | "return" | "star" | "reseller" | "tag" | "alert" | "clock" | "clipboard";
 
 function NavIcon({ name }: { name: IconName }) {
   switch (name) {
@@ -113,6 +113,21 @@ function NavIcon({ name }: { name: IconName }) {
           <path d="M12 3l2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />
         </svg>
       );
+    case "clock":
+      return (
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </svg>
+      );
+    case "clipboard":
+      return (
+        <svg viewBox="0 0 24 24">
+          <rect x="5" y="4" width="14" height="17" rx="2" />
+          <path d="M9 4.5h6v2.5H9z" />
+          <path d="M8.5 13l2.2 2.2L15.5 10.5" />
+        </svg>
+      );
     case "reseller":
       return (
         <svg viewBox="0 0 24 24">
@@ -139,7 +154,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
     items: [
       { label: "Perlu Review", href: "/panel-admin/perlu-review", icon: "alert", badge: "drafts" },
       { label: "Transaksi", href: "/panel-admin/transaksi", icon: "card" },
-      { label: "Pre-Order", href: "/panel-admin/preorder", icon: "box" },
+      { label: "Pre-Order", href: "/panel-admin/preorder", icon: "clock" },
       { label: "Return", href: "/panel-admin/retur", icon: "return" },
     ],
   },
@@ -156,7 +171,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
     section: "Produk & Stok",
     items: [
       { label: "Produk", href: "/panel-admin/produk", icon: "box" },
-      { label: "Stok Opname", href: "/panel-admin/stok-opname", icon: "box" },
+      { label: "Stok Opname", href: "/panel-admin/stok-opname", icon: "clipboard" },
       { label: "Anomali Stok", href: "/panel-admin/anomali-stok", icon: "alert" },
     ],
   },
