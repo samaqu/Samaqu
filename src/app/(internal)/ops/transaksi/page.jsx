@@ -504,6 +504,12 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
             {(poSummary?.demand || []).length > 0 ? (
               <div className="card tw" data-testid="preorder-demand" style={{ marginBottom: 12 }}>
                 <table>
+                  <colgroup>
+                    <col style={{ width: "58%" }} />
+                    <col style={{ width: "14%" }} />
+                    <col style={{ width: "14%" }} />
+                    <col style={{ width: "14%" }} />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th>Kebutuhan barang (PO menunggu)</th>
@@ -712,13 +718,29 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
             <table>
               {/* Lebar kolom dipatok di sini (`table-layout: fixed`) supaya semua tab tampil sama. */}
               <colgroup>
-                <col style={{ width: "16%" }} />
-                <col style={{ width: "20%" }} />
-                <col style={{ width: "24%" }} />
-                <col style={{ width: "11%" }} />
-                <col style={{ width: "13%" }} />
-                <col style={{ width: "12%" }} />
-                <col style={{ width: "4%" }} />
+                {/* Menu Pre-Order: kolom Resi dan Status sedikit lebih lebar (ada "Menunggu stok" dan
+                    tombol "Stok ready") supaya tabel tetap muat tanpa scroll mendatar. */}
+                {isPoPage ? (
+                  <>
+                    <col style={{ width: "16%" }} />
+                    <col style={{ width: "17%" }} />
+                    <col style={{ width: "21%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "14%" }} />
+                    <col style={{ width: "17%" }} />
+                    <col style={{ width: "4%" }} />
+                  </>
+                ) : (
+                  <>
+                    <col style={{ width: "16%" }} />
+                    <col style={{ width: "20%" }} />
+                    <col style={{ width: "24%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "13%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "4%" }} />
+                  </>
+                )}
               </colgroup>
               <thead>
                 <tr>
@@ -740,10 +762,12 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
                     <tr key={order.id} onClick={() => setDetail(order)}>
                       <td data-label="No. Pesanan">
                         <span className="id">{order.order_number}</span>
+                        {/* Lencana di BARISNYA SENDIRI: kolom ini dipaksa satu baris, jadi lencana di samping
+                            nomor pesanan melebarkan kolom dan memunculkan scroll mendatar. */}
                         {order.is_preorder ? (
                           <em
                             data-testid="po-badge"
-                            style={{ marginLeft: 6, fontStyle: "normal", fontSize: 10, fontWeight: 800, color: "#7e22ce", background: "#f3e8ff", borderRadius: 6, padding: "1px 6px" }}
+                            style={{ display: "block", width: "fit-content", marginTop: 2, fontStyle: "normal", fontSize: 10, fontWeight: 800, color: "#7e22ce", background: "#f3e8ff", borderRadius: 6, padding: "1px 6px" }}
                           >
                             PRE-ORDER
                           </em>
@@ -804,7 +828,7 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
                             type="button"
                             className="btn-sec"
                             data-testid="po-ready"
-                            style={{ marginTop: 6, padding: "2px 8px", fontSize: 11 }}
+                            style={{ display: "block", marginTop: 6, padding: "3px 10px", fontSize: 11, lineHeight: 1.2, whiteSpace: "normal" }}
                             disabled={readyMutation.isPending || poReadyByNumber.get(order.order_number)?.can_ready === false}
                             title={
                               poReadyByNumber.get(order.order_number)?.can_ready === false
@@ -816,7 +840,7 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
                               readyMutation.mutate(order);
                             }}
                           >
-                            Stok sudah ready
+                            Stok ready
                           </button>
                         ) : null}
                       </td>
