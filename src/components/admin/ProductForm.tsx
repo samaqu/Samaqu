@@ -2111,11 +2111,12 @@ export default function TambahProdukPage({
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-5 lg:px-8 py-6 lg:py-8 pb-28">
+      <main className={`max-w-6xl mx-auto px-5 lg:px-8 py-6 lg:py-8 ${isOps ? "pb-6" : "pb-28"}`}>
         {/* Kolom kiri `minmax(0,1fr)` supaya tabel ukuran boleh menyusut dan tidak pernah
             mendorong kolom preview keluar layar. Preview tampil mulai 1440px — di bawah itu
-            form pakai lebar penuh supaya isinya tidak terpotong. */}
-        <div className="grid grid-cols-1 min-[1440px]:grid-cols-[minmax(0,1fr)_320px] gap-6 lg:gap-8 items-start">
+            form pakai lebar penuh supaya isinya tidak terpotong. Mode ops tidak punya
+            kolom preview, jadi grid dua kolomnya tidak dipakai (dulu menyisakan ruang kosong 320px). */}
+        <div className={`grid grid-cols-1 ${isOps ? "" : "min-[1440px]:grid-cols-[minmax(0,1fr)_320px]"} gap-6 lg:gap-8 items-start`}>
 
           {/* Left: Form */}
           <div className="space-y-6">
@@ -2128,277 +2129,323 @@ export default function TambahProdukPage({
                   <p className="pf-sub">Nama, kategori, harga, dan atribut utama produk.</p>
                 </div>
               </div>
-              <div className="space-y-4">
-                {/* Baris 1: Nama + Kategori (2 kolom) */}
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="pf-label">Nama Produk <span className="pf-req">*</span></label>
-                    <input value={name} onChange={(e) => handleNameChange(e.target.value)} className={`pf-input${errors.name ? " invalid" : ""}`} placeholder="Contoh: Thobe Jiharkah Premium" />
-                    {errors.name && <p className="pf-error">{errors.name}</p>}
+              <div>
+                <div className="pf-groups">
+                <section className="pf-group" aria-labelledby="pf-g-identitas">
+                  <div className="pf-group-head">
+                    <h3 id="pf-g-identitas" className="pf-group-title">Identitas Produk</h3>
+                    <p className="pf-group-sub">Nama, kategori, kain, dan series yang menentukan jenis produk ini.</p>
                   </div>
-                  <div>
-                    <label className="pf-label">Kategori <span className="pf-req">*</span></label>
-                    <div className="pf-selectwrap">
-                      <select value={category} onChange={(e) => {
-                        const val = e.target.value;
-                        const toPaket = isPaketKategori(val);
-                        // Ganti mode varian (pakaian ↔ paket, atau antar kategori paket) hanya
-                        // setelah dikonfirmasi kalau sudah ada isian — supaya varian yang sudah
-                        // diisi tidak hilang diam-diam.
-                        const paketCategoryChanged = toPaket && isPaket && val !== category;
-                        const variantModeChanged = toPaket !== isPaket || paketCategoryChanged;
-                        if (variantModeChanged && variantDataFilled) {
-                          const pesan = "Varian yang sudah diisi akan diganti mengikuti kategori baru. Lanjut?";
-                          if (!window.confirm(pesan)) return;
-                        }
-                        if (variantModeChanged) setVariants(toPaket ? [emptyPaketVariant()] : []);
-                        setCategory(val);
-                        if (val !== "Thobe") setSeries("");
-                        if (val !== "Thobe" && val !== "Kandora") setSelectedJenisKainId("");
-                      }} className={`pf-select${errors.category ? " invalid" : ""}`}>
-                        <option value="">Pilih kategori</option>
-                        {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                      <ChevronDown size={14} className="pf-selectico" />
-                    </div>
-                    {errors.category && <p className="pf-error">{errors.category}</p>}
-                  </div>
-                </div>
-                {/* Baris 2: Slug + SKU (2 kolom) */}
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="pf-label">Slug</label>
-                    <input value={slug} onChange={(e) => setSlug(e.target.value)} className="pf-input" placeholder="thobe-jiharkah-premium" />
-                    <p className="pf-hint">URL: /katalog/{slug || "..."}</p>
-                  </div>
-                  <div>
-                    <label className="pf-label">SKU Produk {isOps && <span className="pf-req">*</span>}</label>
-                    <input
-                      value={sku || autoBaseSku}
-                      onChange={(e) => setSku(e.target.value)}
-                      onFocus={(e) => e.currentTarget.select()}
-                      className={`pf-input${errors.sku ? " invalid" : ""}`}
-                      placeholder={autoBaseSku || "SMQ-THB-JHK"}
-                    />
-                    {errors.sku && <p className="pf-error">{errors.sku}</p>}
-                    <p className="pf-hint">
-                      SKU dasar tanpa ukuran.{" "}
-                      {category === "Thobe"
-                        ? "Kode series ditambahkan otomatis di SKU tiap series."
-                        : isPaket
-                          ? "Kode varian ditambahkan otomatis di SKU tiap varian."
-                          : "Ukuran ditambahkan otomatis di SKU varian."}{" "}
-                      Kosongkan untuk memakai otomatis.
-                    </p>
-                  </div>
-                </div>
-                {isOps && (() => {
-                  const refPrice = category === "Thobe" && activeSeriesTab && seriesBlocks[activeSeriesTab]
-                    ? parseInt(seriesBlocks[activeSeriesTab].price) || 0
-                    : parseInt(basePrice) || 0;
-                  // Thobe multi-series: HPP diisi per series di blok "[Series] — Harga" (dekat Harga Dasar),
-                  // jadi kotak ini tidak menampilkan HPP/margin lagi. Selain itu: satu HPP produk di sini.
-                  const hppPerSeries = category === "Thobe" && !!activeSeriesTab && !!seriesBlocks[activeSeriesTab];
-                  const hppNum = parseInt(hpp) || 0;
-                  const profit = refPrice - hppNum;
-                  const margin = refPrice > 0 ? Math.round((profit / refPrice) * 100) : 0;
-                  return (
-                    <div className="pf-panel">
-                      <p className="text-sm font-semibold mb-3" style={{ color: "var(--espresso)" }}>Data Internal (Ops)</p>
-                      <div className="grid sm:grid-cols-2 gap-4">
-                        {!hppPerSeries && (
-                        <div>
-                          <label className="pf-label">HPP per Unit (Rp)</label>
-                          <input type="text" inputMode="numeric" value={formatRupiah(hpp)} onChange={(e) => setHpp(parseRupiah(e.target.value))} className="pf-input" placeholder="150.000" />
-                          <p className="pf-hint">Modal per unit — dipakai laporan margin.</p>
-                        </div>
-                        )}
-                        <div>
-                          <label className="pf-label">Tipe Produk</label>
-                          <div className="flex gap-2">
-                            <button type="button" onClick={() => setProductType("normal")} className={`pf-chip${productType === "normal" ? " active" : ""}`}>Normal</button>
-                            <button type="button" onClick={() => setProductType("free_gift")} className={`pf-chip${productType === "free_gift" ? " active" : ""}`}>Free Gift</button>
-                          </div>
-                        </div>
+                  <div className="pf-group-body space-y-5">
+                    {/* Baris 1: Nama + Kategori (2 kolom) */}
+                    <div className="grid sm:grid-cols-2 gap-x-5 gap-y-4">
+                      <div>
+                        <label className="pf-label">Nama Produk <span className="pf-req">*</span></label>
+                        <input value={name} onChange={(e) => handleNameChange(e.target.value)} className={`pf-input${errors.name ? " invalid" : ""}`} placeholder="Contoh: Thobe Jiharkah Premium" />
+                        {errors.name && <p className="pf-error">{errors.name}</p>}
                       </div>
-                      {!hppPerSeries && (
-                        <p className="pf-hint mt-3">Margin otomatis: <b>{refPrice > 0 ? `${margin}%` : "—"}</b> · profit/unit {refPrice > 0 ? `Rp ${formatRupiah(String(profit))}` : "—"}</p>
+                      <div>
+                        <label className="pf-label">Kategori <span className="pf-req">*</span></label>
+                        <div className="pf-selectwrap">
+                          <select value={category} onChange={(e) => {
+                            const val = e.target.value;
+                            const toPaket = isPaketKategori(val);
+                            // Ganti mode varian (pakaian ↔ paket, atau antar kategori paket) hanya
+                            // setelah dikonfirmasi kalau sudah ada isian — supaya varian yang sudah
+                            // diisi tidak hilang diam-diam.
+                            const paketCategoryChanged = toPaket && isPaket && val !== category;
+                            const variantModeChanged = toPaket !== isPaket || paketCategoryChanged;
+                            if (variantModeChanged && variantDataFilled) {
+                              const pesan = "Varian yang sudah diisi akan diganti mengikuti kategori baru. Lanjut?";
+                              if (!window.confirm(pesan)) return;
+                            }
+                            if (variantModeChanged) setVariants(toPaket ? [emptyPaketVariant()] : []);
+                            setCategory(val);
+                            if (val !== "Thobe") setSeries("");
+                            if (val !== "Thobe" && val !== "Kandora") setSelectedJenisKainId("");
+                          }} className={`pf-select${errors.category ? " invalid" : ""}`}>
+                            <option value="">Pilih kategori</option>
+                            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                          <ChevronDown size={14} className="pf-selectico" />
+                        </div>
+                        {errors.category && <p className="pf-error">{errors.category}</p>}
+                      </div>
+                    </div>
+                    {(category === "Thobe" || category === "Kandora") && (
+                    <div>
+                      <label className="pf-label">Jenis Kain</label>
+                      <div className="flex flex-wrap gap-2">
+                        <div className="pf-selectwrap flex-1 min-w-[11rem]">
+                          <select value={selectedJenisKainId} onChange={(e) => setSelectedJenisKainId(e.target.value)} className={`pf-select${errors.jenisKain ? " invalid" : ""}`}>
+                            <option value="">Pilih Jenis Kain</option>
+                            {jenisKainList.map((jk) => <option key={jk.id} value={jk.id}>{jk.name}</option>)}
+                          </select>
+                          <ChevronDown size={14} className="pf-selectico" />
+                        </div>
+                        <button type="button" onClick={() => setShowNewKainForm(!showNewKainForm)} className="pf-btn pf-btn-outline shrink-0">
+                          <Plus size={13} /> Baru
+                        </button>
+                        {selectedJenisKainId && (
+                          <button type="button" onClick={async () => {
+                            const jk = jenisKainList.find((j) => j.id === selectedJenisKainId);
+                            if (!confirm(`Hapus jenis kain "${jk?.name}" dari database?`)) return;
+                            await supabase.from("jenis_kain").delete().eq("id", selectedJenisKainId);
+                            setJenisKainList((prev) => prev.filter((j) => j.id !== selectedJenisKainId));
+                            setSelectedJenisKainId("");
+                          }} className="pf-btn pf-btn-danger shrink-0">
+                            Hapus
+                          </button>
+                        )}
+                      </div>
+                      {errors.jenisKain && <p className="pf-error">{errors.jenisKain}</p>}
+                      {showNewKainForm && (
+                        <div className="mt-3">
+                          <JenisKainForm
+                            onSave={(newKain) => {
+                              setJenisKainList((prev) => [...prev, { id: newKain.id, name: newKain.name }]);
+                              setSelectedJenisKainId(newKain.id);
+                              setShowNewKainForm(false);
+                            }}
+                            onCancel={() => setShowNewKainForm(false)}
+                          />
+                        </div>
                       )}
                     </div>
-                  );
-                })()}
-                {/* Baris 3: Deskripsi */}
-                <div>
-                  <label className="pf-label">Deskripsi</label>
-                  <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="pf-textarea" placeholder="Deskripsi produk..." />
-                </div>
-                {/* Baris 4: Harga Dasar (non-Thobe).
-                    Berat TIDAK diisi di sini lagi — berat per ukuran ada di blok ukuran
-                    (itulah yang dipakai menghitung ongkir J&T). */}
-                {category !== "Thobe" && !cypEnabled && (
-                  <div>
-                    <label className="pf-label">Harga Dasar (Rp) <span className="pf-req">*</span></label>
-                    <input type="text" inputMode="numeric" value={formatRupiah(basePrice)} onChange={(e) => setBasePrice(parseRupiah(e.target.value))} className={`pf-input${errors.basePrice ? " invalid" : ""}`} placeholder="389.000" />
-                    <p className="pf-hint">Harga terendah / yang tampil di katalog. Angka saja, contoh 249000.</p>
-                    {errors.basePrice && <p className="pf-error">{errors.basePrice}</p>}
-                  </div>
-                )}
-                {/* Badge Katalog */}
-                <div>
-                  <label className="pf-label">Badge Katalog (opsional)</label>
-                  <div className="pf-selectwrap">
-                    <select value={badgeType} onChange={(e) => setBadgeType(e.target.value)} className="pf-select">
-                      <option value="">Tanpa Badge</option>
-                      <option value="terlaris">Terlaris</option>
-                      <option value="rekomendasi">Rekomendasi</option>
-                      <option value="new">New</option>
-                    </select>
-                    <ChevronDown size={14} className="pf-selectico" />
-                  </div>
-                  <p className="pf-hint">Badge yang tampil di pojok kanan atas foto card katalog.</p>
-                </div>
-                {/* Open Order — produk ikut tampil di katalog /open-order (menu Open Order). */}
-                <div className={`pf-panel${openOrderEnabled ? " accent" : " flat"}`}>
-                  <div className="flex items-center justify-between gap-3">
+                    )}
+                    {category === "Thobe" && (
                     <div>
-                      <p className="text-sm font-medium" style={{ color: "var(--espresso)" }}>Tampilkan di Open Order</p>
-                      <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Produk ini muncul di katalog halaman /open-order.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setOpenOrderEnabled((v) => !v)}
-                      aria-pressed={openOrderEnabled}
-                      aria-label="Tampilkan produk ini di menu Open Order"
-                      className="pf-toggle"
-                      style={{ background: openOrderEnabled ? "var(--gold)" : "#d4d4d8" }}
-                    >
-                      <span className="pf-toggle-knob" style={{ transform: openOrderEnabled ? "translateX(20px)" : "translateX(0)" }} />
-                    </button>
-                  </div>
-                </div>
-                {/* Create Your Price Toggle — hidden untuk Thobe (CYP per-series) */}
-                {category !== "Thobe" && (
-                <div className={`pf-panel${cypEnabled ? " accent" : " flat"}`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-sm font-medium" style={{ color: "var(--espresso)" }}>Create Your Price</p>
-                      <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Customer bisa tentukan harga sendiri (minimal = Harga Minimum)</p>
-                    </div>
-                    <button type="button" onClick={toggleCyp} className="pf-toggle" style={{ background: cypEnabled ? "var(--gold)" : "#d4d4d8" }}>
-                      <span className="pf-toggle-knob" style={{ transform: cypEnabled ? "translateX(20px)" : "translateX(0)" }} />
-                    </button>
-                  </div>
-                  {cypEnabled && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="pf-label">Harga Minimum (Rp) <span className="pf-req">*</span></label>
-                        <input type="text" inputMode="numeric" value={formatRupiah(minimumPrice)} onChange={(e) => setMinimumPrice(parseRupiah(e.target.value))} className={`pf-input${errors.minimumPrice ? " invalid" : ""}`} placeholder="350.000" />
-                        {errors.minimumPrice && <p className="pf-error">{errors.minimumPrice}</p>}
-                        <p className="pf-hint">Harga terendah yang bisa dipilih customer.</p>
-                      </div>
-                      <div>
-                        <label className="pf-label">Harga Rekomendasi (Rp)</label>
-                        <input type="text" inputMode="numeric" value={formatRupiah(recommendedPrice)} onChange={(e) => setRecommendedPrice(parseRupiah(e.target.value))} className={`pf-input${errors.recommendedPrice ? " invalid" : ""}`} placeholder={basePrice ? formatRupiah(String((parseInt(basePrice) || 0) + 30000)) : "379.000"} />
-                        {errors.recommendedPrice && <p className="pf-error">{errors.recommendedPrice}</p>}
-                        <p className="pf-hint">Kosongkan = otomatis Harga Dasar + Rp 30.000 ({basePrice ? `Rp ${formatRupiah(String((parseInt(basePrice) || 0) + 30000))}` : "—"}).</p>
-                      </div>
-                      <div className="pf-panel">
-                        <div className="flex items-center justify-between gap-3 mb-2">
-                          <div>
-                            <p className="text-sm font-medium" style={{ color: "var(--espresso)" }}>Microcopy CYP (khusus produk ini)</p>
-                            <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Teks kecil di bawah opsi harga pada halaman produk.</p>
-                          </div>
-                          <button type="button" onClick={() => setUseCustomCypMicrocopy((v) => !v)} className="pf-toggle" style={{ background: useCustomCypMicrocopy ? "var(--gold)" : "#d4d4d8" }}>
-                            <span className="pf-toggle-knob" style={{ transform: useCustomCypMicrocopy ? "translateX(20px)" : "translateX(0)" }} />
+                      <label className="pf-label">Series <span className="pf-req">*</span></label>
+                      {errors.series && <p className="pf-error mb-2">{errors.series}</p>}
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {seriesList.map((s) => (
+                          <button key={s} type="button" onClick={() => toggleSeries(s)} className={`pf-chip${selectedSeries.includes(s) ? " active" : ""}`}>
+                            {selectedSeries.includes(s) && <Check size={12} />}
+                            {s}
                           </button>
-                        </div>
-                        {useCustomCypMicrocopy ? (
-                          <>
-                            <textarea value={cypMicrocopyOverride} onChange={(e) => setCypMicrocopyOverride(e.target.value.slice(0, 120))} rows={2} maxLength={120} placeholder="Tulis teks khusus produk ini..." className="pf-textarea" />
-                            <p className="pf-hint text-right" style={{ color: cypMicrocopyOverride.length >= 120 ? "#dc2626" : "var(--text-muted)" }}>{cypMicrocopyOverride.length}/120</p>
-                          </>
-                        ) : (
-                          <p className="text-[12px] leading-relaxed px-3 py-2.5 rounded-xl" style={{ background: "#fafafa", color: "var(--text-muted)", fontStyle: "italic" }}>
-                            {storeSettings.cyp_microcopy || "Harga Minimum boleh dipilih. Itulah alasan kami membuat Create Your Price."}
-                          </p>
-                        )}
+                        ))}
+                        <button type="button" onClick={() => setShowNewSeries(!showNewSeries)} className="pf-chip shrink-0" style={{ borderStyle: "dashed", borderColor: "#d4d4d8", color: "var(--gold-deep)" }}>
+                          <Plus size={13} /> Baru
+                        </button>
                       </div>
+                      {showNewSeries && (
+                        <div className="mb-3 flex gap-2">
+                          <input
+                            value={newSeriesName}
+                            onChange={(e) => setNewSeriesName(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addNewSeries(); } }}
+                            placeholder="Nama series baru…"
+                            autoFocus
+                            className="pf-input flex-1"
+                          />
+                          <button type="button" onClick={addNewSeries} className="pf-btn pf-btn-primary shrink-0">Tambah</button>
+                        </div>
+                      )}
+                      <p className="pf-hint">Centang series yang tersedia untuk produk ini. Setiap series akan jadi baris produk terpisah di database.</p>
                     </div>
-                  )}
-                </div>
-                )}
-                {(category === "Thobe" || category === "Kandora") && (
-                <div>
-                  <label className="pf-label">Jenis Kain</label>
-                  <div className="flex gap-2">
-                    <div className="pf-selectwrap flex-1">
-                      <select value={selectedJenisKainId} onChange={(e) => setSelectedJenisKainId(e.target.value)} className={`pf-select${errors.jenisKain ? " invalid" : ""}`}>
-                        <option value="">Pilih Jenis Kain</option>
-                        {jenisKainList.map((jk) => <option key={jk.id} value={jk.id}>{jk.name}</option>)}
-                      </select>
-                      <ChevronDown size={14} className="pf-selectico" />
-                    </div>
-                    <button type="button" onClick={() => setShowNewKainForm(!showNewKainForm)} className="pf-btn pf-btn-outline shrink-0">
-                      <Plus size={13} /> Baru
-                    </button>
-                    {selectedJenisKainId && (
-                      <button type="button" onClick={async () => {
-                        const jk = jenisKainList.find((j) => j.id === selectedJenisKainId);
-                        if (!confirm(`Hapus jenis kain "${jk?.name}" dari database?`)) return;
-                        await supabase.from("jenis_kain").delete().eq("id", selectedJenisKainId);
-                        setJenisKainList((prev) => prev.filter((j) => j.id !== selectedJenisKainId));
-                        setSelectedJenisKainId("");
-                      }} className="pf-btn pf-btn-danger shrink-0">
-                        Hapus
-                      </button>
                     )}
                   </div>
-                  {errors.jenisKain && <p className="pf-error">{errors.jenisKain}</p>}
-                  {showNewKainForm && (
-                    <div className="mt-3">
-                      <JenisKainForm
-                        onSave={(newKain) => {
-                          setJenisKainList((prev) => [...prev, { id: newKain.id, name: newKain.name }]);
-                          setSelectedJenisKainId(newKain.id);
-                          setShowNewKainForm(false);
-                        }}
-                        onCancel={() => setShowNewKainForm(false)}
-                      />
-                    </div>
-                  )}
-                </div>
-                )}
-                {category === "Thobe" && (
-                <div>
-                  <label className="pf-label">Series <span className="pf-req">*</span></label>
-                  {errors.series && <p className="pf-error mb-2">{errors.series}</p>}
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {seriesList.map((s) => (
-                      <button key={s} type="button" onClick={() => toggleSeries(s)} className={`pf-chip${selectedSeries.includes(s) ? " active" : ""}`}>
-                        {selectedSeries.includes(s) && <Check size={12} />}
-                        {s}
-                      </button>
-                    ))}
-                    <button type="button" onClick={() => setShowNewSeries(!showNewSeries)} className="pf-chip shrink-0" style={{ borderStyle: "dashed", borderColor: "#d4d4d8", color: "var(--gold-deep)" }}>
-                      <Plus size={13} /> Baru
-                    </button>
+                </section>
+                <section className="pf-group" aria-labelledby="pf-g-kode">
+                  <div className="pf-group-head">
+                    <h3 id="pf-g-kode" className="pf-group-title">Kode &amp; URL</h3>
+                    <p className="pf-group-sub">Alamat halaman produk dan kode stok (SKU). Terisi otomatis dari nama dan kategori; boleh diubah.</p>
                   </div>
-                  {showNewSeries && (
-                    <div className="mb-3 flex gap-2">
-                      <input
-                        value={newSeriesName}
-                        onChange={(e) => setNewSeriesName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addNewSeries(); } }}
-                        placeholder="Nama series baru…"
-                        autoFocus
-                        className="pf-input flex-1"
-                      />
-                      <button type="button" onClick={addNewSeries} className="pf-btn pf-btn-primary shrink-0">Tambah</button>
+                  <div className="pf-group-body space-y-5">
+                    {/* Baris 2: Slug + SKU (2 kolom) */}
+                    <div className="grid sm:grid-cols-2 gap-x-5 gap-y-4">
+                      <div>
+                        <label className="pf-label">Slug</label>
+                        <input value={slug} onChange={(e) => setSlug(e.target.value)} className="pf-input" placeholder="thobe-jiharkah-premium" />
+                        <p className="pf-hint">URL: /katalog/{slug || "..."}</p>
+                      </div>
+                      <div>
+                        <label className="pf-label">SKU Produk {isOps && <span className="pf-req">*</span>}</label>
+                        <input
+                          value={sku || autoBaseSku}
+                          onChange={(e) => setSku(e.target.value)}
+                          onFocus={(e) => e.currentTarget.select()}
+                          className={`pf-input${errors.sku ? " invalid" : ""}`}
+                          placeholder={autoBaseSku || "SMQ-THB-JHK"}
+                        />
+                        {errors.sku && <p className="pf-error">{errors.sku}</p>}
+                        <p className="pf-hint">
+                          SKU dasar tanpa ukuran.{" "}
+                          {category === "Thobe"
+                            ? "Kode series ditambahkan otomatis di SKU tiap series."
+                            : isPaket
+                              ? "Kode varian ditambahkan otomatis di SKU tiap varian."
+                              : "Ukuran ditambahkan otomatis di SKU varian."}{" "}
+                          Kosongkan untuk memakai otomatis.
+                        </p>
+                      </div>
                     </div>
-                  )}
-                  <p className="pf-hint">Centang series yang tersedia untuk produk ini. Setiap series akan jadi baris produk terpisah di database.</p>
-                </div>
+                  </div>
+                </section>
+                {(category !== "Thobe" || isOps) && (
+                    <section className="pf-group" aria-labelledby="pf-g-harga">
+                      <div className="pf-group-head">
+                        <h3 id="pf-g-harga" className="pf-group-title">Harga</h3>
+                        <p className="pf-group-sub">Harga jual dan data modal produk.</p>
+                      </div>
+                      <div className="pf-group-body space-y-5">
+                        {category === "Thobe" && (
+                          <p className="pf-hint">Harga jual Thobe diisi per series di bagian &quot;Series &amp; Harga&quot; di bawah.</p>
+                        )}
+                        {/* Baris 4: Harga Dasar (non-Thobe).
+                            Berat TIDAK diisi di sini lagi — berat per ukuran ada di blok ukuran
+                            (itulah yang dipakai menghitung ongkir J&T). */}
+                        {category !== "Thobe" && !cypEnabled && (
+                          <div className="grid sm:grid-cols-2 gap-x-5 gap-y-4">
+                          <div>
+                            <label className="pf-label">Harga Dasar (Rp) <span className="pf-req">*</span></label>
+                            <input type="text" inputMode="numeric" value={formatRupiah(basePrice)} onChange={(e) => setBasePrice(parseRupiah(e.target.value))} className={`pf-input${errors.basePrice ? " invalid" : ""}`} placeholder="389.000" />
+                            <p className="pf-hint">Harga terendah / yang tampil di katalog. Angka saja, contoh 249000.</p>
+                            {errors.basePrice && <p className="pf-error">{errors.basePrice}</p>}
+                          </div>
+                          </div>
+                        )}
+                        {isOps && (() => {
+                          const refPrice = category === "Thobe" && activeSeriesTab && seriesBlocks[activeSeriesTab]
+                            ? parseInt(seriesBlocks[activeSeriesTab].price) || 0
+                            : parseInt(basePrice) || 0;
+                          // Thobe multi-series: HPP diisi per series di blok "[Series] — Harga" (dekat Harga Dasar),
+                          // jadi kotak ini tidak menampilkan HPP/margin lagi. Selain itu: satu HPP produk di sini.
+                          const hppPerSeries = category === "Thobe" && !!activeSeriesTab && !!seriesBlocks[activeSeriesTab];
+                          const hppNum = parseInt(hpp) || 0;
+                          const profit = refPrice - hppNum;
+                          const margin = refPrice > 0 ? Math.round((profit / refPrice) * 100) : 0;
+                          return (
+                            <div className="pf-panel">
+                              <div className="pf-panel-head">
+                                <p className="pf-panel-title">Data Internal (Ops)</p>
+                                <p className="pf-panel-sub">Dipakai laporan margin internal, tidak tampil ke pembeli.</p>
+                              </div>
+                              <div className="grid sm:grid-cols-2 gap-x-5 gap-y-4">
+                                {!hppPerSeries && (
+                                <div>
+                                  <label className="pf-label">HPP per Unit (Rp)</label>
+                                  <input type="text" inputMode="numeric" value={formatRupiah(hpp)} onChange={(e) => setHpp(parseRupiah(e.target.value))} className="pf-input" placeholder="150.000" />
+                                  <p className="pf-hint">Modal per unit — dipakai laporan margin.</p>
+                                </div>
+                                )}
+                                <div>
+                                  <label className="pf-label">Tipe Produk</label>
+                                  <div className="flex gap-2">
+                                    <button type="button" onClick={() => setProductType("normal")} className={`pf-chip${productType === "normal" ? " active" : ""}`}>Normal</button>
+                                    <button type="button" onClick={() => setProductType("free_gift")} className={`pf-chip${productType === "free_gift" ? " active" : ""}`}>Free Gift</button>
+                                  </div>
+                                </div>
+                              </div>
+                              {!hppPerSeries && (
+                                <p className="pf-hint mt-3">Margin otomatis: <b>{refPrice > 0 ? `${margin}%` : "—"}</b> · profit/unit {refPrice > 0 ? `Rp ${formatRupiah(String(profit))}` : "—"}</p>
+                              )}
+                            </div>
+                          );
+                        })()}
+                        {/* Create Your Price Toggle — hidden untuk Thobe (CYP per-series) */}
+                        {category !== "Thobe" && (
+                        <div className={`pf-panel${cypEnabled ? " accent" : " flat"}`}>
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <p className="text-sm font-medium" style={{ color: "var(--espresso)" }}>Create Your Price</p>
+                              <p className="text-xs" style={{ color: "var(--text-muted)" }}>Customer bisa tentukan harga sendiri (minimal = Harga Minimum)</p>
+                            </div>
+                            <button type="button" onClick={toggleCyp} className="pf-toggle" style={{ background: cypEnabled ? "var(--gold)" : "#d4d4d8" }}>
+                              <span className="pf-toggle-knob" style={{ transform: cypEnabled ? "translateX(20px)" : "translateX(0)" }} />
+                            </button>
+                          </div>
+                          {cypEnabled && (
+                            <div className="space-y-3">
+                              <div>
+                                <label className="pf-label">Harga Minimum (Rp) <span className="pf-req">*</span></label>
+                                <input type="text" inputMode="numeric" value={formatRupiah(minimumPrice)} onChange={(e) => setMinimumPrice(parseRupiah(e.target.value))} className={`pf-input${errors.minimumPrice ? " invalid" : ""}`} placeholder="350.000" />
+                                {errors.minimumPrice && <p className="pf-error">{errors.minimumPrice}</p>}
+                                <p className="pf-hint">Harga terendah yang bisa dipilih customer.</p>
+                              </div>
+                              <div>
+                                <label className="pf-label">Harga Rekomendasi (Rp)</label>
+                                <input type="text" inputMode="numeric" value={formatRupiah(recommendedPrice)} onChange={(e) => setRecommendedPrice(parseRupiah(e.target.value))} className={`pf-input${errors.recommendedPrice ? " invalid" : ""}`} placeholder={basePrice ? formatRupiah(String((parseInt(basePrice) || 0) + 30000)) : "379.000"} />
+                                {errors.recommendedPrice && <p className="pf-error">{errors.recommendedPrice}</p>}
+                                <p className="pf-hint">Kosongkan = otomatis Harga Dasar + Rp 30.000 ({basePrice ? `Rp ${formatRupiah(String((parseInt(basePrice) || 0) + 30000))}` : "—"}).</p>
+                              </div>
+                              <div className="pf-panel">
+                                <div className="flex items-center justify-between gap-3 mb-2">
+                                  <div>
+                                    <p className="text-sm font-medium" style={{ color: "var(--espresso)" }}>Microcopy CYP (khusus produk ini)</p>
+                                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>Teks kecil di bawah opsi harga pada halaman produk.</p>
+                                  </div>
+                                  <button type="button" onClick={() => setUseCustomCypMicrocopy((v) => !v)} className="pf-toggle" style={{ background: useCustomCypMicrocopy ? "var(--gold)" : "#d4d4d8" }}>
+                                    <span className="pf-toggle-knob" style={{ transform: useCustomCypMicrocopy ? "translateX(20px)" : "translateX(0)" }} />
+                                  </button>
+                                </div>
+                                {useCustomCypMicrocopy ? (
+                                  <>
+                                    <textarea value={cypMicrocopyOverride} onChange={(e) => setCypMicrocopyOverride(e.target.value.slice(0, 120))} rows={2} maxLength={120} placeholder="Tulis teks khusus produk ini..." className="pf-textarea" />
+                                    <p className="pf-hint text-right" style={{ color: cypMicrocopyOverride.length >= 120 ? "#dc2626" : "var(--text-muted)" }}>{cypMicrocopyOverride.length}/120</p>
+                                  </>
+                                ) : (
+                                  <p className="text-[12px] leading-relaxed px-3 py-2.5 rounded-xl" style={{ background: "#fafafa", color: "var(--text-muted)", fontStyle: "italic" }}>
+                                    {storeSettings.cyp_microcopy || "Harga Minimum boleh dipilih. Itulah alasan kami membuat Create Your Price."}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        )}
+                      </div>
+                    </section>
                 )}
+                <section className="pf-group" aria-labelledby="pf-g-katalog">
+                  <div className="pf-group-head">
+                    <h3 id="pf-g-katalog" className="pf-group-title">Tampilan Katalog</h3>
+                    <p className="pf-group-sub">Deskripsi, badge, dan apakah produk ikut tampil di Open Order.</p>
+                  </div>
+                  <div className="pf-group-body space-y-5">
+                    {/* Baris 3: Deskripsi */}
+                    <div>
+                      <label className="pf-label">Deskripsi</label>
+                      <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="pf-textarea" placeholder="Deskripsi produk..." />
+                    </div>
+                    {/* Badge Katalog */}
+                    <div className="grid sm:grid-cols-2 gap-x-5 gap-y-4">
+                    <div>
+                      <label className="pf-label">Badge Katalog (opsional)</label>
+                      <div className="pf-selectwrap">
+                        <select value={badgeType} onChange={(e) => setBadgeType(e.target.value)} className="pf-select">
+                          <option value="">Tanpa Badge</option>
+                          <option value="terlaris">Terlaris</option>
+                          <option value="rekomendasi">Rekomendasi</option>
+                          <option value="new">New</option>
+                        </select>
+                        <ChevronDown size={14} className="pf-selectico" />
+                      </div>
+                      <p className="pf-hint">Badge yang tampil di pojok kanan atas foto card katalog.</p>
+                    </div>
+                    </div>
+                    {/* Open Order — produk ikut tampil di katalog /open-order (menu Open Order). */}
+                    <div className={`pf-panel${openOrderEnabled ? " accent" : " flat"}`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium" style={{ color: "var(--espresso)" }}>Tampilkan di Open Order</p>
+                          <p className="text-xs" style={{ color: "var(--text-muted)" }}>Produk ini muncul di katalog halaman /open-order.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setOpenOrderEnabled((v) => !v)}
+                          aria-pressed={openOrderEnabled}
+                          aria-label="Tampilkan produk ini di menu Open Order"
+                          className="pf-toggle"
+                          style={{ background: openOrderEnabled ? "var(--gold)" : "#d4d4d8" }}
+                        >
+                          <span className="pf-toggle-knob" style={{ transform: openOrderEnabled ? "translateX(20px)" : "translateX(0)" }} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+                </div>
               </div>
             </div>
 
@@ -3048,8 +3095,12 @@ export default function TambahProdukPage({
       {/* Bar aksi bawah — tampil di SEMUA lebar layar, bukan cuma mobile.
           Form produk sangat panjang (Info Dasar → Media), jadi admin yang sudah di
           bagian bawah tidak perlu scroll balik ke atas lagi untuk menyimpan.
-          Lebarnya mengikuti konten form (max-w-6xl) supaya rapi di desktop. */}
-      <div className="pf-savebar fixed bottom-0 inset-x-0 z-40">
+          Lebarnya mengikuti konten form (max-w-6xl) supaya rapi di desktop.
+
+          Mode ops (office ops + panel admin): `sticky` di dalam kolom konten, jadi TIDAK menimpa
+          sidebar dan sejajar dengan form. Mode admin: tetap `fixed`, digeser `lg:left-64` melewati
+          sidebar AdminShell (main-nya ber-overflow-x-hidden sehingga sticky tidak bisa dipakai). */}
+      <div className={`pf-savebar z-40 ${isOps ? "sticky bottom-0" : "fixed bottom-0 inset-x-0 lg:left-64"}`}>
         <div className="max-w-6xl mx-auto px-5 lg:px-8 pt-3 pb-4 flex items-center gap-3">
           {/* Batal disembunyikan di layar sempit supaya tombol Simpan tetap selebar
               layar (tampilan mobile lama tidak berubah). */}
@@ -3087,16 +3138,16 @@ export default function TambahProdukPage({
           font-family: var(--font-cormorant), Georgia, serif; font-style: italic;
           font-size: 1.35rem; line-height: 1.1; color: var(--espresso);
         }
-        .pf-sub { font-size: .74rem; color: var(--text-muted); margin-top: .18rem; line-height: 1.4; }
+        .pf-sub { font-size: .8rem; color: var(--text-muted); margin-top: .2rem; line-height: 1.45; }
         .pf-label {
-          display: block; font-size: .78rem; font-weight: 600;
-          color: var(--text-secondary); margin-bottom: .4rem;
+          display: block; font-size: .82rem; font-weight: 600; line-height: 1.3;
+          color: var(--coffee); margin-bottom: .45rem;
         }
         .pf-req { color: var(--gold); }
         .pf-input, .pf-select, .pf-textarea {
           width: 100%; border-radius: .8rem; border: 1px solid rgba(0,0,0,.12);
           background: #fff; color: var(--espresso); font-size: .875rem;
-          padding: .7rem .9rem; outline: none;
+          padding: .72rem .95rem; outline: none; min-height: 46px;
           transition: border-color .18s ease, box-shadow .18s ease;
         }
         .pf-textarea { resize: none; line-height: 1.55; }
@@ -3106,8 +3157,8 @@ export default function TambahProdukPage({
           border-color: var(--gold); box-shadow: 0 0 0 3px rgba(0,0,0,.07);
         }
         .pf-input.invalid, .pf-select.invalid, .pf-textarea.invalid { border-color: #dc2626; }
-        .pf-hint { font-size: .7rem; color: var(--text-muted); margin-top: .35rem; }
-        .pf-error { font-size: .72rem; color: #dc2626; margin-top: .35rem; }
+        .pf-hint { font-size: .75rem; line-height: 1.45; color: var(--text-muted); margin-top: .4rem; }
+        .pf-error { font-size: .78rem; line-height: 1.4; color: #dc2626; margin-top: .4rem; }
         .pf-selectwrap { position: relative; }
         .pf-selectico {
           position: absolute; right: .85rem; top: 50%; transform: translateY(-50%);
@@ -3115,14 +3166,28 @@ export default function TambahProdukPage({
         }
         .pf-panel {
           border-radius: 1rem; border: 1px solid #e4e4e7;
-          background: rgba(255,255,255,.65); padding: 1rem;
+          background: rgba(255,255,255,.65); padding: 1.1rem 1.15rem;
         }
+        .pf-panel-head { margin-bottom: .95rem; }
+        .pf-panel-title { font-size: .88rem; font-weight: 700; color: var(--espresso); }
+        .pf-panel-sub { font-size: .75rem; line-height: 1.45; color: var(--text-muted); margin-top: .15rem; }
+        /* Kelompok isian di dalam kartu "Info Dasar": judul kecil + garis pemisah antarkelompok. */
+        .pf-groups { display: flex; flex-direction: column; }
+        .pf-group + .pf-group { margin-top: 1.75rem; padding-top: 1.75rem; border-top: 1px solid rgba(0,0,0,.07); }
+        .pf-group-head { margin-bottom: 1.1rem; }
+        .pf-group-title {
+          display: flex; align-items: center; gap: .5rem;
+          font-size: .74rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase;
+          color: var(--espresso);
+        }
+        .pf-group-title::before { content: ""; width: .26rem; height: .95rem; border-radius: 999px; background: currentColor; opacity: .85; }
+        .pf-group-sub { font-size: .78rem; line-height: 1.45; color: var(--text-muted); margin-top: .25rem; }
         .pf-panel.accent { background: rgba(0,0,0,.03); border-color: #e4e4e7; }
         .pf-panel.flat { background: rgba(0,0,0,.03); border-color: #e4e4e7; }
         .pf-btn {
           display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
           border-radius: .8rem; font-size: .8rem; font-weight: 600;
-          padding: .6rem .95rem; border: 1px solid transparent;
+          padding: .6rem .95rem; border: 1px solid transparent; min-height: 40px;
           transition: filter .18s ease, background .18s ease, border-color .18s ease;
         }
         .pf-btn-primary {
@@ -3357,25 +3422,40 @@ export default function TambahProdukPage({
         }
         .pf-add:hover { color: var(--gold); }
 
-        /* ── Tema ops: kartu putih + aksen biru (menu ops). Hanya warna/bentuk, bukan struktur. ── */
+        /* ── Tema ops: kartu putih + aksen (menu ops). Hanya warna/bentuk, bukan struktur. ──
+           Aksen biru = bawaan office ops. Di panel admin (.panel-ops) aksennya mengikuti tema
+           panel (berry / bunga matahari / tropical) lewat variabel --pink milik panel. */
+        .pf--ops {
+          --pf-ac: #2563eb; --pf-ac-deep: #1d4ed8; --pf-ac-soft: #eff6ff; --pf-ac-line: #bfdbfe;
+          --pf-ac-ring: rgba(37,99,235,.15); --pf-btn-from: #3b82f6; --pf-btn-to: #2563eb; --pf-btn-shadow: rgba(37,99,235,.7);
+        }
+        .panel-ops .pf--ops {
+          --pf-ac: var(--pink-d); --pf-ac-deep: var(--pink-d); --pf-ac-soft: var(--pink-bg); --pf-ac-line: var(--line);
+          --pf-ac-ring: color-mix(in srgb, var(--pink) 22%, transparent); --pf-btn-from: var(--pink); --pf-btn-to: var(--pink-d);
+          --pf-btn-shadow: color-mix(in srgb, var(--pink-d) 70%, transparent);
+        }
         .pf--ops .pf-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 1rem; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
         .pf--ops .pf-head { border-bottom: 1px solid #e2e8f0; }
-        .pf--ops .pf-num { color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: .7rem; }
+        .pf--ops .pf-num { color: var(--pf-ac-deep); background: var(--pf-ac-soft); border: 1px solid var(--pf-ac-line); border-radius: .7rem; }
         .pf--ops .pf-title { font-family: var(--font-inter), system-ui, sans-serif; font-style: normal; font-weight: 800; color: #0f172a; font-size: 1.15rem; }
-        .pf--ops .pf-sub, .pf--ops .pf-label, .pf--ops .pf-hint { color: #64748b; }
+        .pf--ops .pf-sub, .pf--ops .pf-hint, .pf--ops .pf-group-sub, .pf--ops .pf-panel-sub { color: #64748b; }
+        .pf--ops .pf-label { color: #334155; }
+        .pf--ops .pf-group + .pf-group { border-top-color: #e2e8f0; }
+        .pf--ops .pf-group-title { color: var(--pf-ac-deep); }
+        .pf--ops .pf-panel-title { color: #0f172a; }
         .pf--ops .pf-input, .pf--ops .pf-select, .pf--ops .pf-textarea, .pf--ops .pf-cell { border-color: #cbd5e1; color: #0f172a; }
-        .pf--ops .pf-input:focus, .pf--ops .pf-select:focus, .pf--ops .pf-textarea:focus, .pf--ops .pf-cell:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+        .pf--ops .pf-input:focus, .pf--ops .pf-select:focus, .pf--ops .pf-textarea:focus, .pf--ops .pf-cell:focus { border-color: var(--pf-ac); box-shadow: 0 0 0 3px var(--pf-ac-ring); }
         .pf--ops .pf-panel { border-color: #e2e8f0; background: #f8fafc; }
-        .pf--ops .pf-btn-primary { background: linear-gradient(135deg, #3b82f6, #2563eb); box-shadow: 0 10px 22px -12px rgba(37,99,235,.7); }
+        .pf--ops .pf-btn-primary { background: linear-gradient(135deg, var(--pf-btn-from), var(--pf-btn-to)); box-shadow: 0 10px 22px -12px var(--pf-btn-shadow); }
         .pf--ops .pf-btn-ghost { border-color: #cbd5e1; color: #334155; background: #fff; }
         .pf--ops .pf-savebar { background: rgba(255,255,255,.95); border-top-color: #e2e8f0; box-shadow: 0 -18px 34px -30px rgba(15,23,42,.4); }
-        .pf--ops .pf-btn-outline { border-color: #cbd5e1; color: #1d4ed8; }
+        .pf--ops .pf-btn-outline { border-color: #cbd5e1; color: var(--pf-ac-deep); }
         .pf--ops .pf-chip { border-color: #cbd5e1; color: #334155; }
-        .pf--ops .pf-chip.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+        .pf--ops .pf-chip.active { background: var(--pf-ac); border-color: var(--pf-ac); color: #fff; }
         .pf--ops .pf-tab { border-color: #cbd5e1; color: #334155; }
-        .pf--ops .pf-tab.active { background: #2563eb; border-color: #2563eb; color: #fff; }
-        .pf--ops .pf-add { color: #1d4ed8; }
-        .pf--ops .pf-add:hover { color: #2563eb; }
+        .pf--ops .pf-tab.active { background: var(--pf-ac); border-color: var(--pf-ac); color: #fff; }
+        .pf--ops .pf-add { color: var(--pf-ac-deep); }
+        .pf--ops .pf-add:hover { color: var(--pf-ac); }
         .pf--ops .pf-selectico { color: #64748b; }
         .pf--ops .pf-size-row { border-color: #e2e8f0; }
       `}</style>
