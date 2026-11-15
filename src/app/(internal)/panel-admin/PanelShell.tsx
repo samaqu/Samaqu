@@ -153,7 +153,13 @@ type NavItem = { label: string; href: string; icon: IconName; soon?: boolean; ba
 type NavGroup = { section: string; icon: IconName; items: NavItem[] };
 
 /** Menu paling atas: berdiri sendiri, tidak masuk grup yang bisa dilipat. */
-const NAV_TOP: NavItem = { label: "Dashboard", href: "/panel-admin", icon: "dashboard" };
+const NAV_TOP: NavItem[] = [
+  { label: "Dashboard", href: "/panel-admin", icon: "dashboard" },
+  { label: "AI Performance", href: "/panel-admin/ai-performance", icon: "spark" },
+];
+
+/** Menu paling bawah: juga berdiri sendiri. */
+const NAV_BOTTOM: NavItem[] = [{ label: "Asisten", href: "/panel-admin/assistant", icon: "spark" }];
 
 /**
  * Grup menu yang bisa dilipat (judul grup = ikon + nama + panah; isinya teks saja).
@@ -190,19 +196,11 @@ const NAV: NavGroup[] = [
       { label: "Anomali Stok", href: "/panel-admin/anomali-stok", icon: "alert" },
     ],
   },
-  {
-    section: "Asisten AI",
-    icon: "spark",
-    items: [
-      { label: "Asisten", href: "/panel-admin/assistant", icon: "spark" },
-      { label: "AI Performance", href: "/panel-admin/ai-performance", icon: "spark" },
-    ],
-  },
 ];
 
 /** Menu yang cocok dengan alamat sekarang (Dashboard hanya cocok persis). */
 function activeNavItem(pathname: string): NavItem | undefined {
-  return [NAV_TOP, ...NAV.flatMap((group) => group.items)].find((item) =>
+  return [...NAV_TOP, ...NAV.flatMap((group) => group.items), ...NAV_BOTTOM].find((item) =>
     item.href === "/panel-admin" ? pathname === item.href : pathname.startsWith(item.href)
   );
 }
@@ -536,7 +534,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
         </div>
 
         <nav className={styles.nav}>
-          {renderNavLink(NAV_TOP, true)}
+          {NAV_TOP.map((item) => renderNavLink(item, true))}
           {NAV.map((group) => {
             const open = openGroups.includes(group.section);
             const hasActive = group.section === activeGroup;
@@ -571,6 +569,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
               </div>
             );
           })}
+          {NAV_BOTTOM.map((item) => renderNavLink(item, true))}
         </nav>
 
         <div className={styles.foot}>
