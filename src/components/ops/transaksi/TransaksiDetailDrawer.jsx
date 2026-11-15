@@ -241,7 +241,9 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
         ? "Menunggu pembayaran"
         : stage === "dibatalkan"
           ? "Resi tidak tersedia"
-          : "Resi belum dibuat";
+          : stage === "menunggu_stok"
+            ? "Menunggu stok (pre-order)"
+            : "Resi belum dibuat";
 
     const itemsTampilan = (order.items || []).map((item, index) => {
       // Chip varian: kain & series berwarna biru, ukuran/qty netral (seperti mockup).
@@ -296,8 +298,11 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
     }
     // Proses: pending → diproses, sama dengan chip status di /admin. Ditaruh sebagai aksi
     // utama kalau belum ada aksi utama lain (mis. pesanan belum bayar tanpa tombol bayar).
+    // Pre-order yang menunggu stok tidak bisa "diproses/dikirim" dari sini (server menolaknya):
+    // aksinya "Stok sudah ready" di menu Pre-Order.
     const bisaProses =
-      order.status === "pending" || (order.status === "diproses" && order.shipping_status !== "dikirim");
+      !order.preorder_waiting &&
+      (order.status === "pending" || (order.status === "diproses" && order.shipping_status !== "dikirim"));
     if (bisaProses && order.status !== stage) {
       aksi.push({
         key: "proses",
@@ -327,7 +332,9 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
         label: "Cetak Resi",
         jenis: "utama",
         disabled: true,
-        hint: "Resi belum dibuat. Terbitkan resi dulu (Atur Pesanan / input resi HBO).",
+        hint: order.preorder_waiting
+          ? "Pre-order menunggu stok. Tandai “Stok sudah ready” di menu Pre-Order dulu."
+          : "Resi belum dibuat. Terbitkan resi dulu (Atur Pesanan / input resi HBO).",
         onClick: () => {},
       });
     }
@@ -369,7 +376,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
       <PanelDetailShell open={open} onClose={onClose} tema={tema}>
         <PanelDetailPesanan
           tema={tema}
-          sumber={order.source_label}
+          sumber={order.is_preorder ? `${order.source_label} · Pre-Order` : order.source_label}
           tahap={stage}
           createdAt={order.created_at}
           onClose={onClose}
@@ -422,8 +429,16 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
           ekstra={
             /* Hanya dikirim kalau memang ada isinya — fragment kosong membuat kartu putih
                kosong menggantung di atas footer. */
-            order.items_edited_after_resi || order.notes || statusError || (editLockedReason && order.status !== "dibatalkan") ? (
+            order.items_edited_after_resi || order.notes || statusError || order.is_preorder || (editLockedReason && order.status !== "dibatalkan") ? (
               <>
+                {order.is_preorder ? (
+                  <p className="dp-catatan" data-testid="preorder-info">
+                    Pre-order · estimasi barang siap: {order.preorder_estimate || "7-10 hari kerja"}.{" "}
+                    {order.preorder_waiting
+                      ? "Dikirim bersamaan setelah semua barang tersedia. Pesanan tidak dapat dibatalkan ke customer."
+                      : "Stok sudah ready; diproses seperti pesanan biasa."}
+                  </p>
+                ) : null}
                 {order.items_edited_after_resi && awb ? (
                   <div className="dp-warning" role="status">
                     Item diubah setelah resi terbit. Cetak ulang label dan beri tahu tim packing. Label lama jangan dipakai.
@@ -510,12 +525,18 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
                   {source?.icon ? <source.icon size={14} /> : null}
                   {order.source_label}
                 </span>
+                {order.is_preorder ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-100 text-purple-800">
+                    Pre-Order{order.preorder_estimate ? ` · ${order.preorder_estimate}` : ""}
+                  </span>
+                ) : null}
               </div>
 
               {/* Blok reseller — hanya untuk pesanan ber-reseller_id (EP-/RSL-). */}
               {order.reseller_id ? <ResellerOrderBlock order={order} resellerHref={resellerHref} /> : null}
 
-              {order.status !== "dibatalkan" ? (
+              {/* Pre-order yang menunggu stok: status diatur lewat menu Pre-Order, bukan chip di sini. */}
+              {order.status !== "dibatalkan" && !order.preorder_waiting ? (
                 <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-3">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
                     Atur Status Pesanan

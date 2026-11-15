@@ -165,7 +165,15 @@ const sizeRank = (size) => {
   return index === -1 ? OPS_STOCK_SIZES.length : index;
 };
 
-export default function TransaksiFormModal({ isOpen, onClose, initialData = null, onSaved, variant = "ops" }) {
+/**
+ * Pre-order: stok varian TIDAK membatasi pilihan (barang memang belum ada). Batas qty tetap 99,
+ * sama dengan batas server. Stok aslinya tetap ditampilkan (`realStock`) supaya admin tahu kalau
+ * barangnya sebenarnya ada.
+ */
+const PO_STOCK_CAP = 99;
+const poStockText = (real) => (Number(real) > 0 ? `stok ${Number(real)}` : "stok 0 · PO");
+
+export default function TransaksiFormModal({ isOpen, onClose, initialData = null, onSaved, variant = "ops", presetPreorder = false }) {
   const isEdit = !!initialData;
   /**
    * Pesanan Open Order (`CYO-`) memakai JALUR HARGA SENDIRI: kolom `open_order_price` /
@@ -182,7 +190,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
    */
   const reservedByVariant = useMemo(() => {
     const map = {};
-    if (!isEdit) return map;
+    // Pre-order yang menunggu stok belum memotong stok, jadi tidak ada stok "milik pesanan ini".
+    if (!isEdit || initialData?.preorder_waiting) return map;
     for (const item of initialData?.items || []) {
       const productId = String(item?.product_id || "");
       const size = String(item?.size || "").toUpperCase();
@@ -396,6 +405,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
    * `variantSortKey` — sama dengan Daftar Produk & Laporan Stok (varian Thobe menyimpan
    * warna `default`, jadi warnanya diambil dari nama produk).
    */
+  const isPo = Boolean(form?.is_preorder);
   const dataset = useMemo(() => {
     const rows = (variants || []).map((variant) => ({
       product_id: variant.product_id,
@@ -418,7 +428,11 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       open_order_cyp_enabled: variant.open_order_cyp_enabled ?? null,
       // HPP produk — hanya untuk peringatan kalau harga manual di bawah HPP.
       hpp: Number(variant.hpp) || 0,
-      sizes: variant.stock_efektif || variant.stock || {},
+      // Pre-order: setiap ukuran dianggap tersedia (batas 99); `realSizes` = stok sebenarnya.
+      sizes: isPo
+        ? Object.fromEntries(Object.keys(variant.stock_efektif || variant.stock || {}).map((size) => [size, PO_STOCK_CAP]))
+        : variant.stock_efektif || variant.stock || {},
+      realSizes: variant.stock_efektif || variant.stock || {},
       // Berat per ukuran + berat produk (gram) — dari API varian yang sama dengan ongkir/resi.
       weights: variant.weights || {},
       product_weight: Number(variant.product_weight) || 0,
@@ -457,7 +471,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         linkedTo: null,
       },
     ];
-  }, [variants, isEdit, initialData]);
+  }, [variants, isEdit, initialData, isPo]);
 
   /* ── Nilai awal: transaksi baru (waktu sekarang) atau yang sedang diubah ── */
   useEffect(() => {
@@ -507,6 +521,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         shipping_method: initialData.shipping_method || "",
         discount: String(initialData.discount || ""),
         payment_status: initialData.payment_status === "unpaid" ? "unpaid" : "paid",
+        is_preorder: initialData.is_preorder === true,
+        preorder_estimate: initialData.preorder_estimate || "",
         notes: initialData.notes || "",
         // Alamat transaksi ini sudah tersimpan di pesanan, jadi isiannya langsung terisi.
         address_mode: "new",
@@ -531,6 +547,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         shipping_method: "",
         discount: "",
         payment_status: "paid",
+        // Dibuka dari menu Pre-Order: saklar PO langsung menyala.
+        is_preorder: presetPreorder === true,
+        preorder_estimate: "",
         notes: "",
         address_mode: "saved",
         saved_address_id: "",
@@ -543,7 +562,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       setItems([emptyRow()]);
       prefilledFor.current = null;
     }
-  }, [isOpen, initialData, resetKey]);
+  }, [isOpen, initialData, resetKey, presetPreorder]);
 
   /* ── Pelanggan terdaftar: alamat utama langsung terpilih ── */
   useEffect(() => {
@@ -681,7 +700,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       const key = `${entry.category}|${entry.kain}|${entry.product_name}`;
       let group = map.get(key);
       if (!group) {
-        group = { key, product_id: entry.product_id, name: entry.product_name, category: entry.category, kain: entry.kain, warnas: [], series: [], stockTotal: 0, service: false };
+        group = { key, product_id: entry.product_id, name: entry.product_name, category: entry.category, kain: entry.kain, warnas: [], series: [], stockTotal: 0, realTotal: 0, service: false };
         map.set(key, group);
       }
       if (entry.service) group.service = true;
@@ -691,6 +710,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       // memakai stok induknya, jadi kalau ikut dijumlah hasilnya dobel.
       if (!entry.linkedTo) {
         group.stockTotal += Object.values(entry.sizes || {}).reduce((sum, n) => sum + (Number(n) || 0), 0);
+        group.realTotal += Object.values(entry.realSizes || entry.sizes || {}).reduce((sum, n) => sum + (Number(n) || 0), 0);
       }
     }
     return [...map.values()];
@@ -728,8 +748,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     const bySeries = new Map();
     for (const entry of rows) {
       const key = entry.series || "";
-      const current = bySeries.get(key) || { series: entry.series || "", price: pathPrice(entry), stock: 0 };
+      const current = bySeries.get(key) || { series: entry.series || "", price: pathPrice(entry), stock: 0, realStock: 0 };
       current.stock += Object.values(entry.sizes || {}).reduce((sum, n) => sum + (Number(n) || 0), 0);
+      current.realStock += Object.values(entry.realSizes || entry.sizes || {}).reduce((sum, n) => sum + (Number(n) || 0), 0);
       bySeries.set(key, current);
     }
     return [...bySeries.values()].sort((a, b) => seriesRank(a.series) - seriesRank(b.series));
@@ -810,6 +831,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
           stock:
             Object.values(entry.sizes || {}).reduce((sum, n) => sum + (Number(n) || 0), 0) +
             reservedFor(entry.product_id, entry.color, paketSize(entry)),
+          realStock: Object.values(entry.realSizes || entry.sizes || {}).reduce((sum, n) => sum + (Number(n) || 0), 0),
           price: pathPrice(entry),
           linkedTo: entry.linkedTo,
         }
@@ -833,6 +855,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
           color: entry.color,
           showColor: multiColor,
           stock: (Number(entry.sizes?.[size]) || 0) + reservedFor(entry.product_id, entry.color, size),
+          realStock: Number((entry.realSizes || entry.sizes)?.[size]) || 0,
           price: pathPrice(entry),
           linkedTo: entry.linkedTo,
           service: Boolean(entry.service),
@@ -1602,6 +1625,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         // Dipakai panel "Transaksi tercatat" untuk memilih aksi: resi J&T atau tombol GoSend.
         shipping_method: form?.shipping_method || initialData?.shipping_method || "",
         customer_name: form?.customer_name || initialData?.customer_name || "",
+        // PO yang menunggu stok belum bisa dibuatkan resi (panel resi menampilkan penjelasan).
+        is_preorder: isPo,
+        preorder_waiting: isPo && !initialData?.preorder_ready_at,
         isEdit,
       });
     },
@@ -1658,7 +1684,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       discount: Math.min(discountValue, subtotal),
       // "Belum Lunas" → server menyimpan status `pending` (di luar SALE_STATUSES, jadi tidak
       // ikut omset) dan otomatis mengirim invoice berisi nomor rekening ke WA pembeli.
-      payment_status: form.payment_status === "unpaid" ? "unpaid" : "paid",
+      payment_status: !isPo && form.payment_status === "unpaid" ? "unpaid" : "paid",
+      // Pre-order: stok tidak dipotong, wajib Lunas, estimasi kosong = bawaan server ("7-10 hari kerja").
+      ...(isPo ? { is_preorder: true, preorder_estimate: String(form.preorder_estimate || "").trim() } : {}),
       notes: form.notes.trim(),
       // Alamat yang dipakai transaksi ini tersimpan di pesanan (dan di buku alamat kalau baru).
       shipping: {
@@ -2570,6 +2598,54 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                   )}
                 </div>
 
+                {/* Pre-order: ukuran/warna boleh dipilih walau stoknya kosong. Customer transfer dulu,
+                    stok dipotong nanti saat admin menekan "Stok sudah ready" di menu Pre-Order. */}
+                {isEdit && !isPo ? null : (
+                  <div
+                    data-testid="preorder-box"
+                    className={`rounded-xl border px-3.5 py-3 space-y-2 ${
+                      isPo
+                        ? "border-purple-200 bg-purple-50 dark:border-purple-900 dark:bg-purple-950/30"
+                        : "border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40"
+                    }`}
+                  >
+                    <label className={`flex items-start gap-2.5 ${isEdit ? "" : "cursor-pointer"}`}>
+                      <input
+                        type="checkbox"
+                        data-testid="preorder-toggle"
+                        className="mt-0.5 h-4 w-4"
+                        checked={isPo}
+                        disabled={isEdit}
+                        onChange={(event) =>
+                          updateForm(event.target.checked ? { is_preorder: true, payment_status: "paid" } : { is_preorder: false })
+                        }
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-bold text-slate-900 dark:text-white">Pre-Order (stok kosong, customer transfer dulu)</span>
+                        <span className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                          {isPo
+                            ? "Stok tidak dipotong sekarang, wajib Lunas, dan pesanan tidak dapat dibatalkan ke customer. Customer otomatis dikabari lewat satu WA."
+                            : "Nyalakan kalau ukuran/warna yang dipesan stoknya kosong dan customer sudah transfer."}
+                        </span>
+                      </span>
+                    </label>
+                    {isPo ? (
+                      <label className="block">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Estimasi barang siap</span>
+                        <input
+                          type="text"
+                          data-testid="preorder-estimate"
+                          value={form.preorder_estimate || ""}
+                          onChange={(event) => updateForm({ preorder_estimate: event.target.value })}
+                          placeholder="7-10 hari kerja"
+                          maxLength={60}
+                          className={`${inputClass} mt-1`}
+                        />
+                      </label>
+                    ) : null}
+                  </div>
+                )}
+
                 {/* Daftar item tidak lagi punya kotak scroll sendiri: pemilih produk ikut
                     mengalir lega, dan halaman drawer yang men-scroll (satu scrollbar saja). */}
                 <div className="space-y-2">
@@ -2656,7 +2732,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                               </div>
                               <p className="mt-1 text-[11px] font-medium" style={{ color: PANEL_MUTED }}>
                                 {info.chosen.linkedTo ? `Stok mengikuti ${info.chosen.linkedTo} · ` : ""}
-                                {info.service ? "Layanan tanpa stok" : `Sisa stok ${stockMax}`} · {info.unitWeight.source === "missing" ? "berat belum diisi" : formatWeightExact(info.unitWeight.grams)}
+                                {info.service ? "Layanan tanpa stok" : isPo ? `Pre-order · ${poStockText(info.chosen.realStock)}` : `Sisa stok ${stockMax}`} · {info.unitWeight.source === "missing" ? "berat belum diisi" : formatWeightExact(info.unitWeight.grams)}
                               </p>
                             </div>
                             <button
@@ -3078,7 +3154,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                           : "text-slate-400 dark:text-slate-500"
                                       }`}
                                     >
-                                      {option.service ? "jasa" : option.stockTotal > 0 ? `sisa ${option.stockTotal}` : "habis"}
+                                      {option.service ? "jasa" : isPo ? poStockText(option.realTotal) : option.stockTotal > 0 ? `sisa ${option.stockTotal}` : "habis"}
                                     </span>
                                   </button>
                                 ))
@@ -3141,7 +3217,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                       Rp {formatRupiah(paket.price)}
                                     </span>
                                     <span className={`block text-[11px] font-bold ${habis ? "text-slate-400 dark:text-slate-500" : "text-emerald-600 dark:text-emerald-400"}`}>
-                                      {habis ? "stok habis" : `sisa ${sisa}`}
+                                      {isPo
+                                        ? poStockText(Object.values(paket.realSizes || paket.sizes || {}).reduce((sum, n) => sum + (Number(n) || 0), 0))
+                                        : habis ? "stok habis" : `sisa ${sisa}`}
                                     </span>
                                   </button>
                                 );
@@ -3228,7 +3306,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                             : "text-emerald-600 dark:text-emerald-400"
                                       }`}
                                     >
-                                      {soldOut ? "stok habis" : `sisa ${option.stock}`}
+                                      {isPo ? poStockText(option.realStock) : soldOut ? "stok habis" : `sisa ${option.stock}`}
                                     </span>
                                   </button>
                                 );
@@ -3284,7 +3362,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                             : "text-slate-500 dark:text-slate-400"
                                       }`}
                                     >
-                                      {info.service ? "jasa" : soldOut ? "habis" : `sisa ${option.stock}`}
+                                      {info.service ? "jasa" : isPo ? poStockText(option.realStock) : soldOut ? "habis" : `sisa ${option.stock}`}
                                     </span>
                                   </button>
                                 );
@@ -3329,7 +3407,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                   quantity >= maxStock ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"
                                 }`}
                               >
-                                {quantity >= maxStock ? `Stok tersisa ${maxStock}` : `Maks ${maxStock} pcs`}
+                                {isPo
+                                  ? quantity >= maxStock ? `Maksimal ${maxStock} pcs` : "Pre-order · tanpa batas stok"
+                                  : quantity >= maxStock ? `Stok tersisa ${maxStock}` : `Maks ${maxStock} pcs`}
                               </span>
                             </div>
                           </div>
@@ -3698,16 +3778,22 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                     ].map((opsi) => {
                       const active = (form.payment_status || "paid") === opsi.value;
                       const Icon = opsi.icon;
+                      // Pre-order wajib Lunas: customer transfer dulu.
+                      const lockedByPo = isPo && opsi.value === "unpaid";
                       return (
                         <button
                           key={opsi.value}
                           type="button"
                           onClick={() => updateForm({ payment_status: opsi.value })}
+                          disabled={lockedByPo}
+                          title={lockedByPo ? "Pre-order wajib Lunas" : undefined}
                           aria-pressed={active}
                           className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-bold transition-all ${
                             active
                               ? "bg-slate-900 text-white shadow-sm dark:bg-white dark:text-slate-900"
-                              : "text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-700"
+                              : lockedByPo
+                                ? "text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-50"
+                                : "text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-700"
                           }`}
                         >
                           <Icon size={15} />
@@ -3717,7 +3803,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                     })}
                   </div>
                   <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                    {form.payment_status === "unpaid"
+                    {isPo
+                      ? "Pre-order wajib Lunas: customer transfer dulu. Langsung masuk omset; barang dikirim setelah stok ready."
+                      : form.payment_status === "unpaid"
                       ? "Belum ikut dihitung sebagai omset sampai ditandai lunas. Invoice berisi nomor rekening otomatis dikirim ke WA pembeli saat Simpan."
                       : "Transaksi langsung dianggap lunas dan masuk ke omset."}
                   </p>

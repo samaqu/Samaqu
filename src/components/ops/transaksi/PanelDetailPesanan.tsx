@@ -116,6 +116,14 @@ const TAHAP: Record<
     ikonWarna: "#a46a00",
     nada: "kuning",
   },
+  menunggu_stok: {
+    judul: "Pre-order menunggu stok",
+    catatan: "Sudah dibayar. Dikemas dan dikirim setelah barang tersedia",
+    ikon: <IkonJam size={17} />,
+    ikonBg: "#f3e8ff",
+    ikonWarna: "#7e22ce",
+    nada: "kuning",
+  },
   belum_dipacking: {
     judul: "Sedang disiapkan",
     catatan: "Pesanan sudah dibayar, siap dikemas",
@@ -166,7 +174,7 @@ const TAHAP: Record<
 /** Jumlah langkah stepper yang sudah lewat (0–4); langkah `level` = sedang berjalan. */
 export function levelLangkah(tahap: string): number {
   return (
-    { belum_bayar: 0, belum_dipacking: 1, sudah_dipacking: 2, dikirim: 3, selesai: 4 } as Record<string, number>
+    { belum_bayar: 0, menunggu_stok: 1, belum_dipacking: 1, sudah_dipacking: 2, dikirim: 3, selesai: 4 } as Record<string, number>
   )[tahap] ?? 0;
 }
 

@@ -54,6 +54,7 @@ const BASE_MENU_GROUPS: MenuGroup[] = [
     label: "Penjualan",
     items: [
       { title: "Transaksi", href: "/ops/transaksi", icon: FileText },
+      { title: "Pre-Order", href: "/ops/preorder", icon: IconPackagePlus },
       { title: "Reseller", href: "/ops/reseller", icon: IconReseller, badgeKey: "reseller" },
       { title: "Return", href: "/ops/retur", icon: RotateCcw },
       { title: "Leads", href: "/ops/leads", icon: Users },

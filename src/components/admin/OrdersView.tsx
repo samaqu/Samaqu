@@ -50,6 +50,8 @@ export interface AdminOrderRow {
 
 const STAGE_BADGE: Record<string, string> = {
   belum_bayar: "bayar",
+  // Pre-order Lunas yang menunggu stok: bukan "dibatalkan" (abu-abu); pakai warna kuning "tunggu".
+  menunggu_stok: "bayar",
   belum_dipacking: "packing",
   sudah_dipacking: "siap",
   dikirim: "kirim",

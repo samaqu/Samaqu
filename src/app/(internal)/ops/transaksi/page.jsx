@@ -21,6 +21,7 @@ import { matchesStage } from "@/lib/order-flow";
 import { countByStage, stageCounts, stageTabsWithCounts } from "@/lib/order-shared";
 import DateFilter from "@/components/ops/leads/DateFilter";
 import ConfirmDeleteModal from "@/components/ops/ConfirmDeleteModal";
+import PreorderReasonDialog from "@/components/ops/transaksi/PreorderReasonDialog";
 import TransaksiFormModal from "@/components/ops/transaksi/TransaksiFormModal";
 import TransaksiDetailDrawer from "@/components/ops/transaksi/TransaksiDetailDrawer";
 import ResellerEditItemModal from "@/components/ops/transaksi/ResellerEditItemModal";
@@ -36,9 +37,12 @@ const digits = (value) => String(value ?? "").replace(/\D/g, "");
 /** Bandingkan nomor HP tanpa peduli 08… / 628… / 8…. */
 const phoneKey = (value) => digits(value).replace(/^0+/, "").replace(/^62/, "");
 
-export default function Transaksi({ variant = "ops" }) {
+export default function Transaksi({ variant = "ops", mode = "reguler" }) {
   // `variant="panel"` merender tampilan ala mockup (panel admin). Default "ops" = tak berubah.
   const isPanel = variant === "panel";
+  // `mode="preorder"` = menu Pre-Order: halaman yang SAMA, tapi daftar hanya PO + ringkasan kebutuhan
+  // + tombol "Stok sudah ready". Default "reguler": PO yang masih menunggu stok disembunyikan dari tabel.
+  const isPoPage = mode === "preorder";
   const now = new Date();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -81,13 +85,39 @@ export default function Transaksi({ variant = "ops" }) {
     refetchOnWindowFocus: true,
   });
 
+  // Daftar yang tampil di halaman ini. Tabel reguler TIDAK memuat pre-order yang masih menunggu stok
+  // (belum ada yang bisa dikerjakan); setelah "stok sudah ready" PO muncul di sini seperti pesanan biasa.
+  // KPI Total/Omset tetap dihitung dari SEMUA pesanan (`orders`).
+  const listOrders = useMemo(
+    () => (isPoPage ? orders.filter((order) => order.is_preorder) : orders.filter((order) => !order.preorder_waiting)),
+    [orders, isPoPage],
+  );
+  // Menu Pre-Order: chip Menunggu stok / Sudah ready / Semua (pengganti tab tahap).
+  const [poFilter, setPoFilter] = useState("menunggu");
+
+  const { data: poSummary, isLoading: poSummaryLoading } = useQuery({
+    queryKey: ["transaksi", "preorder-summary"],
+    queryFn: () => base44.entities.Preorder.summary(),
+    enabled: isPoPage,
+    refetchInterval: 60_000,
+  });
+  const poReadyByNumber = useMemo(
+    () => new Map((poSummary?.orders || []).map((entry) => [entry.order_number, entry])),
+    [poSummary],
+  );
+
   const visibleOrders = useMemo(() => {
     const query = search.toLowerCase();
     const queryPhone = phoneKey(search);
-    return orders.filter((order) => {
+    return listOrders.filter((order) => {
       if (sourceFilter !== "all" && (order.source_key || order.source) !== sourceFilter) return false;
-      // Saring per TAHAP (order-flow, sama seperti halaman Pesanan admin).
-      if (!matchesStage(order, stageFilter)) return false;
+      if (isPoPage) {
+        if (poFilter === "menunggu" && !order.preorder_waiting) return false;
+        if (poFilter === "ready" && (order.preorder_waiting || order.status === "dibatalkan")) return false;
+      } else if (!matchesStage(order, stageFilter)) {
+        // Saring per TAHAP (order-flow, sama seperti halaman Pesanan admin).
+        return false;
+      }
       if (selectedDate && order.date_wib !== selectedDate) return false;
       if (!query) return true;
       if (String(order.customer_name || "").toLowerCase().includes(query)) return true;
@@ -98,12 +128,12 @@ export default function Transaksi({ variant = "ops" }) {
       if ((order.items || []).some((item) => `${item.product_name || ""} ${itemVariantText(item)}`.toLowerCase().includes(query))) return true;
       return queryPhone.length >= 4 && phoneKey(order.customer_whatsapp).includes(queryPhone);
     });
-  }, [orders, search, sourceFilter, stageFilter, selectedDate]);
+  }, [listOrders, isPoPage, poFilter, search, sourceFilter, stageFilter, selectedDate]);
 
   // Opsi filter diambil dari data yang benar-benar ada di bulan itu.
-  const sourceOptions = useMemo(() => [...new Set(orders.map((o) => o.source_key || o.source))], [orders]);
+  const sourceOptions = useMemo(() => [...new Set(listOrders.map((o) => o.source_key || o.source))], [listOrders]);
 
-  const markedDates = useMemo(() => [...new Set(orders.map((o) => o.date_wib).filter(Boolean))], [orders]);
+  const markedDates = useMemo(() => [...new Set(listOrders.map((o) => o.date_wib).filter(Boolean))], [listOrders]);
 
   const filtersActive =
     Boolean(search) ||
@@ -175,8 +205,9 @@ export default function Transaksi({ variant = "ops" }) {
   const [cancelTarget, setCancelTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  // Pre-order: batal/hapus lewat dialog alasan wajib (bukan konfirmasi biasa).
   const cancelMutation = useMutation({
-    mutationFn: (order) => base44.entities.Transaction.cancel(order.order_number),
+    mutationFn: ({ order, why }) => base44.entities.Transaction.cancel(order.order_number, why),
     onSuccess: (result) => {
       // Stok dikembalikan oleh jalur pembatalan yang sama dengan panel admin.
       queryClient.invalidateQueries({ queryKey: ["transaksi"] });
@@ -197,8 +228,8 @@ export default function Transaksi({ variant = "ops" }) {
    * resi J&T atau kalau itu pesanan website, dan mengembalikan stok lebih dulu.
    */
   const deleteMutation = useMutation({
-    mutationFn: (order) => base44.entities.Transaction.deleteOrder(order.order_number),
-    onSuccess: (result, order) => {
+    mutationFn: ({ order, why }) => base44.entities.Transaction.deleteOrder(order.order_number, why),
+    onSuccess: (result, { order }) => {
       queryClient.invalidateQueries({ queryKey: ["transaksi"] });
       setDeleteTarget(null);
       setDetail((current) => (current?.order_number === order.order_number ? null : current));
@@ -214,6 +245,39 @@ export default function Transaksi({ variant = "ops" }) {
         description: error instanceof Error ? error.message : "Coba lagi.",
         variant: "destructive",
       }),
+  });
+
+  /** "Stok sudah ready" satu PO: stok dipotong, lalu PO mengikuti alur pesanan reguler. */
+  const readyMutation = useMutation({
+    mutationFn: (order) => base44.entities.Preorder.ready(order.order_number),
+    onSuccess: (_result, order) => {
+      queryClient.invalidateQueries({ queryKey: ["transaksi"] });
+      toast({ title: "✅ Stok sudah ready", description: `${order.order_number} · stok dipotong, siap dibuatkan resi`, variant: "success" });
+    },
+    onError: (error) =>
+      toast({ title: "Gagal menandai ready", description: error instanceof Error ? error.message : "Coba lagi.", variant: "destructive" }),
+  });
+
+  /** Proses semua PO yang stoknya cukup, urut siapa transfer duluan; yang belum cukup dilewati. */
+  const [readyAllOpen, setReadyAllOpen] = useState(false);
+  const readyAllMutation = useMutation({
+    mutationFn: () => base44.entities.Preorder.readyAll(),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["transaksi"] });
+      setReadyAllOpen(false);
+      const done = result?.readied?.length || 0;
+      const skipped = result?.skipped?.length || 0;
+      const failed = result?.failed?.length || 0;
+      toast({
+        title: done > 0 ? `✅ ${done} pre-order ditandai ready` : "Tidak ada yang diproses",
+        description: [skipped ? `${skipped} dilewati (stok belum cukup)` : "", failed ? `${failed} gagal` : ""].filter(Boolean).join(" · ") || undefined,
+        variant: failed ? "destructive" : "success",
+      });
+    },
+    onError: (error) => {
+      setReadyAllOpen(false);
+      toast({ title: "Gagal memproses", description: error instanceof Error ? error.message : "Coba lagi.", variant: "destructive" });
+    },
   });
 
   /**
@@ -280,9 +344,17 @@ export default function Transaksi({ variant = "ops" }) {
   // Pesanan admin). "Belum di Packing" SENGAJA tidak jadi tab: ia sub-status dari `diproses`
   // dan tampil sebagai chip filter di baris filter (lihat `belumDipacking` di bawah).
   // Angkanya tetap dari helper yang sama, jadi chip dan isi tabel tidak mungkin berbeda.
-  const stageTabs = useMemo(() => stageTabsWithCounts(orders), [orders]);
+  // Dihitung dari daftar yang TAMPIL (tanpa PO menunggu stok) supaya angka tab = isi tabel.
+  const stageTabs = useMemo(() => stageTabsWithCounts(listOrders), [listOrders]);
 
-  const belumDipacking = useMemo(() => countByStage(orders, "belum_dipacking"), [orders]);
+  const belumDipacking = useMemo(() => countByStage(listOrders, "belum_dipacking"), [listOrders]);
+
+  // Ringkasan menu Pre-Order (dari semua PO bulan terpilih + antrean stok dari server).
+  const poStats = useMemo(() => {
+    const waiting = listOrders.filter((order) => order.preorder_waiting).length;
+    const ready = listOrders.filter((order) => order.is_preorder && !order.preorder_waiting && order.status !== "dibatalkan").length;
+    return { waiting, ready, total: listOrders.length };
+  }, [listOrders]);
 
   // Warna badge STATUS pesanan (bukan tahap packing) untuk tabel panel.
   const PANEL_STATUS_COLOR = { pending: "bayar", diproses: "siap", dikirim: "kirim", selesai: "selesai", dibatalkan: "batal" };
@@ -299,6 +371,7 @@ export default function Transaksi({ variant = "ops" }) {
         initialData={editing}
         onSaved={() => queryClient.invalidateQueries({ queryKey: ["transaksi"] })}
         variant={isPanel ? "panel" : "ops"}
+        presetPreorder={isPoPage}
       />
 
       <TransaksiDetailDrawer
@@ -333,10 +406,39 @@ export default function Transaksi({ variant = "ops" }) {
         />
       ) : null}
 
-      <ConfirmDeleteModal
-        isOpen={!!cancelTarget}
+      {/* Pre-order: batal/hapus wajib beralasan (kebijakan: PO tidak dapat dibatalkan ke customer). */}
+      <PreorderReasonDialog
+        isOpen={!!cancelTarget?.is_preorder}
+        action="batal"
+        itemName={cancelTarget ? `${cancelTarget.order_number} · ${cancelTarget.customer_name}` : undefined}
+        isBusy={cancelMutation.isPending}
         onClose={() => setCancelTarget(null)}
-        onConfirm={() => cancelMutation.mutate(cancelTarget)}
+        onConfirm={(why) => cancelMutation.mutate({ order: cancelTarget, why })}
+      />
+      <PreorderReasonDialog
+        isOpen={!!deleteTarget?.is_preorder}
+        action="hapus"
+        itemName={deleteTarget ? `${deleteTarget.order_number} · ${deleteTarget.customer_name}` : undefined}
+        isBusy={deleteMutation.isPending}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={(why) => deleteMutation.mutate({ order: deleteTarget, why })}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={isPoPage && readyAllOpen}
+        onClose={() => setReadyAllOpen(false)}
+        onConfirm={() => readyAllMutation.mutate()}
+        title="Proses semua yang stoknya cukup?"
+        message={`${poSummary?.ready_now_count || 0} pre-order akan ditandai ready dan stoknya dipotong, urut siapa transfer duluan. Yang stoknya belum cukup dilewati.`}
+        confirmLabel="Proses"
+        busyLabel="Memproses..."
+        isDeleting={readyAllMutation.isPending}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={!!cancelTarget && !cancelTarget.is_preorder}
+        onClose={() => setCancelTarget(null)}
+        onConfirm={() => cancelMutation.mutate({ order: cancelTarget })}
         title="Batalkan transaksi ini?"
         itemName={cancelTarget ? `${cancelTarget.order_number} · ${cancelTarget.customer_name}` : undefined}
         message={
@@ -350,9 +452,9 @@ export default function Transaksi({ variant = "ops" }) {
       />
 
       <ConfirmDeleteModal
-        isOpen={!!deleteTarget}
+        isOpen={!!deleteTarget && !deleteTarget.is_preorder}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={() => deleteMutation.mutate(deleteTarget)}
+        onConfirm={() => deleteMutation.mutate({ order: deleteTarget })}
         title="Hapus transaksi ini?"
         itemName={deleteTarget ? `${deleteTarget.order_number} · ${deleteTarget.customer_name}` : undefined}
         message={
@@ -369,6 +471,72 @@ export default function Transaksi({ variant = "ops" }) {
 
   return (
     <div className={isPanel ? undefined : "ops-tx"}>
+        {isPoPage ? (
+          <>
+            <section className="ks" data-testid="preorder-kpis">
+              <div className="card k">
+                <small>Menunggu stok</small>
+                <b style={{ color: "#7e22ce" }}>
+                  <AnimatedNumber value={isLoading || poSummaryLoading ? 0 : poSummary?.waiting_count ?? poStats.waiting} />
+                </b>
+                <i>Sudah Lunas, belum diproses</i>
+              </div>
+              <div className="card k">
+                <small>Bisa diproses sekarang</small>
+                <b style={{ color: "#2e64c9" }}>
+                  <AnimatedNumber value={isLoading || poSummaryLoading ? 0 : poSummary?.ready_now_count ?? 0} />
+                </b>
+                <i>Stok cukup, urut siapa transfer duluan</i>
+              </div>
+              <div className="card k">
+                <small>Sudah ready bulan ini</small>
+                <b><AnimatedNumber value={isLoading ? 0 : poStats.ready} /></b>
+                <i>Diproses seperti pesanan biasa</i>
+              </div>
+              <div className="card k">
+                <small>Total pre-order bulan ini</small>
+                <b><AnimatedNumber value={isLoading ? 0 : poStats.total} /></b>
+                <i>Termasuk yang dibatalkan</i>
+              </div>
+            </section>
+
+            {/* Ringkasan kebutuhan barang: apa yang harus datang supaya PO bisa diproses. Baca-saja. */}
+            {(poSummary?.demand || []).length > 0 ? (
+              <div className="card tw" data-testid="preorder-demand" style={{ marginBottom: 12 }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Kebutuhan barang (PO menunggu)</th>
+                      <th style={{ textAlign: "right" }}>Dibutuhkan</th>
+                      <th style={{ textAlign: "right" }}>Stok</th>
+                      <th style={{ textAlign: "right" }}>Kurang</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {poSummary.demand.map((row) => {
+                      const kurang = Math.max(0, row.needed - row.stock);
+                      return (
+                        <tr key={row.key} style={{ cursor: "default" }}>
+                          <td>
+                            <b>{row.product_name}</b>
+                            <small>
+                              {[row.series, row.color && row.color !== "default" ? row.color : "", row.size].filter(Boolean).join(" · ")} · {row.orders} pesanan
+                            </small>
+                          </td>
+                          <td className="mono" style={{ textAlign: "right" }}>{row.needed}</td>
+                          <td className="mono" style={{ textAlign: "right" }}>{row.stock}</td>
+                          <td className="mono" style={{ textAlign: "right", color: kurang > 0 ? "#b45309" : "#047857", fontWeight: 700 }}>
+                            {kurang > 0 ? kurang : "cukup"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </>
+        ) : (
         <section className="ks">
           <div className="card k">
             <small>Total transaksi</small>
@@ -396,23 +564,44 @@ export default function Transaksi({ variant = "ops" }) {
             <i>Packing + siap kirim</i>
           </div>
         </section>
+        )}
 
         <div className="bar">
           <div className="tabs">
-            {stageTabs.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                className={`tab${stageFilter === tab.key ? " on" : ""}`}
-                onClick={() => setStageFilter(tab.key)}
-              >
-                <span className="ti">
-                  <StageIcon stage={tab.key} />
-                </span>
-                <span className="tl2">{tab.label}</span>
-                <em>{tab.count}</em>
-              </button>
-            ))}
+            {isPoPage
+              ? [
+                  { key: "menunggu", label: "Menunggu stok", count: poStats.waiting, stage: "menunggu_stok" },
+                  { key: "ready", label: "Sudah ready", count: poStats.ready, stage: "belum_dipacking" },
+                  { key: "semua", label: "Semua", count: poStats.total, stage: "semua" },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    data-testid={`po-tab-${tab.key}`}
+                    className={`tab${poFilter === tab.key ? " on" : ""}`}
+                    onClick={() => setPoFilter(tab.key)}
+                  >
+                    <span className="ti">
+                      <StageIcon stage={tab.stage} />
+                    </span>
+                    <span className="tl2">{tab.label}</span>
+                    <em>{tab.count}</em>
+                  </button>
+                ))
+              : stageTabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    className={`tab${stageFilter === tab.key ? " on" : ""}`}
+                    onClick={() => setStageFilter(tab.key)}
+                  >
+                    <span className="ti">
+                      <StageIcon stage={tab.key} />
+                    </span>
+                    <span className="tl2">{tab.label}</span>
+                    <em>{tab.count}</em>
+                  </button>
+                ))}
           </div>
 
           <div className="f">
@@ -424,16 +613,18 @@ export default function Transaksi({ variant = "ops" }) {
             />
             {/* Filter cepat khusus admin: antrean pesanan yang belum dipacking.
                 Bukan tab — packing adalah sub-status dari pesanan `diproses`. */}
-            <button
-              type="button"
-              className={`packf${stageFilter === "belum_dipacking" ? " on" : ""}`}
-              onClick={() => setStageFilter((current) => (current === "belum_dipacking" ? "semua" : "belum_dipacking"))}
-              aria-pressed={stageFilter === "belum_dipacking"}
-              title="Tampilkan hanya pesanan yang belum dipacking"
-            >
-              Belum di packing
-              <em>{belumDipacking}</em>
-            </button>
+            {isPoPage ? null : (
+              <button
+                type="button"
+                className={`packf${stageFilter === "belum_dipacking" ? " on" : ""}`}
+                onClick={() => setStageFilter((current) => (current === "belum_dipacking" ? "semua" : "belum_dipacking"))}
+                aria-pressed={stageFilter === "belum_dipacking"}
+                title="Tampilkan hanya pesanan yang belum dipacking"
+              >
+                Belum di packing
+                <em>{belumDipacking}</em>
+              </button>
+            )}
             <div className="ptx-month">
               <button type="button" onClick={prevMonth} aria-label="Bulan sebelumnya">
                 ‹
@@ -470,6 +661,18 @@ export default function Transaksi({ variant = "ops" }) {
                 Reset
               </button>
             ) : null}
+            {isPoPage ? (
+              <button
+                type="button"
+                className="btn-sec"
+                data-testid="po-ready-all"
+                disabled={!poSummary || (poSummary.ready_now_count || 0) === 0 || readyAllMutation.isPending}
+                onClick={() => setReadyAllOpen(true)}
+                title="Tandai ready semua pre-order yang stoknya cukup, urut siapa transfer duluan"
+              >
+                Proses semua yang stoknya cukup
+              </button>
+            ) : null}
             <button
               type="button"
               className="btn"
@@ -478,7 +681,7 @@ export default function Transaksi({ variant = "ops" }) {
                 setFormOpen(true);
               }}
             >
-              Tambah Transaksi
+              {isPoPage ? "Tambah Pre-Order" : "Tambah Transaksi"}
             </button>
           </div>
         </div>
@@ -489,10 +692,20 @@ export default function Transaksi({ variant = "ops" }) {
           ) : visibleOrders.length === 0 ? (
             <div style={{ padding: 48, textAlign: "center", color: "#8a7d83" }}>
               <b style={{ color: "#2a1a22" }}>
-                {filtersActive ? "Tidak ada transaksi yang cocok" : `Belum ada transaksi di ${MONTHS[month]} ${year}`}
+                {filtersActive
+                  ? "Tidak ada transaksi yang cocok"
+                  : isPoPage
+                    ? poFilter === "menunggu"
+                      ? `Tidak ada pre-order yang menunggu stok di ${MONTHS[month]} ${year}`
+                      : `Belum ada pre-order di ${MONTHS[month]} ${year}`
+                    : `Belum ada transaksi di ${MONTHS[month]} ${year}`}
               </b>
               <p style={{ fontSize: 13, marginTop: 4 }}>
-                {filtersActive ? "Ubah pencarian atau filter, atau tampilkan semua." : 'Klik "Tambah Transaksi" untuk mencatat penjualan manual.'}
+                {filtersActive
+                  ? "Ubah pencarian atau filter, atau tampilkan semua."
+                  : isPoPage
+                    ? 'Klik "Tambah Pre-Order" untuk mencatat pesanan yang customer-nya sudah transfer.'
+                    : 'Klik "Tambah Transaksi" untuk mencatat penjualan manual.'}
               </p>
             </div>
           ) : (
@@ -527,6 +740,14 @@ export default function Transaksi({ variant = "ops" }) {
                     <tr key={order.id} onClick={() => setDetail(order)}>
                       <td data-label="No. Pesanan">
                         <span className="id">{order.order_number}</span>
+                        {order.is_preorder ? (
+                          <em
+                            data-testid="po-badge"
+                            style={{ marginLeft: 6, fontStyle: "normal", fontSize: 10, fontWeight: 800, color: "#7e22ce", background: "#f3e8ff", borderRadius: 6, padding: "1px 6px" }}
+                          >
+                            PRE-ORDER
+                          </em>
+                        ) : null}
                         <small>
                           {formatTanggalSingkatID(order.date_wib)} · {order.time_wib}
                         </small>
@@ -566,13 +787,38 @@ export default function Transaksi({ variant = "ops" }) {
                         {/* Penanda packing khusus pesanan lunas yang belum dikirim:
                             resi sudah dibuat = menunggu dijemput kurir J&T. */}
                         {order.status === "diproses" ? (
-                          <small className={order.awb_no ? "pack-done" : "pack-todo"}>
-                            {order.awb_no ? "Menunggu pickup" : "Belum di packing"}
-                          </small>
+                          order.preorder_waiting ? (
+                            <small className="pack-todo">Menunggu stok</small>
+                          ) : (
+                            <small className={order.awb_no ? "pack-done" : "pack-todo"}>
+                              {order.awb_no ? "Menunggu pickup" : "Belum di packing"}
+                            </small>
+                          )
                         ) : null}
                       </td>
                       <td data-label="Status">
                         <span className={`bd s-${PANEL_STATUS_COLOR[order.status] || "batal"}`}>{order.status_label}</span>
+                        {/* Menu Pre-Order: tombol "Stok sudah ready" langsung di baris (stok dicek server). */}
+                        {isPoPage && order.preorder_waiting ? (
+                          <button
+                            type="button"
+                            className="btn-sec"
+                            data-testid="po-ready"
+                            style={{ marginTop: 6, padding: "2px 8px", fontSize: 11 }}
+                            disabled={readyMutation.isPending || poReadyByNumber.get(order.order_number)?.can_ready === false}
+                            title={
+                              poReadyByNumber.get(order.order_number)?.can_ready === false
+                                ? "Stok belum cukup untuk pesanan ini"
+                                : "Tandai barang sudah ada: stok dipotong, lalu siap dibuatkan resi"
+                            }
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              readyMutation.mutate(order);
+                            }}
+                          >
+                            Stok sudah ready
+                          </button>
+                        ) : null}
                       </td>
                       <td className="chev" style={{ textAlign: "right" }}>
                         ›

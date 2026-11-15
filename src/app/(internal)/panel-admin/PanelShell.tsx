@@ -134,6 +134,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { label: "AI Performance", href: "/panel-admin/ai-performance", icon: "spark" },
       { label: "Perlu Review", href: "/panel-admin/perlu-review", icon: "alert", badge: "drafts" },
       { label: "Transaksi", href: "/panel-admin/transaksi", icon: "card" },
+      { label: "Pre-Order", href: "/panel-admin/preorder", icon: "box" },
       { label: "Reseller", href: "/panel-admin/reseller", icon: "reseller", badge: "reseller" },
       { label: "Return", href: "/panel-admin/retur", icon: "return" },
       { label: "Promo", href: "/panel-admin/promo", icon: "tag" },

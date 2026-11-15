@@ -118,6 +118,19 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
 
   if (!order) return null;
 
+  // Pre-order yang menunggu stok: belum ada barang untuk dikirim, jadi TIDAK ada tombol resi/kirim/GoSend
+  // (server juga menolaknya). Dibuka lagi setelah admin menandai "Stok sudah ready" di menu Pre-Order.
+  if (order.preorder_waiting === true && !cancelled) {
+    return (
+      <div
+        data-testid="preorder-waiting-panel"
+        className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2.5 text-xs font-semibold text-purple-800 dark:border-purple-900/40 dark:bg-purple-900/20 dark:text-purple-200"
+      >
+        Pre-order menunggu stok. Resi dan pengiriman dibuka setelah barangnya tersedia: tandai “Stok sudah ready” di menu Pre-Order.
+      </div>
+    );
+  }
+
   // Status GoSend terkini: hasil aksi barusan menang atas data pesanan yang dibawa dari induk.
   const goStatus = goPatch?.status ?? order.status;
   const goShip = goPatch?.shipping_status ?? order.shipping_status ?? "";

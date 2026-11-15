@@ -8,6 +8,13 @@ export default function StageIcon({ stage }: { stage: string }) {
           <path d="M3 10h18M7 15h3" />
         </svg>
       );
+    case "menunggu_stok":
+      return (
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </svg>
+      );
     case "belum_dipacking":
       return (
         <svg viewBox="0 0 24 24">

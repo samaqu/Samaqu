@@ -132,6 +132,16 @@ export default function TambahBarangMasuk() {
     initialData: [],
   });
 
+  // Pre-order yang menunggu barang (baca-saja): pengingat supaya admin menekan "Stok sudah ready"
+  // di menu Pre-Order setelah barang masuk. Gagal memuat tidak mengganggu form.
+  const { data: poSummary } = useQuery({
+    queryKey: ["transaksi", "preorder-summary"],
+    queryFn: () => base44.entities.Preorder.summary(),
+    retry: false,
+    staleTime: 60_000,
+  });
+  const poDemand = (poSummary?.demand || []).filter((row) => row.needed > row.stock).slice(0, 5);
+
   const variantsOf = (productId) => allVariants.filter((v) => v.product_id === productId);
   const productOf = (item) => products.find((p) => p.id === item.product_id) || null;
   const variantOf = (item) => allVariants.find((v) => v.id === item.variant_id) || null;
@@ -531,6 +541,28 @@ export default function TambahBarangMasuk() {
             Catat beberapa produk sekaligus — stok langsung masuk ke gudang
           </p>
         </div>
+
+        {(poSummary?.waiting_count || 0) > 0 ? (
+          <div
+            data-testid="preorder-banner"
+            className="mb-6 rounded-2xl border border-purple-200 bg-purple-50 px-5 py-4 font-inter"
+            style={{ fontSize: "14px", color: "#581c87" }}
+          >
+            <b>Ada {poSummary.waiting_count} pre-order menunggu barang.</b>{" "}
+            {poDemand.length > 0 ? "Yang masih kurang:" : "Stok sudah cukup untuk semua."}
+            {poDemand.length > 0 ? (
+              <ul style={{ margin: "6px 0 0 18px", listStyle: "disc" }}>
+                {poDemand.map((row) => (
+                  <li key={row.key}>
+                    {row.product_name}
+                    {row.series ? ` ${row.series}` : ""} · {row.size}: butuh {row.needed}, stok {row.stock}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div style={{ marginTop: 6 }}>Setelah barang dicatat masuk, buka menu Pre-Order lalu tekan “Stok sudah ready”.</div>
+          </div>
+        ) : null}
 
         <form onSubmit={handleSubmit} noValidate className="space-y-6">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
