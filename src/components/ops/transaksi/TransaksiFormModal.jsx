@@ -35,7 +35,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Check, Clock, Info, Lightbulb, Loader2, Pencil, Plus, RotateCcw, Save, Shirt, Trash2, Truck, Wand2, X } from "lucide-react";
+import { AlertCircle, Check, Clock, Info, Lightbulb, Loader2, Pencil, Plus, RotateCcw, Save, Shirt, Store, Trash2, Truck, UserRound, Wand2, X } from "lucide-react";
 import { base44 } from "@/lib/ops-api";
 import { GOSEND_CUSTOMER, GOSEND_SAMAQU, isGosend } from "@/lib/gosend";
 import { MANUAL_PRICE_MAX, MANUAL_PRICE_MIN, MANUAL_SOURCE_KEYS, SOURCE_LABEL, manualPrice } from "@/lib/transaksi";
@@ -3566,7 +3566,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
               {/* Ongkir & diskon */}
               <section className="space-y-2.5">
                 <h4 className={sectionClass}>Ongkir &amp; Diskon</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className={labelClass}>Ongkir</label>
                     <div className="relative">
@@ -3585,69 +3585,6 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                         className={`${inputClass} pl-10 disabled:opacity-60`}
                       />
                     </div>
-                    <button
-                      type="button"
-                      onClick={checkOngkir}
-                      disabled={ongkir.status === "loading"}
-                      className={`mt-2 w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-bold disabled:opacity-60 disabled:cursor-wait transition-colors ${
-                        isPanelForm
-                          ? "border-[#f3c7d6] dark:border-rose-900/50 text-[#c2255c] dark:text-rose-300 hover:bg-[#fdf3f7] dark:hover:bg-rose-900/20"
-                          : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                      }`}
-                    >
-                      {ongkir.status === "loading" ? (
-                        <Loader2 size={15} className="animate-spin" />
-                      ) : (
-                        <Truck size={15} />
-                      )}
-                      {ongkir.status === "loading" ? "Menghitung ongkir…" : "Cek Ongkir J&T"}
-                    </button>
-
-                    {/* Kurir GoSend: tanpa resi J&T. Ongkir tidak dicatat (dikunci 0). Klik pilihan yang
-                        sedang aktif untuk melepasnya; memilih layanan J&T dari hasil Cek Ongkir juga
-                        melepasnya. Server memaksa ongkir 0 untuk GoSend, jadi tidak bergantung pada layar. */}
-                    <div className="mt-3" data-testid="gosend-picker">
-                      <p className={labelClass}>Atau kirim lewat GoSend</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { value: GOSEND_SAMAQU, label: "GoSend SAMAQU", hint: "Admin yang booking driver" },
-                          { value: GOSEND_CUSTOMER, label: "GoSend Customer", hint: "Customer booking sendiri" },
-                        ].map((option) => {
-                          const active = form.shipping_method === option.value;
-                          return (
-                            <button
-                              key={option.value}
-                              type="button"
-                              aria-pressed={active}
-                              onClick={() => {
-                                setTouched(true);
-                                setSelectedService("");
-                                updateForm(
-                                  active
-                                    ? { shipping_method: "" }
-                                    : { shipping_method: option.value, shipping_cost: "" },
-                                );
-                              }}
-                              className={`rounded-xl border-2 px-3 py-2 text-left transition-colors ${
-                                active
-                                  ? isPanelForm
-                                    ? "border-[#c2255c] bg-[#fdf3f7] dark:bg-rose-900/20"
-                                    : "border-slate-900 bg-slate-100 dark:border-white dark:bg-slate-800"
-                                  : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
-                              }`}
-                            >
-                              <span className="block text-sm font-bold text-slate-900 dark:text-white">{option.label}</span>
-                              <span className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400">{option.hint}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {gosendOn ? (
-                        <p className="mt-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                          Ongkir GoSend tidak dicatat, jadi dikunci Rp 0. Tidak ada resi J&T untuk pesanan ini.
-                        </p>
-                      ) : null}
-                    </div>
                   </div>
                   <div>
                     <label className={labelClass}>Diskon (opsional)</label>
@@ -3663,6 +3600,103 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Cek ongkir J&T: aksi untuk kolom Ongkir, dibuat selebar kedua isian supaya rapi. */}
+                <button
+                  type="button"
+                  onClick={checkOngkir}
+                  disabled={ongkir.status === "loading"}
+                  className={`w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-bold disabled:opacity-60 disabled:cursor-wait transition-colors ${
+                    isPanelForm
+                      ? "border-[#f3c7d6] dark:border-rose-900/50 text-[#c2255c] dark:text-rose-300 hover:bg-[#fdf3f7] dark:hover:bg-rose-900/20"
+                      : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  {ongkir.status === "loading" ? (
+                    <Loader2 size={15} className="animate-spin" />
+                  ) : (
+                    <Truck size={15} />
+                  )}
+                  {ongkir.status === "loading" ? "Menghitung ongkir…" : "Cek Ongkir J&T"}
+                </button>
+
+                {/* Kurir GoSend: tanpa resi J&T. Ongkir tidak dicatat (dikunci 0). Klik pilihan yang
+                    sedang aktif untuk melepasnya; memilih layanan J&T dari hasil Cek Ongkir juga
+                    melepasnya. Server memaksa ongkir 0 untuk GoSend, jadi tidak bergantung pada layar. */}
+                <div className="pt-1" data-testid="gosend-picker">
+                  <div className="flex items-center gap-3 mb-2.5">
+                    <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                    <p className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Atau kirim lewat GoSend
+                    </p>
+                    <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {[
+                      { value: GOSEND_SAMAQU, label: "GoSend SAMAQU", hint: "Admin yang booking driver", Icon: Store },
+                      { value: GOSEND_CUSTOMER, label: "GoSend Customer", hint: "Customer booking sendiri", Icon: UserRound },
+                    ].map((option) => {
+                      const active = form.shipping_method === option.value;
+                      const OptionIcon = option.Icon;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => {
+                            setTouched(true);
+                            setSelectedService("");
+                            updateForm(
+                              active
+                                ? { shipping_method: "" }
+                                : { shipping_method: option.value, shipping_cost: "" },
+                            );
+                          }}
+                          className={`flex items-center gap-3 rounded-xl border-2 px-3.5 py-3 text-left transition-colors ${
+                            active
+                              ? isPanelForm
+                                ? "border-[#c2255c] bg-[#fdf3f7] dark:bg-rose-900/20"
+                                : "border-slate-900 bg-slate-100 dark:border-white dark:bg-slate-800"
+                              : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                          }`}
+                        >
+                          <span
+                            className={`grid place-items-center w-9 h-9 shrink-0 rounded-lg transition-colors ${
+                              active
+                                ? isPanelForm
+                                  ? "bg-white text-[#c2255c] dark:bg-rose-900/40 dark:text-rose-300"
+                                  : "bg-white text-slate-900 dark:bg-slate-700 dark:text-white"
+                                : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                            }`}
+                          >
+                            <OptionIcon size={18} />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-bold text-slate-900 dark:text-white truncate">{option.label}</span>
+                            <span className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate">{option.hint}</span>
+                          </span>
+                          <span
+                            className={`grid place-items-center w-5 h-5 shrink-0 rounded-full border-2 transition-colors ${
+                              active
+                                ? isPanelForm
+                                  ? "border-[#c2255c] bg-[#c2255c] text-white"
+                                  : "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900"
+                                : "border-slate-300 dark:border-slate-600 text-transparent"
+                            }`}
+                          >
+                            <Check size={12} strokeWidth={3} />
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {gosendOn ? (
+                    <p className="mt-2 flex items-start gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                      <Info size={13} className="mt-px shrink-0" />
+                      Ongkir GoSend tidak dicatat, jadi dikunci Rp 0. Tidak ada resi J&T untuk pesanan ini.
+                    </p>
+                  ) : null}
                 </div>
 
                 {ongkirStale && (
