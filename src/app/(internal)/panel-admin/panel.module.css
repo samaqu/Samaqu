@@ -1681,3 +1681,51 @@ svg.heart { width: 14px; height: 14px; fill: #e46a92; stroke: none; color: #e46a
   .mobileMenuBtn { display: grid; }
   .navScrim { display: block; }
 }
+
+/* ---------- grup menu yang bisa dilipat (sidebar) ----------
+   Judul grup memakai kelas .navItem (warna, hover, ikon, mode terlipat ikut aturan yang sudah ada),
+   di sini hanya reset tombol + panah + submenu. Ditaruh di akhir file supaya mengalahkan `.nav a`. */
+.navGroupBtn {
+  width: 100%;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.navGroupBtn:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+.nav .navChevron {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  margin-left: auto;
+  transition: transform 0.18s ease;
+}
+.nav .navChevronOpen { transform: rotate(90deg); }
+/* Judul grup yang halamannya sedang dibuka tapi grupnya tertutup (atau sidebar terlipat). */
+.navGroupActive { color: #fff; }
+.navGroupActive svg { color: #f3a7c0; }
+/* Submenu: teks saja, garis tipis di kiri. */
+.navSub {
+  margin: 2px 0 8px 19px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+}
+.navSub a {
+  padding: 8px 10px;
+  margin-bottom: 1px;
+  border-radius: 10px;
+}
+.navSub .navLabel { font-size: 13px; }
+
+.sunflower .navGroupActive { color: #3a2a0c; }
+.sunflower .navGroupActive svg { color: #3a2a0c; }
+.sunflower .navSub { border-left-color: rgba(138, 109, 42, 0.3); }
+.tropical .navGroupActive { color: #34566b; }
+.tropical .navGroupActive svg { color: #168aad; }
+.tropical .navSub { border-left-color: rgba(72, 138, 173, 0.32); }
+
+@media (min-width: 901px) {
+  /* Sidebar terlipat (mode ikon): submenu dan panah disembunyikan. */
+  :global(html[data-panel-sidebar="collapsed"]) .navSub,
+  :global(html[data-panel-sidebar="collapsed"]) .nav .navChevron { display: none; }
+}

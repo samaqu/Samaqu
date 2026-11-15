@@ -48,7 +48,7 @@ const THEME_SWATCH_CLASS: Record<PanelTheme, string> = {
 };
 const themeLabel = (id: PanelTheme) => THEMES.find((option) => option.id === id)?.label ?? "Berry";
 
-type IconName = "home" | "card" | "box" | "users" | "spark" | "return" | "star" | "reseller" | "tag" | "alert" | "clock" | "clipboard";
+type IconName = "home" | "card" | "box" | "users" | "spark" | "return" | "star" | "reseller" | "tag" | "alert" | "clock" | "clipboard" | "dashboard";
 
 function NavIcon({ name }: { name: IconName }) {
   switch (name) {
@@ -113,6 +113,15 @@ function NavIcon({ name }: { name: IconName }) {
           <path d="M12 3l2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />
         </svg>
       );
+    case "dashboard":
+      return (
+        <svg viewBox="0 0 24 24">
+          <rect x="3" y="3" width="7.5" height="7.5" rx="1.8" />
+          <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.8" />
+          <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.8" />
+          <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.8" />
+        </svg>
+      );
     case "clock":
       return (
         <svg viewBox="0 0 24 24">
@@ -141,16 +150,20 @@ function NavIcon({ name }: { name: IconName }) {
 
 type NavItem = { label: string; href: string; icon: IconName; soon?: boolean; badge?: "reviews" | "reseller" | "drafts" };
 
-const NAV: { section: string; items: NavItem[] }[] = [
-  {
-    section: "Ringkasan",
-    items: [
-      { label: "Beranda", href: "/panel-admin", icon: "home" },
-      { label: "AI Performance", href: "/panel-admin/ai-performance", icon: "spark" },
-    ],
-  },
+type NavGroup = { section: string; icon: IconName; items: NavItem[] };
+
+/** Menu paling atas: berdiri sendiri, tidak masuk grup yang bisa dilipat. */
+const NAV_TOP: NavItem = { label: "Dashboard", href: "/panel-admin", icon: "dashboard" };
+
+/**
+ * Grup menu yang bisa dilipat (judul grup = ikon + nama + panah; isinya teks saja).
+ * Grup yang berisi halaman aktif terbuka otomatis. Menu, route, dan badge sama seperti
+ * sebelumnya — hanya cara menampilkannya yang berubah.
+ */
+const NAV: NavGroup[] = [
   {
     section: "Penjualan",
+    icon: "card",
     items: [
       { label: "Perlu Review", href: "/panel-admin/perlu-review", icon: "alert", badge: "drafts" },
       { label: "Transaksi", href: "/panel-admin/transaksi", icon: "card" },
@@ -159,7 +172,8 @@ const NAV: { section: string; items: NavItem[] }[] = [
     ],
   },
   {
-    section: "Pelanggan & Promosi",
+    section: "Pelanggan",
+    icon: "users",
     items: [
       { label: "Leads", href: "/panel-admin/leads", icon: "users" },
       { label: "Reseller", href: "/panel-admin/reseller", icon: "reseller", badge: "reseller" },
@@ -169,6 +183,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
   },
   {
     section: "Produk & Stok",
+    icon: "box",
     items: [
       { label: "Produk", href: "/panel-admin/produk", icon: "box" },
       { label: "Stok Opname", href: "/panel-admin/stok-opname", icon: "clipboard" },
@@ -176,10 +191,27 @@ const NAV: { section: string; items: NavItem[] }[] = [
     ],
   },
   {
-    section: "Bantuan",
-    items: [{ label: "Asisten", href: "/panel-admin/assistant", icon: "spark" }],
+    section: "Asisten AI",
+    icon: "spark",
+    items: [
+      { label: "Asisten", href: "/panel-admin/assistant", icon: "spark" },
+      { label: "AI Performance", href: "/panel-admin/ai-performance", icon: "spark" },
+    ],
   },
 ];
+
+/** Menu yang cocok dengan alamat sekarang (Dashboard hanya cocok persis). */
+function activeNavItem(pathname: string): NavItem | undefined {
+  return [NAV_TOP, ...NAV.flatMap((group) => group.items)].find((item) =>
+    item.href === "/panel-admin" ? pathname === item.href : pathname.startsWith(item.href)
+  );
+}
+
+/** Nama grup yang berisi halaman aktif (kosong kalau yang aktif Dashboard). */
+function activeNavGroup(pathname: string): string | undefined {
+  const href = activeNavItem(pathname)?.href;
+  return NAV.find((group) => group.items.some((item) => item.href === href))?.section;
+}
 
 /**
  * Peta nama halaman (konvensi Base44) → route panel admin. Dipakai halaman ops yang dititipkan
@@ -220,6 +252,13 @@ export default function PanelShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   /** Drawer menu khusus mobile (<=900px). Desktop tidak memakai state ini. */
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  /** Grup menu yang sedang terbuka. Grup berisi halaman aktif otomatis ditambahkan. */
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
+  const activeGroup = activeNavGroup(pathname);
+  useEffect(() => {
+    if (!activeGroup) return;
+    setOpenGroups((prev) => (prev.includes(activeGroup) ? prev : [...prev, activeGroup]));
+  }, [activeGroup]);
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -441,9 +480,48 @@ export default function PanelShell({ children }: { children: ReactNode }) {
     );
   }
 
-  const activeItem = NAV.flatMap((g) => g.items).find((item) =>
-    item.href === "/panel-admin" ? pathname === item.href : pathname.startsWith(item.href)
-  );
+  const activeItem = activeNavItem(pathname);
+
+  const badgeCount = (item: NavItem) =>
+    item.badge === "reviews" ? pendingReviews : item.badge === "drafts" ? pendingDrafts : item.badge === "reseller" ? resellerQueue : 0;
+
+  /** Satu tautan menu. Submenu di dalam grup tampil tanpa ikon (withIcon = false). */
+  const renderNavLink = (item: NavItem, withIcon: boolean) => {
+    if (item.soon) {
+      return (
+        <div key={item.label} className={`${styles.navItem} ${styles.navItemSoon}`}>
+          {withIcon ? <NavIcon name={item.icon} /> : null}
+          <span className={styles.navLabel}>{item.label}</span>
+          <span className={styles.soon}>SOON</span>
+        </div>
+      );
+    }
+    const count = badgeCount(item);
+    return (
+      <Link
+        key={item.label}
+        href={item.href}
+        title={item.label}
+        onClick={() => setMobileNavOpen(false)}
+        className={activeItem?.href === item.href ? styles.on : undefined}
+      >
+        {withIcon ? <NavIcon name={item.icon} /> : null}
+        <span className={styles.navLabel}>{item.label}</span>
+        {count > 0 && <span className={styles.navBadge}>{count}</span>}
+      </Link>
+    );
+  };
+
+  const toggleGroup = (section: string) => {
+    // Sidebar terlipat (mode ikon): submenu tidak punya tempat, jadi klik grup membuka sidebar
+    // dan grup itu sekaligus.
+    if (collapsed) {
+      toggleSidebar();
+      setOpenGroups((prev) => (prev.includes(section) ? prev : [...prev, section]));
+      return;
+    }
+    setOpenGroups((prev) => (prev.includes(section) ? prev.filter((name) => name !== section) : [...prev, section]));
+  };
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -458,43 +536,41 @@ export default function PanelShell({ children }: { children: ReactNode }) {
         </div>
 
         <nav className={styles.nav}>
-          {NAV.map((group) => (
-            <div key={group.section}>
-              <div className={styles.sec}>{group.section}</div>
-              {group.items.map((item) => {
-                if (item.soon) {
-                  return (
-                    <div key={item.label} className={`${styles.navItem} ${styles.navItemSoon}`}>
-                      <NavIcon name={item.icon} />
-                      <span className={styles.navLabel}>{item.label}</span>
-                      <span className={styles.soon}>SOON</span>
-                    </div>
-                  );
-                }
-                return (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    title={item.label}
-                    onClick={() => setMobileNavOpen(false)}
-                    className={activeItem?.href === item.href ? styles.on : undefined}
+          {renderNavLink(NAV_TOP, true)}
+          {NAV.map((group) => {
+            const open = openGroups.includes(group.section);
+            const hasActive = group.section === activeGroup;
+            const childBadges = group.items.reduce((sum, item) => sum + badgeCount(item), 0);
+            const panelId = `nav-group-${group.section.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+            return (
+              <div key={group.section}>
+                <button
+                  type="button"
+                  className={`${styles.navItem} ${styles.navGroupBtn}${hasActive && (!open || collapsed) ? ` ${styles.navGroupActive}` : ""}`}
+                  aria-expanded={open && !collapsed}
+                  aria-controls={panelId}
+                  title={group.section}
+                  onClick={() => toggleGroup(group.section)}
+                >
+                  <NavIcon name={group.icon} />
+                  <span className={styles.navLabel}>{group.section}</span>
+                  {!open && childBadges > 0 && <span className={styles.navBadge}>{childBadges}</span>}
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    className={`${styles.navChevron}${open ? ` ${styles.navChevronOpen}` : ""}`}
                   >
-                    <NavIcon name={item.icon} />
-                    <span className={styles.navLabel}>{item.label}</span>
-                    {item.badge === "reviews" && pendingReviews > 0 && (
-                      <span className={styles.navBadge}>{pendingReviews}</span>
-                    )}
-                    {item.badge === "drafts" && pendingDrafts > 0 && (
-                      <span className={styles.navBadge}>{pendingDrafts}</span>
-                    )}
-                    {item.badge === "reseller" && resellerQueue > 0 && (
-                      <span className={styles.navBadge}>{resellerQueue}</span>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </button>
+                {open ? (
+                  <div id={panelId} className={styles.navSub}>
+                    {group.items.map((item) => renderNavLink(item, false))}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </nav>
 
         <div className={styles.foot}>
