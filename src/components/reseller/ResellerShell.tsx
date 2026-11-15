@@ -176,6 +176,23 @@ export default function ResellerShell({ children }: { children: ReactNode }) {
     }
   }, [me]);
 
+  /**
+   * Halaman login = titik awal sesi baru, jadi catatan sesi sebelumnya dibuang di sini.
+   *
+   * Layout ini TIDAK ikut di-mount ulang saat pindah antar halaman reseller. Tanpa reset:
+   * - Buka /reseller lebih dulu (belum login) → `loadedRef`=true dan state "unauth" tertinggal.
+   *   Setelah OTP berhasil dan pindah ke /reseller, sesi tidak dicek lagi, state "unauth"
+   *   melempar balik ke login, halaman login melihat token sah lalu pindah ke /reseller lagi
+   *   → bolak-balik tanpa henti sampai refresh ("OTP kelihatan muter / crash").
+   * - Logout lalu login sebagai reseller lain di tab yang sama → data `me` akun lama masih tampil.
+   */
+  useEffect(() => {
+    if (!isLogin) return;
+    loadedRef.current = false;
+    setMe(null);
+    setState("loading");
+  }, [isLogin]);
+
   useEffect(() => {
     if (isLogin) {
       // Sudah punya sesi? Langsung ke dashboard.
