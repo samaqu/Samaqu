@@ -556,39 +556,6 @@ export async function POST(req: NextRequest) {
   const id = String(body?.id || "").trim();
   if (!id) return bad("id wajib");
 
-  if (action === "escalation_claim") {
-    const { data, error } = await admin
-      .from("wa_escalations")
-      .update({ status: "claimed", claimed_by: actor, claimed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .eq("status", "open")
-      .select()
-      .maybeSingle();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, item: data });
-  }
-
-  if (action === "escalation_instruction") {
-    const instruction = String(body?.instruction || "").trim();
-    if (!instruction) return bad("instruksi wajib");
-    const scope = body?.scope === "global" ? "global" : "customer";
-    const { data, error } = await admin
-      .from("wa_escalations")
-      .update({
-        instruction,
-        instruction_scope: scope,
-        status: "claimed",
-        claimed_by: actor,
-        claimed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .select()
-      .maybeSingle();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, item: data });
-  }
-
   if (action === "draft_delete") {
     const { data, error } = await admin
       .from("order_drafts")
