@@ -18,6 +18,7 @@ import { InstagramGlyph } from "./icons";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import { openOrderProductImage } from "@/lib/open-order-catalog";
 import { openOrderProductPrice, type OpenOrderProduct } from "@/lib/open-order-offering";
+import { useSafeLocale } from "@/lib/safe-i18n";
 import Countdown, { type OpenOrderPhase } from "./Countdown";
 
 const ALL = "semua";
@@ -105,6 +106,7 @@ export default function StepCatalog({
   onOpen: (product: OpenOrderProduct, color: string) => void;
   onViewCart: () => void;
 }) {
+  const locale = useSafeLocale();
   const [category, setCategory] = useState<string>(ALL);
 
   const categories = useMemo(
@@ -202,6 +204,7 @@ export default function StepCatalog({
           startInfoShort={startInfoShort}
           endInfo={endInfo}
           onRemind={onRemind}
+          catalogHref={`/${locale}/katalog`}
         />
       </section>
 

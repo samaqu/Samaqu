@@ -97,6 +97,7 @@ export default function Countdown({
   endInfo,
   remindLabel,
   onRemind,
+  catalogHref,
 }: {
   /** Batas hitung mundur (epoch ms). */
   target: number | null;
@@ -120,6 +121,15 @@ export default function Countdown({
   remindLabel?: string;
   /** Callback tombol pengingat (kalau ada, tombolnya dirender). */
   onRemind?: () => void;
+  /**
+   * Tujuan tombol "Lihat Katalog" saat periode ditutup (mis. "/id/katalog").
+   *
+   * Dulu fase `ended` hanya punya satu tombol ("Kabari Periode Berikutnya"), sehingga
+   * customer yang tetap ingin membeli tidak punya jalan keluar. Katalog biasa tetap buka
+   * di luar periode Open Order, jadi tombol ini menambahkan jalan tersebut. Opsional:
+   * pemanggil yang tidak mengirimnya tidak berubah sama sekali.
+   */
+  catalogHref?: string;
 }) {
   const { parts } = useCountdown(target);
 
@@ -242,6 +252,23 @@ export default function Countdown({
                 <Bell size={16} strokeWidth={2} />
                 {remindLabel || "Kabari Periode Berikutnya"}
               </button>
+            )}
+
+            {/* Jalan keluar saat periode ditutup: katalog biasa tetap buka. Tanpa ini
+                customer hanya melihat "Coming Soon" lalu pergi. */}
+            {catalogHref && (
+              <div className="mt-6 border-t border-white/10 pt-6">
+                <p className="text-sm text-white/60">
+                  Kamu masih bisa membeli dengan harga normal.
+                </p>
+                <a
+                  href={catalogHref}
+                  className="mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full border border-white/25 px-6 text-sm font-semibold text-white transition hover:bg-white/10 sm:w-auto"
+                >
+                  Lihat Katalog
+                  <span aria-hidden="true">&rarr;</span>
+                </a>
+              </div>
             )}
           </div>
         </div>
