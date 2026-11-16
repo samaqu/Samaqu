@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, opsActorEmail, unauthorized } from "@/lib/ops-auth";
-import { getChatConfig } from "@/lib/chat-config";
 import { waMediaSignedUrl } from "@/lib/wa-media";
 import { POTONG_PANJANG_ID, POTONG_PANJANG_NAME, POTONG_PANJANG_PRICE } from "@/lib/layanan";
 
 /**
  * Menu "Perlu Review".
  *
- * - escalation: AI gagal menjawab -> admin memberi instruksi -> AI menyusun draft
- * - learning: instruksi admin disimpan untuk nomor itu / global
+ * - escalation: dibuat bot lewat `escalation_create`. Menjawabnya dilakukan di Chat Academy; panel ini tidak lagi
+ *   membalas customer dan tidak lagi membuat pelajaran (pelajaran AI hanya lewat tab Pelajaran AI di Academy).
  * - order draft: AI menyiapkan draft; order/stok baru dibuat saat admin approve
  *
  * Route ini additive. Tidak mengubah /api/ops/transaksi, stok, lead, atau laporan.
@@ -341,19 +340,6 @@ function withPotongPanjang(payload: any) {
   };
 }
 
-async function history(admin: ReturnType<typeof getSupabaseAdmin>, sender: string) {
-  const { data } = await admin
-    .from("wa_inbox")
-    .select("id, created_at, message, reply_text, status, media_url, media_key")
-    .eq("sender", sender)
-    .order("created_at", { ascending: false })
-    .limit(12);
-  return (data || []).reverse().map((item) => ({
-    ...item,
-    media_url: waMediaSignedUrl(item.media_key) || item.media_url,
-  }));
-}
-
 export async function GET(req: NextRequest) {
   if (!(await isOpsAdmin(req))) return unauthorized();
   const admin = getSupabaseAdmin();
@@ -362,46 +348,20 @@ export async function GET(req: NextRequest) {
   const countsOnly = new URL(req.url).searchParams.get("counts_only") === "1";
 
   if (countsOnly) {
-    const [drafts, escalations] = await Promise.all([
-      admin
-        .from("order_drafts")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "pending"),
-      admin
-        .from("wa_escalations")
-        .select("id", { count: "exact", head: true })
-        .in("status", ["open", "claimed"]),
-    ]);
-    return NextResponse.json({
-      counts: {
-        drafts: drafts.count || 0,
-        escalations: escalations.count || 0,
-      },
-    });
+    const drafts = await admin
+      .from("order_drafts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending");
+    return NextResponse.json({ counts: { drafts: drafts.count || 0 } });
   }
 
-  const [{ data: escalations, error: escalationError }, { data: drafts, error: draftError }] =
-    await Promise.all([
-      admin
-        .from("wa_escalations")
-        .select("*")
-        .in("status", ["open", "claimed", "answered"])
-        .order("created_at", { ascending: false })
-        .limit(50),
-      admin
-        .from("order_drafts")
-        .select("*")
-        .eq("status", "pending")
-        .order("created_at", { ascending: false })
-        .limit(50),
-    ]);
-  if (escalationError) return NextResponse.json({ error: escalationError.message }, { status: 500 });
+  const { data: drafts, error: draftError } = await admin
+    .from("order_drafts")
+    .select("*")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(50);
   if (draftError) return NextResponse.json({ error: draftError.message }, { status: 500 });
-
-  const escalationItems = [];
-  for (const item of escalations || []) {
-    escalationItems.push({ ...item, messages: await history(admin, String(item.sender)) });
-  }
   const draftProductIds = [
     ...new Set(
       (drafts || []).flatMap((draft) => {
@@ -473,10 +433,8 @@ export async function GET(req: NextRequest) {
   });
 
   return NextResponse.json({
-    escalations: escalationItems,
     drafts: draftItems,
     counts: {
-      escalations: escalationItems.filter((item) => item.status === "open" || item.status === "claimed").length,
       drafts: draftItems.length,
     },
   });
@@ -503,46 +461,6 @@ function applyCoverDiscount(payload: any) {
     .reduce((sum: number, item: any) => sum + Math.max(1, Number(item?.quantity) || 1), 0);
   const target = coverQty ? Math.min(COVER_DISCOUNT * coverQty, subtotal) : 0;
   return { ...payload, discount: Math.min(Math.max(current, target), subtotal) };
-}
-
-async function makeAiReply(input: {
-  instruction: string;
-  summary: string;
-  customerMessage?: string;
-}) {
-  const config = await getChatConfig();
-  if (!config.apiKey) throw new Error("API key AI belum diisi.");
-  const prompt = [
-    "Kamu CS SAMAQU yang ramah, sopan, singkat, dan natural.",
-    "Susun SATU balasan WhatsApp untuk customer berdasarkan instruksi admin di bawah.",
-    "Maksimal 2-3 kalimat. Tanpa emoji. Jangan berlebihan memakai kata Kakak.",
-    "Jangan menambah fakta, harga, stok, atau janji yang tidak ada di instruksi.",
-    "Jangan menyebut bahwa ini instruksi admin atau hasil AI.",
-    "",
-    `Pesan/ringkasan customer: ${input.customerMessage || input.summary}`,
-    `Instruksi admin: ${input.instruction}`,
-  ].join("\n");
-
-  const res = await fetch(`${config.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: config.model,
-      temperature: 0.4,
-      // Batas ATAS, bukan target (balasan tetap 2-3 kalimat lewat prompt). Model reasoning (MiMo/Inkling)
-      // menghabiskan token berpikir dari batas yang sama; 260 membuat jawaban kosong ("finish=length").
-      max_tokens: 1500,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(json?.error?.message || `AI gagal (${res.status})`);
-  const reply = String(json?.choices?.[0]?.message?.content || "").trim();
-  if (!reply) throw new Error("AI tidak menghasilkan balasan.");
-  return reply;
 }
 
 export async function POST(req: NextRequest) {
@@ -814,99 +732,6 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", id);
     return NextResponse.json({ ok: true, order_number: txJson?.order_number, total: txJson?.total });
-  }
-
-  if (!action.startsWith("escalation_")) return bad("Aksi tidak dikenal.");
-
-  const { data: escalation, error: escalationError } = await admin
-    .from("wa_escalations")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (escalationError) return NextResponse.json({ error: escalationError.message }, { status: 500 });
-  if (!escalation) return bad("Eskalasi tidak ditemukan.", 404);
-
-  if (action === "escalation_draft") {
-    const instruction = String(body?.instruction || escalation.instruction || "").trim();
-    if (!instruction) return bad("instruksi wajib");
-    try {
-      const reply = await makeAiReply({
-        instruction,
-        summary: String(escalation.summary || ""),
-        customerMessage: String(escalation.customer_message || ""),
-      });
-      const { data, error } = await admin
-        .from("wa_escalations")
-        .update({
-          instruction,
-          instruction_scope: body?.scope === "global" ? "global" : escalation.instruction_scope || "customer",
-          draft_reply: reply,
-          status: "claimed",
-          claimed_by: actor,
-          claimed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", id)
-        .select()
-        .maybeSingle();
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json({ ok: true, item: data, reply });
-    } catch (error) {
-      return bad(error instanceof Error ? error.message : "Gagal menyusun balasan.");
-    }
-  }
-
-  if (action === "escalation_send") {
-    const reply = String(body?.reply || escalation.draft_reply || "").trim();
-    const instruction = String(body?.instruction || escalation.instruction || "").trim();
-    if (!reply || !instruction) return bad("instruksi dan balasan wajib");
-    const sender = sender62(escalation.sender);
-    const token = req.headers.get("authorization") || "";
-    const sendRes = await fetch(new URL("/api/ops/wa-inbox", req.url), {
-      method: "POST",
-      headers: { Authorization: token, "Content-Type": "application/json" },
-      body: JSON.stringify({ target: sender, message: reply }),
-    });
-    const sendJson = await sendRes.json().catch(() => null);
-    if (!sendRes.ok) return bad(sendJson?.error || `Gagal kirim (${sendRes.status})`);
-    const scope = body?.scope === "global" ? "global" : "customer";
-    const { data: learning, error: learningError } = await admin
-      .from("wa_learnings")
-      .insert({
-        scope,
-        sender: scope === "customer" ? sender : null,
-        topic: String(body?.topic || escalation.reason || "Instruksi admin").slice(0, 120),
-        instruction,
-        example_question: String(escalation.customer_message || escalation.summary || "").slice(0, 500),
-        source_escalation_id: id,
-        created_by: actor,
-      })
-      .select("id")
-      .single();
-    if (learningError) return NextResponse.json({ error: learningError.message }, { status: 500 });
-    const { data, error } = await admin
-      .from("wa_escalations")
-      .update({
-        reply_text: reply,
-        replied_at: new Date().toISOString(),
-        status: "answered",
-        learning_id: learning?.id || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .select()
-      .maybeSingle();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, item: data, learning_id: learning?.id });
-  }
-
-  if (action === "escalation_close") {
-    const { error } = await admin
-      .from("wa_escalations")
-      .update({ status: "closed", updated_at: new Date().toISOString() })
-      .eq("id", id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true });
   }
 
   return bad("Aksi tidak dikenal.");

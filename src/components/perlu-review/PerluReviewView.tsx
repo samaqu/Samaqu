@@ -7,8 +7,6 @@ import {
   Loader2,
   Pencil,
   Scissors,
-  Send,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -26,35 +24,6 @@ import PaymentProofCard from "./PaymentProofCard";
 import OrderSummaryCard from "./OrderSummaryCard";
 import ActionBar from "./ActionBar";
 
-type Tab = "ai" | "transaksi";
-
-type Message = {
-  id: string;
-  created_at: string;
-  message: string | null;
-  reply_text: string | null;
-  status: string;
-  media_url: string | null;
-};
-
-type Escalation = {
-  id: string;
-  inbox_id: string | null;
-  sender: string;
-  sender_name: string | null;
-  customer_message: string | null;
-  summary: string;
-  reason: string | null;
-  status: "open" | "claimed" | "answered" | "closed" | "skipped";
-  instruction: string | null;
-  instruction_scope: "customer" | "global";
-  draft_reply: string | null;
-  reply_text: string | null;
-  replied_at: string | null;
-  created_at: string;
-  messages?: Message[];
-};
-
 type Draft = {
   id: string;
   status: string;
@@ -68,9 +37,8 @@ type Draft = {
 };
 
 type Data = {
-  escalations: Escalation[];
   drafts: Draft[];
-  counts: { escalations: number; drafts: number };
+  counts: { drafts: number };
 };
 
 const money = (value: unknown) => "Rp" + Number(value || 0).toLocaleString("id-ID");
@@ -134,15 +102,10 @@ function Badge({ status }: { status: string }) {
 }
 
 export default function PerluReviewView() {
-  const [tab, setTab] = useState<Tab>("transaksi");
-  const [data, setData] = useState<Data>({ escalations: [], drafts: [], counts: { escalations: 0, drafts: 0 } });
+  const [data, setData] = useState<Data>({ drafts: [], counts: { drafts: 0 } });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedId, setSelectedId] = useState("");
   const [selectedDraftId, setSelectedDraftId] = useState("");
-  const [instruction, setInstruction] = useState("");
-  const [scope, setScope] = useState<"customer" | "global">("customer");
-  const [preview, setPreview] = useState("");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const [dialog, setDialog] = useState<{ kind: "approve" | "reject" | "delete"; draft: Draft } | null>(null);
@@ -159,7 +122,6 @@ export default function PerluReviewView() {
     try {
       const json = (await api()) as Data;
       setData(json);
-      setSelectedId((current) => current || json.escalations[0]?.id || "");
       setSelectedDraftId((current) => current || json.drafts[0]?.id || "");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal memuat antrean.");
@@ -172,22 +134,10 @@ export default function PerluReviewView() {
     void load();
   }, [load]);
 
-  const selected = useMemo(
-    () => data.escalations.find((item) => item.id === selectedId) || null,
-    [data.escalations, selectedId],
-  );
   const selectedDraft = useMemo(
     () => data.drafts.find((item) => item.id === selectedDraftId) || null,
     [data.drafts, selectedDraftId],
   );
-
-  useEffect(() => {
-    if (!selected) return;
-    setInstruction(selected.instruction || "");
-    setScope(selected.instruction_scope || "customer");
-    setPreview(selected.draft_reply || "");
-    setNotice("");
-  }, [selected]);
 
   const notify = (title: string, description?: string, variant: "success" | "destructive" | "default" = "success") => {
     setNotice(title);
@@ -214,28 +164,6 @@ export default function PerluReviewView() {
     } finally {
       setBusy("");
     }
-  };
-
-  const makeDraft = async () => {
-    if (!selected || !instruction.trim()) return;
-    const json = await run("escalation_draft", {
-      id: selected.id,
-      instruction: instruction.trim(),
-      scope,
-    });
-    if (json?.reply) setPreview(String(json.reply));
-  };
-
-  const sendReply = async () => {
-    if (!selected || !preview.trim() || !instruction.trim()) return;
-    await run("escalation_send", {
-      id: selected.id,
-      instruction: instruction.trim(),
-      reply: preview.trim(),
-      scope,
-      topic: selected.reason || "Instruksi admin",
-    });
-    notify("Balasan terkirim", "Instruksi disimpan sebagai pelajaran untuk AI.");
   };
 
   // Peringatan order dobel hanya berlaku untuk dialog yang sedang terbuka.
@@ -283,41 +211,17 @@ export default function PerluReviewView() {
   };
 
   return (
-    <section className={`flex min-h-0 flex-col gap-4 ${tab === "ai" ? "h-[calc(100dvh-140px)] overflow-hidden" : ""}`}>
+    <section className="flex min-h-0 flex-col gap-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-2xl font-black" style={{ color: "#141414" }}>
             Perlu Review
           </h1>
           <p className="mt-1 max-w-2xl text-sm leading-relaxed" style={{ color: "#6B6A64" }}>
-            Kasus AI yang butuh instruksi admin dan draft transaksi yang menunggu persetujuan.
+            Draft transaksi yang dicatat AI dan menunggu persetujuan. Pertanyaan customer yang butuh admin dijawab di Chat Academy.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:items-end">
-          <div className="inline-flex w-full rounded-xl bg-[#F1F0EC] p-1 sm:w-auto" role="tablist" aria-label="Jenis review">
-            {[
-              { id: "transaksi" as const, label: "Transaksi", count: data.counts.drafts },
-              { id: "ai" as const, label: "Pertanyaan AI", count: data.counts.escalations },
-            ].map((item) => {
-              const active = tab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setTab(item.id)}
-                  className={`flex flex-1 items-center justify-center gap-2 rounded-[10px] px-3 py-2 text-[11px] font-bold transition-colors sm:flex-none ${active ? "bg-white shadow-[0_1px_2px_rgba(20,20,20,0.08)]" : "bg-transparent"}`}
-                  style={{ color: active ? "#141414" : "#77756F" }}
-                >
-                  {item.label}
-                  <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ background: active ? "#F1F0EC" : "#E7E5DF", color: active ? "#4E4C47" : "#77756F" }}>
-                    {item.count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
           <button
             type="button"
             onClick={() => void load()}
@@ -338,169 +242,6 @@ export default function PerluReviewView() {
       {loading ? (
         <div className="flex flex-1 items-center justify-center rounded-2xl border bg-white text-sm" style={{ borderColor: "#E7E6E1", color: "#6B6A64" }}>
           Memuat antrean...
-        </div>
-      ) : tab === "ai" ? (
-        <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)]">
-          <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border bg-white" style={{ borderColor: "#E7E6E1" }}>
-            <div className="shrink-0 border-b px-4 py-3" style={{ borderColor: "#E7E6E1" }}>
-              <p className="text-sm font-bold" style={{ color: "#141414" }}>Antrean pertanyaan</p>
-              <p className="mt-0.5 text-[11px]" style={{ color: "#6B6A64" }}>{data.escalations.length} kasus</p>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-2">
-              {data.escalations.length === 0 ? (
-                <p className="p-4 text-center text-xs" style={{ color: "#6B6A64" }}>Belum ada pertanyaan yang perlu review.</p>
-              ) : (
-                data.escalations.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setSelectedId(item.id)}
-                    className="mb-1.5 w-full rounded-xl border p-3 text-left transition"
-                    style={{
-                      borderColor: item.id === selectedId ? "#C8A45D" : "#E7E6E1",
-                      background: item.id === selectedId ? "#FBF6EA" : "#fff",
-                    }}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-xs font-bold" style={{ color: "#141414" }}>{item.sender_name || phone(item.sender)}</p>
-                      <Badge status={item.status} />
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-[11px]" style={{ color: "#6B6A64" }}>{item.summary}</p>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="h-full min-h-0 overflow-y-auto rounded-2xl border bg-white" style={{ borderColor: "#E7E6E1" }}>
-            {!selected ? (
-              <div className="flex h-full min-h-[300px] items-center justify-center p-6 text-center text-sm" style={{ color: "#6B6A64" }}>
-                Pilih kasus di kiri.
-              </div>
-            ) : (
-              <div className="p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-3" style={{ borderColor: "#E7E6E1" }}>
-                  <div>
-                    <p className="text-lg font-black" style={{ color: "#141414" }}>{selected.sender_name || phone(selected.sender)}</p>
-                    <p className="text-xs" style={{ color: "#6B6A64" }}>{phone(selected.sender)} · {time(selected.created_at)}</p>
-                  </div>
-                  <Badge status={selected.status} />
-                </div>
-
-                <div className="mt-3 max-h-[260px] space-y-2 overflow-y-auto rounded-xl p-3" style={{ background: "#FAF9F6" }}>
-                  {(selected.messages || []).map((message) => (
-                    <div key={message.id}>
-                      {message.message ? (
-                        <div className="max-w-[85%] rounded-xl border bg-white px-3 py-2 text-xs" style={{ borderColor: "#E7E6E1", color: "#141414" }}>
-                          {message.message}
-                          {message.media_url ? <a href={message.media_url} target="_blank" rel="noreferrer" className="mt-1 block text-[10px] font-semibold underline" style={{ color: "#1F7A4D" }}>Lihat lampiran</a> : null}
-                          <div className="mt-1 text-[10px]" style={{ color: "#9A9892" }}>{time(message.created_at)}</div>
-                        </div>
-                      ) : null}
-                      {message.reply_text ? (
-                        <div className="ml-auto mt-1 max-w-[85%] rounded-xl px-3 py-2 text-xs" style={{ background: "#141414", color: "#fff" }}>
-                          {message.reply_text}
-                          <div className="mt-1 text-[10px]" style={{ color: "#BDBBB4" }}>AI · {time(message.created_at)}</div>
-                        </div>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-
-                {selected.status === "answered" || selected.status === "closed" ? (
-                  <div className="mt-4 grid gap-3">
-                    <div className="flex items-start gap-3 rounded-xl border p-4" style={{ background: "#E3F2E8", borderColor: "#CFE6D9" }}>
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white" style={{ color: "#1F7A4D" }}>
-                        <Check size={18} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-black" style={{ color: "#22603A" }}>
-                          {selected.status === "closed" ? "Selesai" : "Sudah dijawab & tersimpan"}
-                        </p>
-                        <p className="mt-0.5 text-xs" style={{ color: "#22603A" }}>
-                          {selected.status === "closed"
-                            ? "Kasus ini sudah ditutup."
-                            : "Balasan sudah dikirim ke customer. Instruksi tersimpan sebagai pelajaran."}
-                          {selected.replied_at ? ` · ${time(selected.replied_at)}` : ""}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="mb-1 text-[11px] font-bold uppercase tracking-wide" style={{ color: "#8A8880" }}>Balasan yang terkirim</p>
-                      <div className="max-w-[90%] rounded-xl px-3 py-2.5 text-sm" style={{ background: "#141414", color: "#fff" }}>
-                        {selected.reply_text || preview || "-"}
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="mb-1 text-[11px] font-bold uppercase tracking-wide" style={{ color: "#8A8880" }}>Instruksi tersimpan</p>
-                      <div className="rounded-xl border px-3 py-2.5 text-sm" style={{ borderColor: "#E7E6E1", color: "#141414", background: "#FAF9F6" }}>
-                        {selected.instruction || instruction || "-"}
-                      </div>
-                      <p className="mt-1.5 text-[11px] font-semibold" style={{ color: "#6B6A64" }}>
-                        {selected.instruction_scope === "global"
-                          ? "Berlaku untuk semua customer."
-                          : "Berlaku khusus untuk nomor ini."}
-                      </p>
-                    </div>
-
-                    {selected.status === "answered" ? (
-                      <button
-                        type="button"
-                        onClick={() => void run("escalation_close", { id: selected.id })}
-                        disabled={Boolean(busy)}
-                        className="inline-flex h-9 w-fit items-center gap-2 rounded-xl border px-3 text-xs font-bold disabled:opacity-50"
-                        style={{ borderColor: "#E7E6E1", color: "#6B6A64", background: "#fff" }}
-                      >
-                        {busy === "escalation_close" ? <Loader2 className="animate-spin" size={14} /> : <Check size={14} />} Tandai selesai
-                      </button>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="mt-4 grid gap-3">
-                    <div>
-                      <p className="mb-1 text-[11px] font-bold uppercase tracking-wide" style={{ color: "#8A8880" }}>Instruksi untuk AI</p>
-                      <textarea
-                        value={instruction}
-                        onChange={(event) => setInstruction(event.target.value)}
-                        rows={3}
-                        placeholder="Contoh: Customer ini tetap dapat free cover + hanger walau pembelian kedua."
-                        className="w-full resize-y rounded-xl border px-3 py-2 text-sm outline-none"
-                        style={{ borderColor: "#E7E6E1", color: "#141414" }}
-                      />
-                    </div>
-                    <label className="inline-flex items-center gap-2 text-xs font-semibold" style={{ color: "#6B6A64" }}>
-                      <input type="checkbox" checked={scope === "global"} onChange={(event) => setScope(event.target.checked ? "global" : "customer")} />
-                      Berlaku untuk semua customer (bukan hanya nomor ini)
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => void makeDraft()} disabled={Boolean(busy) || !instruction.trim()} className="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold disabled:opacity-50" style={{ background: "#FBF6EA", color: "#6B4D12", border: "1px solid #E8D4A4" }}>
-                        {busy === "escalation_draft" ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />} Minta AI susun
-                      </button>
-                      <button type="button" onClick={() => void sendReply()} disabled={Boolean(busy) || !preview.trim() || !instruction.trim()} className="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white disabled:opacity-50" style={{ background: "#1F7A4D" }}>
-                        {busy === "escalation_send" ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} />} Kirim ke customer
-                      </button>
-                      <button type="button" onClick={() => void run("escalation_close", { id: selected.id })} disabled={Boolean(busy)} className="inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-bold disabled:opacity-50" style={{ borderColor: "#E7E6E1", color: "#6B6A64" }}>
-                        <X size={14} /> Tutup
-                      </button>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-[11px] font-bold uppercase tracking-wide" style={{ color: "#8A8880" }}>Preview balasan AI</p>
-                      <textarea
-                        value={preview}
-                        onChange={(event) => setPreview(event.target.value)}
-                        rows={4}
-                        placeholder="Klik Minta AI susun, lalu edit jika perlu."
-                        className="w-full resize-y rounded-xl border px-3 py-2 text-sm outline-none"
-                        style={{ borderColor: "#E7E6E1", color: "#141414" }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
         </div>
       ) : (
         <div className="grid items-start gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
