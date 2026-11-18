@@ -170,6 +170,28 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    // ── Pesanan reseller "ongkir menyusul": belum boleh dibuatkan resi / ditandai dikirim ──
+    // Ongkir belum diisi (Reseller → Riwayat Pesanan → Isi Ongkir). Batal tetap boleh (saldo & stok kembali
+    // lewat jalur batal yang sama). Pesanan tanpa penanda lolos tanpa efek.
+    {
+      const { data: spRow } = await supabaseAdmin
+        .from("orders")
+        .select("shipping_pending")
+        .eq("order_number", identifier)
+        .maybeSingle();
+      if (spRow && spRow.shipping_pending === true) {
+        const act = String(action || "");
+        const blockedWhilePending = ["createJnt", "manualResi", "gosendShip", "gosendDone", "markShipped"];
+        const isStatusChip = !act && Boolean(status);
+        if (blockedWhilePending.includes(act) || (isStatusChip && status !== "dibatalkan")) {
+          return NextResponse.json(
+            { error: "Ongkir pesanan reseller ini belum diisi. Isi ongkir dulu di menu Reseller → Riwayat Pesanan." },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     // Cancel J&T order before updating status
     if (action === "cancelJnt") {
       const { data: order, error: fetchError } = await supabaseAdmin

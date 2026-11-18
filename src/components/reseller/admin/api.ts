@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import type { LevelSummary, LevelTier } from "@/lib/reseller/level";
 import type { MateriRow } from "@/lib/reseller/materi";
 import type { RiwayatOrder, RiwayatSummary } from "@/lib/reseller/riwayat";
+import type { KatalogProduct, ShippingOption } from "@/lib/reseller/client";
 import type {
   LedgerOrderPaymentInfo,
   LedgerTopupInfo,
@@ -17,10 +18,13 @@ import type {
 
 export class AdminApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** Kode galat dari server (mis. "possible_duplicate"), kalau ada. */
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = "AdminApiError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -42,13 +46,15 @@ async function adminFetch<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     let message = `HTTP ${res.status}`;
+    let code: string | undefined;
     try {
       const json = JSON.parse(text);
       if (json?.error) message = json.error;
+      if (typeof json?.code === "string") code = json.code;
     } catch {
       /* pesan default */
     }
-    throw new AdminApiError(message, res.status);
+    throw new AdminApiError(message, res.status, code);
   }
 
   return (await res.json()) as T;
@@ -106,6 +112,68 @@ async function riwayatCsvBlob(params: RiwayatQuery): Promise<{ blob: Blob; filen
   const disposition = res.headers.get("Content-Disposition") || "";
   const filename = /filename="([^"]+)"/.exec(disposition)?.[1] || "riwayat-pesanan-reseller.csv";
   return { blob: await res.blob(), filename };
+}
+
+/* ── Buat Pesanan atas nama reseller ── */
+
+export interface AdminBalance {
+  saldo_tersedia: number;
+  saldo_ditahan: number;
+  saldo_total: number;
+}
+
+export interface AdminOrderPayload {
+  reseller_id: string;
+  items: { product_id: string; color: string; size: string; quantity: number; sell_price: number }[];
+  customer: { name: string; whatsapp: string };
+  shipping: {
+    address: string;
+    city: string;
+    district: string;
+    province?: string;
+    postalCode?: string;
+    notes?: string;
+    method?: string;
+    cost?: number;
+  };
+  /** "otomatis" = layanan J&T dipilih sekarang; "menyusul" = ongkir diisi admin belakangan. */
+  mode: "otomatis" | "menyusul";
+  show_reseller_name_on_label: boolean;
+  confirm_duplicate?: boolean;
+}
+
+export interface AdminOrderResult {
+  ok: true;
+  orderNumber: string;
+  orderId: string;
+  total: number;
+  subtotal: number;
+  shippingCost: number;
+  balanceDeduction: number;
+  shortfall: number;
+  status: string;
+  shippingPending?: true;
+}
+
+export interface ShippingFillOptions {
+  data?: ShippingOption[];
+  weight?: number;
+  configured?: boolean;
+  error?: string;
+  tariff_status?: number;
+  order: { order_number: string; total: number; weight: number };
+  saldo: AdminBalance;
+}
+
+export interface ShippingFillResult {
+  ok: true;
+  orderNumber: string;
+  cost: number;
+  method: string;
+  balanceDeduction: number;
+  shortfall: number;
+  total: number;
+  status: string;
 }
 
 /* ── Tipe ── */
@@ -312,6 +380,36 @@ export const opsResellerApi = {
     q.set("pageSize", String(params.pageSize || 50));
     return adminFetch<{ data: LedgerRow[]; total: number }>(`/api/ops/reseller/ledger?${q.toString()}`);
   },
+
+  /* Buat Pesanan atas nama reseller (admin) */
+  orderKatalog: (resellerId: string) =>
+    adminFetch<{ data: KatalogProduct[]; saldo: AdminBalance }>(
+      `/api/ops/reseller/orders/katalog?reseller_id=${encodeURIComponent(resellerId)}`
+    ),
+  orderOngkir: (payload: {
+    city: string;
+    district: string;
+    items: { product_id: string; color: string; size: string; quantity: number }[];
+  }) =>
+    adminFetch<{ data: ShippingOption[]; weight?: number; configured?: boolean }>("/api/ops/reseller/orders/ongkir", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  createOrder: (payload: AdminOrderPayload) =>
+    adminFetch<AdminOrderResult>("/api/ops/reseller/orders", { method: "POST", body: JSON.stringify(payload) }),
+  shippingOptions: (orderNumber: string) =>
+    adminFetch<ShippingFillOptions>(`/api/ops/reseller/orders/${encodeURIComponent(orderNumber)}/ongkir`),
+  fillShipping: (orderNumber: string, payload: { method: string; cost: number }) =>
+    adminFetch<ShippingFillResult>(`/api/ops/reseller/orders/${encodeURIComponent(orderNumber)}/ongkir`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  /** Baca alamat dari teks tempelan — pendeteksi yang sama dengan form Transaksi (`/api/ops/alamat-tebak`). */
+  alamatTebak: (text: string) =>
+    adminFetch<Awaited<ReturnType<typeof import("@/lib/reseller/client").resellerApi.alamatTebak>>>(
+      "/api/ops/alamat-tebak",
+      { method: "POST", body: JSON.stringify({ text }) }
+    ),
 
   /* Riwayat pesanan reseller (baca saja) */
   riwayat: (params: RiwayatQuery & { page?: number; pageSize?: number }) => {

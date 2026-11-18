@@ -140,16 +140,38 @@ function buildAccountCreated(ownerName: string): string {
   ].join("\n");
 }
 
-function buildOrderCreated(ownerName: string, shortfall: number, total: number, orderNumber: string): string {
+/** Pesanan yang dibuatkan ADMIN atas nama reseller (opsional; jalur portal tidak mengirimnya). */
+export interface OrderCreatedOptions {
+  byAdmin?: boolean;
+  /** Ongkir menyusul: total baru berisi produk saja. */
+  shippingPending?: boolean;
+}
+
+function buildOrderCreated(
+  ownerName: string,
+  shortfall: number,
+  total: number,
+  orderNumber: string,
+  options: OrderCreatedOptions = {}
+): string {
   const ka = greetingName(ownerName);
   const lines = [
     `Halo ${ka},`,
     "",
-    `Pesanan reseller ${orderNumber} sudah kami terima.`,
+    `Pesanan reseller ${orderNumber} sudah kami terima${options.byAdmin ? " (dibuatkan oleh admin SAMAQU atas nama kamu)" : ""}.`,
     "",
-    `Total (harga beli + ongkir): ${rupiah(total)}`,
+    options.shippingPending
+      ? `Total produk (harga beli): ${rupiah(total)}`
+      : `Total (harga beli + ongkir): ${rupiah(total)}`,
   ];
-  if (shortfall > 0) {
+  if (options.shippingPending) {
+    lines.push(
+      "",
+      "Ongkir menyusul. Admin akan mengisi ongkir, lalu kamu kami kabari. Pesanan dikirim setelah ongkir terisi.",
+      "",
+      "Pembayaran produk sudah dipotong dari saldo."
+    );
+  } else if (shortfall > 0) {
     lines.push(
       "",
       `Saldo kamu kurang ${rupiah(shortfall)}. Silakan transfer kekurangannya ke rekening BSI SAMAQU lalu upload bukti di portal reseller.`,
@@ -291,11 +313,45 @@ export async function notifyResellerOrderCreated(
   resellerId: string,
   orderNumber: string,
   shortfall: number,
-  total: number
+  total: number,
+  options?: OrderCreatedOptions
 ): Promise<boolean> {
   return notifyOnce("order_created", orderNumber, resellerId, (name) =>
-    buildOrderCreated(name, shortfall, total, orderNumber)
+    buildOrderCreated(name, shortfall, total, orderNumber, options)
   );
+}
+
+/**
+ * Ongkir pesanan "ongkir menyusul" sudah diisi admin. Memakai tipe klaim `order_created` dengan
+ * referensi `<nomor>:ongkir` (UNIQUE type+reference, jadi satu pesan per pesanan dan tanpa mengubah
+ * daftar tipe di database).
+ */
+export async function notifyResellerShippingFilled(
+  resellerId: string,
+  orderNumber: string,
+  detail: { cost: number; shortfall: number; total: number }
+): Promise<boolean> {
+  return notifyOnce("order_created", `${orderNumber}:ongkir`, resellerId, (name) => {
+    const ka = greetingName(name);
+    const lines = [
+      `Halo ${ka},`,
+      "",
+      `Ongkir pesanan ${orderNumber} sudah diisi admin: ${rupiah(detail.cost)}.`,
+      `Total pesanan sekarang: ${rupiah(detail.total)}.`,
+      "",
+    ];
+    if (detail.shortfall > 0) {
+      lines.push(
+        `Saldo kamu kurang ${rupiah(detail.shortfall)} untuk ongkir. Silakan transfer kekurangannya ke rekening BSI SAMAQU lalu upload bukti di portal reseller.`,
+        "",
+        "Pesanan diproses setelah admin mengonfirmasi pembayaran kekurangan."
+      );
+    } else {
+      lines.push("Ongkir sudah dipotong dari saldo dan pesanan langsung diproses.");
+    }
+    lines.push(...linkBlock("Buka pesanan ini di portal reseller:", portalUrl("pesanan", orderNumber)));
+    return lines.join("\n");
+  });
 }
 
 /** Kekurangan pesanan dikonfirmasi admin (padanan "lunas" untuk reseller). */

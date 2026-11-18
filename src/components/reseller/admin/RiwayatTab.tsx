@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, Search } from "lucide-react";
 import { AdminApiError, opsResellerApi, type ResellerAdminRow, type RiwayatQuery } from "./api";
+import IsiOngkirModal from "./IsiOngkirModal";
 import { rupiah, tglJamID } from "@/lib/reseller/format";
-import { ORDER_STAGE_STYLE, ORDER_STAGE_TABS, type OrderStage } from "@/lib/order-flow";
+import { ORDER_STAGE_LABEL, ORDER_STAGE_STYLE, ORDER_STAGE_TABS, type OrderStage } from "@/lib/order-flow";
 import type { RiwayatItem, RiwayatOrder, RiwayatSummary } from "@/lib/reseller/riwayat";
 // Gaya tabel Transaksi (kelas `.card.tw`, `.id`, `.mono`, `.resi-no`, `.bd`, `.chev`). Seluruh rule
 // di-scope `.ops-tx` / `.panel-tx`, jadi tidak memengaruhi bagian lain halaman Reseller.
@@ -17,6 +18,7 @@ type Periode = "bulan" | "rentang" | "semua";
 const STAGE_BADGE: Record<OrderStage, string> = {
   belum_bayar: "bayar",
   menunggu_stok: "siap",
+  menunggu_ongkir: "packing",
   belum_dipacking: "siap",
   sudah_dipacking: "siap",
   dikirim: "kirim",
@@ -33,7 +35,11 @@ function itemDetail(item: RiwayatItem): string {
 const FIELD =
   "px-3 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 
-const STATUS_OPTIONS = ORDER_STAGE_TABS.filter((tab) => tab.key !== "semua");
+const STATUS_OPTIONS = [
+  ...ORDER_STAGE_TABS.filter((tab) => tab.key !== "semua"),
+  // Tahap khusus pesanan reseller "ongkir menyusul" (tidak ada di tab Transaksi).
+  { key: "menunggu_ongkir" as const, label: ORDER_STAGE_LABEL.menunggu_ongkir },
+];
 
 function currentMonth(): string {
   return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 7);
@@ -78,10 +84,13 @@ function SummaryCard({
 export default function RiwayatTab({
   resellers,
   onOpenOrder,
+  onChanged,
   variant = "ops",
 }: {
   resellers: ResellerAdminRow[];
   onOpenOrder: (orderNumber: string) => void;
+  /** Dipanggil setelah "Isi Ongkir" tersimpan (saldo/antrean halaman ikut dimuat ulang). */
+  onChanged?: () => void;
   /** Dashboard ops (`ops-tx`) atau panel admin (`panel-tx`, ikut tema warna panel). */
   variant?: "ops" | "panel";
 }) {
@@ -103,6 +112,8 @@ export default function RiwayatTab({
   const [loadingMore, setLoadingMore] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
+  /** Pesanan yang sedang diisi ongkirnya (dialog "Isi Ongkir"). */
+  const [fillFor, setFillFor] = useState<RiwayatOrder | null>(null);
   const requestId = useRef(0);
 
   // Pencarian ditunda sebentar supaya tidak memanggil server di setiap ketukan.
@@ -358,7 +369,16 @@ export default function RiwayatTab({
                               ) : null}
                             </td>
                             <td data-label="Reseller" className={tdCls}>
-                              {first ? <b>{order.reseller_name}</b> : null}
+                              {first ? (
+                                <>
+                                  <b>{order.reseller_name}</b>
+                                  {order.created_by_admin ? (
+                                    <small title={`Dibuat oleh admin ${order.created_by_admin}`}>
+                                      Dibuat admin · {order.created_by_admin.split("@")[0]}
+                                    </small>
+                                  ) : null}
+                                </>
+                              ) : null}
                             </td>
                             <td data-label="Produk" className={tdCls}>
                               {item ? (
@@ -396,7 +416,23 @@ export default function RiwayatTab({
                               ) : null}
                             </td>
                             <td data-label="Status" className={tdCls}>
-                              {first ? <span className={`bd s-${STAGE_BADGE[order.stage]}`}>{order.stage_label}</span> : null}
+                              {first ? (
+                                <>
+                                  <span className={`bd s-${STAGE_BADGE[order.stage]}`}>{order.stage_label}</span>
+                                  {order.shipping_pending ? (
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        setFillFor(order);
+                                      }}
+                                      className="block mt-1.5 px-2.5 py-1 rounded-lg text-[11px] font-extrabold text-white bg-cyan-700 hover:bg-cyan-800"
+                                    >
+                                      Isi Ongkir
+                                    </button>
+                                  ) : null}
+                                </>
+                              ) : null}
                             </td>
                             <td className={`chev text-right ${tdCls || ""}`}>{first ? "›" : null}</td>
                           </tr>
@@ -425,11 +461,28 @@ export default function RiwayatTab({
                       <div className={`font-bold text-[13px] ${order.cancelled ? "" : "text-slate-900"}`}>{order.order_number}</div>
                       <div className="text-[11px] text-slate-400">{tglJamID(order.created_at)}</div>
                     </div>
-                    <StagePill order={order} />
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <StagePill order={order} />
+                      {order.shipping_pending ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setFillFor(order);
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-extrabold text-white bg-cyan-700 hover:bg-cyan-800"
+                        >
+                          Isi Ongkir
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="text-[12px] mt-1">
                     {order.reseller_name}
                     {order.customer_name ? <span className="text-slate-400"> · {order.customer_name}</span> : null}
+                    {order.created_by_admin ? (
+                      <span className="text-slate-400"> · dibuat admin {order.created_by_admin.split("@")[0]}</span>
+                    ) : null}
                   </div>
                   <ul className="mt-2 space-y-1.5">
                     {order.items.map((item, index) => (
@@ -476,6 +529,19 @@ export default function RiwayatTab({
         )}
       </div>
       </div>
+
+      {fillFor ? (
+        <IsiOngkirModal
+          orderNumber={fillFor.order_number}
+          resellerName={fillFor.reseller_name}
+          onClose={() => setFillFor(null)}
+          onDone={() => {
+            setFillFor(null);
+            load(1);
+            onChanged?.();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

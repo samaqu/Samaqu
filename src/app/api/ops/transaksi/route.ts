@@ -560,7 +560,7 @@ export async function GET(req: NextRequest) {
   let query = admin
     .from("orders")
     .select(
-      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, stock_reserved, is_preorder, preorder_estimate, preorder_ready_at, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel, reseller_id, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label",
+      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, stock_reserved, shipping_pending, created_by_admin, is_preorder, preorder_estimate, preorder_ready_at, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel, reseller_id, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -784,6 +784,9 @@ export async function GET(req: NextRequest) {
       preorder_estimate: order.preorder_estimate || null,
       preorder_ready_at: order.preorder_ready_at || null,
       preorder_waiting: isPreorderWaiting(order),
+      // Pesanan reseller "ongkir menyusul" (tahap "Menunggu Ongkir") + admin yang membuatkannya.
+      shipping_pending: order.shipping_pending === true,
+      created_by_admin: order.created_by_admin || null,
     };
   });
 

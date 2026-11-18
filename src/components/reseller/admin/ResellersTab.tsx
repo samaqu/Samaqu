@@ -28,6 +28,7 @@ export default function ResellersTab({
   levels,
   onChanged,
   onOpenDetail,
+  onCreateOrder,
 }: {
   rows: ResellerAdminRow[];
   loading: boolean;
@@ -37,6 +38,8 @@ export default function ResellersTab({
   levels: LevelTier[];
   onChanged: () => void;
   onOpenDetail: (row: ResellerAdminRow) => void;
+  /** Buka tab "Buat Pesanan" dengan reseller ini sudah terpilih (hanya reseller Aktif). */
+  onCreateOrder?: (row: ResellerAdminRow) => void;
 }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
@@ -182,6 +185,14 @@ export default function ResellersTab({
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          {onCreateOrder && row.status === "active" ? (
+                            <button
+                              className="px-2.5 py-1.5 rounded-lg text-[12px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100"
+                              onClick={() => onCreateOrder(row)}
+                            >
+                              Buat Pesanan
+                            </button>
+                          ) : null}
                           <button
                             className="px-2.5 py-1.5 rounded-lg text-[12px] font-bold bg-slate-100 hover:bg-slate-200"
                             onClick={() => setForm({ open: true, initial: row })}

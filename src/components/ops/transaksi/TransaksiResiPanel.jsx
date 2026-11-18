@@ -131,6 +131,19 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
     );
   }
 
+  // Pesanan reseller "ongkir menyusul": ongkir belum diisi, jadi belum ada resi/kirim/GoSend (server juga
+  // menolaknya). Dibuka setelah admin menekan "Isi Ongkir" di menu Reseller → Riwayat Pesanan.
+  if (order.shipping_pending === true && !cancelled) {
+    return (
+      <div
+        data-testid="shipping-pending-panel"
+        className="rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2.5 text-xs font-semibold text-cyan-800 dark:border-cyan-900/40 dark:bg-cyan-900/20 dark:text-cyan-200"
+      >
+        Ongkir pesanan reseller ini belum diisi. Resi dan pengiriman dibuka setelah ongkir terisi: pakai “Isi Ongkir” di menu Reseller → Riwayat Pesanan.
+      </div>
+    );
+  }
+
   // Status GoSend terkini: hasil aksi barusan menang atas data pesanan yang dibawa dari induk.
   const goStatus = goPatch?.status ?? order.status;
   const goShip = goPatch?.shipping_status ?? order.shipping_status ?? "";

@@ -15,6 +15,14 @@ export default function StageIcon({ stage }: { stage: string }) {
           <path d="M12 7v5l3 2" />
         </svg>
       );
+    case "menunggu_ongkir":
+      return (
+        <svg viewBox="0 0 24 24">
+          <path d="M2 7h12v10H2zM14 10h4l3 3v4h-7" />
+          <circle cx="6" cy="18" r="2" />
+          <path d="M17 18h.01" />
+        </svg>
+      );
     case "belum_dipacking":
       return (
         <svg viewBox="0 0 24 24">

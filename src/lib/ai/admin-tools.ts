@@ -105,6 +105,7 @@ function orderStatusKey(value: unknown): string | null {
     const map: Record<OrderStage, string | null> = {
       belum_bayar: "pending",
       menunggu_stok: "diproses",
+      menunggu_ongkir: "diproses",
       belum_dipacking: "diproses",
       sudah_dipacking: "diproses",
       dikirim: "dikirim",

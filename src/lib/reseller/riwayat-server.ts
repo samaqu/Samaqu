@@ -23,7 +23,7 @@ const CHUNK = 1000;
 const MAX_CHUNKS = 20;
 
 const ORDER_COLUMNS =
-  "id, order_number, created_at, status, shipping_status, tracking_status_code, awb_no, is_preorder, preorder_ready_at, shipping_cost, customer_name, reseller_id, order_items(id, product_name, series, kain, color, size, quantity, reseller_buy_price, price)";
+  "id, order_number, created_at, status, shipping_status, tracking_status_code, awb_no, is_preorder, preorder_ready_at, shipping_pending, created_by_admin, shipping_cost, customer_name, reseller_id, order_items(id, product_name, series, kain, color, size, quantity, reseller_buy_price, price)";
 
 export interface RiwayatResult {
   /** Semua pesanan yang cocok filter (terbaru di atas), termasuk yang dibatalkan. */

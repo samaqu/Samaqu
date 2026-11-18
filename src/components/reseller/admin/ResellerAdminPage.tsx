@@ -14,13 +14,15 @@ import LedgerTab from "./LedgerTab";
 import SettingsTab from "./SettingsTab";
 import MateriTab from "./MateriTab";
 import RiwayatTab from "./RiwayatTab";
+import BuatPesananTab from "./BuatPesananTab";
 
-type TabKey = "perlu-dicek" | "harga" | "data" | "riwayat" | "mutasi" | "materi" | "pengaturan";
+type TabKey = "perlu-dicek" | "harga" | "data" | "buat" | "riwayat" | "mutasi" | "materi" | "pengaturan";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "perlu-dicek", label: "Perlu Dicek" },
   { key: "harga", label: "Produk & Harga" },
   { key: "data", label: "Data Reseller" },
+  { key: "buat", label: "Buat Pesanan" },
   { key: "riwayat", label: "Riwayat Pesanan" },
   { key: "mutasi", label: "Mutasi Saldo" },
   { key: "materi", label: "Materi" },
@@ -42,6 +44,9 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
   const [loadingList, setLoadingList] = useState(true);
   const [detail, setDetail] = useState<ResellerAdminRow | null>(null);
   const [openResellerId, setOpenResellerId] = useState("");
+  // Tab "Buat Pesanan": reseller yang sudah terpilih (tombol per baris di Data Reseller). `key` memaksa formnya mulai bersih.
+  const [createFor, setCreateFor] = useState("");
+  const [createKey, setCreateKey] = useState(0);
   const [error, setError] = useState("");
   // Detail Transaksi (drawer yang sama dengan menu Transaksi) untuk satu pesanan reseller.
   const [orderDetail, setOrderDetail] = useState<any>(null);
@@ -194,9 +199,22 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
           levels={levelTiers}
           onChanged={refreshAll}
           onOpenDetail={setDetail}
+          onCreateOrder={(row) => {
+            setCreateFor(row.id);
+            setCreateKey((key) => key + 1);
+            setTab("buat");
+          }}
+        />
+      ) : tab === "buat" ? (
+        <BuatPesananTab
+          key={createKey}
+          resellers={resellers}
+          initialResellerId={createFor}
+          onCreated={refreshAll}
+          onGoRiwayat={() => setTab("riwayat")}
         />
       ) : tab === "riwayat" ? (
-        <RiwayatTab resellers={resellers} onOpenOrder={openOrder} variant={variant} />
+        <RiwayatTab resellers={resellers} onOpenOrder={openOrder} onChanged={refreshAll} variant={variant} />
       ) : tab === "mutasi" ? (
         <LedgerTab resellers={resellers} onChanged={refreshAll} />
       ) : tab === "materi" ? (

@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
   const { data: expiredOrders, error: fetchError } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, awb_no, jnt_order_id, stock_reserved, customer_name, customer_whatsapp"
+      "id, order_number, status, awb_no, jnt_order_id, stock_reserved, customer_name, customer_whatsapp, shortfall_started_at"
     )
     .eq("status", "pending")
     .is("paid_at", null)
@@ -162,14 +162,23 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (!expiredOrders || expiredOrders.length === 0) {
+  // Pesanan reseller yang kekurangan ongkirnya baru muncul saat admin menekan "Isi Ongkir" memulai jam
+  // 24 jam dari `shortfall_started_at` (bukan dari created_at): jangan dibatalkan sebelum jamnya habis.
+  // Kolom kosong (semua pesanan lain) = perilaku lama. `created_at < cutoff` di query tetap syarat perlunya.
+  const cutoffMs = new Date(cutoff).getTime();
+  const dueOrders = (expiredOrders ?? []).filter((order) => {
+    const started = (order as { shortfall_started_at?: string | null }).shortfall_started_at;
+    return !started || new Date(started).getTime() < cutoffMs;
+  });
+
+  if (dueOrders.length === 0) {
     return NextResponse.json({ reminded, remindErrors, cancelled: 0, errors: 0, total: 0 });
   }
 
   let cancelled = 0;
   let errors = 0;
 
-  for (const order of expiredOrders) {
+  for (const order of dueOrders) {
     try {
       const result = await cancelOrderCompletely(order, "Dibatalkan otomatis (belum dibayar 24 jam)");
 
@@ -186,5 +195,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ reminded, remindErrors, cancelled, errors, total: expiredOrders.length });
+  return NextResponse.json({ reminded, remindErrors, cancelled, errors, total: dueOrders.length });
 }

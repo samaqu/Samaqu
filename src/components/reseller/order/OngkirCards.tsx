@@ -13,18 +13,31 @@ const SERVICES = [
 ] as const;
 
 /** Kartu layanan J&T EZ/ECO — tarif dari API ongkir yang sama dengan checkout. */
+export type OngkirPayload = {
+  city: string;
+  district: string;
+  items: { product_id: string; color: string; size: string; quantity: number }[];
+};
+export type OngkirResponse = { data: ShippingOption[]; weight?: number; configured?: boolean };
+
 export default function OngkirCards({
   city,
   district,
   items,
   selected,
   onSelect,
+  fetchOngkir,
 }: {
   city: string;
   district: string;
   items: { product_id: string; color: string; size: string; quantity: number }[];
   selected: ShippingOption | null;
   onSelect: (option: ShippingOption | null) => void;
+  /**
+   * Pengambil tarif. Kosong = portal reseller (`/api/reseller/ongkir`, sesi reseller). Form admin mengisinya
+   * dengan endpoint admin yang memakai fungsi hitung yang sama.
+   */
+  fetchOngkir?: (payload: OngkirPayload) => Promise<OngkirResponse>;
 }) {
   const [options, setOptions] = useState<ShippingOption[]>([]);
   const [weight, setWeight] = useState(0);
@@ -41,8 +54,7 @@ export default function OngkirCards({
     let alive = true;
     setLoading(true);
     setError("");
-    resellerApi
-      .ongkir({ city, district, items })
+    (fetchOngkir ?? resellerApi.ongkir)({ city, district, items })
       .then((res) => {
         if (!alive) return;
         if (res.configured === false) {

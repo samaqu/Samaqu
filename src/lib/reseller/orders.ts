@@ -55,6 +55,19 @@ export interface ResellerOrderInput {
   showResellerNameOnLabel: boolean;
 }
 
+/**
+ * Opsi khusus pembuatan pesanan OLEH ADMIN atas nama reseller. Jalur portal reseller tidak memakainya
+ * (tanpa opsi ini perilaku persis seperti sebelumnya).
+ */
+export interface ResellerOrderOptions {
+  /** Email admin pembuat. Terisi = pesanan dibuat admin (fungsi database admin, dicatat di pesanan dan ledger). */
+  adminEmail?: string;
+  /** Mode "Ongkir menyusul": ongkir 0 dulu, stok ditahan, saldo dipotong sebesar produk saja. */
+  shippingPending?: boolean;
+  /** Admin sudah melihat peringatan pesanan serupa dan memilih lanjut. */
+  confirmDuplicate?: boolean;
+}
+
 export type CreateResellerOrderResult =
   | {
       ok: true;
@@ -66,8 +79,13 @@ export type CreateResellerOrderResult =
       balanceDeduction: number;
       shortfall: number;
       status: string;
+      /** Hanya ada (true) untuk pesanan "ongkir menyusul"; tidak pernah ada di jalur portal. */
+      shippingPending?: true;
     }
-  | { ok: false; error: string; status: number };
+  | { ok: false; error: string; status: number; code?: string };
+
+/** Pesanan serupa dalam jendela ini dianggap kemungkinan dobel submit (khusus jalur admin). */
+const DUPLICATE_WINDOW_MS = 2 * 60 * 1000;
 
 /** Nomor pesanan reseller: EP-YYYYMMDD-NNN (RSL- lama tetap dikenali). */
 function generateResellerOrderNumber(): string {
@@ -102,9 +120,13 @@ interface ValidatedItem {
 
 export async function createResellerOrder(
   reseller: ResellerRow,
-  input: ResellerOrderInput
+  input: ResellerOrderInput,
+  options: ResellerOrderOptions = {}
 ): Promise<CreateResellerOrderResult> {
   const supabase = getSupabaseAdmin();
+  const adminEmail = String(options.adminEmail || "").trim();
+  const byAdmin = adminEmail.length > 0;
+  const shippingPending = byAdmin && options.shippingPending === true;
 
   const items = input?.items;
   const customer = input?.customer;
@@ -241,18 +263,50 @@ export async function createResellerOrder(
       : Math.max(300, Number(shipping.weight) || serverWeight || 0);
 
   // ── Ongkir diverifikasi ke tarif J&T (bukan dari body) ──
-  const shippingCheck = await verifyJntShipping({
-    city: shipping.city,
-    district: shipping.district,
-    weightGrams,
-    method: shipping.method,
-    cost: shipping.cost,
-  });
+  // Ongkir menyusul (hanya admin): ongkir 0 dan metode "manual" lewat jalur `allowManual` yang sudah ada;
+  // ongkir sebenarnya diisi belakangan lewat "Isi Ongkir" dan tetap diverifikasi ke tarif J&T saat itu.
+  const shippingCheck = await verifyJntShipping(
+    shippingPending
+      ? { city: shipping.city, district: shipping.district, weightGrams, method: "manual", cost: 0, allowManual: true }
+      : {
+          city: shipping.city,
+          district: shipping.district,
+          weightGrams,
+          method: shipping.method,
+          cost: shipping.cost,
+        }
+  );
   if (!shippingCheck.ok) {
     return { ok: false, error: shippingCheck.error, status: shippingCheck.status };
   }
 
   const total = subtotal + shippingCheck.cost;
+
+  // ── Pengaman dobel submit (khusus jalur admin) ──
+  // Pesanan reseller yang sama (penerima + total sama) dalam 2 menit terakhir = kemungkinan klik ganda.
+  // Hanya peringatan: admin boleh lanjut dengan `confirmDuplicate`. Gagal membaca = tetap lanjut (fail-open).
+  if (byAdmin && options.confirmDuplicate !== true) {
+    const since = new Date(Date.now() - DUPLICATE_WINDOW_MS).toISOString();
+    const { data: recent, error: recentError } = await supabase
+      .from("orders")
+      .select("order_number")
+      .eq("reseller_id", reseller.id)
+      .eq("customer_whatsapp", String(customer.whatsapp).trim())
+      .eq("total", total)
+      .neq("status", "dibatalkan")
+      .gte("created_at", since)
+      .limit(1);
+    if (recentError) {
+      console.error("[RESELLER-ORDER] Cek pesanan dobel gagal (dilewati):", recentError.message);
+    } else if (recent && recent.length > 0) {
+      return {
+        ok: false,
+        code: "possible_duplicate",
+        status: 409,
+        error: `Pesanan yang sama (${recent[0].order_number}) baru dibuat kurang dari 2 menit lalu untuk penerima dan total yang sama. Periksa dulu supaya tidak dobel.`,
+      };
+    }
+  }
 
   // ── Foto item (snapshot seperti checkout) ──
   const photoLookup = await loadOrderPhotoLookup(validated.map((i) => i.productId));
@@ -310,11 +364,18 @@ export async function createResellerOrder(
   }
   let rpcResult: RpcResult | null = null;
 
+  // Jalur portal memanggil fungsi database yang sudah ada (argumen tidak berubah). Jalur admin memanggil
+  // fungsi pembungkusnya (membungkus fungsi yang sama dalam satu transaksi + mencatat admin & penanda).
+  const rpcName = byAdmin ? "samaqu_reseller_admin_create_order" : "samaqu_reseller_create_order";
+  const buildRpcArgs = (number: string): Record<string, unknown> => {
+    if (!byAdmin) return { ...rpcParams, p_order_number: number };
+    const { p_created_by: _portalActor, ...rest } = rpcParams;
+    void _portalActor;
+    return { ...rest, p_order_number: number, p_admin_email: adminEmail, p_shipping_pending: shippingPending };
+  };
+
   for (let attempt = 0; attempt < 2; attempt++) {
-    const { data, error } = await supabase.rpc("samaqu_reseller_create_order", {
-      ...rpcParams,
-      p_order_number: orderNumber,
-    });
+    const { data, error } = await supabase.rpc(rpcName, buildRpcArgs(orderNumber));
     if (!error && data) {
       rpcResult = data as RpcResult;
       break;
@@ -340,7 +401,14 @@ export async function createResellerOrder(
   // Notifikasi ke reseller (bukan customer akhir — dropship). Tidak pernah
   // menggagalkan pesanan yang sudah tersimpan.
   await Promise.allSettled([
-    notifyResellerOrderCreated(reseller.id, orderNumber, rpcResult.shortfall || 0, total),
+    notifyResellerOrderCreated(
+      reseller.id,
+      orderNumber,
+      rpcResult.shortfall || 0,
+      total,
+      // Jalur portal: argumen kelima tidak dikirim (pesan persis seperti sebelumnya).
+      byAdmin ? { byAdmin: true, shippingPending } : undefined
+    ),
     // Admin tetap perlu tahu ada pesanan reseller masuk (tanpa harga jual reseller).
     notifyAdminNewOrder({
       orderNumber,
@@ -358,7 +426,7 @@ export async function createResellerOrder(
         price: item.buyPrice,
       })),
       shippingCity,
-      source: `Reseller${reseller.store_name ? ` — ${reseller.store_name}` : ""}`,
+      source: `Reseller${reseller.store_name ? ` — ${reseller.store_name}` : ""}${byAdmin ? " (dibuat admin)" : ""}`,
     }),
   ]);
 
@@ -372,13 +440,14 @@ export async function createResellerOrder(
     balanceDeduction: rpcResult.balance_deduction,
     shortfall: rpcResult.shortfall,
     status: rpcResult.status,
+    ...(shippingPending ? { shippingPending: true as const } : {}),
   };
 }
 
 /* ── Daftar & detail ── */
 
 const ORDER_LIST_COLUMNS =
-  "id, order_number, status, shipping_status, created_at, total, customer_name, customer_whatsapp, shipping_city, awb_no, tracking_status_code, tracking_status_text, reseller_shortfall_amount, reseller_shortfall_status, order_items(product_name, series, kain, color, size, quantity)";
+  "id, order_number, status, shipping_status, shipping_pending, created_at, total, customer_name, customer_whatsapp, shipping_city, awb_no, tracking_status_code, tracking_status_text, reseller_shortfall_amount, reseller_shortfall_status, order_items(product_name, series, kain, color, size, quantity)";
 
 export async function listResellerOrders(
   resellerId: string,
@@ -432,7 +501,7 @@ export async function getResellerOrderDetail(
   const { data: order, error } = await supabase
     .from("orders")
     .select(
-      "id, order_number, status, shipping_status, payment_status, created_at, paid_at, cancelled_at, cancel_reason, subtotal, discount, shipping_cost, shipping_method, payment_method, total, customer_name, customer_whatsapp, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, shipping_notes, awb_no, tracking_status_code, tracking_status_text, tracking_city, tracking_updated_at, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label, order_items(id, product_id, product_name, product_image, color, size, series, kain, quantity, price, reseller_buy_price, reseller_sell_price)"
+      "id, order_number, status, shipping_status, shipping_pending, shortfall_started_at, payment_status, created_at, paid_at, cancelled_at, cancel_reason, subtotal, discount, shipping_cost, shipping_method, payment_method, total, customer_name, customer_whatsapp, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, shipping_notes, awb_no, tracking_status_code, tracking_status_text, tracking_city, tracking_updated_at, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label, order_items(id, product_id, product_name, product_image, color, size, series, kain, quantity, price, reseller_buy_price, reseller_sell_price)"
     )
     .eq("reseller_id", resellerId)
     .eq("order_number", orderNumber)
@@ -456,9 +525,12 @@ export async function getResellerOrderDetail(
   ]);
 
   // Batas bayar kekurangan = 24 jam sejak pesanan dibuat — SAMA dengan jendela
-  // auto-cancel yang sudah ada (cron tidak diubah; ini hanya tampilan batas).
-  const shortfallDeadline = order.created_at
-    ? new Date(new Date(order.created_at as string).getTime() + 24 * 3600 * 1000).toISOString()
+  // auto-cancel. Pesanan "ongkir menyusul" yang kekurangan ongkirnya baru muncul saat Isi Ongkir
+  // memulai jam dari `shortfall_started_at` (kolom kosong = pesanan biasa: dari created_at).
+  const clockStart = ((order as { shortfall_started_at?: string | null }).shortfall_started_at ||
+    order.created_at) as string | null;
+  const shortfallDeadline = clockStart
+    ? new Date(new Date(clockStart).getTime() + 24 * 3600 * 1000).toISOString()
     : null;
 
   // Foto item: snapshot bisa berupa URL video (products.image lama) → pakai
@@ -531,7 +603,7 @@ export async function uploadShortfallProof(
   const supabase = getSupabaseAdmin();
   const { data: order } = await supabase
     .from("orders")
-    .select("id, status, created_at, reseller_shortfall_status")
+    .select("id, status, created_at, shortfall_started_at, reseller_shortfall_status")
     .eq("reseller_id", resellerId)
     .eq("order_number", orderNumber)
     .maybeSingle();
@@ -541,7 +613,9 @@ export async function uploadShortfallProof(
     return { ok: false, error: "Pesanan ini tidak menunggu bukti pembayaran kekurangan", status: 400 };
   }
   // Lewat 24 jam = jendela auto-cancel; bukti tidak diterima lagi (cron tetap yang membatalkan).
-  const deadline = new Date(order.created_at as string).getTime() + 24 * 3600 * 1000;
+  // Jam mulai dari `shortfall_started_at` bila ada (kekurangan ongkir), selain itu dari created_at.
+  const deadline =
+    new Date((order.shortfall_started_at || order.created_at) as string).getTime() + 24 * 3600 * 1000;
   if (Date.now() > deadline) {
     return { ok: false, error: "Waktu pembayaran habis. Pesanan dibatalkan otomatis.", status: 410 };
   }

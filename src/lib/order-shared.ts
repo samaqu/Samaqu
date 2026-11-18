@@ -41,6 +41,8 @@ export interface StageCounts {
    * `perlu_diproses`: belum ada yang bisa dikerjakan admin sampai barangnya datang.
    */
   menunggu_stok: number;
+  /** Pesanan reseller "ongkir menyusul": belum ada yang bisa dikerjakan sampai admin mengisi ongkir. */
+  menunggu_ongkir: number;
   /** Lunas tapi resi belum dibuat — antrean packing. */
   belum_dipacking: number;
   /** Resi sudah dibuat, paket menunggu dijemput kurir. */
@@ -56,6 +58,7 @@ const EMPTY_STAGE_COUNTS: StageCounts = {
   semua: 0,
   belum_bayar: 0,
   menunggu_stok: 0,
+  menunggu_ongkir: 0,
   belum_dipacking: 0,
   sudah_dipacking: 0,
   dikirim: 0,

@@ -243,6 +243,15 @@ export function describeLedgerRow(row: LedgerRowView, options: DescribeLedgerOpt
     };
   }
 
+  // Potongan ONGKIR pesanan "ongkir menyusul": baris terpisah dari potongan produk (reference "<nomor>:ongkir").
+  if (row.type === "order_debit" && String(row.reference || "").endsWith(":ongkir")) {
+    return {
+      title: "Ongkir pesanan",
+      description: `${String(row.reference).replace(/:ongkir$/, "")} · ${date}${actorSuffix(row.created_by, showActor)}`,
+      badge: null,
+    };
+  }
+
   if (row.type === "order_debit" && row.order_payment) {
     const payment = row.order_payment;
     const extra = [`Kekurangan ${rupiah(payment.amount)}`];

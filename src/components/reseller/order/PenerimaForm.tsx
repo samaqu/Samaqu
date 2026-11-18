@@ -38,12 +38,20 @@ function addressLine(value: AddressValue): string {
   return [value.address, region].filter(Boolean).join(", ") + postal;
 }
 
+export type AlamatTebakResult = Awaited<ReturnType<typeof resellerApi.alamatTebak>>;
+
 export default function PenerimaForm({
   value,
   onChange,
+  detectAddress,
 }: {
   value: AddressValue;
   onChange: (patch: Partial<AddressValue>) => void;
+  /**
+   * Pembaca alamat dari teks tempelan. Kosong = portal reseller (`/api/reseller/alamat-tebak`, sesi reseller).
+   * Form admin mengisinya dengan endpoint admin yang memakai pendeteksi yang sama.
+   */
+  detectAddress?: (text: string) => Promise<AlamatTebakResult>;
 }) {
   const [provinceList, setProvinceList] = useState<string[]>([]);
   const [cityList, setCityList] = useState<string[]>([]);
@@ -90,7 +98,7 @@ export default function PenerimaForm({
     }
     setDetecting(true);
     try {
-      const r = await resellerApi.alamatTebak(paste);
+      const r = await (detectAddress ?? resellerApi.alamatTebak)(paste);
       const patch: Partial<AddressValue> = {};
       if (!value.name && r.name) patch.name = r.name;
       if (!value.whatsapp && r.whatsapp) patch.whatsapp = r.whatsapp;

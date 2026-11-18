@@ -23,6 +23,10 @@ export interface RiwayatOrderSource {
   awb_no?: string | null;
   is_preorder?: boolean | null;
   preorder_ready_at?: string | null;
+  /** Pesanan "ongkir menyusul" yang ongkirnya belum diisi admin. */
+  shipping_pending?: boolean | null;
+  /** Email admin yang membuatkan pesanan (kosong = dibuat reseller sendiri). */
+  created_by_admin?: string | null;
   shipping_cost?: number | null;
   customer_name?: string | null;
   reseller_id: string;
@@ -65,6 +69,10 @@ export interface RiwayatOrder {
   stage: OrderStage;
   stage_label: string;
   cancelled: boolean;
+  /** True = menunggu admin mengisi ongkir (tombol "Isi Ongkir"). */
+  shipping_pending: boolean;
+  /** Email admin pembuat; kosong = dibuat reseller sendiri. */
+  created_by_admin: string;
   items: RiwayatItem[];
 }
 
@@ -99,6 +107,7 @@ export interface RiwayatFilters {
 export const RIWAYAT_STAGES: OrderStage[] = [
   "belum_bayar",
   "menunggu_stok",
+  "menunggu_ongkir",
   "belum_dipacking",
   "sudah_dipacking",
   "dikirim",
@@ -164,6 +173,7 @@ export function toRiwayatOrder(row: RiwayatOrderSource, resellerName: string): R
     status: row.status,
     is_preorder: row.is_preorder,
     preorder_ready_at: row.preorder_ready_at,
+    shipping_pending: row.shipping_pending,
     awb_no: row.awb_no,
     shipping_status: row.shipping_status,
     tracking_status_code: row.tracking_status_code,
@@ -195,6 +205,8 @@ export function toRiwayatOrder(row: RiwayatOrderSource, resellerName: string): R
     stage,
     stage_label: ORDER_STAGE_LABEL[stage],
     cancelled: stage === "dibatalkan",
+    shipping_pending: stage === "menunggu_ongkir",
+    created_by_admin: String(row.created_by_admin || "").trim(),
     items,
   };
 }
