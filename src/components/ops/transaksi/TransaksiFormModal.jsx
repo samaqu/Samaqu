@@ -1038,7 +1038,10 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
   const lockedSourceLabel = managedSource ? initialData?.source_label || "Website" : "";
   const oldWeight = Number(initialData?.weight) || 0;
   const totalChanged = managedSource && Math.round(total) !== Math.round(originalTotal);
-  const weightOver = oldWeight > 0 && weightSummary.grams > oldWeight;
+  // PO yang menunggu stok belum punya resi, jadi server TIDAK membatasi berat (PATCH: `isPoEdit`).
+  // Form harus sama dengan server; flag-nya dari GET (`isPreorderWaiting`), sama seperti dataset stok.
+  const poWaiting = isEdit && initialData?.preorder_waiting === true;
+  const weightOver = !poWaiting && oldWeight > 0 && weightSummary.grams > oldWeight;
   const editBlockedReason = totalChanged
     ? `Total berubah (Rp ${formatRupiah(originalTotal)} → Rp ${formatRupiah(total)}). Untuk website/Open Order, gunakan batal lalu buat order baru.`
     : weightOver
@@ -4117,8 +4120,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                     style={{ background: PANEL_PINK, border: `1px solid ${PANEL_PINK_LINE}` }}
                   >
                     <p className="text-[11.5px] font-semibold leading-relaxed" style={{ color: "#b02a5b" }}>
-                      Totalnya harus sama kayak yang dibayar customer ya. Kalau memang perlu diubah, batalkan
-                      pesanan ini lalu buat pesanan baru.
+                      {totalChanged
+                        ? "Totalnya harus sama kayak yang dibayar customer ya. Kalau memang perlu diubah, batalkan pesanan ini lalu buat pesanan baru."
+                        : editBlockedReason}
                     </p>
                   </div>
                 ) : null}
