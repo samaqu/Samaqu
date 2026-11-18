@@ -196,7 +196,7 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
           onOpenDetail={setDetail}
         />
       ) : tab === "riwayat" ? (
-        <RiwayatTab resellers={resellers} onOpenOrder={openOrder} />
+        <RiwayatTab resellers={resellers} onOpenOrder={openOrder} variant={variant} />
       ) : tab === "mutasi" ? (
         <LedgerTab resellers={resellers} onChanged={refreshAll} />
       ) : tab === "materi" ? (

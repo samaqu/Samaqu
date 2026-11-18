@@ -4,10 +4,31 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, Search } from "lucide-react";
 import { AdminApiError, opsResellerApi, type ResellerAdminRow, type RiwayatQuery } from "./api";
 import { rupiah, tglJamID } from "@/lib/reseller/format";
-import { ORDER_STAGE_STYLE, ORDER_STAGE_TABS } from "@/lib/order-flow";
-import type { RiwayatOrder, RiwayatSummary } from "@/lib/reseller/riwayat";
+import { ORDER_STAGE_STYLE, ORDER_STAGE_TABS, type OrderStage } from "@/lib/order-flow";
+import type { RiwayatItem, RiwayatOrder, RiwayatSummary } from "@/lib/reseller/riwayat";
+// Gaya tabel Transaksi (kelas `.card.tw`, `.id`, `.mono`, `.resi-no`, `.bd`, `.chev`). Seluruh rule
+// di-scope `.ops-tx` / `.panel-tx`, jadi tidak memengaruhi bagian lain halaman Reseller.
+import "@/app/(internal)/ops/ops-transaksi.css";
+import "@/app/(internal)/panel-admin/panel-transaksi.css";
 
 type Periode = "bulan" | "rentang" | "semua";
+
+/** Warna lencana status — palet `.bd.s-*` yang sama dengan tabel Transaksi. */
+const STAGE_BADGE: Record<OrderStage, string> = {
+  belum_bayar: "bayar",
+  menunggu_stok: "siap",
+  belum_dipacking: "siap",
+  sudah_dipacking: "siap",
+  dikirim: "kirim",
+  selesai: "selesai",
+  dibatalkan: "batal",
+};
+
+/** Baris kecil di bawah nama produk: "Kain B-01 · Imalah · S × 1" (format yang sama dengan Transaksi). */
+function itemDetail(item: RiwayatItem): string {
+  const variant = [item.kain ? `Kain ${item.kain}` : "", item.series, item.color, item.size].filter(Boolean).join(" · ");
+  return `${variant ? `${variant} ` : ""}× ${item.quantity}`;
+}
 
 const FIELD =
   "px-3 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
@@ -57,9 +78,12 @@ function SummaryCard({
 export default function RiwayatTab({
   resellers,
   onOpenOrder,
+  variant = "ops",
 }: {
   resellers: ResellerAdminRow[];
   onOpenOrder: (orderNumber: string) => void;
+  /** Dashboard ops (`ops-tx`) atau panel admin (`panel-tx`, ikut tema warna panel). */
+  variant?: "ops" | "panel";
 }) {
   const [resellerId, setResellerId] = useState("");
   const [periode, setPeriode] = useState<Periode>("bulan");
@@ -264,8 +288,9 @@ export default function RiwayatTab({
         </>
       ) : null}
 
-      {/* Daftar */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      {/* Daftar: tabel bergaya Transaksi. Pembungkus tema membatasi CSS Transaksi hanya ke area ini. */}
+      <div className={variant === "panel" ? "ops-root panel-tx !bg-transparent !min-h-0" : "ops-tx"}>
+      <div className="card tw">
         {loading ? (
           <div className="p-10 text-center text-slate-400 text-sm">Memuat riwayat pesanan…</div>
         ) : orders.length === 0 ? (
@@ -275,31 +300,41 @@ export default function RiwayatTab({
           </div>
         ) : (
           <>
-            {/* Desktop: tabel, satu baris per item */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left">
+            {/* Desktop: tabel bergaya Transaksi, satu baris per item (data order hanya di baris pertama) */}
+            <div className="hidden min-[721px]:block overflow-x-auto">
+              {/* Di bawah lebar minimum tabel menggulir mendatar (rapi), bukan menjejalkan kolom. */}
+              <table className="!min-w-[960px]">
+                <colgroup>
+                  <col style={{ width: "15%" }} />
+                  <col style={{ width: "13%" }} />
+                  <col style={{ width: "23%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "14%" }} />
+                  <col style={{ width: "3%" }} />
+                </colgroup>
                 <thead>
-                  <tr className="text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-200 bg-slate-50">
-                    <th className="px-3 py-2.5">Tanggal</th>
-                    <th className="px-3 py-2.5">No. Pesanan</th>
-                    <th className="px-3 py-2.5">Reseller</th>
-                    <th className="px-3 py-2.5">Produk</th>
-                    <th className="px-3 py-2.5">Series</th>
-                    <th className="px-3 py-2.5">Warna</th>
-                    <th className="px-3 py-2.5">Size</th>
-                    <th className="px-3 py-2.5 text-right">Qty</th>
-                    <th className="px-3 py-2.5 text-right">Harga Beli</th>
-                    <th className="px-3 py-2.5 text-right">Ongkir</th>
-                    <th className="px-3 py-2.5">Resi</th>
-                    <th className="px-3 py-2.5">Status</th>
+                  <tr>
+                    <th>No. Pesanan</th>
+                    <th>Reseller</th>
+                    <th>Produk</th>
+                    <th className="!text-right">Harga Beli</th>
+                    <th className="!text-right">Ongkir</th>
+                    <th>No. Resi</th>
+                    <th>Status</th>
+                    <th className="chev" />
                   </tr>
                 </thead>
                 {orders.map((order) => {
                   const lines = order.items.length > 0 ? order.items : [null];
                   return (
-                    <tbody key={order.id} className="border-b border-slate-100">
+                    <tbody key={order.id}>
                       {lines.map((item, index) => {
                         const first = index === 0;
+                        const last = index === lines.length - 1;
+                        // Item satu pesanan dirapatkan jadi satu kelompok: garis pemisah hanya di bawah item terakhir.
+                        const tdCls = `${last ? "" : "!border-b-0 !pb-0.5"} ${first ? "" : "!pt-0.5"}`.trim() || undefined;
                         return (
                           <tr
                             key={index}
@@ -308,33 +343,58 @@ export default function RiwayatTab({
                             aria-label={`Buka detail pesanan ${order.order_number}`}
                             onClick={() => open(order)}
                             onKeyDown={keyOpen(order)}
-                            className={`cursor-pointer hover:bg-slate-50 focus:outline-none focus:bg-slate-50 ${
-                              order.cancelled ? "text-slate-400" : "text-slate-700"
-                            } ${first ? "" : "border-t border-slate-50"}`}
+                            className={`focus:outline-none ${order.cancelled ? "opacity-60" : ""}`}
                           >
-                            <td className="px-3 py-2.5 text-[12px] whitespace-nowrap">{first ? tglJamID(order.created_at) : ""}</td>
-                            <td className="px-3 py-2.5 text-[12.5px] font-bold whitespace-nowrap">
-                              <span className={order.cancelled ? "" : "text-slate-900"}>{first ? order.order_number : ""}</span>
+                            <td data-label="No. Pesanan" className={tdCls}>
+                              {first ? (
+                                <>
+                                  <span className="id">{order.order_number}</span>
+                                  <small>{tglJamID(order.created_at)}</small>
+                                </>
+                              ) : null}
                             </td>
-                            <td className="px-3 py-2.5 text-[12px]">{first ? order.reseller_name : ""}</td>
-                            <td className="px-3 py-2.5 text-[12.5px]">
+                            <td data-label="Reseller" className={tdCls}>
+                              {first ? <b>{order.reseller_name}</b> : null}
+                            </td>
+                            <td data-label="Produk" className={tdCls}>
                               {item ? (
                                 <>
-                                  <div className={`font-semibold ${order.cancelled ? "" : "text-slate-900"}`}>{item.product_name || "—"}</div>
-                                  {item.kain ? <div className="text-[11px] text-slate-400">Kain {item.kain}</div> : null}
+                                  <span className="font-semibold">{item.product_name || "—"}</span>
+                                  <small>{itemDetail(item)}</small>
                                 </>
                               ) : (
                                 "—"
                               )}
                             </td>
-                            <td className="px-3 py-2.5 text-[12.5px]">{item?.series || "—"}</td>
-                            <td className="px-3 py-2.5 text-[12.5px]">{item?.color || "—"}</td>
-                            <td className="px-3 py-2.5 text-[12.5px] font-semibold">{item?.size || "—"}</td>
-                            <td className="px-3 py-2.5 text-[12.5px] text-right">{item ? item.quantity : "—"}</td>
-                            <td className="px-3 py-2.5 text-[12.5px] text-right whitespace-nowrap">{item ? rupiah(item.buy_price) : "—"}</td>
-                            <td className="px-3 py-2.5 text-[12.5px] text-right whitespace-nowrap">{first ? rupiah(order.shipping_cost) : ""}</td>
-                            <td className="px-3 py-2.5 text-[12px] font-mono whitespace-nowrap">{first ? order.awb_no || "—" : ""}</td>
-                            <td className="px-3 py-2.5">{first ? <StagePill order={order} /> : null}</td>
+                            <td data-label="Harga Beli" className={`mono text-right ${tdCls || ""}`}>
+                              {item ? (
+                                <>
+                                  {rupiah(item.buy_price)}
+                                  {item.quantity > 1 ? <small className="text-right">= {rupiah(item.buy_price * item.quantity)}</small> : null}
+                                </>
+                              ) : null}
+                            </td>
+                            <td data-label="Ongkir" className={`mono text-right ${tdCls || ""}`}>
+                              {first ? rupiah(order.shipping_cost) : null}
+                            </td>
+                            <td data-label="No. Resi" className={tdCls}>
+                              {first ? (
+                                order.awb_no ? (
+                                  <span
+                                    className={`resi-no${order.cancelled ? " resi-void" : ""}`}
+                                    title={order.cancelled ? `Resi ${order.awb_no} sudah di-void (pesanan dibatalkan)` : `No. Resi J&T ${order.awb_no}`}
+                                  >
+                                    {order.awb_no}
+                                  </span>
+                                ) : (
+                                  <span className="resi-empty">–</span>
+                                )
+                              ) : null}
+                            </td>
+                            <td data-label="Status" className={tdCls}>
+                              {first ? <span className={`bd s-${STAGE_BADGE[order.stage]}`}>{order.stage_label}</span> : null}
+                            </td>
+                            <td className={`chev text-right ${tdCls || ""}`}>{first ? "›" : null}</td>
                           </tr>
                         );
                       })}
@@ -345,7 +405,7 @@ export default function RiwayatTab({
             </div>
 
             {/* HP: satu kartu per pesanan, item dijejer di dalamnya */}
-            <div className="md:hidden divide-y divide-slate-100">
+            <div className="min-[721px]:hidden divide-y divide-slate-100">
               {orders.map((order) => (
                 <div
                   key={order.id}
@@ -410,6 +470,7 @@ export default function RiwayatTab({
             </div>
           </>
         )}
+      </div>
       </div>
     </div>
   );
