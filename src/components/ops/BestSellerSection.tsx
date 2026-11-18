@@ -65,6 +65,8 @@ type BestSellerData = {
     hasData: boolean;
   };
   modes: { series: ModeData; product: ModeData };
+  /** Jasa Potong Panjang: layanan di luar peringkat barang. Opsional supaya respons lama tetap aman. */
+  layanan?: { units: number; revenue: number; prevUnits: number; prevRevenue: number; deltaUnits: number };
 };
 
 const nfmt = (value: number | null | undefined) =>
@@ -406,6 +408,32 @@ export default function BestSellerSection() {
               ) : null}
             </div>
           </div>
+
+          {/* Layanan (Jasa Potong Panjang): bukan barang, jadi di luar peringkat dan total unit. */}
+          {data?.layanan && (data.layanan.units > 0 || data.layanan.prevUnits > 0) ? (
+            <div
+              data-testid="layanan-strip"
+              className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-2xl bg-[#F9FAFB] px-4 py-3"
+            >
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Jasa Potong Panjang</p>
+                <p className="mt-1 text-sm font-black tabular-nums text-[#374151]">
+                  {nfmt(data.layanan.units)} unit · {rp(data.layanan.revenue)}
+                </p>
+              </div>
+              {compareVisible ? (
+                <p className="text-[11px] font-semibold text-slate-500">
+                  vs {comparison?.shortLabel}: {nfmt(data.layanan.prevUnits)} unit (
+                  {data.layanan.deltaUnits > 0 ? "+" : data.layanan.deltaUnits < 0 ? "−" : ""}
+                  {nfmt(Math.abs(data.layanan.deltaUnits))})
+                </p>
+              ) : null}
+              <p className="w-full text-[11px] font-semibold text-slate-400">
+                Layanan, bukan barang, jadi tidak ikut peringkat dan total unit. Omzetnya tetap masuk ke Total Omset di
+                Laporan.
+              </p>
+            </div>
+          ) : null}
 
           {totals?.units === 0 ? (
             <p className="mt-4 rounded-2xl bg-[#F9FAFB] px-4 py-3 text-xs font-semibold text-slate-500">

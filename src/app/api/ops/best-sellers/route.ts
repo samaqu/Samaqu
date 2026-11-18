@@ -310,6 +310,14 @@ export async function GET(req: NextRequest) {
         series: { ...seriesMode, totals: { ...seriesMode.totals, ...orderCounts } },
         product: { ...productMode, totals: { ...productMode.totals, ...orderCounts } },
       },
+      // Layanan (Jasa Potong Panjang) di luar peringkat barang; pembanding memakai rentang yang sama.
+      layanan: {
+        units: currentAgg.layanan.units,
+        revenue: currentAgg.layanan.revenue,
+        prevUnits: previousAgg.layanan.units,
+        prevRevenue: previousAgg.layanan.revenue,
+        deltaUnits: currentAgg.layanan.units - previousAgg.layanan.units,
+      },
     });
   } catch (error) {
     console.error("[OPS] best-sellers GET:", error);

@@ -98,9 +98,20 @@ export interface BestSellerModeTotals {
   fallbackUnits: number;
 }
 
+/**
+ * Total baris LAYANAN (Jasa Potong Panjang). Layanan bukan barang: tidak masuk peringkat dan tidak
+ * menambah total unit/omzet barang di atas, tapi angkanya dihitung dengan aturan yang sama
+ * (omzet baris SETELAH porsi diskon pesanan) supaya cocok dengan "Penjualan" di Laporan.
+ */
+export interface BestSellerLayananTotals {
+  units: number;
+  revenue: number;
+}
+
 export interface BestSellerAggregate {
   series: { rows: BestSellerSeriesRow[]; totals: BestSellerModeTotals };
   product: { rows: BestSellerProductRow[]; totals: BestSellerModeTotals };
+  layanan: BestSellerLayananTotals;
 }
 
 /** Pesanan yang dianggap penjualan sah — satu aturan dengan laporan & menu Transaksi. */
@@ -238,6 +249,8 @@ export function aggregateBestSellers(
   const productGroups = new Map<string, ProductAcc>();
   let fallbackItems = 0;
   let fallbackUnits = 0;
+  let layananUnits = 0;
+  let layananRevenue = 0;
 
   for (const item of items) {
     const qty = Number(item.quantity ?? item.qty) || 0;
@@ -293,8 +306,12 @@ export function aggregateBestSellers(
       fallbackUnits += qty;
     }
 
-    // Baris layanan (Jasa Potong Panjang) bukan barang yang diperingkatkan.
-    if (isLayananCategory(category)) continue;
+    // Baris layanan (Jasa Potong Panjang) bukan barang yang diperingkatkan: dihitung terpisah.
+    if (isLayananCategory(category)) {
+      layananUnits += qty;
+      layananRevenue += price * qty - (Number(item.discount_share) || 0);
+      continue;
+    }
 
     // Cover & Hanger / Kabak memakai `size = "ALL SIZE"` hanya sebagai placeholder;
     // varian sebenarnya ada di `color` (mis. "Set Hanger + Cover", "Kabak 12").
@@ -416,5 +433,6 @@ export function aggregateBestSellers(
   return {
     series: { rows: seriesRows, totals: totalsOf(seriesRows) },
     product: { rows: productRows, totals: totalsOf(productRows) },
+    layanan: { units: layananUnits, revenue: layananRevenue },
   };
 }
