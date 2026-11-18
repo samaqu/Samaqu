@@ -8,6 +8,7 @@
 import { supabase } from "@/lib/supabase";
 import type { LevelSummary, LevelTier } from "@/lib/reseller/level";
 import type { MateriRow } from "@/lib/reseller/materi";
+import type { RiwayatOrder, RiwayatSummary } from "@/lib/reseller/riwayat";
 import type {
   LedgerOrderPaymentInfo,
   LedgerTopupInfo,
@@ -51,6 +52,60 @@ async function adminFetch<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return (await res.json()) as T;
+}
+
+/** Filter tab Riwayat Pesanan (dikirim apa adanya sebagai query string). */
+export interface RiwayatQuery {
+  reseller_id?: string;
+  bulan?: string;
+  dari?: string;
+  sampai?: string;
+  status?: string;
+  q?: string;
+}
+
+export interface RiwayatPayload {
+  data: RiwayatOrder[];
+  total: number;
+  page: number;
+  pageSize: number;
+  has_more: boolean;
+  summary: RiwayatSummary;
+}
+
+function riwayatParams(params: RiwayatQuery): URLSearchParams {
+  const q = new URLSearchParams();
+  (Object.keys(params) as (keyof RiwayatQuery)[]).forEach((key) => {
+    const value = params[key];
+    if (value) q.set(key, value);
+  });
+  return q;
+}
+
+/** Unduh CSV riwayat (butuh token admin, jadi tidak bisa berupa tautan biasa). */
+async function riwayatCsvBlob(params: RiwayatQuery): Promise<{ blob: Blob; filename: string }> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const q = riwayatParams(params);
+  q.set("format", "csv");
+  const res = await fetch(`/api/ops/reseller/riwayat?${q.toString()}`, {
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${session?.access_token || ""}` },
+  });
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const json = await res.json();
+      if (json?.error) message = json.error;
+    } catch {
+      /* pesan default */
+    }
+    throw new AdminApiError(message, res.status);
+  }
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] || "riwayat-pesanan-reseller.csv";
+  return { blob: await res.blob(), filename };
 }
 
 /* ── Tipe ── */
@@ -257,6 +312,15 @@ export const opsResellerApi = {
     q.set("pageSize", String(params.pageSize || 50));
     return adminFetch<{ data: LedgerRow[]; total: number }>(`/api/ops/reseller/ledger?${q.toString()}`);
   },
+
+  /* Riwayat pesanan reseller (baca saja) */
+  riwayat: (params: RiwayatQuery & { page?: number; pageSize?: number }) => {
+    const q = riwayatParams(params);
+    q.set("page", String(params.page || 1));
+    q.set("pageSize", String(params.pageSize || 25));
+    return adminFetch<RiwayatPayload>(`/api/ops/reseller/riwayat?${q.toString()}`);
+  },
+  riwayatCsv: (params: RiwayatQuery) => riwayatCsvBlob(params),
 
   adjust: (payload: { reseller_id: string; amount: number; note: string }) =>
     adminFetch<{ ok: true; saldo_setelah: number }>("/api/ops/reseller/ledger", {

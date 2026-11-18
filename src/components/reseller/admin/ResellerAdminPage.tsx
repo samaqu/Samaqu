@@ -13,13 +13,15 @@ import { base44 } from "@/lib/ops-api";
 import LedgerTab from "./LedgerTab";
 import SettingsTab from "./SettingsTab";
 import MateriTab from "./MateriTab";
+import RiwayatTab from "./RiwayatTab";
 
-type TabKey = "perlu-dicek" | "harga" | "data" | "mutasi" | "materi" | "pengaturan";
+type TabKey = "perlu-dicek" | "harga" | "data" | "riwayat" | "mutasi" | "materi" | "pengaturan";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "perlu-dicek", label: "Perlu Dicek" },
   { key: "harga", label: "Produk & Harga" },
   { key: "data", label: "Data Reseller" },
+  { key: "riwayat", label: "Riwayat Pesanan" },
   { key: "mutasi", label: "Mutasi Saldo" },
   { key: "materi", label: "Materi" },
   { key: "pengaturan", label: "Pengaturan" },
@@ -193,6 +195,8 @@ export default function ResellerAdminPage({ variant = "ops" }: { variant?: "ops"
           onChanged={refreshAll}
           onOpenDetail={setDetail}
         />
+      ) : tab === "riwayat" ? (
+        <RiwayatTab resellers={resellers} onOpenOrder={openOrder} />
       ) : tab === "mutasi" ? (
         <LedgerTab resellers={resellers} onChanged={refreshAll} />
       ) : tab === "materi" ? (
