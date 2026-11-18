@@ -80,7 +80,7 @@ function SummaryCard({
   );
 }
 
-/** Riwayat pesanan semua reseller, satu baris per item — BACA SAJA (tanpa aksi yang mengubah data). */
+/** Riwayat pesanan semua reseller, satu baris per pesanan (produk pertama + penanda "+N produk lain"). Hanya "Isi Ongkir" yang mengubah data. */
 export default function RiwayatTab({
   resellers,
   onOpenOrder,
@@ -315,7 +315,7 @@ export default function RiwayatTab({
           </div>
         ) : (
           <>
-            {/* Desktop: tabel bergaya Transaksi, satu baris per item (data order hanya di baris pertama) */}
+            {/* Desktop: tabel bergaya Transaksi, satu baris per pesanan (produk pertama + penanda "+N produk lain") */}
             <div className="hidden min-[721px]:block overflow-x-auto">
               {/* Di bawah lebar minimum tabel menggulir mendatar (rapi), bukan menjejalkan kolom. */}
               <table className="!min-w-[960px]">
@@ -342,14 +342,16 @@ export default function RiwayatTab({
                   </tr>
                 </thead>
                 {orders.map((order) => {
-                  const lines = order.items.length > 0 ? order.items : [null];
+                  // Satu baris per pesanan: tampil produk pertama saja, sisanya cukup penanda "+N produk lain"
+                  // (rincian lengkap ada di detail pesanan). Harga Beli = total semua item supaya tetap jujur.
+                  const lines = [order.items.length > 0 ? order.items[0] : null];
+                  const extra = Math.max(0, order.items.length - 1);
+                  const itemsTotal = order.items.reduce((sum, row) => sum + row.buy_price * row.quantity, 0);
                   return (
                     <tbody key={order.id}>
                       {lines.map((item, index) => {
                         const first = index === 0;
-                        const last = index === lines.length - 1;
-                        // Item satu pesanan dirapatkan jadi satu kelompok: garis pemisah hanya di bawah item terakhir.
-                        const tdCls = `${last ? "" : "!border-b-0 !pb-0.5"} ${first ? "" : "!pt-0.5"}`.trim() || undefined;
+                        const tdCls = undefined as string | undefined;
                         return (
                           <tr
                             key={index}
@@ -385,6 +387,14 @@ export default function RiwayatTab({
                                 <>
                                   <span className="font-semibold">{item.product_name || "—"}</span>
                                   <small>{itemDetail(item)}</small>
+                                  {extra > 0 ? (
+                                    <span
+                                      className="inline-block mt-1 px-2 py-0.5 rounded-md text-[11px] font-extrabold whitespace-nowrap bg-slate-100 text-slate-600 border border-slate-200"
+                                      title={`Pesanan ini berisi ${order.items.length} produk. Buka detail untuk melihat semuanya.`}
+                                    >
+                                      +{extra} produk lain
+                                    </span>
+                                  ) : null}
                                 </>
                               ) : (
                                 "—"
@@ -393,8 +403,12 @@ export default function RiwayatTab({
                             <td data-label="Harga Beli" className={`mono text-right ${tdCls || ""}`}>
                               {item ? (
                                 <>
-                                  {rupiah(item.buy_price)}
-                                  {item.quantity > 1 ? <small className="text-right">= {rupiah(item.buy_price * item.quantity)}</small> : null}
+                                  {rupiah(extra > 0 ? itemsTotal : item.buy_price)}
+                                  {extra > 0 ? (
+                                    <small className="text-right">{order.items.length} produk · {order.items.reduce((s, row) => s + row.quantity, 0)} pcs</small>
+                                  ) : item.quantity > 1 ? (
+                                    <small className="text-right">= {rupiah(item.buy_price * item.quantity)}</small>
+                                  ) : null}
                                 </>
                               ) : null}
                             </td>
@@ -485,7 +499,7 @@ export default function RiwayatTab({
                     ) : null}
                   </div>
                   <ul className="mt-2 space-y-1.5">
-                    {order.items.map((item, index) => (
+                    {order.items.slice(0, 1).map((item, index) => (
                       <li key={index} className="rounded-lg bg-slate-50 px-3 py-2 text-[12px]">
                         <div className={`font-semibold ${order.cancelled ? "" : "text-slate-900"}`}>{item.product_name || "—"}</div>
                         <div className="text-[11px] text-slate-500">
@@ -501,6 +515,13 @@ export default function RiwayatTab({
                         </div>
                       </li>
                     ))}
+                    {order.items.length > 1 ? (
+                      <li className="px-1">
+                        <span className="inline-block px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-slate-100 text-slate-600 border border-slate-200">
+                          +{order.items.length - 1} produk lain · total {order.items.reduce((s, row) => s + row.quantity, 0)} pcs
+                        </span>
+                      </li>
+                    ) : null}
                   </ul>
                   <div className="flex justify-between gap-3 mt-2 text-[12px]">
                     <span>Ongkir {rupiah(order.shipping_cost)}</span>

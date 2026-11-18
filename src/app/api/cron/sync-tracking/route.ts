@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { trackShipment } from "@/lib/jnt/track";
 import { applyTrackingToOrder } from "@/lib/jnt/tracking-sync";
 import { applyTrackingToReturn } from "@/lib/jnt/return-tracking";
+import { isCustomCourier } from "@/lib/custom-courier";
 
 /**
  * Sinkronkan status pengiriman & pesanan dengan tracking J&T.
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
 
   const { data: orders, error } = await supabase
     .from("orders")
-    .select("id, order_number, awb_no, status, shipping_status, customer_name, customer_whatsapp, shipped_notified_at, reseller_id")
+    .select("id, order_number, awb_no, status, shipping_status, customer_name, customer_whatsapp, shipped_notified_at, reseller_id, shipping_method")
     .in("status", ["pending", "diproses", "dikirim"])
     .not("awb_no", "is", null)
     .order("created_at", { ascending: false })
@@ -49,6 +50,8 @@ export async function GET(request: NextRequest) {
 
   for (const order of orders || []) {
     if (!order.awb_no) continue;
+    // Resi kurir lain diinput manual: J&T tidak mengenalnya ("Invalid AWB"), jadi tidak di-track.
+    if (isCustomCourier(order.shipping_method)) continue;
     checked++;
     try {
       const track = await trackShipment(order.awb_no);

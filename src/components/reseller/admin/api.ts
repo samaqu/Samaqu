@@ -400,7 +400,10 @@ export const opsResellerApi = {
     adminFetch<AdminOrderResult>("/api/ops/reseller/orders", { method: "POST", body: JSON.stringify(payload) }),
   shippingOptions: (orderNumber: string) =>
     adminFetch<ShippingFillOptions>(`/api/ops/reseller/orders/${encodeURIComponent(orderNumber)}/ongkir`),
-  fillShipping: (orderNumber: string, payload: { method: string; cost: number }) =>
+  fillShipping: (
+    orderNumber: string,
+    payload: { method: string; cost: number; custom?: { name: string; service: string } }
+  ) =>
     adminFetch<ShippingFillResult>(`/api/ops/reseller/orders/${encodeURIComponent(orderNumber)}/ongkir`, {
       method: "POST",
       body: JSON.stringify(payload),

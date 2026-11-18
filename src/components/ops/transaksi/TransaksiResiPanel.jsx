@@ -26,6 +26,7 @@ import { formatRupiah } from "@/components/ops/transaksi/transaksi-format";
 import { formatTrackingTime } from "@/lib/jnt/track-status";
 import { jntServiceCodeFromShippingMethod } from "@/lib/jnt/layanan";
 import { gosendCaption, isGosend } from "@/lib/gosend";
+import { customCourierLabel, isCustomCourier } from "@/lib/custom-courier";
 
 /** Label status kirim yang dipakai layar (nilainya dari `orders.shipping_status`). */
 const SHIPPING_STATUS_LABEL = { menunggu_pickup: "Menunggu pickup", dikirim: "Dikirim", selesai: "Selesai" };
@@ -102,6 +103,8 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
   const voided = cancelled || order?.jnt_void_status === "voided";
   /** Pesanan GoSend: tidak ada resi, tapi tetap ada label (barcode dari nomor pesanan). */
   const isGo = isGosend(order?.shipping_method);
+  /** Kurir lain (ekspedisi di luar J&T): resi diinput manual, tanpa label J&T & tanpa tracking J&T. */
+  const isCustom = isCustomCourier(order?.shipping_method);
   const goPrintable = isGo && !cancelled;
   /** Baris kecil di bawah status: lokasi + waktu scan terakhir dari J&T. */
   const trackingMeta = latestTracking
@@ -112,9 +115,9 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
   // dipanggil dari luar lewat ref, supaya dialog pilih ukuran tetap satu sumber di sini.
   useImperativeHandle(ref, () => ({
     print: () => {
-      if ((awb && !voided) || goPrintable) setPrintSize(labelSize);
+      if ((awb && !voided && !isCustom) || goPrintable) setPrintSize(labelSize);
     },
-  }), [awb, voided, labelSize, goPrintable]);
+  }), [awb, voided, labelSize, goPrintable, isCustom]);
 
   if (!order) return null;
 
@@ -159,7 +162,9 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
   const resiFinal = cancelled || order.status === "selesai" || shippingStatus === "selesai";
   /** Status Dikirim: link resi manual memakai teks "Ubah nomor resi". */
   const isDikirim = order.status === "dikirim" || shippingStatus === "dikirim";
-  const manualFormOpen = !resiFinal && (manualOpen || (isHbo && !awb));
+  // Kurir lain: form resi manual langsung terbuka begitu pesanan Diproses (tanpa tombol "Buat Resi" J&T).
+  const manualFormOpen =
+    !resiFinal && (manualOpen || (isHbo && !awb) || (isCustom && !awb && order.status === "diproses"));
   const bisaTandaiDikirim =
     !!awb &&
     !cancelled &&
@@ -322,7 +327,8 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
         awb_no: awbNo,
         shipping_status: result?.shippingStatus || (manualShipped === "sudah" ? "dikirim" : "menunggu_pickup"),
         ...(result?.status ? { status: result.status } : {}),
-        shipping_method: "J&T HBO",
+        // Kurir lain tetap kurir lain (server juga tidak menimpanya); selain itu resi manual = HBO.
+        shipping_method: isCustom ? order.shipping_method : "J&T HBO",
       });
     } catch (error) {
       setManualError(error instanceof Error ? error.message : "Gagal menyimpan nomor resi. Coba lagi.");
@@ -457,11 +463,13 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
   const manualForm = (
     <div className="space-y-2.5">
       <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-        Pesanan HBO dibuat manual di J&amp;T VIP, masukkan nomor resi di sini.
+        {isCustom
+          ? `Kurir lain (bukan J&T): ${customCourierLabel(order.shipping_method)}. Masukkan nomor resi dari ekspedisi di sini. Tidak ada tracking otomatis.`
+          : "Pesanan HBO dibuat manual di J&T VIP, masukkan nomor resi di sini."}
       </p>
       <label className="block">
         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          Nomor Resi HBO
+          {isCustom ? "Nomor Resi Ekspedisi" : "Nomor Resi HBO"}
         </span>
         <input
           type="text"
@@ -619,7 +627,7 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
             </>
           )}
 
-          {!voided && !hidePrintButton ? (
+          {!voided && !hidePrintButton && !isCustom ? (
             /* Satu tombol saja (alurnya sama dengan "Buat Resi" / "Atur Pesanan"): klik → popup
                → pilih ukuran label → halaman label dibuka di tab baru. */
             <button
@@ -649,7 +657,7 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
                 className="od-link-hbo"
               >
                 <RefreshCw size={12} />
-                <span>{isHbo || isDikirim ? "Ubah nomor resi" : "Ganti ke resi HBO (input manual)"}</span>
+                <span>{isHbo || isCustom || isDikirim ? "Ubah nomor resi" : "Ganti ke resi HBO (input manual)"}</span>
                 <ChevronRight size={12} />
               </button>
             )

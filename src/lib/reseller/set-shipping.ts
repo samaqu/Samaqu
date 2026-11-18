@@ -8,6 +8,7 @@
 
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { verifyJntShipping } from "@/lib/shipping-verify";
+import { buildCustomCourierMethod, customCourierLabel, CUSTOM_COURIER_MAX_COST } from "@/lib/custom-courier";
 import { notifyResellerShippingFilled } from "./notify";
 
 export type SetResellerShippingResult =
@@ -66,18 +67,35 @@ export async function loadPendingShippingOrder(orderNumber: string): Promise<Pen
 
 export async function setResellerOrderShipping(input: {
   orderNumber: string;
+  /** Layanan J&T (diverifikasi ke tarif). Diabaikan kalau `custom` diisi. */
   method: string;
   cost: number;
   actorEmail: string;
+  /** Kurir lain (ekspedisi di luar J&T): nama + layanan isian admin, nominal TIDAK diverifikasi ke tarif. */
+  custom?: { name?: unknown; service?: unknown } | null;
 }): Promise<SetResellerShippingResult> {
   const orderNumber = String(input.orderNumber || "").trim();
-  const method = String(input.method || "").trim();
+  let method = String(input.method || "").trim();
   const cost = Math.round(Number(input.cost));
   const actor = String(input.actorEmail || "").trim();
+  const isCustom = input.custom !== undefined && input.custom !== null;
 
   if (!orderNumber) return { ok: false, error: "Nomor pesanan wajib", status: 400 };
-  if (!method) return { ok: false, error: "Pilih layanan pengiriman terlebih dahulu.", status: 400 };
+  if (isCustom) {
+    const built = buildCustomCourierMethod(input.custom?.name, input.custom?.service);
+    if (!built.ok) return { ok: false, error: built.error, status: 400 };
+    method = built.method;
+  } else if (!method) {
+    return { ok: false, error: "Pilih layanan pengiriman terlebih dahulu.", status: 400 };
+  }
   if (!Number.isFinite(cost) || cost <= 0) return { ok: false, error: "Ongkir tidak valid.", status: 400 };
+  if (isCustom && cost > CUSTOM_COURIER_MAX_COST) {
+    return {
+      ok: false,
+      error: `Ongkir kurir lain terlalu besar (maksimal Rp${CUSTOM_COURIER_MAX_COST.toLocaleString("id-ID")}). Periksa angkanya.`,
+      status: 400,
+    };
+  }
   if (!actor) return { ok: false, error: "Admin pengisi ongkir tidak dikenali.", status: 401 };
 
   const order = await loadPendingShippingOrder(orderNumber);
@@ -88,14 +106,18 @@ export async function setResellerOrderShipping(input: {
   }
   if (String(order.awb_no || "").trim()) return { ok: false, error: "Pesanan sudah punya resi.", status: 409 };
 
-  // Tarif diverifikasi ke J&T (bukan dari body): layanan harus dikenal dan biaya harus cocok.
-  const check = await verifyJntShipping({
-    city: cityOfShipping(order.shipping_city, order.shipping_kecamatan),
-    district: order.shipping_kecamatan,
-    weightGrams: Math.max(300, Number(order.weight) || 0),
-    method,
-    cost,
-  });
+  // J&T: tarif diverifikasi ke J&T (bukan dari body): layanan harus dikenal dan biaya harus cocok.
+  // Kurir lain: tidak ada tarif untuk dicocokkan — nominal isian admin dipakai apa adanya (sudah dipagari di atas),
+  // dan tercatat atas nama admin pengisi di ledger lewat `p_actor`.
+  const check = isCustom
+    ? ({ ok: true, method, cost } as const)
+    : await verifyJntShipping({
+        city: cityOfShipping(order.shipping_city, order.shipping_kecamatan),
+        district: order.shipping_kecamatan,
+        weightGrams: Math.max(300, Number(order.weight) || 0),
+        method,
+        cost,
+      });
   if (!check.ok) return { ok: false, error: check.error, status: check.status };
 
   const { data, error } = await getSupabaseAdmin().rpc("samaqu_reseller_set_shipping", {
@@ -126,6 +148,8 @@ export async function setResellerOrderShipping(input: {
       cost: check.cost,
       shortfall: Number(result.shortfall) || 0,
       total: Number(result.total) || 0,
+      // Nama ekspedisi hanya disebut untuk kurir lain (teks WA J&T tetap seperti semula).
+      ...(isCustom ? { courier: customCourierLabel(check.method) } : {}),
     }),
   ]);
 

@@ -38,6 +38,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Check, Clock, Info, Lightbulb, Loader2, Pencil, Plus, RotateCcw, Save, Shirt, Store, Trash2, Truck, UserRound, Wand2, X } from "lucide-react";
 import { base44 } from "@/lib/ops-api";
 import { GOSEND_CUSTOMER, GOSEND_SAMAQU, isGosend } from "@/lib/gosend";
+import { isCustomCourier } from "@/lib/custom-courier";
 import { MANUAL_PRICE_MAX, MANUAL_PRICE_MIN, MANUAL_SOURCE_KEYS, SOURCE_LABEL, manualPrice } from "@/lib/transaksi";
 import { PAKET_SIZE, isPaketKategori, variantName } from "@/lib/item-label";
 import {
@@ -1936,7 +1937,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
 
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                      {isGosend(savedOrder.shipping_method) ? "Pengiriman GoSend" : "Pengiriman J&T"}
+                      {isGosend(savedOrder.shipping_method) ? "Pengiriman GoSend" : isCustomCourier(savedOrder.shipping_method) ? "Pengiriman Kurir Lain" : "Pengiriman J&T"}
                     </p>
                     <div className="rounded-xl border border-slate-200 dark:border-slate-800 px-3.5 py-3 space-y-2.5">
                       <TransaksiResiPanel order={savedOrder} onResiCreated={handleResiCreated} />

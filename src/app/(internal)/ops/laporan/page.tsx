@@ -32,6 +32,7 @@ import {
 } from "recharts";
 import { statusLabel, orderSourceLabel } from "@/lib/transaksi";
 import { gosendCaption, isGosend } from "@/lib/gosend";
+import { customCourierLabel, isCustomCourier } from "@/lib/custom-courier";
 import CountUp from "@/components/admin/CountUp";
 import BestSellerSection from "@/components/ops/BestSellerSection";
 import BreakdownPengeluaran, { type BreakdownData } from "@/components/ops/laporan/BreakdownPengeluaran";
@@ -1717,8 +1718,14 @@ function DetailDrawer({ selected, onClose }: { selected: { kind: Tab; row: any }
         nama={row.customer_name || "-"}
         telepon={row.customer_whatsapp || "-"}
         alamat={alamat || "-"}
-        kurir={isGosend(row.shipping_method) ? "GoSend" : "J&T"}
-        layanan={isGosend(row.shipping_method) ? gosendCaption(row.shipping_method) : row.shipping_method || "-"}
+        kurir={isGosend(row.shipping_method) ? "GoSend" : isCustomCourier(row.shipping_method) ? "Kurir Lain" : "J&T"}
+        layanan={
+          isGosend(row.shipping_method)
+            ? gosendCaption(row.shipping_method)
+            : isCustomCourier(row.shipping_method)
+              ? customCourierLabel(row.shipping_method)
+              : row.shipping_method || "-"
+        }
         resi={row.awb_no || ""}
         resiKosong={isGosend(row.shipping_method) ? "Tanpa resi (GoSend)" : "Resi belum dibuat"}
         onLacak={() => undefined}

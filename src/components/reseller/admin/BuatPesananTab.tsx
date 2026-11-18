@@ -404,7 +404,14 @@ export default function BuatPesananTab({
 
   return (
     <>
-      <div className="rs-root !min-h-0 !bg-transparent">
+      {/*
+        `[&_.order-step.on]:![animation-fill-mode:backwards]`: animasi masuk langkah (`rsStepIn`, reseller.css) memakai
+        fill-mode `both`, sehingga `transform` tertahan di kartu langkah selamanya dan kartu itu jadi acuan posisi bagi
+        anak `position: fixed`. Akibatnya modal di dalam langkah (mis. "Simpan alamat") terjebak di kartu, bukan di layar.
+        `backwards` sama tampilannya (kondisi akhir = kondisi normal) tapi tidak menahan transform. Dipasang di sini
+        (bukan di reseller.css) supaya portal reseller tidak tersentuh.
+      */}
+      <div className="rs-root !min-h-0 !bg-transparent [&_.order-step.on]:![animation-fill-mode:backwards]">
         <div className="order-page !pb-0">
           <OrderStepper step={step} onStep={setStep} done={stepDone} hints={stepHints} />
 

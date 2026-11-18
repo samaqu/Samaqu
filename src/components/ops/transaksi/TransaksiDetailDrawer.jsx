@@ -24,6 +24,7 @@ import { waNumber } from "@/lib/whatsapp";
 import { formatTrackingTime, sortHistoryDesc, trackingRow, trackingSummary } from "@/lib/jnt/track-status";
 import { jntServiceTag } from "@/lib/jnt/layanan";
 import { gosendCaption, isGosend } from "@/lib/gosend";
+import { isCustomCourier } from "@/lib/custom-courier";
 import JntBadge from "@/components/JntBadge";
 import { SOURCE_STYLES, STATUS_STYLES, formatRupiah, formatTanggalJamID } from "@/components/ops/transaksi/transaksi-format";
 import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
@@ -148,7 +149,8 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
 
   /** Ambil riwayat dari J&T. `force` = lewati cache 5 menit di endpoint. Tanpa tulis DB. */
   const loadTrack = async (force = false) => {
-    if (!awb || trackBusy) return;
+    // Resi kurir lain diinput manual: J&T tidak mengenalnya ("Invalid AWB"), jadi tidak ditanyakan ke J&T.
+    if (!awb || trackBusy || isCustomCourier(order?.shipping_method)) return;
     setTrackBusy(true);
     setTrack((current) => ({ ...current, status: "loading", error: "" }));
     try {
@@ -608,7 +610,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
               {/* Pengiriman & resi J&T (murni tampilan + aksi resi) */}
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                  {isGosend(order.shipping_method) ? "Pengiriman GoSend" : "Pengiriman J&T"}
+                  {isGosend(order.shipping_method) ? "Pengiriman GoSend" : isCustomCourier(order.shipping_method) ? "Pengiriman Kurir Lain" : "Pengiriman J&T"}
                 </p>
                 <div className="rounded-xl border border-slate-200 dark:border-slate-800 px-3.5 py-3 space-y-2.5">
                   {/* Nomor resi + tombol cetak + tombol Buat Resi — komponen bersama dengan

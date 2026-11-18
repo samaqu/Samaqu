@@ -10,6 +10,8 @@
  *    label & kode diambil dari respons J&T, jadi tidak perlu ubah kode.
  */
 
+import { isCustomCourier } from "../custom-courier";
+
 export type JntLayanan = {
   /** Kode layanan untuk Tariff Check (`productType`) dan label di UI. */
   code: string;
@@ -72,6 +74,8 @@ export function expressTypeUntuk(code?: string | null): string {
  * Nilai lama bisa berupa "reguler", "J&T - EZ", atau "J&T - J&T ECO (Hemat)".
  */
 export function jntServiceCodeFromShippingMethod(value?: string | null): string | null {
+  // Kurir lain (nama bebas, bisa memuat "EZ"/"ECO"/"HBO") bukan layanan J&T sama sekali.
+  if (isCustomCourier(value)) return null;
   const text = String(value ?? "").toUpperCase();
   // HBO dicek lebih dulu: teksnya "J&T HBO", tidak mengandung EZ/ECO.
   if (text.includes("HBO")) return "HBO";

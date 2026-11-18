@@ -11,6 +11,7 @@ import {
   notifyCustomerOrderShippedGosend,
 } from "@/lib/fonnte";
 import { isGosend } from "@/lib/gosend";
+import { isCustomCourier } from "@/lib/custom-courier";
 import { claimOrderNotification, recordShippedNotifyStatus, sendOnce } from "@/lib/order-notify";
 import { notifyResellerOrderPaid, notifyResellerOrderShipped } from "@/lib/reseller/notify";
 import { isCodOrderPayment } from "@/lib/payment-methods";
@@ -246,6 +247,14 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: "Pesanan GoSend tidak memakai resi J&T." }, { status: 400 });
       }
 
+      // Kurir lain (ekspedisi di luar J&T) juga tidak boleh dibuatkan resi J&T: resinya diinput manual.
+      if (isCustomCourier(order.shipping_method)) {
+        return NextResponse.json(
+          { error: "Pesanan ini memakai kurir lain (bukan J&T). Masukkan nomor resinya lewat form resi manual." },
+          { status: 400 }
+        );
+      }
+
       if (order.awb_no) {
         return NextResponse.json(
           { error: `Pesanan ini sudah punya nomor resi J&T (${order.awb_no}).` },
@@ -426,7 +435,8 @@ export async function PATCH(request: NextRequest) {
         .from("orders")
         .update({
           awb_no: resi,
-          shipping_method: "J&T HBO",
+          // Kurir lain tetap kurir lain (nama ekspedisinya tidak boleh tertimpa); selain itu resi manual = HBO.
+          shipping_method: isCustomCourier(order.shipping_method) ? order.shipping_method : "J&T HBO",
           status: nextStatus,
           shipping_status: nextShip,
           updated_at: new Date().toISOString(),
@@ -467,7 +477,7 @@ export async function PATCH(request: NextRequest) {
         awbNo: resi,
         status: nextStatus,
         shippingStatus: nextShip,
-        serviceCode: "HBO",
+        serviceCode: isCustomCourier(order.shipping_method) ? null : "HBO",
         packagingWarning: packResult.warning,
       });
     }
@@ -666,13 +676,19 @@ export async function PATCH(request: NextRequest) {
       const { data: order, error: fetchError } = await supabaseAdmin
         .from("orders")
         .select(
-          "id, order_number, status, shipping_status, awb_no, customer_name, customer_whatsapp, shipped_notified_at, reseller_id"
+          "id, order_number, status, shipping_status, awb_no, customer_name, customer_whatsapp, shipped_notified_at, reseller_id, shipping_method"
         )
         .eq("order_number", identifier)
         .single();
 
       if (fetchError || !order) {
         return NextResponse.json({ error: "Pesanan tidak ditemukan" }, { status: 404 });
+      }
+      if (isCustomCourier(order.shipping_method)) {
+        return NextResponse.json(
+          { error: "Pesanan ini memakai kurir lain: tidak ada tracking J&T. Cek resinya di situs ekspedisi." },
+          { status: 400 }
+        );
       }
       if (!order.awb_no) {
         return NextResponse.json({ error: "Pesanan ini belum punya nomor resi J&T." }, { status: 400 });

@@ -329,14 +329,14 @@ export async function notifyResellerOrderCreated(
 export async function notifyResellerShippingFilled(
   resellerId: string,
   orderNumber: string,
-  detail: { cost: number; shortfall: number; total: number }
+  detail: { cost: number; shortfall: number; total: number; courier?: string }
 ): Promise<boolean> {
   return notifyOnce("order_created", `${orderNumber}:ongkir`, resellerId, (name) => {
     const ka = greetingName(name);
     const lines = [
       `Halo ${ka},`,
       "",
-      `Ongkir pesanan ${orderNumber} sudah diisi admin: ${rupiah(detail.cost)}.`,
+      `Ongkir pesanan ${orderNumber} sudah diisi admin: ${rupiah(detail.cost)}${detail.courier ? ` (${detail.courier})` : ""}.`,
       `Total pesanan sekarang: ${rupiah(detail.total)}.`,
       "",
     ];

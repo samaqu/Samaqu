@@ -11,6 +11,8 @@ import { cityOfShipping, loadPendingShippingOrder, setResellerOrderShipping } fr
  *         + ringkasan, supaya admin melihat total, saldo, dan kekurangan SEBELUM konfirmasi.
  * POST -> { method, cost }: tarif diverifikasi ulang ke J&T, ongkir dipotong dari saldo (baris ledger
  *         terpisah); kalau saldo kurang masuk jalur bayar kekurangan yang sudah ada.
+ *         { custom: { name, service }, cost }: kurir lain (di luar J&T), nominal isian admin tanpa verifikasi tarif;
+ *         potong saldo & jalur kekurangan sama persis.
  */
 export async function GET(req: NextRequest, context: { params: Promise<{ orderNumber: string }> }) {
   if (!(await isOpsAdmin(req))) return unauthorized();
@@ -52,6 +54,11 @@ export async function POST(req: NextRequest, context: { params: Promise<{ orderN
     method: String(body.method ?? ""),
     cost: Number(body.cost),
     actorEmail: identity.email,
+    // Kurir lain: { name, service } -> nominal isian admin (tanpa verifikasi tarif J&T).
+    custom:
+      body.custom && typeof body.custom === "object"
+        ? { name: (body.custom as Record<string, unknown>).name, service: (body.custom as Record<string, unknown>).service }
+        : null,
   });
 
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });

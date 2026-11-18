@@ -5,6 +5,7 @@ import { getDestinationCode, getOriginCode, getReceiverArea, getSendSiteCode, re
 import { checkTariffSemua } from "./tariff";
 import { expressTypeUntuk, isManualService, jntServiceCodeFromShippingMethod } from "./layanan";
 import type { OrderResponse } from "./types";
+import { isCustomCourier } from "../custom-courier";
 import { sumWeightGramsBySize, productWeightMapFromRows, variantWeightMapFromRows } from "../shipping-weight";
 
 /**
@@ -148,6 +149,15 @@ async function resolveWeightGrams(
 }
 
 export async function createJntOrderForOrder(order: JntOrderSource): Promise<JntOrderResult> {
+  // Kurir lain (ekspedisi di luar J&T): jangan pernah membuat resi J&T untuknya.
+  if (isCustomCourier(order.shipping_method)) {
+    return {
+      success: false,
+      awbNo: null,
+      error: "Pesanan ini memakai kurir lain (bukan J&T). Masukkan nomor resinya lewat form resi manual.",
+    };
+  }
+
   // Pesanan HBO dibuat manual di J&T VIP: jangan pernah membuat resi lewat API.
   if (isManualService(jntServiceCodeFromShippingMethod(order.shipping_method))) {
     return {

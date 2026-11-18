@@ -8,6 +8,7 @@ import { refundResellerOnCancel } from "@/lib/reseller/refund";
 import { revertLeadOnOrderCancelled } from "@/lib/ops-lead-sync";
 import { isPotongPanjangLine } from "@/lib/layanan";
 import { PREORDER_CANCEL_NEEDS_REASON_MESSAGE, isPreorderCancelRemark } from "@/lib/preorder";
+import { isCustomCourier } from "@/lib/custom-courier";
 
 /**
  * Satu jalur pembatalan pesanan untuk semua pemanggil: customer (`/api/orders/cancel`),
@@ -48,6 +49,12 @@ export interface CancelableOrder {
    * otomatis (PO memang tidak dibatalkan ke customer; alasan internal seperti "data uji" tidak untuk customer).
    */
   is_preorder?: boolean | null;
+  /**
+   * Teks `orders.shipping_method`. Kalau tidak diisi pemanggil, dibaca dari database hanya bila perlu
+   * (ada resi tanpa `jnt_order_id`): resi KURIR LAIN diinput manual dan J&T tidak mengenalnya, jadi
+   * tidak boleh di-void ke J&T (pembatalan pasti ditolak).
+   */
+  shipping_method?: string | null;
 }
 
 export type CancelOrderResult =
@@ -68,7 +75,20 @@ export async function cancelOrderCompletely(
   remark: string
 ): Promise<CancelOrderResult> {
   const supabase = getSupabaseAdmin();
-  const cancelId = order.jnt_order_id || order.awb_no;
+  let cancelId = order.jnt_order_id || order.awb_no;
+  if (cancelId && !order.jnt_order_id) {
+    let method = order.shipping_method;
+    if (method === undefined) {
+      try {
+        const { data: row } = await supabase.from("orders").select("shipping_method").eq("id", order.id).maybeSingle();
+        method = (row as { shipping_method?: string | null } | null)?.shipping_method ?? null;
+      } catch {
+        // Gagal dibaca: perilaku lama (anggap resi J&T) — kalau ternyata bukan, J&T menolak dengan aman.
+        method = null;
+      }
+    }
+    if (isCustomCourier(method)) cancelId = null;
+  }
 
   // Pre-order: penjaga pusat. Pemanggil yang tidak menyebut penandanya dicek ke database; kalau
   // gagal dibaca dianggap bukan PO (perilaku pesanan reguler tidak berubah).
