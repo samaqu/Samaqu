@@ -314,6 +314,7 @@ export async function GET(req: NextRequest) {
       layanan: {
         units: currentAgg.layanan.units,
         revenue: currentAgg.layanan.revenue,
+        orders: currentAgg.layanan.orders,
         prevUnits: previousAgg.layanan.units,
         prevRevenue: previousAgg.layanan.revenue,
         deltaUnits: currentAgg.layanan.units - previousAgg.layanan.units,

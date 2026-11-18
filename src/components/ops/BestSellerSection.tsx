@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowUpRight, ChevronDown, Loader2, RefreshCw } from "lucide-react";
+import { ArrowDown, ArrowUpRight, ChevronDown, Loader2, RefreshCw, Scissors } from "lucide-react";
 
 /**
  * Kartu "Produk Terlaris" halaman Laporan ops.
@@ -66,7 +66,14 @@ type BestSellerData = {
   };
   modes: { series: ModeData; product: ModeData };
   /** Jasa Potong Panjang: layanan di luar peringkat barang. Opsional supaya respons lama tetap aman. */
-  layanan?: { units: number; revenue: number; prevUnits: number; prevRevenue: number; deltaUnits: number };
+  layanan?: {
+    units: number;
+    revenue: number;
+    orders?: number;
+    prevUnits: number;
+    prevRevenue: number;
+    deltaUnits: number;
+  };
 };
 
 const nfmt = (value: number | null | undefined) =>
@@ -409,29 +416,73 @@ export default function BestSellerSection() {
             </div>
           </div>
 
-          {/* Layanan (Jasa Potong Panjang): bukan barang, jadi di luar peringkat dan total unit. */}
+          {/* Layanan (Jasa Potong Panjang): bukan barang, jadi di luar peringkat dan total unit. Kartu sendiri
+              supaya angkanya langsung terbaca tanpa harus mencari di daftar. */}
           {data?.layanan && (data.layanan.units > 0 || data.layanan.prevUnits > 0) ? (
             <div
-              data-testid="layanan-strip"
-              className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-2xl bg-[#F9FAFB] px-4 py-3"
+              data-testid="layanan-card"
+              className="mt-3 flex overflow-hidden rounded-2xl border border-amber-200 bg-amber-50"
             >
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Jasa Potong Panjang</p>
-                <p className="mt-1 text-sm font-black tabular-nums text-[#374151]">
-                  {nfmt(data.layanan.units)} unit · {rp(data.layanan.revenue)}
-                </p>
+              <span aria-hidden className="w-1.5 shrink-0 bg-amber-400" />
+              <div className="min-w-0 flex-1 px-4 py-4 md:px-5">
+                <div className="flex items-start gap-3">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700">
+                    <Scissors size={17} strokeWidth={2} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-amber-950">Jasa Potong Panjang</p>
+                    <p className="mt-0.5 text-[11px] font-semibold leading-relaxed text-amber-800/80">
+                      Layanan potong panjang thobe, bukan barang. Tidak masuk peringkat di bawah, tapi pendapatannya
+                      sudah ikut dihitung di Total Omset Laporan.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-800/70">Pendapatan jasa</p>
+                    <p className="mt-0.5 text-2xl font-black tabular-nums text-amber-950">{rp(data.layanan.revenue)}</p>
+                    {data.layanan.units > 0 && data.layanan.revenue % data.layanan.units === 0 ? (
+                      <p className="text-[11px] font-semibold text-amber-800/80">
+                        {nfmt(data.layanan.units)} potong × {rp(data.layanan.revenue / data.layanan.units)}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-800/70">Jumlah dikerjakan</p>
+                    <p className="mt-0.5 text-2xl font-black tabular-nums text-amber-950">
+                      {nfmt(data.layanan.units)} potong
+                    </p>
+                    {data.layanan.orders ? (
+                      <p className="text-[11px] font-semibold text-amber-800/80">
+                        dari {nfmt(data.layanan.orders)} pesanan
+                      </p>
+                    ) : null}
+                  </div>
+                  {compareVisible ? (
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-amber-800/70">
+                        vs {comparison?.shortLabel}
+                      </p>
+                      <p
+                        className={`mt-0.5 text-2xl font-black tabular-nums ${
+                          data.layanan.deltaUnits === 0
+                            ? "text-amber-950"
+                            : data.layanan.deltaUnits > 0
+                              ? "text-emerald-700"
+                              : "text-rose-700"
+                        }`}
+                      >
+                        {data.layanan.deltaUnits > 0 ? "+" : data.layanan.deltaUnits < 0 ? "−" : ""}
+                        {nfmt(Math.abs(data.layanan.deltaUnits))} potong
+                      </p>
+                      <p className="text-[11px] font-semibold text-amber-800/80">
+                        {nfmt(data.layanan.prevUnits)} potong di {comparison?.shortLabel}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
               </div>
-              {compareVisible ? (
-                <p className="text-[11px] font-semibold text-slate-500">
-                  vs {comparison?.shortLabel}: {nfmt(data.layanan.prevUnits)} unit (
-                  {data.layanan.deltaUnits > 0 ? "+" : data.layanan.deltaUnits < 0 ? "−" : ""}
-                  {nfmt(Math.abs(data.layanan.deltaUnits))})
-                </p>
-              ) : null}
-              <p className="w-full text-[11px] font-semibold text-slate-400">
-                Layanan, bukan barang, jadi tidak ikut peringkat dan total unit. Omzetnya tetap masuk ke Total Omset di
-                Laporan.
-              </p>
             </div>
           ) : null}
 

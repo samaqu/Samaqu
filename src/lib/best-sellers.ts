@@ -100,12 +100,14 @@ export interface BestSellerModeTotals {
 
 /**
  * Total baris LAYANAN (Jasa Potong Panjang). Layanan bukan barang: tidak masuk peringkat dan tidak
- * menambah total unit/omzet barang di atas, tapi angkanya dihitung dengan aturan yang sama
- * (omzet baris SETELAH porsi diskon pesanan) supaya cocok dengan "Penjualan" di Laporan.
+ * menambah total unit/omzet barang. Omzet layanan = harga × unit APA ADANYA (bruto), tanpa porsi
+ * diskon pesanan: harga jasa tetap (Rp35.000) dan diskon pesanan ditujukan untuk barang, jadi angka
+ * ini mudah dicocokkan dengan harga jasa. `orders` = jumlah pesanan sah yang memuat layanan.
  */
 export interface BestSellerLayananTotals {
   units: number;
   revenue: number;
+  orders: number;
 }
 
 export interface BestSellerAggregate {
@@ -251,6 +253,7 @@ export function aggregateBestSellers(
   let fallbackUnits = 0;
   let layananUnits = 0;
   let layananRevenue = 0;
+  const layananOrders = new Set<string>();
 
   for (const item of items) {
     const qty = Number(item.quantity ?? item.qty) || 0;
@@ -309,7 +312,8 @@ export function aggregateBestSellers(
     // Baris layanan (Jasa Potong Panjang) bukan barang yang diperingkatkan: dihitung terpisah.
     if (isLayananCategory(category)) {
       layananUnits += qty;
-      layananRevenue += price * qty - (Number(item.discount_share) || 0);
+      layananRevenue += price * qty;
+      if (item.order_id) layananOrders.add(String(item.order_id));
       continue;
     }
 
@@ -433,6 +437,6 @@ export function aggregateBestSellers(
   return {
     series: { rows: seriesRows, totals: totalsOf(seriesRows) },
     product: { rows: productRows, totals: totalsOf(productRows) },
-    layanan: { units: layananUnits, revenue: layananRevenue },
+    layanan: { units: layananUnits, revenue: layananRevenue, orders: layananOrders.size },
   };
 }
