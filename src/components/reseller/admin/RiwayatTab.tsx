@@ -315,9 +315,6 @@ export default function RiwayatTab({
                             <td className="px-3 py-2.5 text-[12px] whitespace-nowrap">{first ? tglJamID(order.created_at) : ""}</td>
                             <td className="px-3 py-2.5 text-[12.5px] font-bold whitespace-nowrap">
                               <span className={order.cancelled ? "" : "text-slate-900"}>{first ? order.order_number : ""}</span>
-                              {first && order.customer_name ? (
-                                <div className="text-[11px] font-normal text-slate-400">{order.customer_name}</div>
-                              ) : null}
                             </td>
                             <td className="px-3 py-2.5 text-[12px]">{first ? order.reseller_name : ""}</td>
                             <td className="px-3 py-2.5 text-[12.5px]">
