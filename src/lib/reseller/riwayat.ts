@@ -78,6 +78,8 @@ export interface RiwayatSummary {
   /** Jumlah harga beli x qty. */
   total_produk: number;
   total_ongkir: number;
+  /** Total transaksi = total produk + total ongkir (sama dengan kolom Total di menu Transaksi). */
+  total_transaksi: number;
   /** Pesanan dibatalkan di hasil filter (tidak dihitung di atas). */
   dibatalkan: number;
 }
@@ -199,7 +201,15 @@ export function toRiwayatOrder(row: RiwayatOrderSource, resellerName: string): R
 
 /** Ringkasan kartu: pesanan dibatalkan tidak dihitung (hanya dilaporkan jumlahnya). */
 export function summarize(orders: RiwayatOrder[]): RiwayatSummary {
-  const summary: RiwayatSummary = { pesanan: 0, item: 0, pcs: 0, total_produk: 0, total_ongkir: 0, dibatalkan: 0 };
+  const summary: RiwayatSummary = {
+    pesanan: 0,
+    item: 0,
+    pcs: 0,
+    total_produk: 0,
+    total_ongkir: 0,
+    total_transaksi: 0,
+    dibatalkan: 0,
+  };
   for (const order of orders) {
     if (order.cancelled) {
       summary.dibatalkan += 1;
@@ -213,6 +223,7 @@ export function summarize(orders: RiwayatOrder[]): RiwayatSummary {
       summary.total_produk += item.buy_price * item.quantity;
     }
   }
+  summary.total_transaksi = summary.total_produk + summary.total_ongkir;
   return summary;
 }
 

@@ -186,10 +186,19 @@ export default function RiwayatTab({
     ? [
         { label: "Jumlah pesanan", value: String(summary.pesanan) },
         { label: "Jumlah item", value: String(summary.item), sub: `${summary.pcs} pcs` },
-        { label: "Total produk", value: rupiah(summary.total_produk) },
+        { label: "Total transaksi", value: rupiah(summary.total_transaksi), sub: `Produk ${rupiah(summary.total_produk)}` },
         { label: "Total ongkir", value: rupiah(summary.total_ongkir) },
       ]
     : [];
+
+  // Sisa saldo (saat ini, tidak ikut filter tanggal): satu reseller = saldonya; "Semua reseller" = jumlah semua saldo.
+  const saldoTersedia = selected
+    ? selected.saldo?.saldo_tersedia ?? 0
+    : resellers.reduce((sum, row) => sum + (row.saldo?.saldo_tersedia ?? 0), 0);
+  const saldoDitahan = selected
+    ? selected.saldo?.saldo_ditahan ?? 0
+    : resellers.reduce((sum, row) => sum + (row.saldo?.saldo_ditahan ?? 0), 0);
+  const saldoSub = `${selected ? selected.store_name : "Semua reseller"}${saldoDitahan > 0 ? ` · ditahan ${rupiah(saldoDitahan)}` : ""}`;
 
   const open = (order: RiwayatOrder) => onOpenOrder(order.order_number);
   const keyOpen = (order: RiwayatOrder) => (event: React.KeyboardEvent) => {
@@ -266,19 +275,14 @@ export default function RiwayatTab({
       {/* Kartu ringkasan: mengikuti filter, pesanan dibatalkan tidak dihitung */}
       {summary ? (
         <>
-          <div className={`grid grid-cols-2 gap-3 ${selected ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             {cards.map((card) => (
               <SummaryCard key={card.label} label={card.label} value={card.value} sub={card.sub} />
             ))}
-            {selected ? (
-              <SummaryCard
-                label={`Saldo saat ini · ${selected.store_name}`}
-                value={rupiah(selected.saldo?.saldo_tersedia ?? 0)}
-                sub={(selected.saldo?.saldo_ditahan ?? 0) > 0 ? `ditahan ${rupiah(selected.saldo?.saldo_ditahan ?? 0)}` : undefined}
-                warn
-                accent
-              />
-            ) : null}
+            {/* Di HP kartu kelima melebar penuh supaya tidak sendirian di setengah baris */}
+            <div className="col-span-2 lg:col-span-1 min-w-0">
+              <SummaryCard label="Sisa saldo" value={rupiah(saldoTersedia)} sub={saldoSub} accent />
+            </div>
           </div>
           {summary.dibatalkan > 0 ? (
             <p className="text-[11.5px] text-slate-400 -mt-2">
