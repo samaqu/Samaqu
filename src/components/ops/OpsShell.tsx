@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   AlertTriangle,
   BarChart3,
+  ChevronLeft,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -83,6 +84,8 @@ const BASE_MENU_GROUPS: MenuGroup[] = [
   },
 ];
 
+const SIDEBAR_KEY = "samaqu:ops-sidebar-collapsed";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -107,58 +110,114 @@ function SidebarContent({
   stripOps,
   groups,
   resellerQueue,
+  collapsed = false,
 }: {
   pathname: string;
   onNavigate?: () => void;
   stripOps?: boolean;
   groups: MenuGroup[];
   resellerQueue: number;
+  /** Mode ciut (hanya ikon, desktop). Drawer HP selalu terbuka penuh. */
+  collapsed?: boolean;
 }) {
   const router = useRouter();
+  // Tooltip mode ciut: memakai posisi `fixed` supaya tidak terpotong area scroll sidebar.
+  const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
+  useEffect(() => { setTip(null); }, [collapsed, pathname]);
   // Prefetch halaman begitu kursor menyentuh menu → klik jadi instan.
   const prefetch = (href: string) => { try { router.prefetch(href); } catch { /* diabaikan */ } };
+  const showTip = (event: React.SyntheticEvent<HTMLElement>, text: string) => {
+    if (!collapsed) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    setTip({ text, top: rect.top + rect.height / 2, left: rect.right + 12 });
+  };
+  const hideTip = () => setTip(null);
   return (
-    <div className="flex-1 px-3 py-3 space-y-3 no-scrollbar overflow-y-auto">
+    <div className="flex-1 px-3 py-3 space-y-3 no-scrollbar overflow-y-auto overflow-x-hidden">
       {groups.map((group, idx) => (
         <div key={idx}>
-          <h4 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 px-3">
-            {group.label}
-          </h4>
+          {/* Judul grup: memudar saat ciut, diganti garis tipis pemisah */}
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-out motion-reduce:transition-none ${
+              collapsed ? "max-h-0 opacity-0 mb-0" : "max-h-6 opacity-100 mb-1.5"
+            }`}
+            aria-hidden={collapsed}
+          >
+            <h4 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-3 whitespace-nowrap">
+              {group.label}
+            </h4>
+          </div>
+          {idx > 0 ? (
+            <div
+              className={`mx-2 bg-slate-200 dark:bg-slate-800 transition-all duration-300 motion-reduce:transition-none ${
+                collapsed ? "h-px mb-2 opacity-100" : "h-0 mb-0 opacity-0"
+              }`}
+            />
+          ) : null}
           <div className="space-y-0.5">
             {group.items.map((item) => {
               const Icon = item.icon;
               // Di subdomain (ops.samaqu.id) URL-nya bersih: /leads, bukan /ops/leads
               const href = stripOps ? item.href.replace(/^\/ops/, "") || "/" : item.href;
               const active = pathname === item.href || pathname === href;
-              const cls = `w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
+              const queued = item.badgeKey === "reseller" && resellerQueue > 0;
+              const cls = `relative w-full flex items-center py-2.5 rounded-xl text-sm font-bold transition-all duration-300 motion-reduce:transition-none ${
+                collapsed ? "pl-[17px] pr-0" : "pl-3 pr-3"
+              } ${
                 active
                   ? "bg-[#18181b] text-white shadow-sm dark:bg-white dark:text-[#18181b]"
                   : item.soon
                   ? "text-slate-400 dark:text-slate-600 cursor-not-allowed"
                   : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
               }`;
+              const label = (
+                <span
+                  className={`overflow-hidden whitespace-nowrap text-left transition-all duration-300 ease-out motion-reduce:transition-none ${
+                    collapsed ? "max-w-0 ml-0 opacity-0 flex-none" : "max-w-[170px] ml-3 opacity-100 flex-1"
+                  }`}
+                >
+                  {item.title}
+                </span>
+              );
+              const tipText = item.soon
+                ? `${item.title} · Belum dibuat`
+                : queued
+                ? `${item.title} · ${resellerQueue} perlu dicek`
+                : item.title;
               return item.soon ? (
-                <div key={item.href} className={cls} title="Belum dibuat">
-                  <Icon size={17} />
-                  <span className="flex-1 text-left">{item.title}</span>
-                  <span className="text-[9px] font-black tracking-wider opacity-70">SOON</span>
+                <div
+                  key={item.href}
+                  className={cls}
+                  title={collapsed ? undefined : "Belum dibuat"}
+                  onMouseEnter={(e) => showTip(e, tipText)}
+                  onMouseLeave={hideTip}
+                >
+                  <Icon size={17} className="shrink-0" />
+                  {label}
+                  {!collapsed ? <span className="text-[9px] font-black tracking-wider opacity-70">SOON</span> : null}
                 </div>
               ) : (
                 <Link
                   key={item.href}
                   href={href}
                   onClick={onNavigate}
-                  onMouseEnter={() => prefetch(href)}
-                  onFocus={() => prefetch(href)}
+                  onMouseEnter={(e) => { prefetch(href); showTip(e, tipText); }}
+                  onMouseLeave={hideTip}
+                  onFocus={(e) => { prefetch(href); showTip(e, tipText); }}
+                  onBlur={hideTip}
                   prefetch
+                  aria-label={collapsed ? tipText : undefined}
                   className={cls}
                 >
-                  <Icon size={17} />
-                  <span className="flex-1 text-left">{item.title}</span>
-                  {item.badgeKey === "reseller" && resellerQueue > 0 ? (
+                  <Icon size={17} className="shrink-0" />
+                  {label}
+                  {queued && !collapsed ? (
                     <span className="min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-black">
                       {resellerQueue}
                     </span>
+                  ) : null}
+                  {queued && collapsed ? (
+                    <span className="absolute top-[7px] left-[30px] w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-[#141821]" aria-hidden="true" />
                   ) : null}
                 </Link>
               );
@@ -166,6 +225,15 @@ function SidebarContent({
           </div>
         </div>
       ))}
+      {collapsed && tip ? (
+        <div
+          role="tooltip"
+          className="fixed z-[300] -translate-y-1/2 px-2.5 py-1.5 rounded-lg bg-[#18181b] text-white text-xs font-bold whitespace-nowrap shadow-lg pointer-events-none"
+          style={{ top: tip.top, left: tip.left }}
+        >
+          {tip.text}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -180,6 +248,8 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [drawer, setDrawer] = useState(false);
+  /** Sidebar desktop ciut (hanya ikon). Pilihan diingat di browser ini saja. */
+  const [collapsed, setCollapsed] = useState(false);
   const [onOpsHost, setOnOpsHost] = useState(false);
   /** Akses menu Produksi (Owner/Leader) — ditentukan server, bukan disimpan di browser. */
   const [prodAccess, setProdAccess] = useState<{ allowed: boolean; role: "owner" | "leader" | "other" }>({
@@ -192,6 +262,21 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setOnOpsHost(window.location.hostname === "office.samaqu.id");
   }, []);
+
+  // Ingat pilihan buka/tutup sidebar. Storage bisa tidak tersedia (mode privat) → tetap jalan tanpa ingatan.
+  useEffect(() => {
+    try {
+      setCollapsed(window.localStorage.getItem(SIDEBAR_KEY) === "1");
+    } catch { /* tanpa penyimpanan */ }
+  }, []);
+
+  const toggleSidebar = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try { window.localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0"); } catch { /* diabaikan */ }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!authorized) {
@@ -351,18 +436,64 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <div className="ops-root flex min-h-screen">
         {/* Sidebar desktop */}
-        <aside className="hidden lg:flex flex-col w-[248px] shrink-0 bg-white dark:bg-[#141821] border-r border-slate-200 dark:border-slate-800 sticky top-0 h-screen">
-          <div className="flex flex-col items-center justify-center gap-1 px-5 h-[68px] border-b border-slate-200 dark:border-slate-800 shrink-0">
-            <img src="/logo.svg" alt="SAMAQU" className="h-8 w-auto object-contain" />
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center">Internal</p>
+        <aside
+          className={`hidden lg:flex flex-col shrink-0 bg-white dark:bg-[#141821] border-r border-slate-200 dark:border-slate-800 sticky top-0 h-screen z-30 transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none ${
+            collapsed ? "w-[76px]" : "w-[248px]"
+          }`}
+        >
+          {/* Tombol buka/tutup di tepi sidebar */}
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={collapsed ? "Buka menu" : "Tutup menu"}
+            aria-expanded={!collapsed}
+            title={collapsed ? "Buka menu" : "Tutup menu"}
+            className="absolute -right-3 top-[22px] z-10 w-6 h-6 rounded-full bg-white dark:bg-[#141821] border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-center text-slate-500 hover:text-slate-900 hover:shadow-md hover:scale-110 active:scale-95 transition-all duration-200 motion-reduce:transition-none"
+          >
+            <ChevronLeft
+              size={14}
+              className={`transition-transform duration-300 motion-reduce:transition-none ${collapsed ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {/* Kepala: logo penuh saat terbuka, tanda "S" saat ciut (saling memudar) */}
+          <div className="relative h-[68px] border-b border-slate-200 dark:border-slate-800 shrink-0 overflow-hidden">
+            <div
+              className={`absolute inset-0 flex flex-col items-center justify-center gap-1 px-5 transition-opacity duration-300 motion-reduce:transition-none ${
+                collapsed ? "opacity-0 pointer-events-none" : "opacity-100"
+              }`}
+              aria-hidden={collapsed}
+            >
+              <img src="/logo.svg" alt="SAMAQU" className="h-8 w-auto object-contain" />
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center">Internal</p>
+            </div>
+            <div
+              className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 motion-reduce:transition-none ${
+                collapsed ? "opacity-100" : "opacity-0 pointer-events-none"
+              }`}
+              aria-hidden={!collapsed}
+            >
+              <span className="w-10 h-10 rounded-xl bg-[#18181b] text-white flex items-center justify-center font-black text-lg tracking-tight">S</span>
+            </div>
           </div>
-          <SidebarContent pathname={pathname} stripOps={onOpsHost} groups={menuGroups} resellerQueue={resellerQueue} />
+          <SidebarContent pathname={pathname} stripOps={onOpsHost} groups={menuGroups} resellerQueue={resellerQueue} collapsed={collapsed} />
           <div className="p-3 border-t border-slate-200 dark:border-slate-800 shrink-0">
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+              title={collapsed ? "Keluar" : undefined}
+              aria-label="Keluar"
+              className={`w-full flex items-center py-2.5 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-300 motion-reduce:transition-none ${
+                collapsed ? "pl-[17px] pr-0" : "pl-3 pr-3"
+              }`}
             >
-              <LogOut size={17} /> Keluar
+              <LogOut size={17} className="shrink-0" />
+              <span
+                className={`overflow-hidden whitespace-nowrap text-left transition-all duration-300 ease-out motion-reduce:transition-none ${
+                  collapsed ? "max-w-0 ml-0 opacity-0" : "max-w-[170px] ml-3 opacity-100"
+                }`}
+              >
+                Keluar
+              </span>
             </button>
           </div>
         </aside>
