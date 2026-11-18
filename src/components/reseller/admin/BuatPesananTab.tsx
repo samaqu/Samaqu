@@ -14,6 +14,8 @@ import OrderStepper from "../order/OrderStepper";
 import PenerimaForm from "../order/PenerimaForm";
 import ProdukPicker from "../order/ProdukPicker";
 import ProductPhoto from "../ProductPhoto";
+import SavedAddresses from "./SavedAddresses";
+import { addressToForm } from "@/lib/reseller/addresses";
 import { Note, SkeletonRows } from "../ui";
 import {
   createOrderLine,
@@ -60,6 +62,8 @@ export default function BuatPesananTab({
   const [catalogError, setCatalogError] = useState("");
   const [lines, setLines] = useState<OrderLine[]>([]);
   const [address, setAddress] = useState<AddressValue>(EMPTY_ADDRESS);
+  // Dinaikkan saat alamat tersimpan dipilih: form penerima dibuka ulang (tab "Isi manual") dengan isian terisi.
+  const [penerimaKey, setPenerimaKey] = useState(0);
   const [mode, setMode] = useState<Mode>("otomatis");
   const [shipping, setShipping] = useState<ShippingOption | null>(null);
   const [showLabel, setShowLabel] = useState(false);
@@ -478,7 +482,19 @@ export default function BuatPesananTab({
               <section className={`card order-step ${step === 1 ? "on" : ""}`}>
                 {stepHead(1, "Data penerima", "Tempel alamat dari chat customer, atau isi manual.")}
                 <div className="card-b stack" style={{ gap: 14 }}>
-                  <PenerimaForm value={address} onChange={patchAddress} detectAddress={opsResellerApi.alamatTebak} />
+                  {reseller ? (
+                    <SavedAddresses
+                      key={reseller.id}
+                      resellerId={reseller.id}
+                      form={address}
+                      formComplete={addressValid}
+                      onPick={(saved) => {
+                        setAddress(addressToForm(saved));
+                        setPenerimaKey((key) => key + 1);
+                      }}
+                    />
+                  ) : null}
+                  <PenerimaForm key={penerimaKey} value={address} onChange={patchAddress} detectAddress={opsResellerApi.alamatTebak} />
                 </div>
               </section>
 

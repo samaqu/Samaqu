@@ -10,13 +10,14 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Award, Gem, Medal, Receipt, Store, User, Wallet } from "lucide-react";
+import { Award, Gem, MapPin, Medal, Receipt, Store, User, Wallet } from "lucide-react";
 import { PanelDetailShell } from "@/components/ops/transaksi/PanelDetailPesanan";
 import { opsResellerApi, type ResellerAdminRow, type ResellerDetail } from "./api";
 import { describeLedgerRow, rupiah, tglJamID } from "@/lib/reseller/format";
 import { bankDisplayName } from "@/lib/reseller/banks";
 import type { LevelKey, LevelSummary } from "@/lib/reseller/level";
 import MutationBadge from "./MutationBadge";
+import AddressBookCard from "./AddressBookCard";
 
 const STATUS: Record<string, { label: string; tone: "ok" | "warn" | "err" | "muted" }> = {
   active: { label: "Aktif", tone: "ok" },
@@ -142,6 +143,12 @@ export default function ResellerDetailDrawer({
         tema={tema}
         onClose={onClose}
         onOpenOrder={onOpenOrder}
+        extra={
+          // Buku alamat reseller (kelola di sini; dipakai form Buat Pesanan). Dimuat sendiri, terpisah dari detail.
+          <Kartu icon={<MapPin size={14} />} judul="Alamat tersimpan">
+            <AddressBookCard resellerId={row.id} />
+          </Kartu>
+        }
       />
     </PanelDetailShell>
   );
@@ -156,6 +163,7 @@ export function ResellerDetailView({
   tema,
   onClose,
   onOpenOrder,
+  extra,
 }: {
   row: ResellerAdminRow;
   detail: ResellerDetail | null;
@@ -164,6 +172,8 @@ export function ResellerDetailView({
   tema: "mono" | "warna";
   onClose: () => void;
   onOpenOrder: (orderNumber: string) => void;
+  /** Kartu tambahan di bawah "Rekening penarikan" (mis. buku alamat). Kosong = tampilan lama. */
+  extra?: ReactNode;
 }) {
   const reseller = detail?.reseller ?? row;
   const status = STATUS[reseller.status] || STATUS.pending;
@@ -297,6 +307,9 @@ export function ResellerDetailView({
                 <Baris label="No. rekening">{reseller.bank_number || "—"}</Baris>
                 <Baris label="Atas nama">{reseller.bank_holder || "—"}</Baris>
               </Kartu>
+
+              {/* 7. Tambahan (buku alamat) */}
+              {extra}
             </>
           ) : null}
         </div>

@@ -10,6 +10,7 @@ import type { LevelSummary, LevelTier } from "@/lib/reseller/level";
 import type { MateriRow } from "@/lib/reseller/materi";
 import type { RiwayatOrder, RiwayatSummary } from "@/lib/reseller/riwayat";
 import type { KatalogProduct, ShippingOption } from "@/lib/reseller/client";
+import type { AddressInput, ResellerAddress } from "@/lib/reseller/addresses";
 import type {
   LedgerOrderPaymentInfo,
   LedgerTopupInfo,
@@ -409,6 +410,30 @@ export const opsResellerApi = {
     adminFetch<Awaited<ReturnType<typeof import("@/lib/reseller/client").resellerApi.alamatTebak>>>(
       "/api/ops/alamat-tebak",
       { method: "POST", body: JSON.stringify({ text }) }
+    ),
+
+  /* Buku alamat reseller (admin) */
+  resellerAddresses: (resellerId: string) =>
+    adminFetch<{ data: ResellerAddress[] }>(`/api/ops/reseller/resellers/${encodeURIComponent(resellerId)}/addresses`),
+  addAddress: (resellerId: string, payload: AddressInput) =>
+    adminFetch<{ ok: true; data: ResellerAddress }>(`/api/ops/reseller/resellers/${encodeURIComponent(resellerId)}/addresses`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateAddress: (resellerId: string, addressId: string, payload: AddressInput) =>
+    adminFetch<{ ok: true; data: ResellerAddress }>(
+      `/api/ops/reseller/resellers/${encodeURIComponent(resellerId)}/addresses/${encodeURIComponent(addressId)}`,
+      { method: "PATCH", body: JSON.stringify(payload) }
+    ),
+  setDefaultAddress: (resellerId: string, addressId: string) =>
+    adminFetch<{ ok: true; data: ResellerAddress }>(
+      `/api/ops/reseller/resellers/${encodeURIComponent(resellerId)}/addresses/${encodeURIComponent(addressId)}`,
+      { method: "PATCH", body: JSON.stringify({ action: "set_default" }) }
+    ),
+  deleteAddress: (resellerId: string, addressId: string) =>
+    adminFetch<{ ok: true; promoted_id: string | null }>(
+      `/api/ops/reseller/resellers/${encodeURIComponent(resellerId)}/addresses/${encodeURIComponent(addressId)}`,
+      { method: "DELETE" }
     ),
 
   /* Riwayat pesanan reseller (baca saja) */
