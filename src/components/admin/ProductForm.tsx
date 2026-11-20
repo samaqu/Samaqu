@@ -249,10 +249,10 @@ function SizeGrid({
   skuContext,
   stockLocked,
   stockLockedLabel,
-  hidePrice,
+  basePriceHint,
 }: {
-  /** Sembunyikan kolom "Harga khusus" (dipindah ke bagian Harga, per ukuran untuk semua warna). */
-  hidePrice?: boolean;
+  /** Harga Dasar produk (digit polos): ditampilkan sebagai petunjuk di kolom Harga khusus yang kosong. */
+  basePriceHint?: string;
   sizes: SizeRow[];
   onUpdate: (idx: number, field: keyof SizeRow, value: string | number) => void;
   /** Ubah SATU field untuk SEMUA baris sekaligus (satu update state, bukan loop per baris). */
@@ -427,7 +427,6 @@ function SizeGrid({
                 </span>
               </div>
 
-              {!hidePrice && (
               <label className="pf-size-field pf-f-price">
                 <span className="pf-size-label">Harga khusus</span>
                 <span className="pf-adorn pf-adorn--rp">
@@ -437,12 +436,12 @@ function SizeGrid({
                     inputMode="numeric"
                     value={formatRupiah(s.priceOverride)}
                     onChange={(e) => onUpdate(i, "priceOverride", parseRupiah(e.target.value))}
-                    placeholder="—"
+                    placeholder={basePriceHint ? formatRupiah(basePriceHint) : "—"}
+                    title="Kosong = pakai Harga Dasar"
                     className="pf-cell pf-cell-num"
                   />
                 </span>
               </label>
-              )}
 
               <label className="pf-size-field pf-f-sku">
                 <span className="pf-size-label">SKU</span>
@@ -1217,13 +1216,6 @@ export default function TambahProdukPage({
       prev.map((v) =>
         v.color === color ? { ...v, sizes: v.sizes.map((s) => ({ ...s, [field]: value })) } : v
       )
-    );
-  }
-
-  /** Harga khusus satu ukuran, diterapkan ke SEMUA warna yang punya ukuran itu. */
-  function setSizePriceAllColors(size: string, value: string) {
-    setVariants((prev) =>
-      prev.map((v) => ({ ...v, sizes: v.sizes.map((s) => (s.size === size ? { ...s, priceOverride: value } : s)) }))
     );
   }
 
@@ -2376,49 +2368,6 @@ export default function TambahProdukPage({
                           </div>
                           </div>
                         )}
-                        {category !== "Thobe" && !isPaketKategori(category) && !cypEnabled && (() => {
-                          const sizeList = Array.from(new Set(variants.flatMap((v) => v.sizes.map((sz) => sz.size).filter(Boolean))));
-                          if (sizeList.length === 0) return null;
-                          const valueOf = (size: string) => {
-                            const vals = Array.from(new Set(variants.flatMap((v) => v.sizes.filter((sz) => sz.size === size).map((sz) => sz.priceOverride || ""))));
-                            return { value: vals.length === 1 ? vals[0] : "", mixed: vals.length > 1 };
-                          };
-                          const anyMixed = sizeList.some((sz) => valueOf(sz).mixed);
-                          return (
-                            <div className="pf-panel">
-                              <p className="pf-label" style={{ marginBottom: 4 }}>Harga khusus per ukuran <span className="pf-hint" style={{ fontWeight: 400 }}>(opsional)</span></p>
-                              <p className="pf-hint" style={{ marginBottom: 10 }}>
-                                Kosongkan = ukuran itu pakai Harga Dasar{basePrice ? ` (Rp ${formatRupiah(basePrice)})` : ""}. Isi sekali, berlaku untuk semua warna.
-                              </p>
-                              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                                {sizeList.map((sz) => {
-                                  const { value, mixed } = valueOf(sz);
-                                  return (
-                                    <label key={sz} className="block">
-                                      <span className="pf-size-label" style={{ display: "block", marginBottom: 4 }}>{sz}</span>
-                                      <span className="pf-adorn pf-adorn--rp" style={{ width: "100%" }}>
-                                        <span className="pf-prefix">Rp</span>
-                                        <input
-                                          type="text"
-                                          inputMode="numeric"
-                                          value={formatRupiah(value)}
-                                          onChange={(e) => setSizePriceAllColors(sz, parseRupiah(e.target.value))}
-                                          placeholder={mixed ? "beda tiap warna" : "—"}
-                                          className="pf-cell pf-cell-num"
-                                        />
-                                      </span>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                              {anyMixed && (
-                                <p className="pf-hint" style={{ marginTop: 8, color: "#b45309" }}>
-                                  Ada ukuran yang harganya beda antar warna. Mengisi kolom ukuran itu akan menyamakan semua warna.
-                                </p>
-                              )}
-                            </div>
-                          );
-                        })()}
                         {isOps && (() => {
                           const refPrice = category === "Thobe" && activeSeriesTab && seriesBlocks[activeSeriesTab]
                             ? parseInt(seriesBlocks[activeSeriesTab].price) || 0
@@ -3033,7 +2982,7 @@ export default function TambahProdukPage({
                         </label>
                       )}
                       <SizeGrid
-                        hidePrice={category !== "Thobe" && !isPaketKategori(category) && !cypEnabled}
+                        basePriceHint={basePrice}
                         sizes={activeVariant.sizes}
                         onUpdate={(i, field, value) => updateSizeField(activeColor!, i, field, value)}
                         onUpdateAll={(field, value) => updateSizesBulk(activeColor!, field, value)}
