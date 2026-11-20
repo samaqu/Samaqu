@@ -492,8 +492,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
      */
     supabase.from("product_variant_stock")
       .select("price_override, effective_stock, weight, base_product_id, base_size, is_sellable")
-      .eq("product_id", stockId).eq("color", selectedColor).eq("size", selectedSize).maybeSingle()
-      .then(({ data, error }) => {
+      .eq("product_id", displayId).eq("color", selectedColor).eq("size", selectedSize).maybeSingle()
+      .then(async ({ data, error }) => {
         // Query gagal JANGAN ditampilkan sebagai "Habis".
         if (error) {
           console.error("[katalog] gagal memuat stok varian:", error.message, error.details ?? "");
@@ -502,16 +502,27 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           return;
         }
         setStockError(false);
-        setVariantPrice(data?.price_override ?? null);
+        // View stok publik hanya memuat produk yang tampil di website, sedangkan baris Lengan
+        // Pendek sengaja tidak tampil. Stok Lengan Pendek = stok Lengan Panjang (stok sharing),
+        // jadi stok selalu dibaca dari produk ini; baris pendek hanya dicek ketersediaannya.
+        setVariantPrice(pendekActive ? null : data?.price_override ?? null);
         setVariantWeight(Number(data?.weight) || null);
         // View sudah memecahkan stok sharing, jadi `effective_stock` langsung dipakai.
         setStock(typeof data?.effective_stock === "number" ? data.effective_stock : null);
         // Varian pensiun tidak boleh bisa dibeli, termasuk lewat `?color=` di URL.
-        // Lengan Pendek: warna/ukuran yang belum ada di model pendek dianggap tidak tersedia
-        // (bukan "stok tak terbatas") supaya tidak bisa masuk keranjang.
-        setVariantRetired(data?.is_sellable === false || (stockId !== displayId && !data));
+        let retired = data?.is_sellable === false;
+        if (pendekActive) {
+          // Lengan Pendek: warna/ukuran yang belum ada di model pendek dianggap tidak tersedia
+          // (bukan "stok tak terbatas") supaya tidak bisa masuk keranjang.
+          const { data: pv } = await supabase
+            .from("product_variants")
+            .select("is_sellable")
+            .eq("product_id", stockId).eq("color", selectedColor).eq("size", selectedSize).maybeSingle();
+          retired = retired || !pv || pv.is_sellable === false;
+        }
+        setVariantRetired(retired);
       });
-  }, [stockId, displayId, selectedColor, selectedSize]);
+  }, [stockId, displayId, pendekActive, selectedColor, selectedSize]);
 
   const currentPrice = variantPrice ?? (pendekActive && lenganPendek ? lenganPendek.price : product?.price) ?? 0;
   // Stok varian yang sedang dipilih (color + size). null = varian tidak dikelola stoknya

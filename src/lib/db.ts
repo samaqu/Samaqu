@@ -420,7 +420,7 @@ export async function getLenganPendekModel(parentId: string): Promise<ModelOptio
   if (!parentId) return null;
   try {
     const { data: links, error: linkError } = await supabase
-      .from("product_variant_stock")
+      .from("product_variants")
       .select("product_id, is_sellable")
       .eq("base_product_id", parentId);
     if (linkError || !links || links.length === 0) return null;

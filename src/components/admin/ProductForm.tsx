@@ -20,6 +20,7 @@ import { usePageUrl } from "@/lib/ops-router";
 import { requestRevalidate } from "@/lib/admin-revalidate";
 import { duplicateSkus, generateBaseSku, generateVariantSku, resolveColorName, seriesCode } from "@/lib/sku";
 import { findProductSkuClashes, findVariantSkuClashes, skuClashMessage, skuErrorFromDatabase } from "@/lib/sku-unique";
+import LenganModelPanel from "@/components/admin/LenganModelPanel";
 import { LENGAN_PENDEK, loadLenganPendekState, syncLenganPendek } from "@/lib/lengan-pendek";
 
 const CATEGORIES = ["Thobe", "Kandora", "Koko", "Vest", "Kabak", "Cover & Hanger"] as const;
@@ -2486,40 +2487,14 @@ export default function TambahProdukPage({
                     {/* Koko: model Lengan Pendek. Produk ini = Lengan Panjang (stok utama);
                         Lengan Pendek ikut stok produk ini per warna & ukuran. */}
                     {category === "Koko" && !isOpenOrderPrice && !isLenganPendekRow && (
-                      <div className={`pf-panel${lenganPendekOn ? " accent" : " flat"}`}>
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-medium" style={{ color: "var(--espresso)" }}>Sediakan model {LENGAN_PENDEK}</p>
-                            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                              Customer bisa memilih Lengan Panjang atau {LENGAN_PENDEK} di halaman produk ini. Stok {LENGAN_PENDEK} ikut stok produk ini (Lengan Panjang) per warna &amp; ukuran, foto sama.
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setLenganPendekOn((v) => !v)}
-                            aria-pressed={lenganPendekOn}
-                            aria-label={`Sediakan model ${LENGAN_PENDEK} untuk produk ini`}
-                            className="pf-toggle"
-                            style={{ background: lenganPendekOn ? "var(--gold)" : "#d4d4d8" }}
-                          >
-                            <span className="pf-toggle-knob" style={{ transform: lenganPendekOn ? "translateX(20px)" : "translateX(0)" }} />
-                          </button>
-                        </div>
-                        {lenganPendekOn && (
-                          <div className="mt-4 max-w-xs">
-                            <label className="pf-label">Harga {LENGAN_PENDEK} (Rp, opsional)</label>
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              value={formatRupiah(lenganPendekPrice)}
-                              onChange={(e) => setLenganPendekPrice(parseRupiah(e.target.value))}
-                              className="pf-input"
-                              placeholder="Kosong = sama dengan Lengan Panjang"
-                            />
-                            <p className="pf-hint">Kosongkan kalau harganya sama. Isi hanya kalau harga {LENGAN_PENDEK} berbeda.</p>
-                          </div>
-                        )}
-                      </div>
+                      <LenganModelPanel
+                        enabled={lenganPendekOn}
+                        onEnabledChange={setLenganPendekOn}
+                        price={lenganPendekPrice}
+                        onPriceChange={setLenganPendekPrice}
+                        basePrice={basePrice}
+                        wasEnabled={lenganPendekHad}
+                      />
                     )}
                   </div>
                 </section>
