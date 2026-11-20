@@ -148,6 +148,18 @@ export async function POST(request: NextRequest) {
     }
     const productsById = new Map((productRows || []).map((row: any) => [String(row.id), row]));
 
+    // Harga khusus per ukuran (product_variants.price_override) — dipakai kalau diisi, selain itu harga produk.
+    const { data: overrideRows } = requestedProductIds.length
+      ? await supabase
+          .from("product_variants")
+          .select("product_id, color, size, price_override")
+          .in("product_id", requestedProductIds)
+          .not("price_override", "is", null)
+      : { data: [] };
+    const overrideByVariant = new Map<string, number>(
+      (overrideRows || []).map((r: any) => [`${r.product_id}|${r.color}|${r.size}`, Math.round(Number(r.price_override) || 0)]),
+    );
+
     const validatedItems: Array<{ productId: string; name: string; image?: string; color?: string; size?: string; series?: string; kain?: string; quantity: number; price: number; customer_price: number | null; minimum_price: number | null; create_your_price_enabled: boolean }> = [];
 
     for (const item of items) {
@@ -184,7 +196,8 @@ export async function POST(request: NextRequest) {
           create_your_price_enabled: true,
         });
       } else {
-        const expectedPrice = Math.round(Number(product.price) || 0);
+        const variantOverride = overrideByVariant.get(`${String(item.productId || "").trim()}|${item.color ?? ""}|${item.size ?? ""}`);
+        const expectedPrice = variantOverride && variantOverride > 0 ? variantOverride : Math.round(Number(product.price) || 0);
         const submittedPrice = Math.round(Number(item.price) || 0);
         if (!Number.isFinite(submittedPrice) || submittedPrice !== expectedPrice) {
           console.error("[ORDERS] Price mismatch:", {
