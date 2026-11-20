@@ -191,7 +191,9 @@ export async function syncLenganPendek(
       stock: 0,
       // Berat kosong = jangan sentuh kolom (nilai lama tetap).
       ...(v.weight ? { weight: v.weight } : {}),
-      price_override: v.price_override ?? null,
+      // Harga Lengan Pendek mengikuti `products.price` barisnya (itu yang divalidasi server saat
+      // checkout), jadi harga khusus per ukuran milik Lengan Panjang tidak disalin.
+      price_override: null,
       sku: v.sku ? `${v.sku}${SKU_SUFFIX}` : null,
       display_order: v.display_order ?? 0,
       base_product_id: parentId,

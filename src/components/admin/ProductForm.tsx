@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 import AdminShell from "@/components/AdminShell";
 import JenisKainForm from "@/components/JenisKainForm";
 import PresetColorPicker from "@/components/PresetColorPicker";
+import ConfirmModal from "@/components/ConfirmModal";
 import { colorMap } from "@/lib/katalog-data";
 import { PAKET_SIZE, isCoverHangerKategori, isKabakKategori, isPaketKategori, isPaketSize, variantName } from "@/lib/item-label";
 import { validateMediaFile } from "@/lib/cloudinary";
@@ -672,6 +673,8 @@ export default function TambahProdukPage({
   const [slug, setSlug] = useState("");
   // Slug otomatis dari nama; kolomnya baru dibuka kalau admin menekan "Ubah" (produk baru saja).
   const [slugOpen, setSlugOpen] = useState(false);
+  // Warna yang menunggu konfirmasi hapus (modal), null = tidak ada.
+  const [colorToDelete, setColorToDelete] = useState<string | null>(null);
   // SKU dasar produk (tanpa ukuran). Kosong = otomatis dari kategori-kain-warna-series.
   // SKU tiap varian dihitung per ukuran di SizeGrid.
   const [sku, setSku] = useState("");
@@ -1110,8 +1113,7 @@ export default function TambahProdukPage({
 
   // Hapus warna setelah konfirmasi (menghapus seluruh ukuran & stok warna itu).
   function confirmRemoveColor(color: string) {
-    if (typeof window !== "undefined" && !window.confirm(`Hapus warna ${color} beserta semua ukurannya?`)) return;
-    removeColor(color);
+    setColorToDelete(color);
   }
 
   // Remove color variant
@@ -2989,6 +2991,15 @@ export default function TambahProdukPage({
                   {variants.length === 0 && (
                     <p className="text-sm text-center py-6" style={{ color: "var(--text-muted)" }}>Pilih warna terlebih dahulu untuk mengatur ukuran dan stok</p>
                   )}
+                  <ConfirmModal
+                    open={colorToDelete !== null}
+                    title="Hapus warna?"
+                    message={`Warna ${colorToDelete ?? ""} beserta semua ukuran dan stoknya akan dihapus dari produk ini setelah kamu klik Simpan Perubahan.`}
+                    confirmText="Ya, hapus"
+                    cancelText="Batal"
+                    onConfirm={() => { if (colorToDelete) removeColor(colorToDelete); setColorToDelete(null); }}
+                    onCancel={() => setColorToDelete(null)}
+                  />
                 </>
                 )}
               </div>

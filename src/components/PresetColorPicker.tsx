@@ -17,17 +17,19 @@ export default function PresetColorPicker({ existing, onAdd, startOpen = false }
   const [open, setOpen] = useState(startOpen);
   const [customHex, setCustomHex] = useState("#141414");
   const [customColorName, setCustomColorName] = useState("");
+  const [error, setError] = useState("");
 
   const usedKeys = new Set(existing.map((c) => c.toLowerCase()));
 
   function addCustomColor() {
     const nama = customColorName.trim();
-    if (!nama) { alert("Nama warna wajib diisi."); return; }
+    setError("");
+    if (!nama) { setError("Nama warna wajib diisi."); return; }
     if (usedKeys.has(nama.toLowerCase())) {
       // Sebutkan bentuk yang sudah ada supaya admin tahu harus mengedit yang mana,
       // bukan sekadar "sudah ada" tanpa petunjuk.
       const kembar = existing.find((c) => c.toLowerCase() === nama.toLowerCase());
-      alert(
+      setError(
         kembar && kembar !== nama
           ? `Warna "${nama}" sudah ada sebagai "${kembar}". Nama varian tidak boleh sama walau beda huruf besar/kecil. Untuk mengganti nama, klik nama variannya lalu ubah.`
           : `Warna "${nama}" sudah ada. Klik variannya untuk mengubah nama.`
@@ -82,11 +84,12 @@ export default function PresetColorPicker({ existing, onAdd, startOpen = false }
       </p>
       <div className="flex items-center gap-1.5">
         <input type="color" value={customHex} onChange={(e) => setCustomHex(e.target.value)} className="w-6 h-6 rounded-full border-0 cursor-pointer p-0 bg-transparent" title="Pilih warna" />
-        <input value={customColorName} onChange={(e) => setCustomColorName(e.target.value)}
+        <input value={customColorName} onChange={(e) => { setCustomColorName(e.target.value); if (error) setError(""); }}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomColor(); } }}
           placeholder="Nama warna baru…" className="w-[130px] bg-transparent outline-none text-xs" style={{ color: "var(--espresso)" }} />
         <button type="button" onClick={addCustomColor} className="font-semibold hover:opacity-70">+</button>
       </div>
+      {error && <p className="text-[11px] mt-1.5" style={{ color: "#b91c1c" }}>{error}</p>}
     </div>
   );
 }
