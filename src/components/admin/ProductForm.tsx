@@ -2358,16 +2358,6 @@ export default function TambahProdukPage({
                         {/* Baris 4: Harga Dasar (non-Thobe).
                             Berat TIDAK diisi di sini lagi — berat per ukuran ada di blok ukuran
                             (itulah yang dipakai menghitung ongkir J&T). */}
-                        {category !== "Thobe" && !cypEnabled && (
-                          <div className="grid sm:grid-cols-2 gap-x-5 gap-y-4">
-                          <div>
-                            <label className="pf-label">Harga Dasar (Rp) <span className="pf-req">*</span></label>
-                            <input type="text" inputMode="numeric" value={formatRupiah(basePrice)} onChange={(e) => setBasePrice(parseRupiah(e.target.value))} className={`pf-input${errors.basePrice ? " invalid" : ""}`} placeholder="389.000" />
-                            <p className="pf-hint">Harga terendah / yang tampil di katalog. Angka saja, contoh 249000.</p>
-                            {errors.basePrice && <p className="pf-error">{errors.basePrice}</p>}
-                          </div>
-                          </div>
-                        )}
                         {isOps && (() => {
                           const refPrice = category === "Thobe" && activeSeriesTab && seriesBlocks[activeSeriesTab]
                             ? parseInt(seriesBlocks[activeSeriesTab].price) || 0
@@ -2911,6 +2901,15 @@ export default function TambahProdukPage({
                   <p className="text-sm text-center py-6" style={{ color: "var(--text-muted)" }}>Pilih minimal 1 series terlebih dahulu</p>
                 ) : (
                 <>
+                  {/* Harga Dasar dipindah ke sini supaya satu tempat dengan Harga khusus per ukuran. */}
+                  {category !== "Thobe" && !cypEnabled && (
+                    <div className="pf-panel mb-4">
+                      <label className="pf-label">Harga Dasar (Rp) <span className="pf-req">*</span></label>
+                      <input type="text" inputMode="numeric" value={formatRupiah(basePrice)} onChange={(e) => setBasePrice(parseRupiah(e.target.value))} className={`pf-input${errors.basePrice ? " invalid" : ""}`} style={{ maxWidth: "18rem" }} placeholder="389.000" />
+                      <p className="pf-hint">Harga yang tampil di katalog. Harga khusus per ukuran diisi di tabel bawah; kosong = pakai Harga Dasar ini.</p>
+                      {errors.basePrice && <p className="pf-error">{errors.basePrice}</p>}
+                    </div>
+                  )}
                   {/* Color chips — disembunyikan untuk produk default SAMAQU. */}
                   {!onlyDefaultVariant ? (
                     <div className="mb-4">
