@@ -165,15 +165,6 @@ export default function LenganModelPanel({
               </span>
             </li>
           </ul>
-
-          <div className="lm-preview" aria-hidden="true">
-            <p className="lm-preview-label">Tampilan di halaman produk</p>
-            <p className="lm-preview-title">Pilih Model</p>
-            <div className="lm-preview-chips">
-              <span className="lm-chip lm-chip-active">{PANJANG}</span>
-              <span className="lm-chip">{PENDEK}</span>
-            </div>
-          </div>
         </div>
       )}
 
@@ -189,15 +180,14 @@ export default function LenganModelPanel({
 }
 
 const LM_CSS = `
-.lm-card{border:1px solid #e4e4e7;border-radius:1rem;background:#fff;padding:1.1rem 1.15rem;color:#18181b}
+.lm-card{border:1px solid #d4d4d8;border-radius:1rem;background:#fff;padding:1.15rem 1.2rem;color:#18181b;box-shadow:0 1px 2px rgba(0,0,0,.05)}
 .lm-head{margin-bottom:.85rem}
 .lm-title{font-size:.95rem;font-weight:700;color:#18181b}
 .lm-sub{font-size:.78rem;line-height:1.45;color:#71717a;margin-top:.15rem}
-.lm-list{list-style:none;margin:0;padding:0;border:1px solid #e4e4e7;border-radius:.85rem;overflow:hidden}
-.lm-row{display:flex;align-items:center;gap:.8rem;padding:.8rem .95rem;background:#fff}
-.lm-row + .lm-row{border-top:1px solid #e4e4e7}
-.lm-row-opt{background:#fafafa}
-.lm-row-opt.is-on{background:#f4faf6}
+.lm-list{list-style:none;margin:0;padding:0;display:grid;gap:.6rem}
+.lm-row{display:flex;align-items:center;gap:.85rem;padding:.9rem 1rem;background:#fff;border:1.5px solid #d4d4d8;border-radius:.9rem;border-left-width:5px;border-left-color:#18181b;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.lm-row-opt{border-left-color:#a1a1aa}
+.lm-row-opt.is-on{background:#f0fdf4;border-color:#86efac;border-left-color:#16a34a}
 .lm-dot{width:.7rem;height:.7rem;border-radius:999px;border:2px solid #d4d4d8;flex:none}
 .lm-dot-on{border-color:#16a34a;background:#16a34a}
 .lm-main{flex:1;min-width:0}
@@ -212,27 +202,22 @@ const LM_CSS = `
 .lm-switch.on{background:#18181b}
 .lm-switch-knob{position:absolute;top:.17rem;left:.17rem;width:1.21rem;height:1.21rem;border-radius:999px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s ease}
 .lm-switch.on .lm-switch-knob{transform:translateX(1.2rem)}
-.lm-detail{margin-top:1rem;display:grid;gap:1rem}
+.lm-detail{margin-top:.9rem;display:grid;gap:.9rem}
 .lm-label{font-size:.8rem;font-weight:700;margin-bottom:.45rem}
 .lm-seg{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
-.lm-seg-btn{display:flex;flex-direction:column;align-items:flex-start;gap:.15rem;text-align:left;border:1px solid #e4e4e7;border-radius:.75rem;background:#fff;padding:.65rem .8rem;font-size:.82rem;font-weight:600;color:#18181b;cursor:pointer;transition:border-color .15s ease,background .15s ease}
+.lm-seg-btn{display:flex;flex-direction:column;align-items:flex-start;gap:.15rem;text-align:left;border:1.5px solid #d4d4d8;border-radius:.75rem;background:#fff;padding:.65rem .8rem;font-size:.82rem;font-weight:600;color:#18181b;cursor:pointer;transition:border-color .15s ease,background .15s ease}
 .lm-seg-btn:hover{border-color:#a1a1aa}
-.lm-seg-btn.active{border-color:#18181b;background:#fafafa;box-shadow:0 0 0 1px #18181b inset}
+.lm-seg-btn.active{border-color:#18181b;background:#18181b;color:#fff}
+.lm-seg-btn.active .lm-seg-sub{color:#d4d4d8}
 .lm-seg-sub{font-size:.72rem;font-weight:500;color:#71717a}
 .lm-input-wrap{display:flex;align-items:center;margin-top:.6rem;max-width:18rem;border:1px solid #d4d4d8;border-radius:.75rem;background:#fff;overflow:hidden}
 .lm-input-wrap:focus-within{border-color:#18181b;box-shadow:0 0 0 1px #18181b inset}
 .lm-input-prefix{padding:0 .75rem;font-size:.85rem;font-weight:600;color:#52525b;background:#f4f4f5;align-self:stretch;display:flex;align-items:center;border-right:1px solid #e4e4e7}
 .lm-input{flex:1;min-width:0;border:0;outline:0;padding:.65rem .8rem;font-size:.9rem;background:transparent;color:#18181b}
 .lm-warn{margin-top:.45rem;font-size:.75rem;color:#b45309}
-.lm-facts{list-style:none;margin:0;padding:.85rem .95rem;display:grid;gap:.55rem;background:#fafafa;border:1px solid #e4e4e7;border-radius:.85rem}
+.lm-facts{list-style:none;margin:0;padding:.9rem 1rem;display:grid;gap:.6rem;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:.9rem}
 .lm-facts li{display:flex;gap:.55rem;font-size:.78rem;line-height:1.45;color:#3f3f46}
-.lm-check{flex:none;width:1.1rem;height:1.1rem;border-radius:999px;background:#dcfce7;color:#166534;font-size:.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:.05rem}
-.lm-preview{border:1px dashed #d4d4d8;border-radius:.85rem;padding:.8rem .95rem}
-.lm-preview-label{font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#a1a1aa}
-.lm-preview-title{font-size:.8rem;font-weight:600;margin-top:.45rem}
-.lm-preview-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.4rem}
-.lm-chip{border:1px solid #d4d4d8;border-radius:.6rem;padding:.35rem .75rem;font-size:.78rem;color:#3f3f46;background:#fff}
-.lm-chip-active{background:#18181b;border-color:#18181b;color:#fff}
+.lm-check{flex:none;width:1.1rem;height:1.1rem;border-radius:999px;background:#16a34a;color:#fff;font-size:.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:.05rem}
 .lm-alert{margin-top:.85rem;font-size:.78rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:.75rem;padding:.6rem .8rem}
 .lm-foot{margin-top:.85rem;font-size:.74rem;color:#71717a}
 @media (max-width:520px){
