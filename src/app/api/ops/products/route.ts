@@ -258,6 +258,18 @@ export async function DELETE(req: NextRequest) {
     if (!id) return NextResponse.json({ error: "id wajib" }, { status: 400 });
 
     const admin = getSupabaseAdmin();
+    // Koko: model Lengan Pendek (baris turunan yang menumpang stok produk ini) ikut dihapus,
+    // supaya tidak tersisa baris yatim. Produk lain tidak punya baris seperti ini → tidak berubah.
+    const { data: linked } = await admin.from("product_variants").select("product_id").eq("base_product_id", id);
+    const linkedIds = [...new Set((linked || []).map((r) => String(r.product_id)).filter((pid) => pid && pid !== String(id)))];
+    if (linkedIds.length > 0) {
+      const { data: kokoRows } = await admin.from("products").select("id").in("id", linkedIds).eq("category", "Koko");
+      const derivedIds = (kokoRows || []).map((r) => String(r.id));
+      if (derivedIds.length > 0) {
+        await admin.from("product_variants").delete().in("product_id", derivedIds);
+        await admin.from("products").delete().in("id", derivedIds);
+      }
+    }
     // Hapus varian dulu (stok & ukuran), baru produknya.
     await admin.from("product_variants").delete().eq("product_id", id);
     const { error, count } = await admin.from("products").delete({ count: "exact" }).eq("id", id);

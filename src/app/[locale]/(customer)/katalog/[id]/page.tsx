@@ -11,7 +11,8 @@ import { getKainSwatchColor } from "@/lib/kain-series-color";
 import Breadcrumb from "@/components/Breadcrumb";
 import { CartBadge } from "@/components/CartBadge";
 import { colorMap, type Product, type MediaItem } from "@/lib/katalog-data";
-import { getCatalogProductById, getAvailableSeries, getRelatedProducts, type SeriesOption } from "@/lib/db";
+import { getCatalogProductById, getAvailableSeries, getRelatedProducts, getLenganPendekModel, type ModelOption, type SeriesOption } from "@/lib/db";
+import { LENGAN_PANJANG, LENGAN_PENDEK } from "@/lib/lengan-pendek";
 import { relatedProductTitle } from "@/lib/related-products";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import { toImgUrl, toLegacyUrl } from "@/lib/image-url";
@@ -285,6 +286,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   // ID produk yang sedang ditampilkan (bisa beda dari URL slug saat ganti series)
   const displayId = activeSeriesId || id;
 
+  // Model Koko (Lengan Panjang / Lengan Pendek). Lengan Pendek = baris produk turunan yang stoknya
+  // ikut produk ini; hanya stok, harga, dan keranjang yang mengikuti model — foto & halaman tetap.
+  const [lenganPendek, setLenganPendek] = useState<ModelOption | null>(null);
+  const [modelPendek, setModelPendek] = useState(false);
+  const pendekActive = modelPendek && !!lenganPendek;
+  /** ID produk untuk membaca ukuran, stok, dan harga varian (= displayId kecuali Lengan Pendek). */
+  const stockId = pendekActive && lenganPendek ? lenganPendek.id : displayId;
+
   // Supabase images per color
   const [supabaseMedia, setSupabaseMedia] = useState<MediaItem[]>([]);
   /** Ukuran asli produk tanpa series — dipakai menyusun content_ids ViewContent sesuai feed. */
@@ -416,12 +425,24 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     });
   }, [activeSeriesId, id, isThobe]);
 
-  // Reset variant state when switching series (avoid stale data from old product)
+  // Reset variant state when switching series/model (avoid stale data from old product)
   useEffect(() => {
     setVariantPrice(null);
     setVariantWeight(null);
     setStock(null);
-  }, [displayId]);
+  }, [stockId]);
+
+  // Koko: cari model Lengan Pendek untuk produk ini (null = produk tidak menyediakannya).
+  useEffect(() => {
+    setModelPendek(false);
+    setLenganPendek(null);
+    if (!product || product.category !== "Koko") return;
+    let cancelled = false;
+    getLenganPendekModel(product.id).then((model) => {
+      if (!cancelled) setLenganPendek(model);
+    });
+    return () => { cancelled = true; };
+  }, [product?.id, product?.category]);
 
   // Reset gallery when color changes
   useEffect(() => {
@@ -445,8 +466,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   }, [product?.jenis_kain_id, product?.series, selectedColor]);
 
   useEffect(() => {
-    if (!displayId || !selectedColor) return;
-    supabase.from("product_variants").select("size, price_override").eq("product_id", displayId).eq("color", selectedColor).order("display_order").then(({ data }) => {
+    if (!stockId || !selectedColor) return;
+    supabase.from("product_variants").select("size, price_override").eq("product_id", stockId).eq("color", selectedColor).order("display_order").then(({ data }) => {
       if (data && data.length > 0) {
         const sizes = data.map((d) => d.size);
         setAvailableSizes(sizes);
@@ -457,10 +478,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         setStock(null);
       }
     });
-  }, [displayId, selectedColor]);
+  }, [stockId, selectedColor]);
 
   useEffect(() => {
-    if (!displayId || !selectedColor || !selectedSize) { setVariantPrice(null); setVariantWeight(null); setStock(null); return; }
+    if (!stockId || !selectedColor || !selectedSize) { setVariantPrice(null); setVariantWeight(null); setStock(null); return; }
     /*
      * Stok dibaca dari VIEW `product_variant_stock`, bukan tabel mentah.
      *
@@ -471,7 +492,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
      */
     supabase.from("product_variant_stock")
       .select("price_override, effective_stock, weight, base_product_id, base_size, is_sellable")
-      .eq("product_id", displayId).eq("color", selectedColor).eq("size", selectedSize).maybeSingle()
+      .eq("product_id", stockId).eq("color", selectedColor).eq("size", selectedSize).maybeSingle()
       .then(({ data, error }) => {
         // Query gagal JANGAN ditampilkan sebagai "Habis".
         if (error) {
@@ -486,11 +507,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         // View sudah memecahkan stok sharing, jadi `effective_stock` langsung dipakai.
         setStock(typeof data?.effective_stock === "number" ? data.effective_stock : null);
         // Varian pensiun tidak boleh bisa dibeli, termasuk lewat `?color=` di URL.
-        setVariantRetired(data?.is_sellable === false);
+        // Lengan Pendek: warna/ukuran yang belum ada di model pendek dianggap tidak tersedia
+        // (bukan "stok tak terbatas") supaya tidak bisa masuk keranjang.
+        setVariantRetired(data?.is_sellable === false || (stockId !== displayId && !data));
       });
-  }, [displayId, selectedColor, selectedSize]);
+  }, [stockId, displayId, selectedColor, selectedSize]);
 
-  const currentPrice = variantPrice ?? product?.price ?? 0;
+  const currentPrice = variantPrice ?? (pendekActive && lenganPendek ? lenganPendek.price : product?.price) ?? 0;
   // Stok varian yang sedang dipilih (color + size). null = varian tidak dikelola stoknya
   // Varian pensiun (is_sellable = false) diperlakukan tidak tersedia.
   const isOutOfStock = stock === 0 || variantRetired;
@@ -574,8 +597,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     console.log("[CYP] handleAddToCart:", { isCYP, selectedPrice, minimumPrice, finalCYPPrice, effectivePrice, colorImage });
 
     addItem({
-      id: displayId,
-      name: product.name,
+      // Lengan Pendek masuk keranjang sebagai produk turunannya sendiri, jadi nama di pesanan
+      // & label pengiriman otomatis memuat "Lengan Pendek" dan stok terpotong lewat stok sharing.
+      id: stockId,
+      name: pendekActive && lenganPendek ? lenganPendek.name : product.name,
       image: colorImage,
       price: isCYP ? minimumPrice : currentPrice,
       color: selectedColor || product.colors[0] || "-",
@@ -626,7 +651,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     const variantParts = [kainName, seriesName, color !== "default" ? color : null].filter(Boolean).join(" - ");
     // Cover & Hanger: tidak ada ukuran pakaian — paketnya sudah disebut di nama varian.
     const ukuranPart = isPaket ? "" : ` - Ukuran ${selectedSize}`;
-    const msg = `Halo, saya mau pesan produk:\n${product.name}${variantParts ? " - " + variantParts : ""}${ukuranPart}\nHarga: Rp ${effectivePrice.toLocaleString("id-ID")}\nJumlah: ${qty}`;
+    const modelPart = pendekActive ? ` - ${LENGAN_PENDEK}` : "";
+    const msg = `Halo, saya mau pesan produk:\n${product.name}${variantParts ? " - " + variantParts : ""}${modelPart}${ukuranPart}\nHarga: Rp ${effectivePrice.toLocaleString("id-ID")}\nJumlah: ${qty}`;
     trackWhatsAppClick(
       "product_detail",
       metaCatalogItemId({ id: displayId, series: seriesName }, isPaket ? PAKET_SIZE : selectedSize)
@@ -897,6 +923,28 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Model — khusus Koko yang menyediakan Lengan Pendek (stok ikut Lengan Panjang) */}
+          {lenganPendek && !isPaket && (
+            <div className="mb-5">
+              <p className="text-[10px] tracking-[0.1em] uppercase font-ui font-medium mb-2.5" style={{ color: "#000000" }}>Pilih Model</p>
+              <div className="flex flex-wrap gap-1.5">
+                {[{ pendek: false, label: LENGAN_PANJANG }, { pendek: true, label: LENGAN_PENDEK }].map((m) => {
+                  const active = pendekActive === m.pendek;
+                  return (
+                    <button key={m.label} onClick={() => setModelPendek(m.pendek)}
+                      className="px-2.5 py-1.5 text-[11px] font-ui rounded-sm transition-all duration-200"
+                      style={{ background: active ? "#000000" : "transparent", color: active ? "#ffffff" : "#000000", border: `1px solid ${active ? "#000000" : "rgba(0,0,0,.15)"}` }}>
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {pendekActive && (
+                <p className="text-[10.5px] font-ui mt-2" style={{ color: "rgba(0,0,0,.55)" }}>Foto menampilkan model lengan panjang</p>
+              )}
             </div>
           )}
 
@@ -1201,6 +1249,27 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+            {/* Model — khusus Koko yang menyediakan Lengan Pendek (stok ikut Lengan Panjang) */}
+            {lenganPendek && !isPaket && (
+              <div className="mb-6">
+                <p className="text-[10.5px] tracking-[0.18em] uppercase text-[var(--muted)] mb-2.5">Pilih Model</p>
+                <div className="flex flex-wrap gap-2">
+                  {[{ pendek: false, label: LENGAN_PANJANG }, { pendek: true, label: LENGAN_PENDEK }].map((m) => {
+                    const active = pendekActive === m.pendek;
+                    return (
+                      <button key={m.label} onClick={() => setModelPendek(m.pendek)}
+                        className="px-4 py-2 rounded-lg text-[12.5px] transition cursor-pointer"
+                        style={{ background: active ? "#000000" : "#ffffff", color: active ? "#ffffff" : "#000000", border: `1px solid ${active ? "#000000" : "rgba(0,0,0,.15)"}` }}>
+                        {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {pendekActive && (
+                  <p className="text-[12px] mt-2" style={{ color: "rgba(0,0,0,.55)" }}>Foto menampilkan model lengan panjang</p>
+                )}
               </div>
             )}
             {/* Sizes — dilewati untuk Cover & Hanger (paket, bukan ukuran pakaian) */}

@@ -399,3 +399,69 @@ export async function getAvailableSeries(jenisKainId: string | null | undefined,
       create_your_price_enabled: p.create_your_price_enabled ?? false,
     }));
 }
+
+/**
+ * Model "Lengan Pendek" untuk produk Koko.
+ *
+ * Lengan Pendek disimpan sebagai baris produk turunan: `is_published = false` (tidak jadi kartu
+ * sendiri di katalog) dan varian-variannya menunjuk ke produk induk lewat `base_product_id`
+ * (stok ikut Lengan Panjang). Baris turunan dicari lewat VIEW `product_variant_stock` yang sudah
+ * dipakai halaman detail. Fungsi ini hanya membaca; null = produk ini tidak punya model pendek.
+ */
+export interface ModelOption {
+  id: string;
+  name: string;
+  price: number;
+  minimum_price: number | null;
+  create_your_price_enabled: boolean;
+}
+
+export async function getLenganPendekModel(parentId: string): Promise<ModelOption | null> {
+  if (!parentId) return null;
+  try {
+    const { data: links, error: linkError } = await supabase
+      .from("product_variant_stock")
+      .select("product_id, is_sellable")
+      .eq("base_product_id", parentId);
+    if (linkError || !links || links.length === 0) return null;
+
+    // Model yang dimatikan admin (semua variannya `is_sellable = false`) tidak ditawarkan.
+    const derivedIds = [
+      ...new Set(
+        (links as { product_id: string; is_sellable: boolean | null }[])
+          .filter((row) => row.is_sellable !== false)
+          .map((row) => row.product_id)
+          .filter((id) => id && id !== parentId),
+      ),
+    ];
+    if (derivedIds.length === 0) return null;
+
+    const { data: rows, error } = await supabase
+      .from("products")
+      .select("id, name, price, minimum_price, create_your_price_enabled")
+      .in("id", derivedIds)
+      .eq("category", "Koko")
+      .eq("is_published", false)
+      .order("created_at", { ascending: true })
+      .limit(1);
+    if (error || !rows || rows.length === 0) return null;
+
+    const row = rows[0] as {
+      id: string;
+      name: string;
+      price: number;
+      minimum_price: number | null;
+      create_your_price_enabled: boolean | null;
+    };
+    return {
+      id: row.id,
+      name: row.name,
+      price: row.price,
+      minimum_price: row.minimum_price,
+      create_your_price_enabled: row.create_your_price_enabled ?? false,
+    };
+  } catch (err) {
+    console.error("[getLenganPendekModel] Unexpected error:", err);
+    return null;
+  }
+}

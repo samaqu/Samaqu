@@ -281,7 +281,12 @@ function AdminPageInner() {
     [dashOrders, products]
   );
 
-  const catalogItems = useMemo(() => groupByMainProduct(products), [products]);
+  const catalogItems = useMemo(() => {
+    // Koko: baris turunan "Lengan Pendek" (stok ikut Lengan Panjang) bukan produk tersendiri di
+    // daftar — dikelola dari produk Lengan Panjang (toggle di form Edit).
+    const derivedIds = new Set(productVariants.filter((v) => v.base_product_id).map((v) => v.product_id));
+    return groupByMainProduct(products.filter((p) => !(p.category === "Koko" && derivedIds.has(p.id))));
+  }, [products, productVariants]);
 
   const catalogItemsWithStock = useMemo(() => {
     // Build lookup maps
@@ -548,10 +553,20 @@ function AdminPageInner() {
   }
 
   async function handleDeleteProduct(id: string, name: string, memberIds?: string[]) {
-    const ids = memberIds && memberIds.length > 0 ? memberIds : [id];
-    const label = ids.length > 1 ? `"${name}" (${ids.length} produk)` : `"${name}"`;
+    const baseIds = memberIds && memberIds.length > 0 ? memberIds : [id];
+    const label = baseIds.length > 1 ? `"${name}" (${baseIds.length} produk)` : `"${name}"`;
     showConfirm("Hapus Produk?", `Yakin ingin menghapus ${label}? Tindakan ini tidak bisa dibatalkan.`, async () => {
       try {
+        // Koko: model Lengan Pendek (baris turunan yang menumpang stok produk ini) ikut dihapus,
+        // supaya tidak tersisa baris yatim. Produk lain: daftar tidak berubah.
+        let ids = baseIds;
+        const { data: linked } = await supabase.from("product_variants").select("product_id").in("base_product_id", baseIds);
+        const linkedIds = [...new Set((linked || []).map((row: { product_id: string }) => row.product_id).filter((pid: string) => !baseIds.includes(pid)))];
+        if (linkedIds.length > 0) {
+          const { data: kokoRows } = await supabase.from("products").select("id").in("id", linkedIds).eq("category", "Koko");
+          const extra = (kokoRows || []).map((row: { id: string }) => row.id);
+          if (extra.length > 0) ids = [...baseIds, ...extra];
+        }
         await supabase.from("product_images").delete().in("product_id", ids);
         await supabase.from("product_variants").delete().in("product_id", ids);
         await supabase.from("products").delete().in("id", ids);

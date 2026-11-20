@@ -481,6 +481,20 @@ function ProductDetailModal({ isOpen, onClose, product, stockIns = [], transacti
                   Produk baru dari panel-admin sengaja disimpan `is_published = false`,
                   tetapi sakelar publikasinya dulu HANYA ada di dashboard /admin — panel
                   tidak punya jalan untuk menerbitkannya. Sekarang bisa dari sini. */}
+              {/* Koko: baris turunan = model Lengan Pendek. Dia tampil sebagai pilihan "Pilih Model" di
+                  halaman produk Lengan Panjang, BUKAN kartu sendiri — tombol terbitkan disembunyikan
+                  supaya tidak kepencet (kalau terbit, produknya dobel di katalog). */}
+              {isDerived && String(product.category || "").toLowerCase() === "koko" ? (
+              <section>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Tampilkan di website</p>
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 px-3 py-2.5">
+                  <p className="text-[13px] font-semibold text-slate-900 dark:text-white">Model Lengan Pendek</p>
+                  <p className="text-[11px] text-slate-500">
+                    Tampil sebagai pilihan model di halaman produk Lengan Panjang, bukan kartu sendiri. Atur lewat Edit produk Lengan Panjang.
+                  </p>
+                </div>
+              </section>
+              ) : (
               <section>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Tampilkan di website</p>
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 px-3 py-2.5">
@@ -506,6 +520,7 @@ function ProductDetailModal({ isOpen, onClose, product, stockIns = [], transacti
                   </button>
                 </div>
               </section>
+              )}
 
               {/* Stok per ukuran / warna asli */}
               <section>

@@ -20,6 +20,7 @@ import { usePageUrl } from "@/lib/ops-router";
 import { requestRevalidate } from "@/lib/admin-revalidate";
 import { duplicateSkus, generateBaseSku, generateVariantSku, resolveColorName, seriesCode } from "@/lib/sku";
 import { findProductSkuClashes, findVariantSkuClashes, skuClashMessage, skuErrorFromDatabase } from "@/lib/sku-unique";
+import { LENGAN_PENDEK, loadLenganPendekState, syncLenganPendek } from "@/lib/lengan-pendek";
 
 const CATEGORIES = ["Thobe", "Kandora", "Koko", "Vest", "Kabak", "Cover & Hanger"] as const;
 const SIZES = ["S", "M", "L", "XL", "XXL"] as const;
@@ -690,6 +691,17 @@ export default function TambahProdukPage({
   // Ikut Open Order: produk baru default tampil di /open-order (bisa dimatikan kapan saja).
   const [openOrderEnabled, setOpenOrderEnabled] = useState(true);
 
+  // ── Model Lengan Pendek (khusus Koko) ──
+  // Produk ini = Lengan Panjang (stok utama). Lengan Pendek disimpan sebagai baris turunan yang
+  // stoknya ikut produk ini; lihat `src/lib/lengan-pendek.ts`.
+  const [lenganPendekOn, setLenganPendekOn] = useState(false);
+  /** Harga khusus Lengan Pendek; kosong = sama dengan Lengan Panjang. */
+  const [lenganPendekPrice, setLenganPendekPrice] = useState("");
+  /** Status saat form dimuat — supaya menyimpan tanpa menyentuh toggle tidak menulis apa-apa. */
+  const [lenganPendekHad, setLenganPendekHad] = useState(false);
+  /** Produk yang sedang diedit adalah baris turunan itu sendiri: toggle disembunyikan. */
+  const [isLenganPendekRow, setIsLenganPendekRow] = useState(false);
+
   // ── Field khusus mode ops (dipakai laporan internal) ──
   const [productType, setProductType] = useState<"normal" | "free_gift">("normal");
   const [hpp, setHpp] = useState("");
@@ -915,6 +927,21 @@ export default function TambahProdukPage({
 
         // Non-Thobe (atau Thobe tanpa series): varian & media global.
         const { data: dbVariants } = await supabase.from("product_variants").select("*").eq("product_id", editProductId).order("display_order");
+        // Koko: baca status model Lengan Pendek. Baris yang variannya menumpang produk lain
+        // (`base_product_id`) adalah baris turunan itu sendiri → toggle tidak ditampilkan.
+        if (product.category === "Koko") {
+          const isDerivedRow = (dbVariants || []).some((v: { base_product_id?: string | null }) => !!v.base_product_id);
+          if (isDerivedRow) {
+            setIsLenganPendekRow(true);
+          } else {
+            const lp = await loadLenganPendekState(supabase, editProductId, product.price);
+            if (alive) {
+              setLenganPendekOn(lp.enabled);
+              setLenganPendekHad(lp.enabled);
+              setLenganPendekPrice(lp.price);
+            }
+          }
+        }
         if (isPaketKategori(product.category)) {
           // Cover & Hanger: tiap baris = satu NAMA varian (bukan warna × ukuran). Nama paket
           // dibaca dari `color` (data lama bisa menyimpannya di `series`/nama produk), ukuran
@@ -2053,6 +2080,19 @@ export default function TambahProdukPage({
         if (imageRows.length > 0) {
           await supabase.from("product_images").insert(imageRows);
         }
+
+        // Koko: sinkronkan model Lengan Pendek (baris turunan, stok ikut produk ini) SETELAH
+        // produk & variannya tersimpan. Hanya jalan kalau modelnya aktif atau baru dimatikan,
+        // jadi produk lain dan simpan biasa tidak tersentuh.
+        if (category === "Koko" && !isOpenOrderPrice && !isLenganPendekRow && (lenganPendekOn || lenganPendekHad)) {
+          try {
+            await syncLenganPendek(supabase, { parentId: slug, enabled: lenganPendekOn, priceInput: lenganPendekPrice });
+          } catch (syncErr) {
+            throw new VariantWriteError(
+              `Produk sudah tersimpan, tapi model ${LENGAN_PENDEK} gagal disimpan: ${syncErr instanceof Error ? syncErr.message : "kesalahan tidak diketahui"}`
+            );
+          }
+        }
       }
 
       // Segarkan cache halaman publik SEBELUM pindah halaman, supaya katalog & detail
@@ -2443,6 +2483,44 @@ export default function TambahProdukPage({
                         </button>
                       </div>
                     </div>
+                    {/* Koko: model Lengan Pendek. Produk ini = Lengan Panjang (stok utama);
+                        Lengan Pendek ikut stok produk ini per warna & ukuran. */}
+                    {category === "Koko" && !isOpenOrderPrice && !isLenganPendekRow && (
+                      <div className={`pf-panel${lenganPendekOn ? " accent" : " flat"}`}>
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium" style={{ color: "var(--espresso)" }}>Sediakan model {LENGAN_PENDEK}</p>
+                            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                              Customer bisa memilih Lengan Panjang atau {LENGAN_PENDEK} di halaman produk ini. Stok {LENGAN_PENDEK} ikut stok produk ini (Lengan Panjang) per warna &amp; ukuran, foto sama.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setLenganPendekOn((v) => !v)}
+                            aria-pressed={lenganPendekOn}
+                            aria-label={`Sediakan model ${LENGAN_PENDEK} untuk produk ini`}
+                            className="pf-toggle"
+                            style={{ background: lenganPendekOn ? "var(--gold)" : "#d4d4d8" }}
+                          >
+                            <span className="pf-toggle-knob" style={{ transform: lenganPendekOn ? "translateX(20px)" : "translateX(0)" }} />
+                          </button>
+                        </div>
+                        {lenganPendekOn && (
+                          <div className="mt-4 max-w-xs">
+                            <label className="pf-label">Harga {LENGAN_PENDEK} (Rp, opsional)</label>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={formatRupiah(lenganPendekPrice)}
+                              onChange={(e) => setLenganPendekPrice(parseRupiah(e.target.value))}
+                              className="pf-input"
+                              placeholder="Kosong = sama dengan Lengan Panjang"
+                            />
+                            <p className="pf-hint">Kosongkan kalau harganya sama. Isi hanya kalau harga {LENGAN_PENDEK} berbeda.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </section>
                 </div>
