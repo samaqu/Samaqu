@@ -2902,7 +2902,7 @@ export default function TambahProdukPage({
                 ) : (
                 <>
                   {/* Harga Dasar dipindah ke sini supaya satu tempat dengan Harga khusus per ukuran. */}
-                  {category !== "Thobe" && !cypEnabled && (
+                  {category !== "Thobe" && !cypEnabled && !activeVariant && (
                     <div className="pf-panel mb-4">
                       <label className="pf-label">Harga Dasar (Rp) <span className="pf-req">*</span></label>
                       <input type="text" inputMode="numeric" value={formatRupiah(basePrice)} onChange={(e) => setBasePrice(parseRupiah(e.target.value))} className={`pf-input${errors.basePrice ? " invalid" : ""}`} style={{ maxWidth: "18rem" }} placeholder="389.000" />
@@ -2979,6 +2979,14 @@ export default function TambahProdukPage({
                           />
                           Ganti warna titik (hanya tampilan chip warna)
                         </label>
+                      )}
+                      {category !== "Thobe" && !cypEnabled && (
+                        <div className="pf-panel mb-3">
+                      <label className="pf-label">Harga Dasar (Rp) <span className="pf-req">*</span></label>
+                      <input type="text" inputMode="numeric" value={formatRupiah(basePrice)} onChange={(e) => setBasePrice(parseRupiah(e.target.value))} className={`pf-input${errors.basePrice ? " invalid" : ""}`} style={{ maxWidth: "18rem" }} placeholder="389.000" />
+                      <p className="pf-hint">Harga yang tampil di katalog. Harga khusus per ukuran diisi di tabel bawah; kosong = pakai Harga Dasar ini.</p>
+                      {errors.basePrice && <p className="pf-error">{errors.basePrice}</p>}
+                    </div>
                       )}
                       <SizeGrid
                         basePriceHint={basePrice}
