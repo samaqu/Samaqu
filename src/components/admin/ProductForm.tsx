@@ -703,6 +703,7 @@ export default function TambahProdukPage({
   const [lenganPendekOn, setLenganPendekOn] = useState(false);
   /** Harga khusus Lengan Pendek; kosong = sama dengan Lengan Panjang. */
   const [lenganPendekPrice, setLenganPendekPrice] = useState("");
+  const [lenganPendekSizePrices, setLenganPendekSizePrices] = useState<Record<string, string>>({});
   /** Status saat form dimuat — supaya menyimpan tanpa menyentuh toggle tidak menulis apa-apa. */
   const [lenganPendekHad, setLenganPendekHad] = useState(false);
   /** Produk yang sedang diedit adalah baris turunan itu sendiri: toggle disembunyikan. */
@@ -945,6 +946,7 @@ export default function TambahProdukPage({
               setLenganPendekOn(lp.enabled);
               setLenganPendekHad(lp.enabled);
               setLenganPendekPrice(lp.price);
+              setLenganPendekSizePrices(lp.sizePrices);
             }
           }
         }
@@ -2097,7 +2099,7 @@ export default function TambahProdukPage({
         // jadi produk lain dan simpan biasa tidak tersentuh.
         if (category === "Koko" && !isOpenOrderPrice && !isLenganPendekRow && (lenganPendekOn || lenganPendekHad)) {
           try {
-            await syncLenganPendek(supabase, { parentId: slug, enabled: lenganPendekOn, priceInput: lenganPendekPrice });
+            await syncLenganPendek(supabase, { parentId: slug, enabled: lenganPendekOn, priceInput: lenganPendekPrice, sizePrices: lenganPendekSizePrices });
           } catch (syncErr) {
             throw new VariantWriteError(
               `Produk sudah tersimpan, tapi model ${LENGAN_PENDEK} gagal disimpan: ${syncErr instanceof Error ? syncErr.message : "kesalahan tidak diketahui"}`
@@ -2510,6 +2512,9 @@ export default function TambahProdukPage({
                         onPriceChange={setLenganPendekPrice}
                         basePrice={basePrice}
                         wasEnabled={lenganPendekHad}
+                        sizes={Array.from(new Set(variants.flatMap((v) => v.sizes.map((sz) => sz.size).filter(Boolean))))}
+                        sizePrices={lenganPendekSizePrices}
+                        onSizePriceChange={(sz, digits) => setLenganPendekSizePrices((prev) => ({ ...prev, [sz]: digits }))}
                       />
                     )}
                   </div>

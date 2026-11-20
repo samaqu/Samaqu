@@ -75,6 +75,8 @@ export interface LenganPendekState {
   enabled: boolean;
   /** Harga khusus Lengan Pendek (teks form); kosong = sama dengan Lengan Panjang. */
   price: string;
+  /** Harga khusus Lengan Pendek per ukuran (ukuran → digit). Hanya terisi kalau harga Pendek berbeda. */
+  sizePrices: Record<string, string>;
 }
 
 /** Status Lengan Pendek untuk form edit. Gagal baca = anggap tidak aktif (form tetap jalan). */
@@ -85,11 +87,23 @@ export async function loadLenganPendekState(
 ): Promise<LenganPendekState> {
   try {
     const derived = await findDerived(client, parentId);
-    if (!derived) return { enabled: false, price: "" };
+    if (!derived) return { enabled: false, price: "", sizePrices: {} };
     const differs = derived.price > 0 && derived.price !== Number(parentPrice);
-    return { enabled: derived.active, price: differs ? String(derived.price) : "" };
+    const sizePrices: Record<string, string> = {};
+    if (differs) {
+      const { data } = await client
+        .from("product_variants")
+        .select("size, price_override")
+        .eq("product_id", derived.id)
+        .eq("is_sellable", true)
+        .not("price_override", "is", null);
+      for (const r of (data || []) as { size: string; price_override: number }[]) {
+        if (!sizePrices[r.size]) sizePrices[r.size] = String(r.price_override);
+      }
+    }
+    return { enabled: derived.active, price: differs ? String(derived.price) : "", sizePrices };
   } catch {
-    return { enabled: false, price: "" };
+    return { enabled: false, price: "", sizePrices: {} };
   }
 }
 
@@ -104,9 +118,9 @@ export async function loadLenganPendekState(
  */
 export async function syncLenganPendek(
   client: SupabaseClient,
-  opts: { parentId: string; enabled: boolean; priceInput: string },
+  opts: { parentId: string; enabled: boolean; priceInput: string; sizePrices?: Record<string, string> },
 ): Promise<void> {
-  const { parentId, enabled, priceInput } = opts;
+  const { parentId, enabled, priceInput, sizePrices = {} } = opts;
 
   const { data: parent, error: parentError } = await client
     .from("products")
@@ -143,6 +157,14 @@ export async function syncLenganPendek(
   if (sellable.length === 0) throw new Error("produk utama belum punya varian warna/ukuran");
 
   const typedPrice = parseInt(String(priceInput || "").trim(), 10);
+  // Harga Pendek berbeda → harga khusus per ukuran diisi admin khusus untuk Pendek (kosong = harga
+  // Pendek). Harga sama → ikut harga khusus per ukuran milik Lengan Panjang.
+  const customPrice = Number.isFinite(typedPrice) && typedPrice > 0 && typedPrice !== Number(parent.price);
+  const overrideFor = (size: string, parentOverride: number | null): number | null => {
+    if (!customPrice) return parentOverride ?? null;
+    const n = parseInt(String(sizePrices[size] ?? "").trim(), 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
   const row: Record<string, unknown> = {
     id: derivedId,
     name: lenganPendekName(parent.name),
@@ -191,9 +213,7 @@ export async function syncLenganPendek(
       stock: 0,
       // Berat kosong = jangan sentuh kolom (nilai lama tetap).
       ...(v.weight ? { weight: v.weight } : {}),
-      // Harga Lengan Pendek mengikuti `products.price` barisnya (itu yang divalidasi server saat
-      // checkout), jadi harga khusus per ukuran milik Lengan Panjang tidak disalin.
-      price_override: null,
+      price_override: overrideFor(v.size, v.price_override),
       sku: v.sku ? `${v.sku}${SKU_SUFFIX}` : null,
       display_order: v.display_order ?? 0,
       base_product_id: parentId,

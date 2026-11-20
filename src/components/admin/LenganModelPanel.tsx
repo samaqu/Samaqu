@@ -28,6 +28,11 @@ export interface LenganModelPanelProps {
   basePrice: string;
   /** Lengan Pendek sudah aktif saat form dimuat (untuk peringatan saat dimatikan). */
   wasEnabled: boolean;
+  /** Daftar ukuran produk ini (unik) untuk harga khusus per ukuran Lengan Pendek. */
+  sizes: string[];
+  /** Harga khusus Lengan Pendek per ukuran (ukuran → digit polos). */
+  sizePrices: Record<string, string>;
+  onSizePriceChange: (size: string, digits: string) => void;
 }
 
 export default function LenganModelPanel({
@@ -37,6 +42,9 @@ export default function LenganModelPanel({
   onPriceChange,
   basePrice,
   wasEnabled,
+  sizes,
+  sizePrices,
+  onSizePriceChange,
 }: LenganModelPanelProps) {
   // "Harga berbeda" dipilih eksplisit; kalau data dimuat dengan harga khusus, otomatis ikut.
   const [customPrice, setCustomPrice] = useState(price !== "");
@@ -143,6 +151,41 @@ export default function LenganModelPanel({
             {customPrice && price === "" && (
               <p className="lm-warn">Harga belum diisi, jadi harganya akan sama dengan {PANJANG}.</p>
             )}
+
+            {!customPrice && (
+              <p className="lm-hint">
+                Harga khusus per ukuran yang lu isi di tabel &ldquo;Varian &amp; Stok&rdquo; ikut berlaku ke {PENDEK}.
+              </p>
+            )}
+
+            {customPrice && price !== "" && sizes.length > 0 && (
+              <div className="lm-sizes">
+                <p className="lm-label">Harga khusus per ukuran {PENDEK} (opsional)</p>
+                <p className="lm-hint">
+                  Kosongkan = ukuran itu pakai harga {PENDEK} di atas (Rp {rupiah(price)}). Harga khusus {PANJANG} di
+                  tabel Varian &amp; Stok tidak ikut ke {PENDEK}. Berlaku untuk semua warna.
+                </p>
+                <div className="lm-size-grid">
+                  {sizes.map((sz) => (
+                    <label key={sz} className="lm-size-item">
+                      <span className="lm-size-name">{sz}</span>
+                      <span className="lm-input-wrap lm-input-wrap-sm">
+                        <span className="lm-input-prefix">Rp</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={rupiah(sizePrices[sz] ?? "")}
+                          onChange={(e) => onSizePriceChange(sz, e.target.value.replace(/\D/g, ""))}
+                          className="lm-input"
+                          placeholder={rupiah(price)}
+                          aria-label={`Harga khusus ${PENDEK} ukuran ${sz}`}
+                        />
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <ul className="lm-facts">
@@ -214,6 +257,13 @@ const LM_CSS = `
 .lm-input-wrap:focus-within{border-color:#18181b;box-shadow:0 0 0 1px #18181b inset}
 .lm-input-prefix{padding:0 .75rem;font-size:.85rem;font-weight:600;color:#52525b;background:#f4f4f5;align-self:stretch;display:flex;align-items:center;border-right:1px solid #e4e4e7}
 .lm-input{flex:1;min-width:0;border:0;outline:0;padding:.65rem .8rem;font-size:.9rem;background:transparent;color:#18181b}
+.lm-hint{margin-top:.45rem;font-size:.75rem;line-height:1.45;color:#52525b}
+.lm-sizes{margin-top:.9rem;padding:.9rem 1rem;border:1.5px solid #e4e4e7;border-radius:.9rem;background:#fafafa}
+.lm-size-grid{margin-top:.6rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr));gap:.6rem}
+.lm-size-item{display:flex;flex-direction:column;gap:.25rem}
+.lm-size-name{font-size:.75rem;font-weight:700;color:#18181b}
+.lm-input-wrap-sm{margin-top:0;max-width:none}
+.lm-input-wrap-sm .lm-input{padding:.5rem .6rem;font-size:.85rem}
 .lm-warn{margin-top:.45rem;font-size:.75rem;color:#b45309}
 .lm-facts{list-style:none;margin:0;padding:.9rem 1rem;display:grid;gap:.6rem;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:.9rem}
 .lm-facts li{display:flex;gap:.55rem;font-size:.78rem;line-height:1.45;color:#3f3f46}

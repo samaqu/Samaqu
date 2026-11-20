@@ -505,7 +505,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         // View stok publik hanya memuat produk yang tampil di website, sedangkan baris Lengan
         // Pendek sengaja tidak tampil. Stok Lengan Pendek = stok Lengan Panjang (stok sharing),
         // jadi stok selalu dibaca dari produk ini; baris pendek hanya dicek ketersediaannya.
-        setVariantPrice(pendekActive ? null : data?.price_override ?? null);
+        if (!pendekActive) setVariantPrice(data?.price_override ?? null);
         setVariantWeight(Number(data?.weight) || null);
         // View sudah memecahkan stok sharing, jadi `effective_stock` langsung dipakai.
         setStock(typeof data?.effective_stock === "number" ? data.effective_stock : null);
@@ -516,9 +516,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           // (bukan "stok tak terbatas") supaya tidak bisa masuk keranjang.
           const { data: pv } = await supabase
             .from("product_variants")
-            .select("is_sellable")
+            .select("is_sellable, price_override")
             .eq("product_id", stockId).eq("color", selectedColor).eq("size", selectedSize).maybeSingle();
           retired = retired || !pv || pv.is_sellable === false;
+          // Harga Pendek: harga khusus per ukuran milik baris Pendek, kalau tidak ada pakai harga Pendek.
+          setVariantPrice(pv?.price_override ?? null);
         }
         setVariantRetired(retired);
       });
