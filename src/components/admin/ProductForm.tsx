@@ -670,6 +670,8 @@ export default function TambahProdukPage({
   // Basic fields
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  // Slug otomatis dari nama; kolomnya baru dibuka kalau admin menekan "Ubah" (produk baru saja).
+  const [slugOpen, setSlugOpen] = useState(false);
   // SKU dasar produk (tanpa ukuran). Kosong = otomatis dari kategori-kain-warna-series.
   // SKU tiap varian dihitung per ukuran di SizeGrid.
   const [sku, setSku] = useState("");
@@ -2289,37 +2291,43 @@ export default function TambahProdukPage({
                 </section>
                 <section className="pf-group" aria-labelledby="pf-g-kode">
                   <div className="pf-group-head">
-                    <h3 id="pf-g-kode" className="pf-group-title">Kode &amp; URL</h3>
-                    <p className="pf-group-sub">Alamat halaman produk dan kode stok (SKU). Terisi otomatis dari nama dan kategori; boleh diubah.</p>
+                    <h3 id="pf-g-kode" className="pf-group-title">Kode Produk</h3>
+                    <p className="pf-group-sub">Kode stok (SKU) terisi otomatis dari nama dan kategori; boleh diubah.</p>
                   </div>
                   <div className="pf-group-body space-y-5">
-                    {/* Baris 2: Slug + SKU (2 kolom) */}
-                    <div className="grid sm:grid-cols-2 gap-x-5 gap-y-4">
-                      <div>
-                        <label className="pf-label">Slug</label>
-                        <input value={slug} onChange={(e) => setSlug(e.target.value)} className="pf-input" placeholder="thobe-jiharkah-premium" />
-                        <p className="pf-hint">URL: /katalog/{slug || "..."}</p>
-                      </div>
-                      <div>
-                        <label className="pf-label">SKU Produk {isOps && <span className="pf-req">*</span>}</label>
+                    {/* SKU produk. Slug otomatis dari nama; hanya produk baru yang boleh mengubahnya. */}
+                    <div className="max-w-xl">
+                      <label className="pf-label">SKU Produk {isOps && <span className="pf-req">*</span>}</label>
+                      <input
+                        value={sku || autoBaseSku}
+                        onChange={(e) => setSku(e.target.value)}
+                        onFocus={(e) => e.currentTarget.select()}
+                        className={`pf-input${errors.sku ? " invalid" : ""}`}
+                        placeholder={autoBaseSku || "SMQ-THB-JHK"}
+                      />
+                      {errors.sku && <p className="pf-error">{errors.sku}</p>}
+                      <p className="pf-hint">
+                        Kode dasar produk, ukuran ditambahkan otomatis. Kosongkan untuk memakai kode otomatis.
+                      </p>
+                    </div>
+                    <div className="pf-slugline">
+                      <span className="pf-slugline-label">Alamat halaman</span>
+                      {slugOpen && !isEdit ? (
                         <input
-                          value={sku || autoBaseSku}
-                          onChange={(e) => setSku(e.target.value)}
-                          onFocus={(e) => e.currentTarget.select()}
-                          className={`pf-input${errors.sku ? " invalid" : ""}`}
-                          placeholder={autoBaseSku || "SMQ-THB-JHK"}
+                          value={slug}
+                          onChange={(e) => setSlug(e.target.value)}
+                          className="pf-input"
+                          placeholder="thobe-jiharkah-premium"
+                          aria-label="Slug produk"
                         />
-                        {errors.sku && <p className="pf-error">{errors.sku}</p>}
-                        <p className="pf-hint">
-                          SKU dasar tanpa ukuran.{" "}
-                          {category === "Thobe"
-                            ? "Kode series ditambahkan otomatis di SKU tiap series."
-                            : isPaket
-                              ? "Kode varian ditambahkan otomatis di SKU tiap varian."
-                              : "Ukuran ditambahkan otomatis di SKU varian."}{" "}
-                          Kosongkan untuk memakai otomatis.
-                        </p>
-                      </div>
+                      ) : (
+                        <>
+                          <code className="pf-slugline-url">/katalog/{slug || "…"}</code>
+                          {!isEdit && (
+                            <button type="button" className="pf-slugline-btn" onClick={() => setSlugOpen(true)}>Ubah</button>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                 </section>
@@ -3267,6 +3275,11 @@ export default function TambahProdukPage({
           border-top: 1px solid rgba(0,0,0,.07);
           box-shadow: 0 -18px 34px -30px rgba(45,33,27,.65);
         }
+        .pf-slugline { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem .7rem; padding: .65rem .85rem; border-radius: .75rem; background: #f4f4f5; border: 1px solid #e4e4e7; font-size: .78rem; }
+        .pf-slugline-label { font-weight: 700; color: #52525b; }
+        .pf-slugline-url { color: #18181b; word-break: break-all; }
+        .pf-slugline-btn { margin-left: auto; font-weight: 700; color: #18181b; text-decoration: underline; cursor: pointer; }
+        .pf-slugline .pf-input { flex: 1; min-width: 12rem; }
         .pf-toggle {
           position: relative; width: 2.6rem; height: 1.45rem; border-radius: 999px;
           flex: none; transition: background .2s ease;
