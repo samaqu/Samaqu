@@ -934,7 +934,7 @@ export default function TambahProdukPage({
           if (isDerivedRow) {
             setIsLenganPendekRow(true);
           } else {
-            const lp = await loadLenganPendekState(supabase, editProductId, product.price);
+            const lp = await loadLenganPendekState(supabase, editProductId as string, product.price);
             if (alive) {
               setLenganPendekOn(lp.enabled);
               setLenganPendekHad(lp.enabled);
