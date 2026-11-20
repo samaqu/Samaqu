@@ -107,7 +107,14 @@ export async function cancelOrderCompletely(
 
   if (cancelId) {
     const result = await cancelOrder({ orderId: cancelId, remark });
-    if (!result.success) {
+    // Resi manual (HBO / diinput tangan) hanya menyimpan nomor resi, TANPA `jnt_order_id`: J&T tidak
+    // punya "orderid" dari sistem ini, jadi API void pasti menjawab "Orderid tidak ada". Pembatalan
+    // pesanan tetap boleh lanjut (stok kembali); resinya harus dibatalkan manual di aplikasi/agen J&T.
+    const reason = String(result.raw?.detail?.[0]?.reason || result.raw?.desc || "");
+    if (!result.success && !order.jnt_order_id && /orderid\s*tidak\s*ada/i.test(reason)) {
+      console.warn("[CANCEL] Resi manual tidak dikenal API J&T, lanjut batalkan pesanan tanpa void:", order.order_number, cancelId);
+      cancelId = null;
+    } else if (!result.success) {
       console.error("[CANCEL] J&T void failed:", order.order_number, result.raw);
       // `desc` J&T cuma berbunyi "Request berhasil" walau ditolaknya di `detail[].reason`,
       // jadi alasan aslinya yang dipakai sebagai pesan error.
@@ -120,7 +127,7 @@ export async function cancelOrderCompletely(
           "Gagal membatalkan pengiriman di J&T",
       };
     }
-    console.log("[CANCEL] J&T voided:", order.order_number, cancelId);
+    if (cancelId) console.log("[CANCEL] J&T voided:", order.order_number, cancelId);
   }
 
   if (hasStockReservation(order)) {
