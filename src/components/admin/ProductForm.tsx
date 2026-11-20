@@ -3066,26 +3066,54 @@ export default function TambahProdukPage({
                         </div>
                       </div>
                     ) : null}
-                    <p className="text-sm mb-3" style={{ color: "var(--text-secondary)" }}>
-                      {isPaket ? (
-                        <>Media untuk <span className="font-medium" style={{ color: "var(--gold)" }}>{paketMediaColor || "semua varian"}</span></>
-                      ) : (
-                        <>Upload untuk warna: <span className="font-medium" style={{ color: "var(--gold)" }}>{activeColor}</span></>
-                      )}
-                    </p>
-                    <label className="pf-drop">
-                      <span className="pf-drop-ico"><Upload size={20} /></span>
-                      <p className="text-sm font-medium" style={{ color: "var(--espresso)" }}>Klik atau seret file ke sini</p>
-                      <p className="pf-hint">JPG, PNG, WebP (max 10MB) · MP4, WebM (max 50MB)</p>
+                    {!isPaket && category !== "Thobe" && variants.length > 1 ? (
+                      <div className="pf-mtabs" role="tablist" aria-label="Pilih warna untuk media">
+                        {variants.map((v) => {
+                          const n = media.filter((m) => m.color === v.color).length;
+                          return (
+                            <button
+                              key={v.color}
+                              type="button"
+                              role="tab"
+                              aria-selected={activeColor === v.color}
+                              className={`pf-mtab${activeColor === v.color ? " active" : ""}`}
+                              onClick={() => { setActiveColor(v.color); setPreviewIndex(0); }}
+                            >
+                              <span className="pf-mtab-dot" style={{ background: v.hex || colorMap[v.color] || "#ccc" }} />
+                              {v.color}
+                              <span className="pf-mtab-n">{n}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm mb-3" style={{ color: "var(--text-secondary)" }}>
+                        {isPaket ? (
+                          <>Media untuk <span className="font-medium" style={{ color: "var(--gold)" }}>{paketMediaColor || "semua varian"}</span></>
+                        ) : (
+                          <>Upload untuk warna: <span className="font-medium" style={{ color: "var(--gold)" }}>{activeColor}</span></>
+                        )}
+                      </p>
+                    )}
+                    <label className="pf-drop pf-drop--row">
+                      <span className="pf-drop-ico"><Upload size={18} /></span>
+                      <span className="pf-drop-txt">
+                        <span className="pf-drop-title">Klik atau seret file ke sini</span>
+                        <span className="pf-hint">JPG, PNG, WebP (maks 10MB) · MP4, WebM (maks 50MB)</span>
+                      </span>
+                      <span className="pf-drop-btn">Pilih file</span>
                       <input type="file" multiple accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" onChange={(e) => handleFileSelect(e, mediaColor)} className="hidden" />
                     </label>
                     <div className="flex gap-2 mt-2.5">
-                      <input value={mediaUrl} onChange={(e) => setMediaUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMediaByUrl(); } }} placeholder="atau tempel URL gambar / video…" className="pf-input flex-1" />
+                      <input value={mediaUrl} onChange={(e) => setMediaUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMediaByUrl(); } }} placeholder="Atau tempel URL gambar / video…" className="pf-input flex-1" />
                       <button type="button" onClick={addMediaByUrl} className="pf-btn pf-btn-primary shrink-0">Tambah</button>
                     </div>
-                    <p className="pf-hint">Foto pertama = foto utama di katalog.</p>
+                    <div className="pf-mcount">
+                      <span>{activeMedia.length > 0 ? `${activeMedia.length} file` : "Belum ada file"}</span>
+                      <span>Foto pertama = foto utama di katalog</span>
+                    </div>
                     {activeMedia.length > 0 && (
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-4">
+                      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3 mt-3">
                         {activeMedia.map((m, idx) => (
                           <div key={m.id} className="pf-thumb group cursor-pointer"
                             onClick={() => { if (!m.uploading && !m.error) { setPreviewIndex(idx); } }}>
@@ -3367,6 +3395,33 @@ export default function TambahProdukPage({
           width: 2.75rem; height: 2.75rem; border-radius: 999px; margin: 0 auto .6rem;
           display: flex; align-items: center; justify-content: center;
           background: #f4f4f5; color: var(--gold-deep);
+        }
+        .pf-drop--row {
+          display: flex; align-items: center; gap: .9rem; text-align: left; padding: .9rem 1.1rem;
+          border-width: 1.5px; border-radius: .9rem;
+        }
+        .pf-drop--row .pf-drop-ico { margin: 0; flex: none; width: 2.5rem; height: 2.5rem; }
+        .pf-drop-txt { display: flex; flex-direction: column; gap: .1rem; flex: 1; min-width: 0; }
+        .pf-drop-title { font-size: .875rem; font-weight: 600; color: var(--espresso); }
+        .pf-drop-btn {
+          flex: none; border-radius: .65rem; padding: .5rem .9rem; font-size: .8rem; font-weight: 600;
+          background: #18181b; color: #fff;
+        }
+        .pf-mtabs { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .85rem; }
+        .pf-mtab {
+          display: inline-flex; align-items: center; gap: .45rem; border: 1.5px solid #d4d4d8; border-radius: 999px;
+          background: #fff; padding: .35rem .7rem; font-size: .8rem; font-weight: 600; color: #18181b; cursor: pointer;
+          transition: border-color .15s ease, background .15s ease;
+        }
+        .pf-mtab:hover { border-color: #a1a1aa; }
+        .pf-mtab.active { background: #18181b; border-color: #18181b; color: #fff; }
+        .pf-mtab-dot { width: .8rem; height: .8rem; border-radius: 999px; border: 1px solid rgba(0,0,0,.2); flex: none; }
+        .pf-mtab-n { font-size: .68rem; font-weight: 700; padding: .05rem .4rem; border-radius: 999px; background: #f4f4f5; color: #52525b; }
+        .pf-mtab.active .pf-mtab-n { background: rgba(255,255,255,.2); color: #fff; }
+        .pf-mcount { display: flex; justify-content: space-between; gap: .75rem; margin-top: .55rem; font-size: .75rem; color: #71717a; }
+        @media (max-width: 520px) {
+          .pf-drop--row { flex-wrap: wrap; }
+          .pf-drop-btn { width: 100%; text-align: center; }
         }
         .pf-thumb {
           position: relative; aspect-ratio: 1 / 1; border-radius: .85rem; overflow: hidden;
