@@ -746,7 +746,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
                                 .join(" · ")}{" "}
                           × {item.quantity}
                         </p>
-                        {item.weight ? (
+                        {item.weight && item.weight.source !== "service" ? (
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                             Berat:{" "}
                             <b className="text-slate-700 dark:text-slate-200">

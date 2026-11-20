@@ -212,7 +212,7 @@ export default function OrderDetailPanel({
                       .join(" · ")}
               </small>
               <small>× {item.quantity}</small>
-              {item.weight ? (
+              {item.weight && item.weight.source !== "service" ? (
                 <small>
                   Berat:{" "}
                   <b style={{ color: "#334155" }}>

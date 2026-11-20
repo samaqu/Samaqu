@@ -12,6 +12,8 @@
  * (bukan ditutupi nilai tetap di dalam fungsi ini).
  */
 
+import { isPotongPanjangLine } from "./layanan";
+
 export type WeightMap = Record<string, number>;
 
 /**
@@ -116,7 +118,8 @@ export interface SizeWeightLine {
 }
 
 /** Dari mana berat satu item diambil — supaya fallback tidak pernah "diam-diam". */
-export type WeightSource = "variant" | "product" | "missing";
+/** "service" = baris layanan (mis. Jasa Potong Panjang): bukan barang, tidak punya berat dan tidak ikut dihitung. */
+export type WeightSource = "variant" | "product" | "missing" | "service";
 
 export interface ResolvedLineWeight {
   /** Berat satuan (gram); 0 kalau `source` = "missing". */
@@ -133,6 +136,7 @@ export function resolveLineWeight(
   productWeights?: WeightMap | null,
   variantWeights?: VariantWeightMap | null
 ): ResolvedLineWeight {
+  if (isPotongPanjangLine({ product_id: line?.productId })) return { grams: 0, source: "service" };
   const vw = Number(variantWeights?.[variantWeightKey(line?.productId, line?.color, line?.size)]);
   if (Number.isFinite(vw) && vw > 0) return { grams: vw, source: "variant" };
 
@@ -162,8 +166,10 @@ export function sumWeightGramsBySize(
   let countedQty = 0;
   for (const line of lines || []) {
     const qty = Number(line?.quantity) || 1;
+    const { grams: w, source } = resolveLineWeight(line, productWeights, variantWeights);
+    // Layanan (Jasa Potong Panjang) bukan barang kirim: tidak menambah berat, tidak dihitung sebagai "berat belum diisi".
+    if (source === "service") continue;
     countedQty += qty;
-    const { grams: w } = resolveLineWeight(line, productWeights, variantWeights);
     if (w > 0) grams += w * qty;
     else missingQty += qty;
   }

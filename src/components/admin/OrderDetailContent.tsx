@@ -364,7 +364,7 @@ export default function OrderDetailContent({
         );
         map[`${it.product_id}|${it.color}|${it.size}`] = resolved;
         // Fallback TIDAK boleh diam-diam: catat di log supaya ketahuan.
-        if (resolved.source !== "variant") {
+        if (resolved.source !== "variant" && resolved.source !== "service") {
           console.warn("[BERAT] berat per ukuran tidak ditemukan → fallback:", {
             order: order.order_number,
             product: it.product_id,

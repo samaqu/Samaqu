@@ -807,6 +807,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
    */
   const unitWeightOf = (product, paket, chosen) => {
     if (!product) return { grams: 0, source: "missing" };
+    // Layanan (Jasa Potong Panjang) bukan barang kirim: tidak punya berat & tidak ikut dihitung.
+    if (product.service === true || String(product.category || "") === "Jasa") return { grams: 0, source: "service" };
     const size = String(paket ? paketSize(product) : chosen?.size || "").toUpperCase();
     const variantWeight = Number(product.weights?.[size]);
     if (Number.isFinite(variantWeight) && variantWeight > 0) return { grams: variantWeight, source: "variant" };
@@ -973,6 +975,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       if (!info.product || !info.chosen) return acc;
       const qty = Number(info.quantity) || 0;
       if (qty < 1) return acc;
+      if (info.unitWeight.source === "service") return acc;
       if (info.unitWeight.grams > 0) acc.grams += info.unitWeight.grams * qty;
       else acc.missingQty += qty;
       return acc;
@@ -2760,7 +2763,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                               </div>
                               <p className="mt-1 text-[11px] font-medium" style={{ color: PANEL_MUTED }}>
                                 {info.chosen.linkedTo ? `Stok mengikuti ${info.chosen.linkedTo} · ` : ""}
-                                {info.service ? "Layanan tanpa stok" : isPo ? `Pre-order · ${poStockText(info.chosen.realStock)}` : `Sisa stok ${stockMax}`} · {info.unitWeight.source === "missing" ? "berat belum diisi" : formatWeightExact(info.unitWeight.grams)}
+                                {info.service ? "Layanan tanpa stok" : isPo ? `Pre-order · ${poStockText(info.chosen.realStock)}` : `Sisa stok ${stockMax}`}{info.unitWeight.source === "service" ? "" : <> · {info.unitWeight.source === "missing" ? "berat belum diisi" : formatWeightExact(info.unitWeight.grams)}</>}
                               </p>
                             </div>
                             <button
@@ -2936,7 +2939,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                       : "font-semibold text-slate-600 dark:text-slate-300"
                                   }
                                 >
-                                  Berat {weightMissing ? "belum diisi" : formatWeightExact(info.unitWeight.grams)}
+                                  Berat {info.unitWeight.source === "service" ? "tidak dihitung" : weightMissing ? "belum diisi" : formatWeightExact(info.unitWeight.grams)}
                                   {info.unitWeight.source === "product" ? " (fallback)" : ""}
                                 </span>
                               </p>
@@ -3109,7 +3112,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                 }`}
                               >
                                 {" · "}Berat{" "}
-                                {info.unitWeight.source === "missing" ? "belum diisi" : formatWeightExact(info.unitWeight.grams)}
+                                {info.unitWeight.source === "service" ? "tidak dihitung" : info.unitWeight.source === "missing" ? "belum diisi" : formatWeightExact(info.unitWeight.grams)}
                                 {info.unitWeight.source === "product" ? " (fallback)" : ""}
                               </span>
                             </p>
@@ -3964,7 +3967,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                           <span className="mt-0.5 block text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                             Berat:{" "}
                             <b className={weightMissing ? "text-amber-600 dark:text-amber-400" : "text-slate-700 dark:text-slate-200"}>
-                              {weightMissing ? "belum diisi" : formatWeightExact(info.unitWeight.grams)}
+                              {info.unitWeight.source === "service" ? "tidak dihitung" : weightMissing ? "belum diisi" : formatWeightExact(info.unitWeight.grams)}
                             </b>
                             {info.unitWeight.source === "product" ? (
                               <span className="font-bold text-amber-600 dark:text-amber-400"> · fallback berat produk</span>

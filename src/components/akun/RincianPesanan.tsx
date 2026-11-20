@@ -494,7 +494,7 @@ export default function RincianPesanan({ order }: { order: RincianOrder }) {
               <div style={{ minWidth: 0, flex: 1 }}>
                 <p className="rp-nm">{item.product_name}</p>
                 <p className="rp-var">{VARIAN_LINE(item)}</p>
-                {item.product_id && itemWeights[`${item.product_id}|${item.color}|${item.size}`] ? (
+                {item.product_id && itemWeights[`${item.product_id}|${item.color}|${item.size}`] && itemWeights[`${item.product_id}|${item.color}|${item.size}`].source !== "service" ? (
                   <p className="rp-var">
                     Berat: <b>{itemWeights[`${item.product_id}|${item.color}|${item.size}`].source === "missing" ? "-" : formatWeightExact(itemWeights[`${item.product_id}|${item.color}|${item.size}`].grams)}</b>
                   </p>
