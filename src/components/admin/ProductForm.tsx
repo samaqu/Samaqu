@@ -1108,6 +1108,12 @@ export default function TambahProdukPage({
     setNewSeriesName("");
   }
 
+  // Hapus warna setelah konfirmasi (menghapus seluruh ukuran & stok warna itu).
+  function confirmRemoveColor(color: string) {
+    if (typeof window !== "undefined" && !window.confirm(`Hapus warna ${color} beserta semua ukurannya?`)) return;
+    removeColor(color);
+  }
+
   // Remove color variant
   function removeColor(color: string) {
     setVariants(variants.filter((v) => v.color !== color));
@@ -2897,9 +2903,12 @@ export default function TambahProdukPage({
                   {/* Color chips — disembunyikan untuk produk default SAMAQU. */}
                   {!onlyDefaultVariant ? (
                     <div className="mb-4">
-                      <p className="text-[11px] font-medium mb-2" style={{ color: "var(--text-muted)" }}>
-                        Varian warna — klik nama untuk mengganti, klik <b>×</b> untuk menghapus seluruh varian itu beserta ukurannya.
-                      </p>
+                      <div className="mb-2">
+                        <p className="text-sm font-bold" style={{ color: "var(--espresso)" }}>Warna produk ini</p>
+                        <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                          Klik warna untuk mengatur ukurannya. Klik nama warna untuk menggantinya.
+                        </p>
+                      </div>
                       <div className="flex flex-wrap gap-2">
                       {variants.map((v) => (
                         editingColor === v.color ? (
@@ -2921,7 +2930,7 @@ export default function TambahProdukPage({
                           </span>
                         ) : (
                           <button key={v.color} onClick={() => { setActiveColor(v.color); setPreviewIndex(0); }} className={`pf-chip${activeColor === v.color ? " active" : ""}`}>
-                            <span className="w-3 h-3 rounded-full" style={{ background: v.hex || colorMap[v.color] || "#ccc", border: "1px solid rgba(42,33,27,.1)" }} />
+                            <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ background: v.hex || colorMap[v.color] || "#ccc", border: "1.5px solid rgba(255,255,255,.85)", boxShadow: "0 0 0 1px rgba(0,0,0,.25)" }} />
                             <span
                               role="button"
                               tabIndex={0}
@@ -2935,11 +2944,12 @@ export default function TambahProdukPage({
                             </span>
                             {/* Hapus warna memakai span role="button" — kontrol bersarang di dalam
                                 tombol chip membuat React melaporkan hydration error. */}
-                            <span role="button" tabIndex={0} title={`Hapus varian ${v.color}`} aria-label={`Hapus warna ${v.color}`} onClick={(e) => { e.stopPropagation(); removeColor(v.color); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); removeColor(v.color); } }} className="ml-1 hover:opacity-60"><X size={12} /></span>
+                            <span className="text-[10px] font-medium opacity-70">{v.sizes.length} ukuran</span>
+                            <span role="button" tabIndex={0} title={`Hapus warna ${v.color}`} aria-label={`Hapus warna ${v.color}`} onClick={(e) => { e.stopPropagation(); confirmRemoveColor(v.color); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); confirmRemoveColor(v.color); } }} className="ml-1 hover:opacity-60"><Trash2 size={12} /></span>
                           </button>
                         )
                       ))}
-                      <PresetColorPicker existing={variants.map((v) => v.color)} onAdd={addColor} />
+                      <PresetColorPicker existing={variants.map((v) => v.color)} onAdd={addColor} startOpen={variants.length === 0} />
                       </div>
                     </div>
                   ) : null}
@@ -2948,6 +2958,18 @@ export default function TambahProdukPage({
                       <p className="text-sm font-medium" style={{ color: "var(--espresso)" }}>
                         {onlyDefaultVariant ? "Ukuran & stok" : <>Ukuran untuk <span style={{ color: "var(--gold)" }}>{activeColor}</span></>}
                       </p>
+                      {!onlyDefaultVariant && (
+                        <label className="inline-flex items-center gap-2 text-[11px] font-medium cursor-pointer" style={{ color: "var(--text-muted)" }}>
+                          <input
+                            type="color"
+                            value={/^#[0-9a-f]{6}$/i.test(activeVariant.hex || "") ? activeVariant.hex : /^#[0-9a-f]{6}$/i.test(colorMap[activeVariant.color] || "") ? colorMap[activeVariant.color] : "#141414"}
+                            onChange={(e) => setVariants((prev) => prev.map((x) => (x.color === activeVariant.color ? { ...x, hex: e.target.value } : x)))}
+                            aria-label={`Warna titik ${activeVariant.color}`}
+                            className="w-6 h-6 rounded-full border-0 p-0 bg-transparent cursor-pointer"
+                          />
+                          Ganti warna titik (hanya tampilan chip warna)
+                        </label>
+                      )}
                       <SizeGrid
                         sizes={activeVariant.sizes}
                         onUpdate={(i, field, value) => updateSizeField(activeColor!, i, field, value)}

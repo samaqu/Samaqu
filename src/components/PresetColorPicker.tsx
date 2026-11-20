@@ -6,12 +6,15 @@ import { colorMap } from "@/lib/katalog-data";
 interface PresetColorPickerProps {
   existing: string[];
   onAdd: (color: string, hex?: string) => void;
+  /** Panel langsung terbuka (mis. belum ada warna sama sekali). Default: terlipat. */
+  startOpen?: boolean;
 }
 
 // Picker warna admin: pilih dari daftar preset (colorMap) atau tambah warna
 // baru manual kalau belum ada di daftar. Warna yang sudah terpakai
 // (existing) disembunyikan dari preset supaya tidak klik dua kali.
-export default function PresetColorPicker({ existing, onAdd }: PresetColorPickerProps) {
+export default function PresetColorPicker({ existing, onAdd, startOpen = false }: PresetColorPickerProps) {
+  const [open, setOpen] = useState(startOpen);
   const [customHex, setCustomHex] = useState("#141414");
   const [customColorName, setCustomColorName] = useState("");
 
@@ -37,11 +40,27 @@ export default function PresetColorPicker({ existing, onAdd }: PresetColorPicker
 
   const presets = Object.entries(colorMap).filter(([name]) => !usedKeys.has(name.toLowerCase()));
 
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold hover:opacity-70"
+        style={{ border: "1.5px dashed rgba(0,0,0,.45)", color: "var(--espresso)", background: "rgba(255,255,255,.7)" }}
+      >
+        <span aria-hidden="true">+</span> Tambah warna
+      </button>
+    );
+  }
+
   return (
     <div className="w-full rounded-xl p-3" style={{ border: "1px dashed rgba(0,0,0,.4)", background: "rgba(255,255,255,.4)" }}>
-      <p className="text-[11px] font-medium mb-2" style={{ color: "var(--text-muted)" }}>
-        Klik warna untuk menambahkannya — bisa lebih dari satu, semuanya tersimpan saat simpan.
-      </p>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <p className="text-[12px] font-bold" style={{ color: "var(--espresso)" }}>Pilih warna untuk ditambahkan</p>
+        <button type="button" onClick={() => setOpen(false)} className="text-[12px] font-semibold underline hover:opacity-70" style={{ color: "var(--espresso)" }}>
+          Selesai
+        </button>
+      </div>
       {presets.length > 0 ? (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {presets.map(([name, hex]) => (
