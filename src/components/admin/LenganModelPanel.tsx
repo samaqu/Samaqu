@@ -154,7 +154,7 @@ export default function LenganModelPanel({
 
             {!customPrice && (
               <p className="lm-hint">
-                Harga khusus per ukuran yang lu isi di tabel &ldquo;Varian &amp; Stok&rdquo; ikut berlaku ke {PENDEK}.
+                Harga khusus per ukuran yang lu isi di bagian &ldquo;Harga&rdquo; ikut berlaku ke {PENDEK}.
               </p>
             )}
 
@@ -163,7 +163,7 @@ export default function LenganModelPanel({
                 <p className="lm-label">Harga khusus per ukuran {PENDEK} (opsional)</p>
                 <p className="lm-hint">
                   Kosongkan = ukuran itu pakai harga {PENDEK} di atas (Rp {rupiah(price)}). Harga khusus {PANJANG} di
-                  tabel Varian &amp; Stok tidak ikut ke {PENDEK}. Berlaku untuk semua warna.
+                  bagian Harga tidak ikut ke {PENDEK}. Berlaku untuk semua warna.
                 </p>
                 <div className="lm-size-grid">
                   {sizes.map((sz) => (
