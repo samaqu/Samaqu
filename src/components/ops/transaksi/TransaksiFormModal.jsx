@@ -3564,6 +3564,20 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                   ) : null}
                 </div>
               </section>
+
+              {/* Catatan - hanya di panel Ubah Pesanan (mode ubah tidak menampilkan langkah 3) */}
+              {isPanelForm && isEdit && (
+                <section className="space-y-2">
+                  <h4 className={sectionClass}>Catatan</h4>
+                  <textarea
+                    rows={2}
+                    value={form.notes}
+                    onChange={(event) => updateForm({ notes: event.target.value })}
+                    placeholder="Catatan transaksi (opsional)"
+                    className={inputClass}
+                  />
+                </section>
+              )}
                 </>
               )}
 
