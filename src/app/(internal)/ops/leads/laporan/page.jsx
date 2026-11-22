@@ -998,33 +998,63 @@ function PanelHead({ title, subtitle, right }) {
   );
 }
 
-/* ───────────────────────── agent vs admin (satu sumber: AI Performance) ───────────────────────── */
+/* ───────────────────────── agent / admin / dibantu Surya (satu sumber: AI Performance) ───────────────────────── */
 
 const AGENT_COLOR = "#0EA5E9";
-const REST_COLOR = "#F97316";
+const HELPER_COLOR = "#64748B";
+/** Warna tiap admin (urut kemunculan). Admin baru otomatis kebagian warna berikutnya. */
+const ADMIN_PALETTE = ["#F97316", "#14B8A6", "#E11D48", "#8B5CF6", "#EAB308", "#22C55E", "#EC4899", "#6366F1"];
+/**
+ * Nama orang yang menyelesaikan closing di luar Agent dan di luar admin ber-PIC (sisa). Sistem tidak merekam
+ * siapa yang membantu; ganti di sini kalau admin lain mulai ikut ambil alih.
+ */
+const HELPER_NAME = "Surya";
 
 const convOf = (g) => (g.leads ? (g.closing / g.leads) * 100 : 0);
 const avgOf = (g) => (g.closing ? g.nominal / g.closing : 0);
 
 /**
- * SATU SUMBER. Angka Agent diambil PERSIS dari AI Performance Center (`/api/ops/ai-performance`), bukan dihitung
- * ulang dari kolom PIC: leads = "Leads dicatat AI" (lead yang nomornya ada di percakapan WA bulan itu),
- * closing dan nominal = closing yang dicatat bot sendiri (`wa_closings`). Konversi = closing ÷ leads, sama dengan
- * "54 dari 281 lead AI" di dashboard itu. "Admin & lainnya" = total halaman dikurangi Agent, jadi jumlahnya
- * selalu nyambung ke total (termasuk lead Website yang order langsung tanpa chat).
+ * SATU SUMBER untuk Agent: angka PERSIS dari AI Performance Center (`/api/ops/ai-performance`): leads = "Leads dicatat
+ * AI" (lead yang nomornya ada di percakapan WA bulan itu), closing dan nominal = closing yang dicatat bot sendiri
+ * (`wa_closings`). Konversi = closing / leads, sama dengan "54 dari 281 lead AI" di dashboard itu.
+ *
+ * Admin = tiap nama PIC selain "Agent" (kosong tidak dihitung), dari kolom `leads.pic`. Admin baru otomatis muncul.
+ *
+ * Dibantu Surya = SISA closing dan nominal: total halaman dikurangi Agent dan semua admin. Ini angka sisa, bukan hasil
+ * pengukuran, dan tidak punya pembagi lead yang adil (lead Agent dihitung dari chat, lead admin dari PIC), jadi
+ * leads dan konversinya sengaja tidak ditampilkan.
  */
-function buildAgentVsRest(totals, ai) {
+function buildAgentAdminHelper(totals, ai, leadList) {
   const agent = {
     leads: Number(ai?.leadsFromChat) || 0,
     closing: Number(ai?.closing) || 0,
     nominal: Number(ai?.nominal) || 0,
   };
-  const rest = {
-    leads: Math.max(0, (Number(totals?.total) || 0) - agent.leads),
-    closing: Math.max(0, (Number(totals?.closing) || 0) - agent.closing),
-    nominal: Math.max(0, (Number(totals?.nominal) || 0) - agent.nominal),
+
+  const byName = new Map();
+  (leadList || []).forEach((l) => {
+    const name = String(l.pic || "").trim();
+    if (!name || name.toLowerCase() === "agent") return;
+    const key = name.toLowerCase();
+    if (!byName.has(key)) byName.set(key, { name, leads: 0, closing: 0, nominal: 0 });
+    const row = byName.get(key);
+    row.leads += 1;
+    if (l.status === "closing") {
+      row.closing += 1;
+      row.nominal += Number(l.nominal) || 0;
+    }
+  });
+  const admins = [...byName.values()]
+    .sort((a, b) => b.nominal - a.nominal || b.leads - a.leads)
+    .map((row, index) => ({ ...row, color: ADMIN_PALETTE[index % ADMIN_PALETTE.length] }));
+
+  const adminClosing = admins.reduce((s, a) => s + a.closing, 0);
+  const adminNominal = admins.reduce((s, a) => s + a.nominal, 0);
+  const helper = {
+    closing: Math.max(0, (Number(totals?.closing) || 0) - agent.closing - adminClosing),
+    nominal: Math.max(0, (Number(totals?.nominal) || 0) - agent.nominal - adminNominal),
   };
-  return { agent, rest };
+  return { agent, admins, helper };
 }
 
 function MiniStat({ label, value }) {
@@ -1044,7 +1074,8 @@ function ConvBar({ value, color }) {
   );
 }
 
-function GroupCard({ title, subtitle, color, icon, data }) {
+/** Kartu satu kelompok. `showLeads` false = tanpa leads dan konversi (kelompok sisa). */
+function GroupCard({ title, subtitle, color, icon, data, showLeads = true, note = null }) {
   const conv = convOf(data);
   return (
     <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 18, minWidth: 0, background: "#FFFFFF", position: "relative", overflow: "hidden" }}>
@@ -1057,23 +1088,26 @@ function GroupCard({ title, subtitle, color, icon, data }) {
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
-        <MiniStat label="Leads" value={nfmt(data.leads)} />
+        {showLeads ? <MiniStat label="Leads" value={nfmt(data.leads)} /> : null}
         <MiniStat label="Closing" value={nfmt(data.closing)} />
         <MiniStat label="Nominal" value={rpShort(data.nominal)} />
         <MiniStat label="Rata-rata / closing" value={data.closing ? rpShort(avgOf(data)) : "-"} />
       </div>
-      <div style={{ marginTop: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 800, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Konversi</span>
-          <span className="tabular-nums" style={{ fontSize: 15, fontWeight: 800, color: COLORS.ink }}>{pct(conv)}</span>
+      {showLeads ? (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Konversi</span>
+            <span className="tabular-nums" style={{ fontSize: 15, fontWeight: 800, color: COLORS.ink }}>{pct(conv)}</span>
+          </div>
+          <ConvBar value={conv} color={color} />
         </div>
-        <ConvBar value={conv} color={color} />
-      </div>
+      ) : null}
+      {note ? <p style={{ margin: "14px 0 0", fontSize: 11.5, color: COLORS.muted, lineHeight: 1.45 }}>{note}</p> : null}
     </div>
   );
 }
 
-/** Satu batang bertumpuk: porsi Agent dan Admin & lainnya dari satu ukuran. */
+/** Satu batang bertumpuk: porsi tiap kelompok dari satu ukuran (jumlah semua bagian = total halaman). */
 function ShareBar({ label, parts }) {
   const total = parts.reduce((s, p) => s + p.value, 0);
   return (
@@ -1101,39 +1135,58 @@ function ShareBar({ label, parts }) {
   );
 }
 
-function AgentVsRestSection({ agent, rest }) {
-  const parts = (key, format) => [
-    { name: "Agent", value: agent[key], color: AGENT_COLOR, format },
-    { name: "Admin & lainnya", value: rest[key], color: REST_COLOR, format },
+function AgentAdminHelperSection({ data }) {
+  const { agent, admins, helper } = data;
+  const groups = [
+    { name: "Agent", color: AGENT_COLOR, closing: agent.closing, nominal: agent.nominal },
+    ...admins.map((a) => ({ name: a.name, color: a.color, closing: a.closing, nominal: a.nominal })),
+    { name: `Dibantu ${HELPER_NAME}`, color: HELPER_COLOR, closing: helper.closing, nominal: helper.nominal },
   ];
+  const parts = (key, format) => groups.map((g) => ({ name: g.name, value: g[key], color: g.color, format }));
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))" }}>
         <GroupCard title="Agent" subtitle="AI agent WhatsApp · angka AI Performance" color={AGENT_COLOR} icon={<Bot size={20} />} data={agent} />
-        <GroupCard title="Admin & lainnya" subtitle="Total dikurangi Agent (manual + Website langsung)" color={REST_COLOR} icon={<Users size={20} />} data={rest} />
+        {admins.map((a) => (
+          <GroupCard
+            key={a.name}
+            title={a.name}
+            subtitle="Admin · lead dengan PIC ini"
+            color={a.color}
+            icon={<Users size={20} />}
+            data={a}
+          />
+        ))}
+        <GroupCard
+          title={`Dibantu ${HELPER_NAME}`}
+          subtitle="Sisa closing di luar Agent dan admin"
+          color={HELPER_COLOR}
+          icon={<Users size={20} />}
+          data={helper}
+          showLeads={false}
+          note="Angka sisa (total dikurangi Agent dan admin), bukan hasil pengukuran. Leads dan konversi tidak ditampilkan karena sisa ini tidak punya pembagi lead yang adil."
+        />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <ShareBar label="Porsi leads" parts={parts("leads", nfmt)} />
+      <div className="grid gap-4 md:grid-cols-2">
         <ShareBar label="Porsi closing" parts={parts("closing", nfmt)} />
         <ShareBar label="Porsi nominal" parts={parts("nominal", rpShort)} />
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-        {[
-          ["Agent", AGENT_COLOR],
-          ["Admin & lainnya", REST_COLOR],
-        ].map(([name, color]) => (
-          <span key={name} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: COLORS.muted }}>
-            <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: 999, background: color, display: "inline-block" }} />
-            {name}
+        {groups.map((g) => (
+          <span key={g.name} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: COLORS.muted }}>
+            <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: 999, background: g.color, display: "inline-block" }} />
+            {g.name}
           </span>
         ))}
       </div>
 
       <p style={{ margin: 0, fontSize: 12, color: COLORS.muted, lineHeight: 1.5 }}>
-        Angka Agent sama dengan AI Performance Center. &quot;Leads&quot; di sana artinya lead yang nomornya ada di percakapan WhatsApp bulan ini
-        (termasuk chat yang diambil alih admin), sedangkan closing dan nominal hanya yang dicatat bot sendiri. &quot;Admin &amp; lainnya&quot; adalah sisa
-        dari total halaman ini, termasuk lead Website yang order langsung tanpa chat, jadi konversinya tidak sebanding langsung dengan Agent.
+        Angka Agent sama dengan AI Performance Center. &quot;Leads&quot; Agent artinya lead yang nomornya ada di percakapan WhatsApp bulan ini
+        (termasuk chat yang diambil alih), sedangkan closing dan nominalnya hanya yang dicatat bot sendiri. Admin dihitung dari kolom PIC lead.
+        Sisa closing masuk &quot;Dibantu {HELPER_NAME}&quot;, jadi tiga bagian selalu menjumlah ke total halaman. Konversi Agent dan admin
+        memakai pembagi yang berbeda, jadi jangan dibandingkan langsung.
       </p>
     </div>
   );
@@ -1274,10 +1327,10 @@ export default function LaporanLeads() {
   const dailyLimit = isCurrentMonth ? todayIso : monthKey > currentMonthKey() ? "" : null;
 
   const { totals, bySource, leaks } = agg;
-  /** Agent = angka AI Performance; Admin & lainnya = total halaman dikurangi Agent. */
+  /** Agent = angka AI Performance; admin = kolom PIC; sisa closing = dibantu Surya. */
   const agentVsRest = useMemo(
-    () => (aiPerf?.stats ? buildAgentVsRest(totals, aiPerf.stats) : null),
-    [aiPerf, totals],
+    () => (aiPerf?.stats ? buildAgentAdminHelper(totals, aiPerf.stats, leads) : null),
+    [aiPerf, totals, leads],
   );
   const rate = totals.total ? (totals.closing / totals.total) * 100 : 0;
   const avgPerClosing = totals.closing ? totals.nominal / totals.closing : 0;
@@ -1581,11 +1634,11 @@ export default function LaporanLeads() {
             {/* AGENT VS ADMIN: satu sumber dengan dashboard AI Performance */}
             <Panel delay={0.1}>
               <PanelHead
-                title="Agent vs Admin"
-                subtitle="Angka Agent sama dengan AI Performance Center. Admin & lainnya = total dikurangi Agent."
+                title="Agent, Admin, dan dibantu Surya"
+                subtitle="Agent mengikuti AI Performance Center, admin dari PIC lead, sisanya dibantu Surya."
               />
               {agentVsRest ? (
-                <AgentVsRestSection agent={agentVsRest.agent} rest={agentVsRest.rest} />
+                <AgentAdminHelperSection data={agentVsRest} />
               ) : aiLoading ? (
                 <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>Memuat angka AI Performance…</p>
               ) : (
