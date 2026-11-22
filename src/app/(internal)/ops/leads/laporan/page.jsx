@@ -13,8 +13,8 @@
  * - nominal = jumlah `leads.nominal` dari lead yang closing
  * - konversi = closing ÷ leads
  *
- * Urutan tampilan: header → 5 kartu angka → insight + kontribusi sumber → tabel per sumber →
- * grafik harian → rekap harian.
+ * Urutan tampilan: header → 5 kartu angka → rekap harian (hari ini paling atas) → Agent vs Admin
+ * (per PIC) → insight + kontribusi sumber → tabel per sumber → grafik harian.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -35,6 +35,8 @@ import {
   Star,
   TrendingUp,
   AlertTriangle,
+  Bot,
+  Users,
 } from "lucide-react";
 
 /* ───────────────────────── konstanta ───────────────────────── */
@@ -857,11 +859,20 @@ function PeakPill({ x, y, width, day, visible, reduce }) {
 
 /* ───────────────────────── rekap harian ───────────────────────── */
 
-function DailyTable({ days = [], totals }) {
+/**
+ * `todayKey`: batas tanggal terakhir yang ditampilkan ("2026-11-22"). Hari yang belum terjadi disembunyikan
+ * supaya baris paling atas selalu hari ini (bukan tanggal akhir bulan yang semuanya 0).
+ * null = bulan yang sudah lewat (tampil semua), "" = bulan depan (belum ada hari yang berjalan).
+ */
+function DailyTable({ days = [], totals, todayKey = null }) {
   const [expanded, setExpanded] = useState(false);
   const newestFirst = useMemo(
-    () => [...(days || [])].reverse().map((d) => ({ ...d, bySource: d?.bySource || {} })),
-    [days],
+    () =>
+      [...(days || [])]
+        .filter((d) => todayKey === null || (todayKey !== "" && String(d?.tanggal || "") <= todayKey))
+        .reverse()
+        .map((d) => ({ ...d, bySource: d?.bySource || {} })),
+    [days, todayKey],
   );
   const visible = expanded ? newestFirst : newestFirst.slice(0, 7);
   const th = { fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted, padding: "10px 12px", whiteSpace: "nowrap" };
@@ -888,9 +899,23 @@ function DailyTable({ days = [], totals }) {
             </tr>
           </thead>
           <tbody>
+            {visible.length === 0 ? (
+              <tr>
+                <td colSpan={SOURCES.length + 4} style={{ ...td, textAlign: "center", color: COLORS.muted }}>
+                  Belum ada hari yang berjalan di bulan ini.
+                </td>
+              </tr>
+            ) : null}
             {visible.map((d) => (
-              <tr key={d.tanggal} className="lt-row">
-                <td style={{ ...td, fontWeight: 700, color: COLORS.ink }}>{formatTanggalPendek(d.tanggal)}</td>
+              <tr key={d.tanggal} className="lt-row" style={d.tanggal === todayKey ? { background: "#FFF7ED" } : undefined}>
+                <td style={{ ...td, fontWeight: 700, color: COLORS.ink }}>
+                  {formatTanggalPendek(d.tanggal)}
+                  {d.tanggal === todayKey ? (
+                    <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: "#C2410C", background: "#FFEDD5", borderRadius: 999, padding: "2px 8px" }}>
+                      Hari ini
+                    </span>
+                  ) : null}
+                </td>
                 {SOURCES.map((s) => (
                   <td key={s} style={{ ...td, textAlign: "right", color: d.bySource?.[s] ? "#374151" : COLORS.faint }}>{nfmt(d.bySource?.[s])}</td>
                 ))}
@@ -913,7 +938,7 @@ function DailyTable({ days = [], totals }) {
           </tbody>
         </table>
       </div>
-      {days.length > 7 ? (
+      {newestFirst.length > 7 ? (
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
@@ -932,7 +957,7 @@ function DailyTable({ days = [], totals }) {
             cursor: "pointer",
           }}
         >
-          {expanded ? "Ringkas 7 hari" : `Lihat semua ${days.length} hari`}
+          {expanded ? "Ringkas 7 hari" : `Lihat semua ${newestFirst.length} hari`}
           <ChevronDown size={14} style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s ease" }} />
         </button>
       ) : null}
@@ -969,6 +994,236 @@ function PanelHead({ title, subtitle, right }) {
         {subtitle ? <p style={{ margin: "2px 0 0", fontSize: 13, color: COLORS.muted }}>{subtitle}</p> : null}
       </div>
       {right}
+    </div>
+  );
+}
+
+/* ───────────────────────── agent vs admin (per PIC) ───────────────────────── */
+
+const PIC_NONE_LABEL = "Belum tercatat";
+const AGENT_COLOR = "#0EA5E9";
+const ADMIN_COLOR = "#F97316";
+const NONE_COLOR = "#CBD5E1";
+/** Warna tiap admin (urut kemunculan). Admin baru otomatis kebagian warna berikutnya. */
+const PIC_PALETTE = ["#F97316", "#14B8A6", "#E11D48", "#8B5CF6", "#EAB308", "#22C55E", "#EC4899", "#6366F1"];
+
+/**
+ * Kelompok dari kolom `leads.pic`: "Agent" = AI agent, kosong = belum tercatat (data lama), selain itu = admin.
+ * Nama admin apa pun otomatis masuk "Admin", jadi admin baru tidak perlu mengubah kode.
+ */
+const picKind = (pic) => {
+  const name = String(pic || "").trim();
+  if (!name) return "none";
+  return name.toLowerCase() === "agent" ? "agent" : "admin";
+};
+
+function buildPicAggregate(list) {
+  const empty = () => ({ leads: 0, closing: 0, nominal: 0 });
+  const groups = { agent: empty(), admin: empty(), none: empty() };
+  const people = new Map();
+  (list || []).forEach((l) => {
+    const raw = String(l.pic || "").trim();
+    const kind = picKind(raw);
+    const key = raw.toLowerCase() || "__none__";
+    if (!people.has(key)) people.set(key, { key, name: raw || PIC_NONE_LABEL, kind, ...empty() });
+    const isClosing = l.status === "closing";
+    const value = isClosing ? Number(l.nominal) || 0 : 0;
+    [groups[kind], people.get(key)].forEach((g) => {
+      g.leads += 1;
+      if (isClosing) {
+        g.closing += 1;
+        g.nominal += value;
+      }
+    });
+  });
+  const kindOrder = { agent: 0, admin: 1, none: 2 };
+  const sorted = [...people.values()].sort((a, b) => kindOrder[a.kind] - kindOrder[b.kind] || b.nominal - a.nominal || b.leads - a.leads);
+  let adminIndex = 0;
+  sorted.forEach((p) => {
+    p.color = p.kind === "agent" ? AGENT_COLOR : p.kind === "none" ? NONE_COLOR : PIC_PALETTE[adminIndex++ % PIC_PALETTE.length];
+  });
+  return { groups, people: sorted };
+}
+
+const convOf = (g) => (g.leads ? (g.closing / g.leads) * 100 : 0);
+const avgOf = (g) => (g.closing ? g.nominal / g.closing : 0);
+
+function PicAvatar({ name, color, kind }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{ width: 38, height: 38, borderRadius: 999, background: color, color: "#FFFFFF", display: "grid", placeItems: "center", fontSize: 15, fontWeight: 800, flexShrink: 0 }}
+    >
+      {kind === "agent" ? <Bot size={19} /> : String(name || "?").trim().charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
+function MiniStat({ label, value }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <p style={{ margin: 0, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted }}>{label}</p>
+      <p className="tabular-nums" style={{ margin: "2px 0 0", fontSize: 18, fontWeight: 800, color: COLORS.ink, letterSpacing: "-0.01em" }}>{value}</p>
+    </div>
+  );
+}
+
+function ConvBar({ value, color }) {
+  return (
+    <div style={{ height: 6, borderRadius: 999, background: "#F1F2F4", overflow: "hidden" }} aria-hidden="true">
+      <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, value))}%`, borderRadius: 999, background: color }} />
+    </div>
+  );
+}
+
+function GroupCard({ title, subtitle, color, icon, data, best }) {
+  const conv = convOf(data);
+  return (
+    <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 18, minWidth: 0, background: "#FFFFFF", position: "relative", overflow: "hidden" }}>
+      <span aria-hidden="true" style={{ position: "absolute", inset: "0 0 auto 0", height: 4, background: color }} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <span style={{ width: 38, height: 38, borderRadius: 12, background: color, color: "#FFFFFF", display: "grid", placeItems: "center", flexShrink: 0 }}>{icon}</span>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: COLORS.ink }}>{title}</p>
+            <p style={{ margin: 0, fontSize: 12, color: COLORS.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</p>
+          </div>
+        </div>
+        {best ? (
+          <span style={{ fontSize: 10.5, fontWeight: 800, color: "#15803D", background: "#DCFCE7", borderRadius: 999, padding: "4px 10px", whiteSpace: "nowrap" }}>Konversi tertinggi</span>
+        ) : null}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
+        <MiniStat label="Leads" value={nfmt(data.leads)} />
+        <MiniStat label="Closing" value={nfmt(data.closing)} />
+        <MiniStat label="Nominal" value={rpShort(data.nominal)} />
+        <MiniStat label="Rata-rata / closing" value={data.closing ? rpShort(avgOf(data)) : "-"} />
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Konversi</span>
+          <span className="tabular-nums" style={{ fontSize: 15, fontWeight: 800, color: COLORS.ink }}>{pct(conv)}</span>
+        </div>
+        <ConvBar value={conv} color={color} />
+      </div>
+    </div>
+  );
+}
+
+/** Satu batang bertumpuk: porsi Agent / Admin / Belum tercatat dari satu ukuran. */
+function ShareBar({ label, parts }) {
+  const total = parts.reduce((s, p) => s + p.value, 0);
+  return (
+    <div>
+      <p style={{ margin: "0 0 6px", fontSize: 12, fontWeight: 800, color: COLORS.ink }}>{label}</p>
+      <div style={{ display: "flex", height: 26, borderRadius: 10, overflow: "hidden", background: "#F1F2F4", gap: 2 }} role="img" aria-label={label}>
+        {total > 0
+          ? parts
+              .filter((p) => p.value > 0)
+              .map((p) => {
+                const share = (p.value / total) * 100;
+                return (
+                  <div
+                    key={p.name}
+                    title={`${p.name}: ${p.format(p.value)} (${pct(share)})`}
+                    style={{ width: `${share}%`, background: p.color, color: "#FFFFFF", fontSize: 11, fontWeight: 800, display: "grid", placeItems: "center", minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" }}
+                  >
+                    {share >= 12 ? pct(share) : ""}
+                  </div>
+                );
+              })
+          : null}
+      </div>
+    </div>
+  );
+}
+
+function PicSection({ agg }) {
+  const { groups, people } = agg;
+  const adminNames = people.filter((p) => p.kind === "admin").map((p) => p.name);
+  const agentConv = convOf(groups.agent);
+  const adminConv = convOf(groups.admin);
+  const bothHave = groups.agent.leads > 0 && groups.admin.leads > 0;
+  const parts = (key, format) => [
+    { name: "Agent", value: groups.agent[key], color: AGENT_COLOR, format },
+    { name: "Admin", value: groups.admin[key], color: ADMIN_COLOR, format },
+    { name: PIC_NONE_LABEL, value: groups.none[key], color: NONE_COLOR, format },
+  ];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <div className="grid gap-4 md:grid-cols-2">
+        <GroupCard
+          title="Agent"
+          subtitle="AI agent WhatsApp"
+          color={AGENT_COLOR}
+          icon={<Bot size={20} />}
+          data={groups.agent}
+          best={bothHave && agentConv > adminConv}
+        />
+        <GroupCard
+          title="Admin"
+          subtitle={adminNames.length ? adminNames.join(", ") : "Belum ada lead dengan PIC admin"}
+          color={ADMIN_COLOR}
+          icon={<Users size={20} />}
+          data={groups.admin}
+          best={bothHave && adminConv > agentConv}
+        />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <ShareBar label="Porsi leads" parts={parts("leads", nfmt)} />
+        <ShareBar label="Porsi closing" parts={parts("closing", nfmt)} />
+        <ShareBar label="Porsi nominal" parts={parts("nominal", rpShort)} />
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
+        {[
+          ["Agent", AGENT_COLOR],
+          ["Admin", ADMIN_COLOR],
+          [PIC_NONE_LABEL, NONE_COLOR],
+        ].map(([name, color]) => (
+          <span key={name} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: COLORS.muted }}>
+            <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: 999, background: color, display: "inline-block" }} />
+            {name}
+          </span>
+        ))}
+      </div>
+
+      <div>
+        <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, color: COLORS.ink }}>Rincian per PIC</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {people.map((p) => {
+            const conv = convOf(p);
+            return (
+              <div
+                key={p.key}
+                style={{ display: "grid", gridTemplateColumns: "minmax(150px, 1.3fr) repeat(3, minmax(70px, 0.7fr)) minmax(120px, 1.2fr)", alignItems: "center", gap: 12, border: `1px solid ${COLORS.rowLine}`, borderRadius: 14, padding: "10px 14px", background: "#FFFFFF" }}
+                className="lp-pic-row"
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                  <PicAvatar name={p.name} color={p.color} kind={p.kind} />
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</p>
+                    <p style={{ margin: 0, fontSize: 11, color: COLORS.muted }}>
+                      {p.kind === "agent" ? "AI agent" : p.kind === "none" ? "Data lama tanpa PIC" : "Admin"}
+                    </p>
+                  </div>
+                </div>
+                <MiniStat label="Leads" value={nfmt(p.leads)} />
+                <MiniStat label="Closing" value={nfmt(p.closing)} />
+                <MiniStat label="Nominal" value={rpShort(p.nominal)} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 800, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Konversi</span>
+                    <span className="tabular-nums" style={{ fontSize: 13, fontWeight: 800, color: COLORS.ink }}>{pct(conv)}</span>
+                  </div>
+                  <ConvBar value={conv} color={p.color} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1078,6 +1333,12 @@ export default function LaporanLeads() {
 
   const agg = useMemo(() => buildAggregate(leads), [leads]);
   const prevAgg = useMemo(() => buildAggregate(prevLeads), [prevLeads]);
+  /** Perbandingan Agent vs Admin dari kolom `pic` lead bulan terpilih. */
+  const picAgg = useMemo(() => buildPicAggregate(leads), [leads]);
+
+  /** Batas hari yang ditampilkan di Rekap harian: bulan berjalan sampai hari ini (WIB), bulan lewat semua, bulan depan kosong. */
+  const todayIso = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const dailyLimit = isCurrentMonth ? todayIso : monthKey > currentMonthKey() ? "" : null;
 
   const { totals, bySource, leaks } = agg;
   const rate = totals.total ? (totals.closing / totals.total) * 100 : 0;
@@ -1287,6 +1548,10 @@ export default function LaporanLeads() {
         @media (max-width: 640px) {
           .lp-page { padding: 14px !important; }
         }
+        @media (max-width: 760px) {
+          .lp-page .lp-pic-row { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+          .lp-page .lp-pic-row > :first-child, .lp-page .lp-pic-row > :last-child { grid-column: 1 / -1; }
+        }
       `}</style>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -1366,6 +1631,28 @@ export default function LaporanLeads() {
               ))}
             </div>
 
+            {/* REKAP HARIAN — di atas supaya hari ini langsung terlihat */}
+            <Panel delay={0.06}>
+              <PanelHead
+                title="Rekap harian"
+                subtitle={`${monthKeyLabel(monthKey)} · ${isCurrentMonth ? "hari ini paling atas" : "tanggal terbaru paling atas"}`}
+              />
+              <DailyTable days={allDays} totals={{ ...totals, bySource }} todayKey={dailyLimit} />
+            </Panel>
+
+            {/* AGENT VS ADMIN (per PIC) */}
+            <Panel delay={0.1}>
+              <PanelHead
+                title="Agent vs Admin"
+                subtitle="Perbandingan berdasarkan PIC lead. Admin baru otomatis muncul di sini."
+              />
+              {picAgg.people.length === 0 ? (
+                <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>Belum ada lead di bulan ini.</p>
+              ) : (
+                <PicSection agg={picAgg} />
+              )}
+            </Panel>
+
             {/* INSIGHT + KONTRIBUSI */}
             <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr]">
               <Panel>
@@ -1420,12 +1707,6 @@ export default function LaporanLeads() {
             <Panel delay={0.14}>
               <PanelHead title="Leads & Closing per hari" />
               <DailyChart days={chartDays} filter={sourceFilter} onFilter={setSourceFilter} showCls={showCls} />
-            </Panel>
-
-            {/* REKAP HARIAN */}
-            <Panel delay={0.18}>
-              <PanelHead title="Rekap harian" subtitle={`${monthKeyLabel(monthKey)} · ${dayCount} hari`} />
-              <DailyTable days={allDays} totals={{ ...totals, bySource }} />
             </Panel>
 
             <p style={{ margin: 0, fontSize: 11, color: COLORS.faint, fontWeight: 600 }}>
