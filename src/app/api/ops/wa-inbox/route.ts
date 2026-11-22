@@ -298,6 +298,9 @@ export async function POST(req: NextRequest) {
         replied_at: now,
         error: null,
         updated_at: now,
+        // Simpan lampiran balasan (foto/video) supaya inbox Academy bisa menampilkannya.
+        // Hanya ikut kalau memang ada lampiran, jadi pengiriman teks biasa tidak berubah.
+        ...(mediaUrl ? { reply_media_url: mediaUrl } : {}),
       })
       .eq("id", inboxId);
   }
