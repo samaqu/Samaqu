@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * Inbox WhatsApp di panel admin — TAHAP 1: BACA SAJA.
+ * Inbox WhatsApp di panel admin.
  *
- * Datanya diambil lewat `/api/ops/wa-panel` (penerus ke fungsi `wa-admin` yang juga dipakai inbox Academy dan bot),
- * jadi daftar chat, status "diambil alih", dan riwayat persis sama dengan Academy. Belum ada tombol kirim/ambil alih:
- * itu tahap berikutnya setelah tampilan ini terbukti benar.
+ * Semua aksi lewat `/api/ops/wa-panel` (penerus ke fungsi `wa-admin` yang juga dipakai inbox Academy dan bot), jadi daftar
+ * chat, status "diambil alih", riwayat, balasan, dan kirim foto persis sama dengan Academy. Membalas otomatis mengambil
+ * alih chat dari bot (aturan di server, bukan di sini).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -99,6 +99,49 @@ function waitInfo(iso?: string | null): { text: string; color: string; bg: strin
   return { text, color: "#991b1b", bg: "#fee2e2" };
 }
 
+/** Foto yang dipilih admin: sudah dikecilkan (maks 1600px, JPEG) supaya cepat terkirim dan jauh di bawah batas server. */
+interface Photo {
+  data: string;
+  mime: string;
+  preview: string;
+}
+const PHOTO_MAX_SIDE = 1600;
+
+function shrinkPhoto(file: File): Promise<Photo> {
+  return new Promise((resolve, reject) => {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      reject(new Error("Format foto harus JPG, PNG, atau WebP."));
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * scale));
+      const h = Math.max(1, Math.round(img.naturalHeight * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Browser tidak bisa memproses foto."));
+        return;
+      }
+      ctx.fillStyle = "#fff"; // PNG transparan tidak boleh jadi hitam saat menjadi JPEG
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      resolve({ data: dataUrl.split(",")[1] || "", mime: "image/jpeg", preview: dataUrl });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Foto tidak bisa dibuka."));
+    };
+    img.src = url;
+  });
+}
+
 const initials = (c: Conversation) => (c.name || c.sender).trim().charAt(0).toUpperCase() || "#";
 
 export default function WaInboxPanelView() {
@@ -114,6 +157,12 @@ export default function WaInboxPanelView() {
   const [threadError, setThreadError] = useState("");
   const [, tick] = useState(0);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [draft, setDraft] = useState("");
+  const [photo, setPhoto] = useState<Photo | null>(null);
+  const [sending, setSending] = useState(false);
+  const [handoverBusy, setHandoverBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
 
   const loadList = useCallback(async () => {
     try {
@@ -178,6 +227,61 @@ export default function WaInboxPanelView() {
 
   const current = items.find((c) => c.sender === selected) || null;
 
+  // Pindah chat: kotak balasan dan pesan galat milik chat sebelumnya tidak ikut terbawa.
+  useEffect(() => {
+    setDraft("");
+    setPhoto(null);
+    setActionError("");
+  }, [selected]);
+
+  async function refreshThread(sender: string) {
+    const res = await call<{ items: Message[] }>({ action: "messages", sender, limit: 100 });
+    setThread(res.items || []);
+  }
+
+  async function onSend() {
+    const text = draft.trim();
+    if ((!text && !photo) || !selected || sending) return;
+    setSending(true);
+    setActionError("");
+    try {
+      await call({ action: "reply", sender: selected, message: text, ...(photo ? { media: { data: photo.data, mime: photo.mime } } : {}) });
+      setDraft("");
+      setPhoto(null);
+      await Promise.all([refreshThread(selected), loadList()]);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Gagal mengirim.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function onPickPhoto(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      setPhoto(await shrinkPhoto(file));
+      setActionError("");
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Foto tidak bisa dipakai.");
+    }
+  }
+
+  async function onToggleHandover() {
+    if (!current || handoverBusy) return;
+    setHandoverBusy(true);
+    setActionError("");
+    try {
+      await call({ action: current.handover ? "release" : "takeover", sender: current.sender });
+      await loadList();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Gagal mengubah status percakapan.");
+    } finally {
+      setHandoverBusy(false);
+    }
+  }
+
   const chip = (key: typeof filter, label: string, count?: number) => (
     <button
       key={key}
@@ -205,7 +309,7 @@ export default function WaInboxPanelView() {
         <div>
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: INK }}>Inbox WA</h1>
           <p style={{ margin: "2px 0 0", fontSize: 12.5, color: SUB }}>
-            Tampilan baca-saja (tahap 1). Balas dan ambil alih masih lewat inbox Academy sampai tahap berikutnya.
+            Sama dengan inbox Academy. Membalas otomatis mengambil alih chat dari bot.
           </p>
         </div>
         {stats ? (
@@ -344,6 +448,25 @@ export default function WaInboxPanelView() {
                     +{current.sender} · {current.handover ? "ditangani admin" : "ditangani bot"}
                   </span>
                 </div>
+                <button
+                  type="button"
+                  onClick={onToggleHandover}
+                  disabled={handoverBusy}
+                  title={current.handover ? "Kembalikan chat ini ke bot" : "Ambil alih chat ini dari bot"}
+                  style={{
+                    marginLeft: "auto",
+                    border: `1px solid ${LINE}`,
+                    background: current.handover ? "#fef3c7" : "#fff",
+                    color: INK,
+                    borderRadius: 999,
+                    padding: "6px 14px",
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    cursor: handoverBusy ? "wait" : "pointer",
+                  }}
+                >
+                  {handoverBusy ? "Memproses…" : current.handover ? "Kembalikan ke bot" : "Ambil alih"}
+                </button>
               </div>
               <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px", display: "grid", gap: 6, alignContent: "start" }}>
                 {threadLoading ? <p style={{ color: SUB, fontSize: 13 }}>Memuat riwayat…</p> : null}
@@ -377,8 +500,71 @@ export default function WaInboxPanelView() {
                 ))}
                 <div ref={endRef} />
               </div>
-              <div style={{ background: "#fff", borderTop: `1px solid ${LINE}`, padding: "10px 16px", fontSize: 12, color: SUB }}>
-                Mode baca-saja. Untuk membalas, buka inbox Academy.
+              <div style={{ background: "#fff", borderTop: `1px solid ${LINE}`, padding: "10px 12px", display: "grid", gap: 8 }}>
+                {actionError ? (
+                  <div style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, fontWeight: 600 }}>
+                    {actionError}
+                  </div>
+                ) : null}
+                {photo ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photo.preview} alt="Pratinjau foto" style={{ height: 64, borderRadius: 8, border: `1px solid ${LINE}` }} />
+                    <button
+                      type="button"
+                      onClick={() => setPhoto(null)}
+                      style={{ border: 0, background: "transparent", color: "#991b1b", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
+                    >
+                      Hapus foto
+                    </button>
+                  </div>
+                ) : null}
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
+                  <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={onPickPhoto} style={{ display: "none" }} />
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={sending}
+                    title="Lampirkan foto"
+                    aria-label="Lampirkan foto"
+                    style={{ border: `1px solid ${LINE}`, background: "#fff", borderRadius: 10, width: 40, height: 40, fontSize: 18, cursor: "pointer" }}
+                  >
+                    📎
+                  </button>
+                  <textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      // Enter = kirim, Shift+Enter = baris baru. Saat memilih huruf lewat IME, Enter tidak mengirim.
+                      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                        e.preventDefault();
+                        void onSend();
+                      }
+                    }}
+                    rows={2}
+                    placeholder="Ketik balasan… (Enter kirim, Shift+Enter baris baru)"
+                    disabled={sending}
+                    style={{ flex: 1, border: `1px solid ${LINE}`, borderRadius: 10, padding: "8px 12px", fontSize: 13.5, resize: "none", outline: "none", fontFamily: "inherit" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void onSend()}
+                    disabled={sending || (!draft.trim() && !photo)}
+                    style={{
+                      border: 0,
+                      background: sending || (!draft.trim() && !photo) ? "#cbd5e1" : "#16a34a",
+                      color: "#fff",
+                      borderRadius: 10,
+                      height: 40,
+                      padding: "0 18px",
+                      fontSize: 13.5,
+                      fontWeight: 800,
+                      cursor: sending ? "wait" : "pointer",
+                    }}
+                  >
+                    {sending ? "Mengirim…" : "Kirim"}
+                  </button>
+                </div>
               </div>
             </>
           )}
