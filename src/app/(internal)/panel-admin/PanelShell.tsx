@@ -48,7 +48,7 @@ const THEME_SWATCH_CLASS: Record<PanelTheme, string> = {
 };
 const themeLabel = (id: PanelTheme) => THEMES.find((option) => option.id === id)?.label ?? "Berry";
 
-type IconName = "home" | "card" | "box" | "users" | "spark" | "return" | "star" | "reseller" | "tag" | "alert" | "clock" | "clipboard" | "dashboard";
+type IconName = "home" | "card" | "box" | "users" | "spark" | "return" | "star" | "reseller" | "tag" | "alert" | "clock" | "clipboard" | "dashboard" | "chat";
 
 function NavIcon({ name }: { name: IconName }) {
   switch (name) {
@@ -137,6 +137,13 @@ function NavIcon({ name }: { name: IconName }) {
           <path d="M8.5 13l2.2 2.2L15.5 10.5" />
         </svg>
       );
+    case "chat":
+      return (
+        <svg viewBox="0 0 24 24">
+          <path d="M4 5h16v11H9l-5 4z" />
+          <path d="M8 9.5h8M8 12.5h5" />
+        </svg>
+      );
     case "reseller":
       return (
         <svg viewBox="0 0 24 24">
@@ -181,6 +188,7 @@ const NAV: NavGroup[] = [
     section: "Pelanggan",
     icon: "users",
     items: [
+      { label: "Inbox WA", href: "/panel-admin/inbox-wa", icon: "chat" },
       { label: "Leads", href: "/panel-admin/leads", icon: "users" },
       { label: "Reseller", href: "/panel-admin/reseller", icon: "reseller", badge: "reseller" },
       { label: "Promo", href: "/panel-admin/promo", icon: "tag" },
