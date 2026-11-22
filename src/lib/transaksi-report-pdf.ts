@@ -614,9 +614,13 @@ export interface BuiltTransaksiReport {
 
 export async function buildTransaksiReportPdf(input: TransaksiReportInput): Promise<BuiltTransaksiReport> {
   const now = input.now ?? new Date();
-  // Daftar mengikuti tabel di layar: pesanan pre-order yang masih menunggu stok tidak ikut ditampilkan.
-  const orders = (input.orders || []).filter((o) => !o.preorder_waiting);
-  const summary = summarizeTransaksi(input.month, orders);
+  // RINGKASAN (KPI, produk terjual) dihitung dari SEMUA pesanan bulan itu, sama persis dengan kartu di menu Transaksi
+  // (panelKpis memakai seluruh `orders`, termasuk pre-order yang sudah Lunas tapi menunggu stok).
+  const allOrders = input.orders || [];
+  const summary = summarizeTransaksi(input.month, allOrders);
+  // DAFTAR mengikuti tabel di layar: pre-order yang masih menunggu stok tampil di menu Pre-Order, bukan di tabel ini.
+  const orders = allOrders.filter((o) => !o.preorder_waiting);
+  const waitingCount = allOrders.length - orders.length;
 
   const fonts = input.fonts ?? loadReportFonts();
   const doc = await PDFDocument.create();
@@ -663,7 +667,7 @@ export async function buildTransaksiReportPdf(input: TransaksiReportInput): Prom
   }
 
   /* ═══ Daftar transaksi ═══ */
-  newPage(ctx, "Daftar Transaksi", `${summary.monthLabel} · ${nfmt(orders.length)} transaksi, termasuk belum bayar dan dibatalkan`);
+  newPage(ctx, "Daftar Transaksi", `${summary.monthLabel} · ${nfmt(orders.length)} transaksi, termasuk belum bayar dan dibatalkan${waitingCount > 0 ? ` · ${nfmt(waitingCount)} pre-order menunggu stok ada di menu Pre-Order` : ""}`);
   if (orders.length === 0) {
     text(ctx.page, regular, "Belum ada transaksi pada bulan ini.", { x: MARGIN + 12, y: ctx.y - 16, size: 10, color: SUB });
   } else {
