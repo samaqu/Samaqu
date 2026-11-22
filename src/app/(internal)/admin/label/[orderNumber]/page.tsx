@@ -427,6 +427,14 @@ export default function LabelPage() {
           </div>
         </div>
 
+        {/* Catatan pengiriman (mis. titip satpam) - hanya tampil kalau ada isinya */}
+        {order.shipping_notes && order.shipping_notes.trim() ? (
+          <div style={{ padding: "1.4mm 3.5mm", borderBottom: "2px dashed #000" }}>
+            <div style={{ display: "inline-block", fontSize: "7.5px", fontWeight: "800", background: "#000", color: "#fff", padding: "0.4mm 2mm", borderRadius: "1mm", marginBottom: "0.6mm" }}>Catatan</div>
+            <div style={{ fontSize: "9.5px", fontWeight: "800", lineHeight: "1.25", wordBreak: "break-word", whiteSpace: "pre-line" }}>{order.shipping_notes.trim()}</div>
+          </div>
+        ) : null}
+
         {/* Info Grid */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", margin: "0 3.5mm", borderBottom: "2px solid #000" }}>
           <div style={{ padding: "1.5mm 3mm 1.5mm 0", borderRight: "1.5px solid #000" }}>
@@ -547,6 +555,14 @@ export default function LabelPage() {
             );
           })}
         </div>
+
+        {/* Catatan pengiriman (mis. titip satpam) - hanya tampil kalau ada isinya */}
+        {order.shipping_notes && order.shipping_notes.trim() ? (
+          <div style={{ padding: "0.9mm 2.5mm", borderBottom: "1.5px solid #000" }}>
+            <div style={{ fontSize: "6px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.3px", marginBottom: "0.3mm" }}>Catatan</div>
+            <div style={{ fontSize: "8px", fontWeight: "800", lineHeight: "1.2", wordBreak: "break-word", whiteSpace: "pre-line" }}>{order.shipping_notes.trim()}</div>
+          </div>
+        ) : null}
 
         {/* Info grid */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", margin: "0 2.5mm" }}>
