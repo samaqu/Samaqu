@@ -162,6 +162,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Simpan data mentah dari Fonnte (untuk menyelidiki field kutipan/ID pesan). Murni tambahan, terpisah dari
+    // insert di atas, di luar jalur respons, dan kegagalannya hanya dicatat: bot dan penyimpanan pesan tidak terganggu.
+    if (!error) {
+      after(async () => {
+        try {
+          const { error: rawError } = await getSupabaseAdmin()
+            .from("wa_inbox")
+            .update({ raw_payload: body })
+            .eq("dedupe_key", dedupeKey);
+          if (rawError) console.error("[WA-INBOX] gagal simpan raw_payload:", rawError.message);
+        } catch (rawFail) {
+          console.error("[WA-INBOX] raw_payload error:", rawFail);
+        }
+      });
+    }
+
     // Trigger bot server langsung setelah pesan tersimpan — cron 1 menit tetap jadi fallback.
     // Tidak ditunggu supaya webhook Fonnte tetap cepat; debounce 4 detik di wa-agent
     // menggabungkan pesan beruntun.
