@@ -1067,19 +1067,19 @@ function buildAgentAdminHelper(totals, ai, leadList) {
 /** Kotak kecil di bawah kartu: label di atas, nilai di bawah. */
 function Tile({ label, value, hint }) {
   return (
-    /* Ukuran huruf mengikuti LEBAR KARTU (container query, kartu = container), jadi "Rp545,9 rb" tidak keluar kotak
-       di kartu sempit dan tetap besar di kartu lebar. */
-    <div style={{ minWidth: 0, background: "#F6F7F9", borderRadius: 14, padding: "12px clamp(8px, 3cqw, 14px)" }} title={hint}>
-      <p style={{ margin: 0, fontSize: "clamp(9.5px, 2.5cqw, 11px)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.faint, whiteSpace: "nowrap" }}>{label}</p>
-      <p className="tabular-nums" style={{ margin: "5px 0 0", fontSize: "clamp(13px, 4.4cqw, 17px)", fontWeight: 800, color: COLORS.ink, whiteSpace: "nowrap" }}>{value}</p>
+    /* Ukuran huruf mengikuti LEBAR KARTU (container query, kartu = container), jadi nilai tidak keluar kotak
+       di kartu sempit dan tetap terbaca di kartu lebar. */
+    <div style={{ minWidth: 0, background: "#F6F7F9", borderRadius: 12, padding: "9px clamp(8px, 3cqw, 12px)" }} title={hint}>
+      <p style={{ margin: 0, fontSize: "clamp(9px, 2.3cqw, 10.5px)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.faint, whiteSpace: "nowrap" }}>{label}</p>
+      <p className="tabular-nums" style={{ margin: "3px 0 0", fontSize: "clamp(12px, 3.8cqw, 15px)", fontWeight: 800, color: COLORS.ink, whiteSpace: "nowrap" }}>{value}</p>
     </div>
   );
 }
 
 /**
- * Kartu satu kelompok, susunan SAMA untuk semua: ikon + nama + persen porsi closing, blok warna besar (closing dan
- * nominal), batang share nominal, lalu tiga kotak (leads, konversi, rata-rata). `noLeads` = kelompok sisa: ketiga
- * kotak tampil "—" dengan penjelasan di tooltip.
+ * Kartu satu kelompok (ringkas), susunan SAMA untuk semua: ikon + nama + persen porsi closing, blok warna (closing dan
+ * nominal PENUH, tidak disingkat), batang share nominal, lalu tiga kotak (leads, konversi, rata-rata). `noLeads` =
+ * kelompok sisa: ketiga kotak tampil "—" dengan penjelasan di tooltip.
  */
 function GroupCard({ title, caption, color, icon, data, shareClosing, shareNominal, heroLabel = "Closing", noLeads = false }) {
   const noLeadsHint = "Tidak ditampilkan: angka sisa tidak punya pembagi lead yang adil.";
@@ -1087,44 +1087,44 @@ function GroupCard({ title, caption, color, icon, data, shareClosing, shareNomin
     <div
       style={{
         border: `1px solid ${COLORS.border}`,
-        borderRadius: 26,
-        padding: 22,
+        borderRadius: 18,
+        padding: 16,
         minWidth: 0,
         background: "#FFFFFF",
-        boxShadow: "0 1px 2px rgba(16,24,40,0.04), 0 10px 28px rgba(16,24,40,0.05)",
+        boxShadow: "0 1px 2px rgba(16,24,40,0.04), 0 6px 18px rgba(16,24,40,0.04)",
         display: "flex",
         flexDirection: "column",
-        gap: 20,
+        gap: 12,
         containerType: "inline-size",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <span
             style={{
-              width: 52,
-              height: 52,
-              borderRadius: 16,
+              width: 38,
+              height: 38,
+              borderRadius: 12,
               background: color,
               backgroundImage: `linear-gradient(135deg, ${color}, ${shade(color, 28)})`,
               color: "#FFFFFF",
               display: "grid",
               placeItems: "center",
               flexShrink: 0,
-              boxShadow: `0 6px 14px ${tint(color, 30)}`,
+              boxShadow: `0 4px 10px ${tint(color, 30)}`,
             }}
           >
             {icon}
           </span>
           <div style={{ minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: 19, fontWeight: 800, color: COLORS.ink, lineHeight: 1.2, letterSpacing: "-0.01em" }}>{title}</p>
-            <p style={{ margin: "3px 0 0", fontSize: 13, color: COLORS.muted, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{caption}</p>
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: COLORS.ink, lineHeight: 1.2, letterSpacing: "-0.01em" }}>{title}</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: COLORS.muted, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{caption}</p>
           </div>
         </div>
         <span
           className="tabular-nums"
           title="Porsi dari total closing bulan ini"
-          style={{ flexShrink: 0, fontSize: 14, fontWeight: 800, color: shade(color, 30), background: tint(color, 14), borderRadius: 999, padding: "7px 14px", whiteSpace: "nowrap" }}
+          style={{ flexShrink: 0, fontSize: 12.5, fontWeight: 800, color: shade(color, 30), background: tint(color, 14), borderRadius: 999, padding: "5px 11px", whiteSpace: "nowrap" }}
         >
           {pct(shareClosing)}
         </span>
@@ -1133,27 +1133,26 @@ function GroupCard({ title, caption, color, icon, data, shareClosing, shareNomin
       <div
         style={{
           position: "relative",
-          borderRadius: 22,
-          padding: "20px 22px 22px",
+          borderRadius: 14,
+          padding: "12px 16px 14px",
           color: "#FFFFFF",
           background: color,
           backgroundImage: `linear-gradient(135deg, ${color} 0%, ${shade(color, 34)} 100%)`,
-          minHeight: 150,
           overflow: "hidden",
         }}
       >
-        <Trophy size={34} strokeWidth={1.6} aria-hidden="true" style={{ position: "absolute", top: 20, right: 22, opacity: 0.85 }} />
-        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.92 }}>{heroLabel}</p>
-        <p className="tabular-nums" style={{ margin: "12px 0 0", fontSize: 58, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.03em" }}>{nfmt(data.closing)}</p>
-        <p className="tabular-nums" style={{ margin: "10px 0 0", fontSize: 22, fontWeight: 700, letterSpacing: "-0.01em" }}>{rpShort(data.nominal)}</p>
+        <Trophy size={24} strokeWidth={1.6} aria-hidden="true" style={{ position: "absolute", top: 12, right: 14, opacity: 0.85 }} />
+        <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.92 }}>{heroLabel}</p>
+        <p className="tabular-nums" style={{ margin: "4px 0 0", fontSize: 38, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.03em" }}>{nfmt(data.closing)}</p>
+        <p className="tabular-nums" style={{ margin: "6px 0 0", fontSize: 17, fontWeight: 700, letterSpacing: "-0.01em", whiteSpace: "nowrap" }}>{rp(data.nominal)}</p>
       </div>
 
       <div>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: COLORS.muted }}>Share nominal</span>
-          <span className="tabular-nums" style={{ fontSize: 15, fontWeight: 800, color: shade(color, 18) }}>{pct(shareNominal)}</span>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginBottom: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: COLORS.muted }}>Share nominal</span>
+          <span className="tabular-nums" style={{ fontSize: 13, fontWeight: 800, color: shade(color, 18) }}>{pct(shareNominal)}</span>
         </div>
-        <div style={{ height: 12, borderRadius: 999, background: "#EEF0F3", overflow: "hidden" }} aria-hidden="true">
+        <div style={{ height: 8, borderRadius: 999, background: "#EEF0F3", overflow: "hidden" }} aria-hidden="true">
           <div
             style={{
               height: "100%",
@@ -1166,10 +1165,10 @@ function GroupCard({ title, caption, color, icon, data, shareClosing, shareNomin
         </div>
       </div>
 
-      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))" }}>
+      <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(78px, 1fr))" }}>
         <Tile label="Leads" value={noLeads ? "—" : nfmt(data.leads)} hint={noLeads ? noLeadsHint : undefined} />
         <Tile label="Konversi" value={noLeads ? "—" : pct(convOf(data))} hint={noLeads ? noLeadsHint : undefined} />
-        <Tile label="Rata-rata" value={noLeads ? "—" : data.closing ? rpShort(avgOf(data)) : "—"} hint={noLeads ? noLeadsHint : "Nominal dibagi jumlah closing"} />
+        <Tile label="Rata-rata" value={noLeads ? "—" : data.closing ? rp(avgOf(data)) : "—"} hint={noLeads ? noLeadsHint : "Nominal dibagi jumlah closing"} />
       </div>
     </div>
   );
@@ -1180,10 +1179,12 @@ function AgentAdminHelperSection({ data }) {
   const totalClosing = agent.closing + admins.reduce((s, a) => s + a.closing, 0) + helper.closing;
   const totalNominal = agent.nominal + admins.reduce((s, a) => s + a.nominal, 0) + helper.nominal;
   const share = (value, total) => (total > 0 ? (value / total) * 100 : 0);
+  /** Jumlah kartu = jumlah kelompok (Agent + admin + Dibantu Surya): semuanya satu baris, sidebar buka atau tutup. */
+  const groupCount = 2 + admins.length;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "grid", gap: 20, gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
+      <div className={`lp-groups${groupCount > 4 ? " wrap" : ""}`} style={{ "--cols": groupCount }}>
         <GroupCard
           title="Agent"
           caption="AI agent WhatsApp"
@@ -1589,6 +1590,12 @@ export default function LaporanLeads() {
         }
         @media (max-width: 640px) {
           .lp-page { padding: 14px !important; }
+        }
+        /* Kartu Agent / admin / Dibantu Surya: satu baris dengan kolom sama lebar; 1 kolom di layar sempit. */
+        .lp-page .lp-groups { display: grid; gap: 16px; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); }
+        .lp-page .lp-groups.wrap { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+        @media (max-width: 820px) {
+          .lp-page .lp-groups, .lp-page .lp-groups.wrap { grid-template-columns: minmax(0, 1fr); }
         }
         @media (max-width: 760px) {
           .lp-page .lp-pic-row { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
