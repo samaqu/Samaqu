@@ -189,6 +189,7 @@ const NAV: NavGroup[] = [
     icon: "users",
     items: [
       { label: "Inbox WA", href: "/panel-admin/inbox-wa", icon: "chat" },
+      { label: "Tim Admin", href: "/panel-admin/tim-admin", icon: "users" },
       { label: "Leads", href: "/panel-admin/leads", icon: "users" },
       { label: "Reseller", href: "/panel-admin/reseller", icon: "reseller", badge: "reseller" },
       { label: "Promo", href: "/panel-admin/promo", icon: "tag" },
@@ -238,6 +239,8 @@ export default function PanelShell({ children }: { children: ReactNode }) {
   const tanggal = useWibLongDate();
   const [ready, setReady] = useState(false);
   const [authorized, setAuthorized] = useState(false);
+  /** Nama + label jabatan akun yang login (header kanan atas). Sebelum terbaca / kalau gagal, tampilan lama ("Lea") dipakai. */
+  const [me, setMe] = useState<{ name: string; title: string } | null>(null);
   /** Ulasan menunggu persetujuan -> badge menu "Ulasan Pelanggan". */
   const pendingReviews = usePendingReviewCount(authorized);
   /** Antrean reseller yang perlu dicek -> badge menu "Reseller". */
@@ -372,6 +375,30 @@ export default function PanelShell({ children }: { children: ReactNode }) {
       /* abaikan */
     }
   }
+
+  useEffect(() => {
+    if (!authorized) {
+      setMe(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (!token) return;
+        const res = await fetch("/api/ops/me", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled && json?.name) setMe({ name: String(json.name), title: String(json.title || "") });
+      } catch {
+        /* header tetap memakai tampilan lama */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authorized]);
 
   useEffect(() => {
     let cancelled = false;
@@ -705,10 +732,10 @@ export default function PanelShell({ children }: { children: ReactNode }) {
             </svg>
           </div>
           <div className={styles.user}>
-            <img className={styles.av} src={AVATAR} alt="Lea" width={40} height={40} />
+            <img className={styles.av} src={AVATAR} alt={me?.name || "Lea"} width={40} height={40} />
             <div>
-              <b>Lea</b>
-              <small>SAMAQU</small>
+              <b>{me?.name || "Lea"}</b>
+              <small>{me?.title || "SAMAQU"}</small>
             </div>
           </div>
         </div>

@@ -14,7 +14,10 @@ const ADMIN_TTL_MS = 5 * 60 * 1000;
 /** Role yang dikenal sistem. `other` = admin biasa / Admin Operasional. */
 export type OpsRole = "owner" | "leader" | "admin" | "admin_operasional" | "other";
 
-type CacheEntry = { ok: boolean; email: string; role: OpsRole; exp: number };
+/** Identitas admin yang sedang login. Field tambahan (userId, name, title) dipakai Tim Admin dan header panel. */
+export type OpsIdentity = { email: string; role: OpsRole; userId: string; name: string; title: string };
+
+type CacheEntry = { ok: boolean; identity: OpsIdentity; exp: number };
 const adminCache = new Map<string, CacheEntry>();
 
 function tokenOf(req: NextRequest): string {
@@ -34,13 +37,20 @@ export function normalizeOpsRole(value?: string | null): OpsRole {
   return "other";
 }
 
-async function readIdentity(req: NextRequest): Promise<{ email: string; role: OpsRole } | null> {
+/** Buang cache login satu admin (dipakai saat akunnya dinonaktifkan; berlaku di instance server ini, instance lain ≤ 5 menit). */
+export function evictAdminCache(userId: string) {
+  for (const [token, entry] of adminCache) {
+    if (entry.identity.userId === userId) adminCache.delete(token);
+  }
+}
+
+async function readIdentity(req: NextRequest): Promise<OpsIdentity | null> {
   const token = tokenOf(req);
   if (!token) return null;
 
   const hit = adminCache.get(token);
   if (hit && hit.exp > Date.now()) {
-    return hit.ok ? { email: hit.email, role: hit.role } : null;
+    return hit.ok ? hit.identity : null;
   }
 
   try {
@@ -49,17 +59,26 @@ async function readIdentity(req: NextRequest): Promise<{ email: string; role: Op
     if (error || !user) return null;
     const { data } = await admin
       .from("admins")
-      .select("role")
+      .select("role, active, display_name, title")
       .eq("user_id", user.id)
       .maybeSingle();
     if (!data) return null;
+    // Akun yang dinonaktifkan dari Tim Admin ditolak di SEMUA /api/ops/*.
+    if (data.active === false) return null;
 
     const role = normalizeOpsRole(data.role);
     const email = user.email || "";
+    const identity: OpsIdentity = {
+      email,
+      role,
+      userId: user.id,
+      name: String(data.display_name || "").trim() || email.split("@")[0] || "Admin",
+      title: String(data.title || "").trim(),
+    };
     // Hanya hasil positif yang di-cache, supaya error sesaat tidak bikin
     // admin terkunci 5 menit.
-    adminCache.set(token, { ok: true, email, role, exp: Date.now() + ADMIN_TTL_MS });
-    return { email, role };
+    adminCache.set(token, { ok: true, identity, exp: Date.now() + ADMIN_TTL_MS });
+    return identity;
   } catch (e) {
     console.error("[OPS] Verifikasi admin gagal:", e);
     return null;
@@ -71,7 +90,7 @@ export async function isOpsAdmin(req: NextRequest): Promise<boolean> {
 }
 
 /** Email + role admin yang sedang login (untuk kolom `actor` / gerbang fitur). */
-export async function opsIdentity(req: NextRequest): Promise<{ email: string; role: OpsRole } | null> {
+export async function opsIdentity(req: NextRequest): Promise<OpsIdentity | null> {
   return readIdentity(req);
 }
 
