@@ -1017,9 +1017,27 @@ const picKind = (pic) => {
   return name.toLowerCase() === "agent" ? "agent" : "admin";
 };
 
-function buildPicAggregate(list) {
+/**
+ * Nama orang yang menyelesaikan closing Agent secara manual (tanpa catatan closing bot). Sistem tidak merekam siapa
+ * yang membantu; labelnya disimpulkan dari "PIC Agent, closing, tapi bukan closing bot". Ganti di sini kalau admin
+ * lain mulai ikut ambil alih (mis. jadi "admin").
+ */
+const HELPER_NAME = "Surya";
+
+/** Kunci pencocokan nomor ke catatan closing bot: 9 digit terakhir (08xx, 628xx, dan 8xx dianggap sama). */
+const contactKey = (value) => {
+  const d = String(value || "").replace(/\D/g, "");
+  return d.length >= 8 ? d.slice(-9) : "";
+};
+
+/**
+ * @param botKeys Set kunci nomor yang punya catatan closing bot bulan itu (dari /api/ops/leads/closing-bot),
+ *   atau null kalau datanya tidak tersedia (pemisahan Agent disembunyikan, tampilan seperti biasa).
+ */
+function buildPicAggregate(list, botKeys = null) {
   const empty = () => ({ leads: 0, closing: 0, nominal: 0 });
   const groups = { agent: empty(), admin: empty(), none: empty() };
+  const agentSplit = { botClosing: 0, botNominal: 0, helped: 0, helpedNominal: 0 };
   const people = new Map();
   /** Sumber × kelompok PIC, untuk perbandingan yang adil (sumber yang sama dibandingkan dengan sumber yang sama). */
   const bySourceKind = {};
@@ -1033,6 +1051,16 @@ function buildPicAggregate(list) {
     if (!people.has(key)) people.set(key, { key, name: raw || PIC_NONE_LABEL, kind, ...empty() });
     const isClosing = l.status === "closing";
     const value = isClosing ? Number(l.nominal) || 0 : 0;
+    // Closing PIC Agent dipisah: ada catatan closing bot untuk nomor itu = oleh bot, tidak ada = diselesaikan manual.
+    if (isClosing && kind === "agent" && botKeys) {
+      if (botKeys.has(contactKey(l.kontak))) {
+        agentSplit.botClosing += 1;
+        agentSplit.botNominal += value;
+      } else {
+        agentSplit.helped += 1;
+        agentSplit.helpedNominal += value;
+      }
+    }
     if (SOURCES.includes(l.sumber)) {
       const cell = bySourceKind[l.sumber][kind];
       cell.leads += 1;
@@ -1055,7 +1083,7 @@ function buildPicAggregate(list) {
   sorted.forEach((p) => {
     p.color = p.kind === "agent" ? AGENT_COLOR : p.kind === "none" ? NONE_COLOR : PIC_PALETTE[adminIndex++ % PIC_PALETTE.length];
   });
-  return { groups, people: sorted, bySourceKind };
+  return { groups, people: sorted, bySourceKind, agentSplit: botKeys ? agentSplit : null };
 }
 
 const convOf = (g) => (g.leads ? (g.closing / g.leads) * 100 : 0);
@@ -1089,7 +1117,25 @@ function ConvBar({ value, color }) {
   );
 }
 
-function GroupCard({ title, subtitle, color, icon, data, best }) {
+/** Satu baris pemisahan closing Agent: titik warna, label, jumlah, nominal. */
+function SplitLine({ color, label, count, nominal, hint }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: 999, background: color, flexShrink: 0 }} />
+        <span style={{ minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: COLORS.ink }}>{label}</span>
+          {hint ? <span style={{ display: "block", fontSize: 11, color: COLORS.muted }}>{hint}</span> : null}
+        </span>
+      </span>
+      <span className="tabular-nums" style={{ fontSize: 13, fontWeight: 800, color: COLORS.ink, whiteSpace: "nowrap" }}>
+        {nfmt(count)} closing · {rpShort(nominal)}
+      </span>
+    </div>
+  );
+}
+
+function GroupCard({ title, subtitle, color, icon, data, best, extra = null }) {
   const conv = convOf(data);
   return (
     <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 18, minWidth: 0, background: "#FFFFFF", position: "relative", overflow: "hidden" }}>
@@ -1119,6 +1165,7 @@ function GroupCard({ title, subtitle, color, icon, data, best }) {
         </div>
         <ConvBar value={conv} color={color} />
       </div>
+      {extra}
     </div>
   );
 }
@@ -1274,9 +1321,28 @@ function SourceCompare({ bySourceKind, noneLeads }) {
   );
 }
 
-function PicSection({ agg }) {
+function PicSection({ agg, botInfo = null }) {
   const [tab, setTab] = useState("ringkasan");
-  const { groups, people, bySourceKind } = agg;
+  const { groups, people, bySourceKind, agentSplit } = agg;
+  /** Pemisahan closing Agent: oleh bot sendiri (ada catatan closing bot) lawan diselesaikan manual. */
+  const agentExtra = agentSplit ? (
+    <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px dashed ${COLORS.border}`, display: "grid", gap: 10 }}>
+      <p style={{ margin: 0, fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted }}>
+        Closing Agent: siapa yang menyelesaikan
+      </p>
+      <SplitLine color={AGENT_COLOR} label="Oleh bot sendiri" count={agentSplit.botClosing} nominal={agentSplit.botNominal} />
+      <SplitLine
+        color="#94A3B8"
+        label={`Dibantu ${HELPER_NAME}`}
+        hint="bukan closing bot, diselesaikan manual"
+        count={agentSplit.helped}
+        nominal={agentSplit.helpedNominal}
+      />
+      <p style={{ margin: 0, fontSize: 12, color: COLORS.muted }}>
+        Konversi bot saja: <b style={{ color: COLORS.ink }}>{pct(groups.agent.leads ? (agentSplit.botClosing / groups.agent.leads) * 100 : 0)}</b>
+      </p>
+    </div>
+  ) : null;
   const adminNames = people.filter((p) => p.kind === "admin").map((p) => p.name);
   const agentConv = convOf(groups.agent);
   const adminConv = convOf(groups.admin);
@@ -1309,6 +1375,7 @@ function PicSection({ agg }) {
           icon={<Bot size={20} />}
           data={groups.agent}
           best={bothHave && agentConv > adminConv}
+          extra={agentExtra}
         />
         <GroupCard
           title="Admin"
@@ -1337,6 +1404,12 @@ function PicSection({ agg }) {
           </span>
         ))}
       </div>
+      {agentSplit && botInfo ? (
+        <p style={{ margin: 0, fontSize: 12, color: COLORS.muted, lineHeight: 1.5 }}>
+          AI Performance mencatat {nfmt(botInfo.count)} closing bot bulan ini ({rpShort(botInfo.nominal)}). {nfmt(agentSplit.botClosing)} di antaranya
+          cocok dengan lead PIC Agent yang closing; sisanya ada di lead PIC lain, lead yang belum berstatus closing, atau lead di luar bulan ini.
+        </p>
+      ) : null}
 
         </>
       ) : null}
@@ -1360,7 +1433,11 @@ function PicSection({ agg }) {
                   <div style={{ minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</p>
                     <p style={{ margin: 0, fontSize: 11, color: COLORS.muted }}>
-                      {p.kind === "agent" ? "AI agent" : p.kind === "none" ? "Data lama tanpa PIC" : "Admin"}
+                      {p.kind === "agent"
+                        ? `AI agent${agentSplit ? ` · ${agentSplit.botClosing} closing bot, ${agentSplit.helped} dibantu ${HELPER_NAME}` : ""}`
+                        : p.kind === "none"
+                          ? "Data lama tanpa PIC"
+                          : "Admin"}
                     </p>
                   </div>
                 </div>
@@ -1489,8 +1566,32 @@ export default function LaporanLeads() {
 
   const agg = useMemo(() => buildAggregate(leads), [leads]);
   const prevAgg = useMemo(() => buildAggregate(prevLeads), [prevLeads]);
+  /**
+   * Closing yang dicatat bot sendiri bulan ini (Academy `wa_closings`, sumber yang sama dengan AI Performance).
+   * Tambahan saja: kalau gagal/tidak tersedia, pemisahan closing Agent disembunyikan dan halaman tampil seperti biasa.
+   */
+  const { data: botClosing } = useQuery({
+    queryKey: ["leads_closing_bot", monthKey],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      const res = await fetch(`/api/ops/leads/closing-bot?bulan=${monthKey}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`closing bot ${res.status}`);
+      return res.json();
+    },
+    retry: false,
+    throwOnError: false,
+  });
+  const botKeys = useMemo(
+    () => (botClosing?.available && Array.isArray(botClosing.keys) ? new Set(botClosing.keys) : null),
+    [botClosing],
+  );
+  const botInfo = botClosing?.available ? { count: Number(botClosing.count) || 0, nominal: Number(botClosing.nominal) || 0 } : null;
+
   /** Perbandingan Agent vs Admin dari kolom `pic` lead bulan terpilih. */
-  const picAgg = useMemo(() => buildPicAggregate(leads), [leads]);
+  const picAgg = useMemo(() => buildPicAggregate(leads, botKeys), [leads, botKeys]);
 
   /** Batas hari yang ditampilkan di Rekap harian: bulan berjalan sampai hari ini (WIB), bulan lewat semua, bulan depan kosong. */
   const todayIso = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -1805,7 +1906,7 @@ export default function LaporanLeads() {
               {picAgg.people.length === 0 ? (
                 <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>Belum ada lead di bulan ini.</p>
               ) : (
-                <PicSection agg={picAgg} />
+                <PicSection agg={picAgg} botInfo={botInfo} />
               )}
             </Panel>
 
