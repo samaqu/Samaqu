@@ -15,6 +15,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import { base44 } from "@/lib/ops-api";
 import { SALE_BASIS_NOTE, SALE_STATUSES, orderRevenue, saleCount } from "@/lib/transaksi";
 import { matchesStage } from "@/lib/order-flow";
@@ -161,6 +162,38 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
       setMonth(0);
       setYear(year + 1);
     } else setMonth(month + 1);
+  };
+
+  // Export PDF: mengikuti BULAN yang dipilih (bukan filter lain). PDF dibuat server dari data yang sama dengan tabel.
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const handleExportPdf = async () => {
+    setExportingPdf(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      const bulan = `${year}-${pad(month + 1)}`;
+      const res = await fetch(`/api/ops/transaksi/report?bulan=${bulan}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(payload?.error || `Gagal membuat PDF (${res.status})`);
+      }
+      const blob = await res.blob();
+      const match = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = match?.[1] || `Laporan-Transaksi-SAMAQU-${MONTHS[month]}-${year}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast({ title: "Export PDF gagal", description: err?.message || "Coba lagi sebentar.", variant: "destructive" });
+    } finally {
+      setExportingPdf(false);
+    }
   };
 
   const [formOpen, setFormOpen] = useState(false);
@@ -679,6 +712,17 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
                 Proses semua yang stoknya cukup
               </button>
             ) : null}
+            {isPoPage ? null : (
+              <button
+                type="button"
+                className="btn-sec"
+                onClick={handleExportPdf}
+                disabled={exportingPdf}
+                title={`Unduh laporan transaksi ${MONTHS[month]} ${year} (PDF)`}
+              >
+                {exportingPdf ? "Menyiapkan…" : "Export PDF"}
+              </button>
+            )}
             <button
               type="button"
               className="btn"

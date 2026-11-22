@@ -84,7 +84,7 @@ const MONTHS_ID_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu",
 const DAY_SHORT = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
 const pad = (n: number) => String(n).padStart(2, "0");
-const nfmt = (n: number) => n.toLocaleString("id-ID");
+export const nfmt = (n: number) => n.toLocaleString("id-ID");
 
 export function tanggalID(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
@@ -243,28 +243,28 @@ export function reportFileName(summary: LeadsSummary): string {
 
 /* ────────────────────────────── tipografi & palet ────────────────────────────── */
 
-const PAGE_W = 595.28;
-const PAGE_H = 841.89;
-const MARGIN = 44;
-const CW = PAGE_W - MARGIN * 2; // 507.28
-const FOOTER_Y = 30;
-const FOOTER_TOP = FOOTER_Y + 32; // batas bawah konten
+export const PAGE_W = 595.28;
+export const PAGE_H = 841.89;
+export const MARGIN = 44;
+export const CW = PAGE_W - MARGIN * 2; // 507.28
+export const FOOTER_Y = 30;
+export const FOOTER_TOP = FOOTER_Y + 32; // batas bawah konten
 
 // Palet selaras halaman web /ops/leads/laporan: sky (leads) + orange (closing) di atas slate.
-const NAVY = "#0f172a";
-const INK = "#0f172a";
-const TEXT = "#334155";
-const SUB = "#64748b";
-const FAINT = "#94a3b8";
-const LINE = "#e2e8f0";
-const SOFT = "#f8fafc";
-const TRACK = "#eef2f6";
-const SKY = "#0ea5e9";
-const SKY_SOFT = "#e0f2fe";
-const ORANGE = "#f97316";
-const ORANGE_SOFT = "#ffedd5";
-const GREEN = "#16a34a";
-const GREEN_SOFT = "#dcfce7";
+export const NAVY = "#0f172a";
+export const INK = "#0f172a";
+export const TEXT = "#334155";
+export const SUB = "#64748b";
+export const FAINT = "#94a3b8";
+export const LINE = "#e2e8f0";
+export const SOFT = "#f8fafc";
+export const TRACK = "#eef2f6";
+export const SKY = "#0ea5e9";
+export const SKY_SOFT = "#e0f2fe";
+export const ORANGE = "#f97316";
+export const ORANGE_SOFT = "#ffedd5";
+export const GREEN = "#16a34a";
+export const GREEN_SOFT = "#dcfce7";
 
 /** Warna per sumber leads (dipakai di bar sumber). */
 const SOURCE_COLOR: Record<string, string> = {
@@ -274,7 +274,7 @@ const SOURCE_COLOR: Record<string, string> = {
   Website: "#6366f1",
 };
 
-const hex = (h: string) => {
+export const hex = (h: string) => {
   const s = h.replace("#", "");
   return rgb(parseInt(s.slice(0, 2), 16) / 255, parseInt(s.slice(2, 4), 16) / 255, parseInt(s.slice(4, 6), 16) / 255);
 };
@@ -293,7 +293,7 @@ export function loadReportFonts(): ReportFonts {
   };
 }
 
-interface Ctx {
+export interface Ctx {
   doc: PDFDocument;
   regular: PDFFont;
   bold: PDFFont;
@@ -302,7 +302,7 @@ interface Ctx {
 }
 
 /** Persegi panjang sudut membulat (r = radius). `y` = sisi BAWAH, seperti drawRectangle. */
-function rrect(
+export function rrect(
   page: PDFPage,
   o: { x: number; y: number; w: number; h: number; r?: number; fill?: string; border?: string; borderWidth?: number }
 ) {
@@ -334,32 +334,32 @@ function rrect(
   });
 }
 
-function hline(page: PDFPage, y: number, x1 = MARGIN, x2 = MARGIN + CW, color = LINE, thickness = 0.6) {
+export function hline(page: PDFPage, y: number, x1 = MARGIN, x2 = MARGIN + CW, color = LINE, thickness = 0.6) {
   page.drawLine({ start: { x: x1, y }, end: { x: x2, y }, thickness, color: hex(color) });
 }
 
-function text(page: PDFPage, font: PDFFont, value: string, o: { x: number; y: number; size?: number; color?: string }) {
+export function text(page: PDFPage, font: PDFFont, value: string, o: { x: number; y: number; size?: number; color?: string }) {
   page.drawText(value, { x: o.x, y: o.y, size: o.size ?? 10, font, color: hex(o.color ?? INK) });
 }
 
-function textRight(page: PDFPage, font: PDFFont, value: string, o: { right: number; y: number; size?: number; color?: string }) {
+export function textRight(page: PDFPage, font: PDFFont, value: string, o: { right: number; y: number; size?: number; color?: string }) {
   const size = o.size ?? 10;
   page.drawText(value, { x: o.right - font.widthOfTextAtSize(value, size), y: o.y, size, font, color: hex(o.color ?? INK) });
 }
 
-function textCenter(page: PDFPage, font: PDFFont, value: string, o: { center: number; y: number; size?: number; color?: string }) {
+export function textCenter(page: PDFPage, font: PDFFont, value: string, o: { center: number; y: number; size?: number; color?: string }) {
   const size = o.size ?? 10;
   page.drawText(value, { x: o.center - font.widthOfTextAtSize(value, size) / 2, y: o.y, size, font, color: hex(o.color ?? INK) });
 }
 
 /** Perkecil ukuran huruf sampai teks muat di lebar `max`. */
-function fitSize(font: PDFFont, value: string, max: number, start: number, min = 6): number {
+export function fitSize(font: PDFFont, value: string, max: number, start: number, min = 6): number {
   let size = start;
   while (size > min && font.widthOfTextAtSize(value, size) > max) size -= 0.25;
   return size;
 }
 
-function wrap(value: string, font: PDFFont, size: number, maxWidth: number): string[] {
+export function wrap(value: string, font: PDFFont, size: number, maxWidth: number): string[] {
   // Normalisasi spasi tak biasa (NBSP / narrow no-break space dari toLocaleString).
   const clean = String(value).replace(/[    ⁠]/g, " ").replace(/\s+/g, " ").trim();
   // Batas aman 6%: sebagian glyph (tanda hubung panjang / tanda kurung) diukur lebih kecil
@@ -394,7 +394,7 @@ function wrap(value: string, font: PDFFont, size: number, maxWidth: number): str
 }
 
 /** Judul bagian: balok aksen sky di kiri + teks tebal. */
-function sectionTitle(ctx: Ctx, title: string, sub?: string) {
+export function sectionTitle(ctx: Ctx, title: string, sub?: string) {
   rrect(ctx.page, { x: MARGIN, y: ctx.y - 3, w: 3, h: 13, r: 1.5, fill: SKY });
   text(ctx.page, ctx.bold, title, { x: MARGIN + 10, y: ctx.y, size: 11.5, color: INK });
   if (sub) textRight(ctx.page, ctx.regular, sub, { right: MARGIN + CW, y: ctx.y + 0.5, size: 8, color: FAINT });
@@ -405,7 +405,7 @@ function sectionTitle(ctx: Ctx, title: string, sub?: string) {
 
 const BAND_H = 96;
 
-function drawBand(page: PDFPage, regular: PDFFont, bold: PDFFont, o: { title: string; line: string; generatedAt: string; pill?: string }) {
+export function drawBand(page: PDFPage, regular: PDFFont, bold: PDFFont, o: { title: string; line: string; generatedAt: string; pill?: string }) {
   const top = PAGE_H;
   const bottom = PAGE_H - BAND_H;
   rrect(page, { x: 0, y: bottom, w: PAGE_W, h: BAND_H, fill: NAVY });
@@ -1033,7 +1033,7 @@ function drawGroupsPage(ctx: Ctx, groups: GroupStat[]) {
 
 /* ────────────────────────────── footer ────────────────────────────── */
 
-function drawFooters(doc: PDFDocument, regular: PDFFont, bold: PDFFont) {
+export function drawFooters(doc: PDFDocument, regular: PDFFont, bold: PDFFont) {
   const pages = doc.getPages();
   pages.forEach((page, i) => {
     hline(page, FOOTER_Y + 14, MARGIN, MARGIN + CW, LINE, 0.6);
