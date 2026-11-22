@@ -37,6 +37,8 @@ export interface DailyLeadRow {
   total: number;
   closing: number;
   closingMetaAds: number;
+  /** Jumlah nominal closing pada hari itu (rekap harian). */
+  nominal?: number;
 }
 
 export interface LeadsTotals {
@@ -119,6 +121,7 @@ export function buildDailyRows(leads: LeadRow[]): DailyLeadRow[] {
       row.closing += 1;
       row.perSumberClosing[sumber] = (row.perSumberClosing[sumber] || 0) + 1;
       if (sumber === "Meta ads") row.closingMetaAds += 1;
+      row.nominal = (row.nominal || 0) + (Number(lead.nominal) || 0);
     }
   }
   return Object.values(map).sort((a, b) => a.tanggal.localeCompare(b.tanggal));
@@ -707,56 +710,59 @@ function drawTrendChart(ctx: Ctx, rows: DailyLeadRow[], chartH = CHART_H) {
 
 /* ────────────────────────────── halaman 2: tabel harian ────────────────────────────── */
 
-const COL_TANGGAL = 88;
-const COL_SOURCE = 56;
-const COL_TOTAL = 66;
-const COL_CLOSING = 66;
+/** Titik warna judul kolom sumber di rekap harian (sama dengan tabel di halaman web). */
+const DAILY_DOT: Record<string, string> = { "Meta ads": "#8b5cf6", WA: "#22c55e", IG: "#ec4899", Website: "#3b82f6" };
+const DAILY_LABEL: Record<string, string> = { "Meta ads": "META ADS", WA: "WA", IG: "IG", Website: "WEBSITE" };
+
+const COL_TANGGAL = 96;
+const COL_SOURCE = 48;
+const COL_TOTAL = 60;
+const COL_CLOSING = 50;
 
 function tableColumns() {
   const tanggal = MARGIN;
   const sources = REPORT_SOURCES.map((_, i) => tanggal + COL_TANGGAL + i * COL_SOURCE);
   const total = tanggal + COL_TANGGAL + REPORT_SOURCES.length * COL_SOURCE;
   const closing = total + COL_TOTAL;
-  const closingMeta = closing + COL_CLOSING;
-  return { tanggal, sources, total, closing, closingMeta };
+  return { tanggal, sources, total, closing, nominalRight: MARGIN + CW - 12 };
 }
 
+const rpPenuh = (n: number) => `Rp${nfmt(Math.round(n))}`;
+
+/** Judul kolom ringan (huruf besar abu-abu, titik warna di sumber), seperti tabel Rekap harian di halaman web. */
 function drawTableHeader(ctx: Ctx, h: number) {
   const page = ctx.page;
   const cols = tableColumns();
-  const right = MARGIN + CW;
-  rrect(page, { x: MARGIN, y: ctx.y - h, w: CW, h, r: 8, fill: NAVY });
-  const o = { size: 7.6, color: "#e2e8f0" };
-  text(page, ctx.bold, "Tanggal", { x: cols.tanggal + 12, y: ctx.y - h + h / 2 - 2.7, ...o });
+  const base = ctx.y - h / 2 - 2.4;
+  const o = { size: 7.2, color: SUB };
+  text(page, ctx.bold, "TANGGAL", { x: cols.tanggal + 12, y: base, ...o });
   REPORT_SOURCES.forEach((s, i) => {
-    textRight(page, ctx.bold, SOURCE_LABEL[s], { right: cols.sources[i] + COL_SOURCE - 8, y: ctx.y - h + h / 2 - 2.7, ...o });
+    const right = cols.sources[i] + COL_SOURCE - 8;
+    const label = DAILY_LABEL[s];
+    const w = ctx.bold.widthOfTextAtSize(label, o.size);
+    page.drawCircle({ x: right - w - 7, y: base + 2.6, size: 2.4, color: hex(DAILY_DOT[s]) });
+    textRight(page, ctx.bold, label, { right, y: base, ...o });
   });
-  const two = (l1: string, l2: string, r: number) => {
-    textRight(page, ctx.bold, l1, { right: r, y: ctx.y - h + h / 2 + 1.5, ...o });
-    textRight(page, ctx.bold, l2, { right: r, y: ctx.y - h + h / 2 - 7, ...o });
-  };
-  two("Total", "leads", cols.total + COL_TOTAL - 8);
-  two("Total", "closing", cols.closing + COL_CLOSING - 8);
-  two("Closing", "Meta Ads", right - 12);
+  textRight(page, ctx.bold, "TOTAL LEADS", { right: cols.total + COL_TOTAL - 4, y: base, ...o });
+  textRight(page, ctx.bold, "CLOSING", { right: cols.closing + COL_CLOSING - 4, y: base, ...o });
+  textRight(page, ctx.bold, "NOMINAL", { right: cols.nominalRight, y: base, ...o });
+  hline(page, ctx.y - h, MARGIN, MARGIN + CW, LINE, 0.8);
   ctx.y -= h;
 }
 
-function drawTableRow(ctx: Ctx, row: DailyLeadRow, o: { zebra: boolean; rowH: number; total?: boolean }) {
+function drawTableRow(ctx: Ctx, row: DailyLeadRow, o: { rowH: number; total?: boolean; today?: boolean }) {
   const page = ctx.page;
   const cols = tableColumns();
-  const right = MARGIN + CW;
   const y = ctx.y - o.rowH;
-  const size = o.rowH < 20 ? 8.5 : 9.5;
+  const size = o.rowH < 20 ? 8.8 : 9.8;
   const baseline = y + (o.rowH - size * 0.72) / 2;
-  const dow = new Date(`${row.tanggal}T00:00:00Z`).getUTCDay();
 
   if (o.total) {
-    rrect(page, { x: MARGIN, y, w: CW, h: o.rowH, r: 8, fill: SKY_SOFT });
-  } else if (o.zebra) {
-    rrect(page, { x: MARGIN, y, w: CW, h: o.rowH, fill: SOFT });
+    rrect(page, { x: MARGIN, y, w: CW, h: o.rowH, r: 8, fill: "#f1f5f9" });
+  } else if (o.today) {
+    rrect(page, { x: MARGIN, y, w: CW, h: o.rowH, r: 6, fill: "#fff7ed" });
   }
 
-  const font = o.total ? ctx.bold : ctx.regular;
   const num = (v: number, rightX: number, strong = false) =>
     textRight(page, strong || o.total ? ctx.bold : ctx.regular, nfmt(v), {
       right: rightX,
@@ -769,16 +775,29 @@ function drawTableRow(ctx: Ctx, row: DailyLeadRow, o: { zebra: boolean; rowH: nu
     text(page, ctx.bold, "Total", { x: cols.tanggal + 12, y: baseline, size, color: INK });
   } else {
     const day = Number(row.tanggal.slice(8, 10));
-    const label = `${day} ${MONTHS_ID_SHORT[Number(row.tanggal.slice(5, 7)) - 1]} · ${DAY_SHORT[dow]}`;
-    text(page, ctx.regular, label, { x: cols.tanggal + 12, y: baseline, size, color: dow === 0 ? "#dc2626" : INK });
+    const label = `${day} ${MONTHS_ID_SHORT[Number(row.tanggal.slice(5, 7)) - 1]}`;
+    text(page, ctx.bold, label, { x: cols.tanggal + 12, y: baseline, size, color: INK });
+    if (o.today) {
+      const lw = ctx.bold.widthOfTextAtSize(label, size);
+      const tag = "HARI INI";
+      const tw = ctx.bold.widthOfTextAtSize(tag, 6.3) + 12;
+      rrect(page, { x: cols.tanggal + 12 + lw + 7, y: y + o.rowH / 2 - 6, w: tw, h: 12, r: 6, fill: ORANGE_SOFT });
+      textCenter(page, ctx.bold, tag, { center: cols.tanggal + 12 + lw + 7 + tw / 2, y: y + o.rowH / 2 - 2.2, size: 6.3, color: "#c2410c" });
+    }
   }
   REPORT_SOURCES.forEach((s, i) => num(row.perSumber[s] || 0, cols.sources[i] + COL_SOURCE - 8));
-  num(row.total, cols.total + COL_TOTAL - 8, true);
-  num(row.closing, cols.closing + COL_CLOSING - 8, true);
-  num(row.closingMetaAds, right - 12);
-  void font;
+  num(row.total, cols.total + COL_TOTAL - 4, true);
+  num(row.closing, cols.closing + COL_CLOSING - 4, true);
+  const nominal = row.nominal || 0;
+  textRight(page, o.total ? ctx.bold : ctx.regular, rpPenuh(nominal), {
+    right: cols.nominalRight,
+    y: baseline,
+    size,
+    color: !o.total && nominal === 0 ? "#cbd5e1" : INK,
+  });
 
   ctx.y = y;
+  if (!o.total) hline(page, ctx.y, MARGIN, MARGIN + CW, "#f1f5f9", 0.6);
 }
 
 /* ────────────────────────────── halaman Agent / Admin / dibantu Surya ────────────────────────────── */
@@ -1150,14 +1169,14 @@ export async function buildLeadsReportPdf(
   ctx.page = doc.addPage([PAGE_W, PAGE_H]);
   slimBand("Rekap Data Harian", `${summary.periodLabel}${summary.running ? " · data berjalan" : ""} · ${summary.dayCount} hari`);
 
-  const headH = 28;
+  const headH = 26;
   const notesBlock = 44;
   const availRows = ctx.y - headH - FOOTER_TOP - notesBlock - 10;
   const rowH = Math.max(18, Math.min(26, Math.floor(availRows / (Math.max(1, rows.length) + 1))));
 
   drawTableHeader(ctx, headH);
-  ctx.y -= 2;
   const totals = summary.totals;
+  const totalNominal = rows.reduce((t, r) => t + (r.nominal || 0), 0);
   const totalRow: DailyLeadRow = {
     tanggal: summary.periodEnd,
     perSumber: totals.perSumber,
@@ -1165,33 +1184,35 @@ export async function buildLeadsReportPdf(
     total: totals.total,
     closing: totals.closing,
     closingMetaAds: totals.closingMetaAds,
+    nominal: totalNominal,
   };
 
-  rows.forEach((row, i) => {
-    const last = i === rows.length - 1;
+  // Urutan seperti tabel Rekap harian di halaman web: hari terbaru PALING ATAS, hari ini diberi penanda.
+  const today = todayWib(now);
+  const ordered = [...rows].reverse();
+  ordered.forEach((row, i) => {
+    const last = i === ordered.length - 1;
     const needed = rowH + (last ? rowH + 6 : 0);
     if (ctx.y - needed < FOOTER_TOP) {
       ctx.page = doc.addPage([PAGE_W, PAGE_H]);
       slimBand("Rekap Data Harian (lanjutan)", `${summary.periodLabel}${summary.running ? " · data berjalan" : ""}`);
       drawTableHeader(ctx, headH);
-      ctx.y -= 2;
     }
-    drawTableRow(ctx, row, { zebra: i % 2 === 1, rowH });
+    drawTableRow(ctx, row, { rowH, today: summary.running && row.tanggal === today });
   });
 
   if (ctx.y - rowH - 6 < FOOTER_TOP) {
     ctx.page = doc.addPage([PAGE_W, PAGE_H]);
     slimBand("Rekap Data Harian (lanjutan)", `${summary.periodLabel}${summary.running ? " · data berjalan" : ""}`);
     drawTableHeader(ctx, headH);
-    ctx.y -= 2;
   }
   ctx.y -= 6;
-  drawTableRow(ctx, totalRow, { zebra: false, rowH, total: true });
+  drawTableRow(ctx, totalRow, { rowH, total: true });
 
   // Catatan definisi & sumber data
   ctx.y -= 16;
   const notesText = [
-    "Konversi = Total closing ÷ Total leads pada periode laporan. Closing Meta Ads = leads berstatus closing dengan sumber Meta Ads.",
+    "Konversi = Total closing ÷ Total leads pada periode laporan. Nominal = jumlah nominal closing pada hari itu. Hari terbaru di paling atas.",
     "Hari tanpa data tetap ditampilkan dengan angka 0. Sumber data: tabel leads pada dashboard internal SAMAQU (/ops/leads).",
   ];
   notesText.forEach((n) => {
