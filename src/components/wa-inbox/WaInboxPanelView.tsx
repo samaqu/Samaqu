@@ -475,12 +475,9 @@ export default function WaInboxPanelView() {
                   <div key={m.id} style={{ display: "grid", gap: 6 }}>
                     {m.message || m.media_url ? (
                       <Bubble side="left" time={m.created_at}>
-                        {m.media_url ? (
-                          <a href={m.media_url} target="_blank" rel="noreferrer" style={{ color: "#0369a1", fontSize: 12.5, fontWeight: 600 }}>
-                            📎 {m.filename || "Lampiran"}
-                          </a>
-                        ) : null}
-                        {m.message ? <span>{m.message}</span> : null}
+                        {m.media_url ? <Media url={m.media_url} name={m.filename} /> : null}
+                        {/* "[lampiran]" hanya penanda dari sistem; kalau fotonya tampil, teks itu tidak perlu. */}
+                        {m.message && !(m.media_url && /^\[lampiran\]$/i.test(m.message.trim())) ? <span>{m.message}</span> : null}
                       </Bubble>
                     ) : null}
                     {m.reply_text || m.reply_media_url ? (
@@ -489,10 +486,7 @@ export default function WaInboxPanelView() {
                         time={m.replied_at || m.created_at}
                         who={m.admin_email ? m.admin_email.split("@")[0] : m.status === "admin" ? "admin" : "Bot"}
                       >
-                        {m.reply_media_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={m.reply_media_url} alt="Foto balasan" style={{ maxWidth: 240, borderRadius: 8, display: "block", marginBottom: 4 }} />
-                        ) : null}
+                        {m.reply_media_url ? <Media url={m.reply_media_url} name="Lampiran balasan" /> : null}
                         {m.reply_text ? <span>{m.reply_text}</span> : null}
                       </Bubble>
                     ) : null}
@@ -571,6 +565,38 @@ export default function WaInboxPanelView() {
         </div>
       </div>
     </div>
+  );
+}
+
+const isVideoUrl = (url: string) => /\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(String(url || ""));
+
+/**
+ * Lampiran di dalam gelembung: foto tampil langsung (klik = buka ukuran penuh), video bisa diputar. Kalau filenya
+ * bukan gambar atau gagal dimuat (PDF, tautan kedaluwarsa), jatuh ke tautan bernama file.
+ */
+function Media({ url, name }: { url: string; name?: string | null }) {
+  const [failed, setFailed] = useState(false);
+  if (isVideoUrl(url)) {
+    return <video src={url} controls preload="metadata" style={{ maxWidth: 260, borderRadius: 8, display: "block" }} />;
+  }
+  if (failed) {
+    return (
+      <a href={url} target="_blank" rel="noreferrer" style={{ color: "#0369a1", fontSize: 12.5, fontWeight: 600 }}>
+        📎 {name || "Lampiran"}
+      </a>
+    );
+  }
+  return (
+    <a href={url} target="_blank" rel="noreferrer" style={{ display: "block" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt={name || "Lampiran"}
+        loading="lazy"
+        onError={() => setFailed(true)}
+        style={{ maxWidth: 260, maxHeight: 320, borderRadius: 8, display: "block", objectFit: "cover" }}
+      />
+    </a>
   );
 }
 
