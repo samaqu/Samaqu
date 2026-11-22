@@ -1057,75 +1057,99 @@ function buildAgentAdminHelper(totals, ai, leadList) {
   return { agent, admins, helper };
 }
 
-function MiniStat({ label, value }) {
+/** Satu angka kecil di baris bawah kartu: label di atas, nilai di bawah. */
+function FootStat({ label, value, hint }) {
   return (
-    <div style={{ minWidth: 0 }}>
-      <p style={{ margin: 0, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted }}>{label}</p>
-      <p className="tabular-nums" style={{ margin: "2px 0 0", fontSize: 18, fontWeight: 800, color: COLORS.ink, letterSpacing: "-0.01em" }}>{value}</p>
+    <div style={{ minWidth: 0 }} title={hint}>
+      <p style={{ margin: 0, fontSize: 10, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.faint }}>{label}</p>
+      <p className="tabular-nums" style={{ margin: "3px 0 0", fontSize: 15, fontWeight: 800, color: COLORS.ink, whiteSpace: "nowrap" }}>{value}</p>
     </div>
   );
 }
 
-function ConvBar({ value, color }) {
+/**
+ * Kartu satu kelompok, susunan SAMA untuk semua: nama, angka besar (closing), nominal, lalu satu baris kecil
+ * (leads, konversi, rata-rata). `noLeads` = kelompok sisa: leads dan konversi tampil "-" dengan penjelasan di tooltip.
+ */
+function GroupCard({ title, caption, color, icon, data, chip = null, noLeads = false }) {
+  const noLeadsHint = "Tidak ditampilkan: angka sisa tidak punya pembagi lead yang adil.";
   return (
-    <div style={{ height: 6, borderRadius: 999, background: "#F1F2F4", overflow: "hidden" }} aria-hidden="true">
-      <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, value))}%`, borderRadius: 999, background: color }} />
-    </div>
-  );
-}
-
-/** Kartu satu kelompok. `showLeads` false = tanpa leads dan konversi (kelompok sisa). */
-function GroupCard({ title, subtitle, color, icon, data, showLeads = true, note = null }) {
-  const conv = convOf(data);
-  return (
-    <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 18, minWidth: 0, background: "#FFFFFF", position: "relative", overflow: "hidden" }}>
+    <div
+      style={{
+        border: `1px solid ${COLORS.border}`,
+        borderRadius: 20,
+        padding: 20,
+        minWidth: 0,
+        background: "#FFFFFF",
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+      }}
+    >
       <span aria-hidden="true" style={{ position: "absolute", inset: "0 0 auto 0", height: 4, background: color }} />
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, minWidth: 0 }}>
-        <span style={{ width: 38, height: 38, borderRadius: 12, background: color, color: "#FFFFFF", display: "grid", placeItems: "center", flexShrink: 0 }}>{icon}</span>
-        <div style={{ minWidth: 0 }}>
-          <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: COLORS.ink }}>{title}</p>
-          <p style={{ margin: 0, fontSize: 12, color: COLORS.muted }}>{subtitle}</p>
-        </div>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
-        {showLeads ? <MiniStat label="Leads" value={nfmt(data.leads)} /> : null}
-        <MiniStat label="Closing" value={nfmt(data.closing)} />
-        <MiniStat label="Nominal" value={rpShort(data.nominal)} />
-        <MiniStat label="Rata-rata / closing" value={data.closing ? rpShort(avgOf(data)) : "-"} />
-      </div>
-      {showLeads ? (
-        <div style={{ marginTop: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 800, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Konversi</span>
-            <span className="tabular-nums" style={{ fontSize: 15, fontWeight: 800, color: COLORS.ink }}>{pct(conv)}</span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <span style={{ width: 36, height: 36, borderRadius: 12, background: color, color: "#FFFFFF", display: "grid", placeItems: "center", flexShrink: 0 }}>{icon}</span>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: COLORS.ink, lineHeight: 1.2 }}>{title}</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: COLORS.muted, lineHeight: 1.3 }}>{caption}</p>
           </div>
-          <ConvBar value={conv} color={color} />
         </div>
-      ) : null}
-      {note ? <p style={{ margin: "14px 0 0", fontSize: 11.5, color: COLORS.muted, lineHeight: 1.45 }}>{note}</p> : null}
+      </div>
+
+      <div>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+          <span style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}>
+            <span className="tabular-nums" style={{ fontSize: 42, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.03em", color: COLORS.ink }}>{nfmt(data.closing)}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.muted }}>closing</span>
+          </span>
+          {chip ? (
+            <span style={{ alignSelf: "center", fontSize: 10.5, fontWeight: 800, color: COLORS.muted, background: "#F1F2F4", borderRadius: 999, padding: "4px 10px", whiteSpace: "nowrap" }}>{chip}</span>
+          ) : null}
+        </div>
+        <p className="tabular-nums" style={{ margin: "8px 0 0", fontSize: 18, fontWeight: 800, color, letterSpacing: "-0.01em" }}>{rpShort(data.nominal)}</p>
+      </div>
+
+      {/* Bagian bawah selalu menempel ke dasar kartu supaya barisan angka sejajar antar kartu. */}
+      <div style={{ marginTop: "auto", display: "grid", gap: 16 }}>
+        <div style={{ height: 1, background: COLORS.rowLine }} />
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <FootStat label="Leads" value={noLeads ? "-" : nfmt(data.leads)} hint={noLeads ? noLeadsHint : undefined} />
+          <FootStat label="Konversi" value={noLeads ? "-" : pct(convOf(data))} hint={noLeads ? noLeadsHint : undefined} />
+          <FootStat label="Rata-rata" value={data.closing ? rpShort(avgOf(data)) : "-"} hint="Nominal dibagi jumlah closing" />
+        </div>
+      </div>
     </div>
   );
 }
 
-/** Satu batang bertumpuk: porsi tiap kelompok dari satu ukuran (jumlah semua bagian = total halaman). */
-function ShareBar({ label, parts }) {
-  const total = parts.reduce((s, p) => s + p.value, 0);
+/** Satu batang bertumpuk: nama dan persen di dalam potongan, jumlah semua potongan = total halaman. */
+function ShareBar({ label, total, parts, height = 52, showName = true }) {
+  const sum = parts.reduce((s, p) => s + p.value, 0);
   return (
     <div>
-      <p style={{ margin: "0 0 6px", fontSize: 12, fontWeight: 800, color: COLORS.ink }}>{label}</p>
-      <div style={{ display: "flex", height: 26, borderRadius: 10, overflow: "hidden", background: "#F1F2F4", gap: 2 }} role="img" aria-label={label}>
-        {total > 0
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: COLORS.ink }}>{label}</p>
+        <p className="tabular-nums" style={{ margin: 0, fontSize: 12, fontWeight: 700, color: COLORS.muted }}>{total}</p>
+      </div>
+      <div style={{ display: "flex", height, borderRadius: 12, overflow: "hidden", background: "#F1F2F4", gap: 2 }} role="img" aria-label={label}>
+        {sum > 0
           ? parts
               .filter((p) => p.value > 0)
               .map((p) => {
-                const share = (p.value / total) * 100;
+                const share = (p.value / sum) * 100;
+                // Nama di atas, persen di bawah (muat di potongan sempit/HP); potongan yang sangat kecil tanpa teks.
+                const withName = showName && share >= 18;
                 return (
                   <div
                     key={p.name}
                     title={`${p.name}: ${p.format(p.value)} (${pct(share)})`}
-                    style={{ width: `${share}%`, background: p.color, color: "#FFFFFF", fontSize: 11, fontWeight: 800, display: "grid", placeItems: "center", minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" }}
+                    style={{ width: `${share}%`, background: p.color, color: "#FFFFFF", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", padding: "0 6px" }}
                   >
-                    {share >= 12 ? pct(share) : ""}
+                    {withName ? <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.92, lineHeight: 1.1, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span> : null}
+                    {share >= 9 ? <span style={{ fontSize: withName ? 14 : 12, fontWeight: 800, lineHeight: 1.1 }}>{pct(share)}</span> : null}
                   </div>
                 );
               })
@@ -1143,51 +1167,49 @@ function AgentAdminHelperSection({ data }) {
     { name: `Dibantu ${HELPER_NAME}`, color: HELPER_COLOR, closing: helper.closing, nominal: helper.nominal },
   ];
   const parts = (key, format) => groups.map((g) => ({ name: g.name, value: g[key], color: g.color, format }));
+  const totalClosing = groups.reduce((s, g) => s + g.closing, 0);
+  const totalNominal = groups.reduce((s, g) => s + g.nominal, 0);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))" }}>
-        <GroupCard title="Agent" subtitle="AI agent WhatsApp · angka AI Performance" color={AGENT_COLOR} icon={<Bot size={20} />} data={agent} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      <div style={{ display: "grid", gap: 14 }}>
+        <ShareBar label="Siapa yang closing" total={`${nfmt(totalClosing)} closing`} parts={parts("closing", nfmt)} />
+        <ShareBar label="Nominal closing" total={rp(totalNominal)} parts={parts("nominal", rpShort)} height={26} showName={false} />
+      </div>
+
+      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))" }}>
+        <GroupCard title="Agent" caption="AI agent WhatsApp" color={AGENT_COLOR} icon={<Bot size={19} />} data={agent} />
         {admins.map((a) => (
-          <GroupCard
-            key={a.name}
-            title={a.name}
-            subtitle="Admin · lead dengan PIC ini"
-            color={a.color}
-            icon={<Users size={20} />}
-            data={a}
-          />
+          <GroupCard key={a.name} title={a.name} caption="Admin · lead dengan PIC ini" color={a.color} icon={<Users size={19} />} data={a} />
         ))}
         <GroupCard
           title={`Dibantu ${HELPER_NAME}`}
-          subtitle="Sisa closing di luar Agent dan admin"
+          caption="Sisa closing manual"
           color={HELPER_COLOR}
-          icon={<Users size={20} />}
+          icon={<Users size={19} />}
           data={helper}
-          showLeads={false}
-          note="Angka sisa (total dikurangi Agent dan admin), bukan hasil pengukuran. Leads dan konversi tidak ditampilkan karena sisa ini tidak punya pembagi lead yang adil."
+          chip="Angka sisa"
+          noLeads
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <ShareBar label="Porsi closing" parts={parts("closing", nfmt)} />
-        <ShareBar label="Porsi nominal" parts={parts("nominal", rpShort)} />
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-        {groups.map((g) => (
-          <span key={g.name} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: COLORS.muted }}>
-            <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: 999, background: g.color, display: "inline-block" }} />
-            {g.name}
-          </span>
-        ))}
-      </div>
-
-      <p style={{ margin: 0, fontSize: 12, color: COLORS.muted, lineHeight: 1.5 }}>
-        Angka Agent sama dengan AI Performance Center. &quot;Leads&quot; Agent artinya lead yang nomornya ada di percakapan WhatsApp bulan ini
-        (termasuk chat yang diambil alih), sedangkan closing dan nominalnya hanya yang dicatat bot sendiri. Admin dihitung dari kolom PIC lead.
-        Sisa closing masuk &quot;Dibantu {HELPER_NAME}&quot;, jadi tiga bagian selalu menjumlah ke total halaman. Konversi Agent dan admin
-        memakai pembagi yang berbeda, jadi jangan dibandingkan langsung.
-      </p>
+      <details style={{ background: "#F8F9FA", border: `1px solid ${COLORS.rowLine}`, borderRadius: 14, padding: "12px 16px" }}>
+        <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 800, color: COLORS.ink }}>Cara membaca angka ini</summary>
+        <ul style={{ margin: "10px 0 0", paddingLeft: 18, display: "grid", gap: 6, fontSize: 12.5, color: COLORS.muted, lineHeight: 1.5 }}>
+          <li>
+            <b style={{ color: COLORS.ink }}>Agent</b>: sama dengan AI Performance Center. &quot;Leads&quot; = lead yang nomornya ada di percakapan WhatsApp
+            bulan ini (termasuk chat yang diambil alih); closing dan nominal hanya yang dicatat bot sendiri.
+          </li>
+          <li>
+            <b style={{ color: COLORS.ink }}>Admin</b>: dihitung dari kolom PIC lead. Admin baru muncul otomatis.
+          </li>
+          <li>
+            <b style={{ color: COLORS.ink }}>Dibantu {HELPER_NAME}</b>: sisa closing (total dikurangi Agent dan admin), bukan hasil ukur, jadi leads dan
+            konversinya tidak ditampilkan.
+          </li>
+          <li>Konversi Agent dan admin memakai pembagi yang berbeda, jadi jangan dibandingkan langsung.</li>
+        </ul>
+      </details>
     </div>
   );
 }
