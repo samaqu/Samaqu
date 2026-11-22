@@ -227,6 +227,12 @@ export default function WaInboxPanelView() {
 
   const current = items.find((c) => c.sender === selected) || null;
 
+  // Jam pesan pelanggan terakhir di chat yang dibuka: dasar centang biru (sudah dibaca).
+  const lastCustomerMs = useMemo(
+    () => thread.reduce((max, m) => (m.message || m.media_url ? Math.max(max, Date.parse(m.created_at) || 0) : max), 0),
+    [thread],
+  );
+
   // Pindah chat: kotak balasan dan pesan galat milik chat sebelumnya tidak ikut terbawa.
   useEffect(() => {
     setDraft("");
@@ -405,7 +411,7 @@ export default function WaInboxPanelView() {
                         {c.name || `+${c.sender}`}
                       </b>
                       <span style={{ display: "block", fontSize: 12, color: SUB, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {c.lastFrom === "kita" ? "Kita: " : ""}
+                        {c.lastFrom === "kita" ? <Ticks read={false} /> : null}
                         {c.lastMessage || "—"}
                       </span>
                     </span>
@@ -484,6 +490,7 @@ export default function WaInboxPanelView() {
                       <Bubble
                         side="right"
                         time={m.replied_at || m.created_at}
+                        read={Boolean(m.replied_at) && lastCustomerMs > (Date.parse(String(m.replied_at)) || Number.POSITIVE_INFINITY)}
                         who={m.admin_email ? m.admin_email.split("@")[0] : m.status === "admin" ? "admin" : "Bot"}
                       >
                         {m.reply_media_url ? <Media url={m.reply_media_url} name="Lampiran balasan" /> : null}
@@ -568,7 +575,22 @@ export default function WaInboxPanelView() {
   );
 }
 
-const isVideoUrl = (url: string) => /\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(String(url || ""));
+/**
+ * Centang dua ala WhatsApp Web. Abu-abu = terkirim. Biru = sudah dibaca: WhatsApp tidak memberi data "dibaca", jadi biru
+ * dipakai hanya kalau pelanggan sudah membalas SETELAH pesan kita (pasti sudah dibaca). Aturan sama dengan inbox Academy.
+ */
+function Ticks({ read }: { read: boolean }) {
+  return (
+    <span title={read ? "Dibaca" : "Terkirim"} style={{ display: "inline-block", lineHeight: 0, verticalAlign: "middle", marginRight: 4, color: read ? "#53bdeb" : "#8696a0" }}>
+      <svg viewBox="0 0 16 11" width="16" height="11" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1.5 5.9 4.4 8.8 10.3 1.4" />
+        <path d="M5.6 5.9 8.5 8.8 14.4 1.4" />
+      </svg>
+    </span>
+  );
+}
+
+const isVideoUrl =(url: string) => /\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(String(url || ""));
 
 /**
  * Lampiran di dalam gelembung: foto tampil langsung (klik = buka ukuran penuh), video bisa diputar. Kalau filenya
@@ -604,11 +626,14 @@ function Bubble({
   side,
   time,
   who,
+  read,
   children,
 }: {
   side: "left" | "right";
   time: string;
   who?: string;
+  /** Hanya untuk gelembung kita: true = centang biru (dibaca), false = abu-abu (terkirim), kosong = tanpa centang. */
+  read?: boolean;
   children: React.ReactNode;
 }) {
   const right = side === "right";
@@ -631,7 +656,10 @@ function Bubble({
       >
         {who ? <b style={{ fontSize: 11, color: "#0f766e" }}>{who}</b> : null}
         {children}
-        <span style={{ fontSize: 10.5, color: SUB, justifySelf: "end" }}>{clock(time)}</span>
+        <span style={{ fontSize: 10.5, color: SUB, justifySelf: "end", display: "inline-flex", alignItems: "center" }}>
+          {typeof read === "boolean" ? <Ticks read={read} /> : null}
+          {clock(time)}
+        </span>
       </div>
     </div>
   );
