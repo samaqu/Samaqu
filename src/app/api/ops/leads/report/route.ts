@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
-import { buildLeadsReportPdf, reportFileName, loadReportFonts, type LeadRow } from "@/lib/leads-report-pdf";
+import { buildLeadsReportPdf, reportFileName, loadReportFonts, type AgentStats, type LeadRow } from "@/lib/leads-report-pdf";
+import { GET as aiPerformanceGET } from "../../ai-performance/route";
 
 /**
  * GET /api/ops/leads/report?bulan=YYYY-MM
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
     for (let offset = 0; offset < MAX_ROWS; offset += PAGE_SIZE) {
       const { data, error } = await admin
         .from("leads")
-        .select("tanggal, sumber, status, nominal")
+        .select("tanggal, sumber, status, nominal, pic")
         .gte("tanggal", start)
         .lte("tanggal", end)
         .order("tanggal", { ascending: true })
@@ -66,7 +67,19 @@ export async function GET(req: NextRequest) {
       fonts = undefined;
     }
 
-    const report = await buildLeadsReportPdf({ month: bulan, leads: rows, fonts });
+    // Angka Agent: SATU SUMBER dengan dashboard AI Performance (handler route yang sama, bukan hitungan lain).
+    // Gagal dimuat → halaman Agent/Admin dilewati, laporan lain tetap jadi.
+    let agent: AgentStats | null = null;
+    try {
+      const aiReq = new NextRequest(new URL(`/api/ops/ai-performance?month=${bulan}`, req.url), { headers: req.headers });
+      const aiRes = await aiPerformanceGET(aiReq);
+      if (aiRes.ok) agent = ((await aiRes.json()) as { stats?: AgentStats })?.stats ?? null;
+      else console.error("[OPS] AI Performance untuk laporan gagal:", aiRes.status);
+    } catch (aiErr) {
+      console.error("[OPS] AI Performance untuk laporan tidak terbaca:", aiErr);
+    }
+
+    const report = await buildLeadsReportPdf({ month: bulan, leads: rows, fonts, agent });
 
     return new NextResponse(Buffer.from(report.bytes), {
       status: 200,

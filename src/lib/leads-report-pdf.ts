@@ -26,6 +26,8 @@ export interface LeadRow {
   sumber?: string | null;
   status?: string | null;
   nominal?: number | null;
+  /** Penanggung jawab lead (kolom `leads.pic`); dipakai seksi Agent / Admin / dibantu Surya. */
+  pic?: string | null;
 }
 
 export interface DailyLeadRow {
@@ -779,6 +781,256 @@ function drawTableRow(ctx: Ctx, row: DailyLeadRow, o: { zebra: boolean; rowH: nu
   ctx.y = y;
 }
 
+/* ────────────────────────────── halaman Agent / Admin / dibantu Surya ────────────────────────────── */
+
+/** Angka Agent dari AI Performance Center (`/api/ops/ai-performance` → `stats`), satu sumber dengan dashboard itu. */
+export interface AgentStats {
+  leadsFromChat?: number | null;
+  closing?: number | null;
+  nominal?: number | null;
+}
+
+export interface GroupStat {
+  key: "agent" | "admin" | "helper";
+  name: string;
+  caption: string;
+  color: string;
+  leads: number;
+  closing: number;
+  nominal: number;
+  shareClosing: number;
+  shareNominal: number;
+  /** Kelompok sisa: leads, konversi, dan rata-rata tidak punya pembagi yang adil, jadi tidak ditampilkan. */
+  noLeads: boolean;
+}
+
+const AGENT_COLOR = SKY;
+const HELPER_COLOR = "#475569";
+/** Warna tiap admin (urut nominal). Admin baru otomatis kebagian warna berikutnya. */
+const ADMIN_PALETTE = ["#f97316", "#14b8a6", "#e11d48", "#8b5cf6", "#eab308", "#22c55e", "#ec4899", "#6366f1"];
+/** Nama orang yang menyelesaikan closing di luar Agent dan admin ber-PIC (sisa). Sama dengan halaman laporan. */
+const HELPER_NAME = "Surya";
+
+/**
+ * Logika SAMA dengan `buildAgentAdminHelper` di halaman /ops/leads/laporan: Agent = AI Performance Center;
+ * Admin = tiap nama PIC selain "Agent" (kolom `leads.pic`); Dibantu Surya = SISA closing dan nominal
+ * (total dikurangi Agent dan semua admin).
+ */
+export function buildGroupStats(
+  totals: { closing: number; nominal: number },
+  ai: AgentStats,
+  leads: LeadRow[]
+): GroupStat[] {
+  const agent = {
+    leads: Number(ai?.leadsFromChat) || 0,
+    closing: Number(ai?.closing) || 0,
+    nominal: Number(ai?.nominal) || 0,
+  };
+
+  const byName = new Map<string, { name: string; leads: number; closing: number; nominal: number }>();
+  for (const l of leads || []) {
+    const name = String(l.pic ?? "").trim();
+    if (!name || name.toLowerCase() === "agent") continue;
+    const key = name.toLowerCase();
+    if (!byName.has(key)) byName.set(key, { name, leads: 0, closing: 0, nominal: 0 });
+    const row = byName.get(key)!;
+    row.leads += 1;
+    if (l.status === "closing") {
+      row.closing += 1;
+      row.nominal += Number(l.nominal) || 0;
+    }
+  }
+  const admins = [...byName.values()].sort((a, b) => b.nominal - a.nominal || b.leads - a.leads);
+
+  const adminClosing = admins.reduce((s, a) => s + a.closing, 0);
+  const adminNominal = admins.reduce((s, a) => s + a.nominal, 0);
+  const helper = {
+    closing: Math.max(0, (Number(totals.closing) || 0) - agent.closing - adminClosing),
+    nominal: Math.max(0, (Number(totals.nominal) || 0) - agent.nominal - adminNominal),
+  };
+
+  const totalClosing = agent.closing + adminClosing + helper.closing;
+  const totalNominal = agent.nominal + adminNominal + helper.nominal;
+  const share = (v: number, t: number) => (t > 0 ? (v / t) * 100 : 0);
+
+  const out: GroupStat[] = [
+    {
+      key: "agent",
+      name: "Agent",
+      caption: "AI agent WhatsApp",
+      color: AGENT_COLOR,
+      ...agent,
+      shareClosing: share(agent.closing, totalClosing),
+      shareNominal: share(agent.nominal, totalNominal),
+      noLeads: false,
+    },
+  ];
+  admins.forEach((a, i) => {
+    out.push({
+      key: "admin",
+      name: a.name,
+      caption: "Admin · lead ber-PIC",
+      color: ADMIN_PALETTE[i % ADMIN_PALETTE.length],
+      leads: a.leads,
+      closing: a.closing,
+      nominal: a.nominal,
+      shareClosing: share(a.closing, totalClosing),
+      shareNominal: share(a.nominal, totalNominal),
+      noLeads: false,
+    });
+  });
+  out.push({
+    key: "helper",
+    name: `Dibantu ${HELPER_NAME}`,
+    caption: "Sisa closing manual",
+    color: HELPER_COLOR,
+    leads: 0,
+    closing: helper.closing,
+    nominal: helper.nominal,
+    shareClosing: share(helper.closing, totalClosing),
+    shareNominal: share(helper.nominal, totalNominal),
+    noLeads: true,
+  });
+  return out;
+}
+
+const rp = (n: number) => `Rp ${nfmt(Math.round(n))}`;
+const pctText = (n: number) => `${n.toFixed(1)}%`;
+
+const GROUP_CARD_H = 224;
+
+/** Satu kartu kelompok: ikon inisial + nama, blok warna (closing + nominal penuh), bar share nominal, tiga baris info. */
+function drawGroupCard(ctx: Ctx, g: GroupStat, x: number, top: number, w: number) {
+  const page = ctx.page;
+  const y = top - GROUP_CARD_H;
+  const pad = 12;
+  rrect(page, { x, y, w, h: GROUP_CARD_H, r: 12, fill: "#ffffff", border: LINE });
+
+  // kepala: lingkaran inisial + nama + keterangan
+  page.drawCircle({ x: x + pad + 12, y: top - pad - 12, size: 12, color: hex(g.color) });
+  textCenter(page, ctx.bold, (g.key === "helper" ? HELPER_NAME : g.name).charAt(0).toUpperCase(), {
+    center: x + pad + 12,
+    y: top - pad - 15.5,
+    size: 10,
+    color: "#ffffff",
+  });
+  const nameX = x + pad + 30;
+  const nameMax = w - pad * 2 - 30;
+  text(page, ctx.bold, g.name, { x: nameX, y: top - pad - 9, size: fitSize(ctx.bold, g.name, nameMax, 10.5, 7), color: INK });
+  text(page, ctx.regular, g.caption, { x: nameX, y: top - pad - 20, size: fitSize(ctx.regular, g.caption, nameMax, 7.5, 6), color: SUB });
+
+  // blok warna
+  const heroH = 74;
+  const heroTop = top - pad - 34;
+  const heroY = heroTop - heroH;
+  rrect(page, { x: x + pad, y: heroY, w: w - pad * 2, h: heroH, r: 9, fill: g.color });
+  text(page, ctx.bold, g.key === "helper" ? "CLOSING · ANGKA SISA" : "CLOSING", {
+    x: x + pad + 10,
+    y: heroTop - 15,
+    size: fitSize(ctx.bold, "CLOSING · ANGKA SISA", w - pad * 2 - 62, 6.8, 5.5),
+    color: "#ffffff",
+  });
+  // persen porsi closing (pil putih)
+  const pill = pctText(g.shareClosing);
+  const pw = ctx.bold.widthOfTextAtSize(pill, 7.5) + 12;
+  rrect(page, { x: x + w - pad - 8 - pw, y: heroTop - 21, w: pw, h: 14, r: 7, fill: "#ffffff" });
+  textCenter(page, ctx.bold, pill, { center: x + w - pad - 8 - pw / 2, y: heroTop - 17, size: 7.5, color: g.color });
+  text(page, ctx.bold, nfmt(g.closing), { x: x + pad + 10, y: heroTop - 44, size: 26, color: "#ffffff" });
+  const nom = rp(g.nominal);
+  text(page, ctx.bold, nom, { x: x + pad + 10, y: heroTop - 62, size: fitSize(ctx.bold, nom, w - pad * 2 - 20, 11.5, 7.5), color: "#ffffff" });
+
+  // share nominal
+  let cy = heroY - 18;
+  text(page, ctx.bold, "SHARE NOMINAL", { x: x + pad, y: cy, size: 6.5, color: SUB });
+  textRight(page, ctx.bold, pctText(g.shareNominal), { right: x + w - pad, y: cy, size: 8, color: INK });
+  cy -= 10;
+  rrect(page, { x: x + pad, y: cy - 6, w: w - pad * 2, h: 6, r: 3, fill: TRACK });
+  const fw = ((w - pad * 2) * Math.max(0, Math.min(100, g.shareNominal))) / 100;
+  if (fw > 0) rrect(page, { x: x + pad, y: cy - 6, w: Math.max(fw, 6), h: 6, r: 3, fill: g.color });
+
+  // tiga baris info
+  const avg = g.closing > 0 ? g.nominal / g.closing : 0;
+  const rows: [string, string][] = [
+    ["Leads", g.noLeads ? "—" : nfmt(g.leads)],
+    ["Konversi", g.noLeads ? "—" : pctText(g.leads > 0 ? (g.closing / g.leads) * 100 : 0)],
+    ["Rata-rata", g.noLeads ? "—" : g.closing > 0 ? rp(avg) : "—"],
+  ];
+  cy -= 14;
+  rows.forEach(([label, value], i) => {
+    hline(page, cy + 4, x + pad, x + w - pad, "#f1f5f9", 0.6);
+    text(page, ctx.regular, label, { x: x + pad, y: cy - 8, size: 8, color: SUB });
+    textRight(page, ctx.bold, value, { right: x + w - pad, y: cy - 8, size: fitSize(ctx.bold, value, w - pad * 2 - 44, 9, 6.5), color: INK });
+    cy -= 20;
+    void i;
+  });
+}
+
+/** Gambar seluruh halaman kelompok (judul band sudah digambar pemanggil). */
+function drawGroupsPage(ctx: Ctx, groups: GroupStat[]) {
+  const page = ctx.page;
+  const totalClosing = groups.reduce((s, g) => s + g.closing, 0);
+  const totalNominal = groups.reduce((s, g) => s + g.nominal, 0);
+
+  // 1) bar porsi closing (bertumpuk) + legenda
+  sectionTitle(ctx, "Porsi closing", `${nfmt(totalClosing)} closing · ${rp(totalNominal)}`);
+  const barH = 14;
+  const gapW = 2;
+  const active = groups.filter((g) => g.closing > 0);
+  const usable = CW - gapW * Math.max(0, active.length - 1);
+  rrect(page, { x: MARGIN, y: ctx.y - barH, w: CW, h: barH, r: 7, fill: TRACK });
+  let bx = MARGIN;
+  active.forEach((g) => {
+    const w = (g.closing / Math.max(1, totalClosing)) * usable;
+    if (w > 0) rrect(page, { x: bx, y: ctx.y - barH, w, h: barH, r: Math.min(5, w / 2), fill: g.color });
+    bx += w + gapW;
+  });
+  ctx.y -= barH + 16;
+  let lx = MARGIN;
+  groups.forEach((g) => {
+    const label = `${g.name}  ${pctText(g.shareClosing)}`;
+    const lw = ctx.regular.widthOfTextAtSize(label, 8.5) + 22;
+    if (lx + lw > MARGIN + CW) return; // legenda tidak boleh melebar keluar halaman
+    page.drawCircle({ x: lx + 3.5, y: ctx.y + 3, size: 3.2, color: hex(g.color) });
+    text(page, ctx.regular, label, { x: lx + 12, y: ctx.y, size: 8.5, color: TEXT });
+    lx += lw + 6;
+  });
+  ctx.y -= 26;
+
+  // 2) kartu kelompok (maks 4 per baris)
+  sectionTitle(ctx, "Rincian per kelompok");
+  const perRow = Math.min(4, Math.max(1, groups.length));
+  const gap = 10;
+  const w = (CW - gap * (perRow - 1)) / perRow;
+  for (let i = 0; i < groups.length; i += perRow) {
+    groups.slice(i, i + perRow).forEach((g, j) => drawGroupCard(ctx, g, MARGIN + j * (w + gap), ctx.y, w));
+    ctx.y -= GROUP_CARD_H + 12;
+  }
+  ctx.y -= 6;
+
+  // 3) cara membaca angka
+  sectionTitle(ctx, "Cara membaca angka ini");
+  const notes = [
+    `Persen di pojok kartu = porsi dari total closing (${nfmt(totalClosing)} closing, ${rp(totalNominal)}). "Share nominal" = porsi dari total nominal. Semua kartu menjumlah ke total halaman.`,
+    'Agent: sama dengan AI Performance Center. "Leads" = lead yang nomornya ada di percakapan WhatsApp bulan ini (termasuk chat yang diambil alih); closing dan nominal hanya yang dicatat bot sendiri.',
+    "Admin: dihitung dari kolom PIC lead. Admin baru muncul otomatis.",
+    `Dibantu ${HELPER_NAME}: sisa closing (total dikurangi Agent dan admin), bukan hasil ukur, jadi leads, konversi, dan rata-ratanya tidak ditampilkan.`,
+    "Konversi Agent dan admin memakai pembagi yang berbeda, jadi jangan dibandingkan langsung.",
+  ];
+  const lines = notes.map((n) => wrap(n, ctx.regular, 8.5, CW - 40));
+  const h = lines.reduce((t, l) => t + l.length * 11.5 + 3, 0) + 20;
+  rrect(page, { x: MARGIN, y: ctx.y - h, w: CW, h, r: 10, fill: SOFT, border: LINE });
+  let ny = ctx.y - 16;
+  lines.forEach((ls) => {
+    page.drawCircle({ x: MARGIN + 15, y: ny + 3, size: 1.8, color: hex(SKY) });
+    ls.forEach((l) => {
+      text(page, ctx.regular, l, { x: MARGIN + 24, y: ny, size: 8.5, color: TEXT });
+      ny -= 11.5;
+    });
+    ny -= 3;
+  });
+  ctx.y -= h;
+}
+
 /* ────────────────────────────── footer ────────────────────────────── */
 
 function drawFooters(doc: PDFDocument, regular: PDFFont, bold: PDFFont) {
@@ -813,7 +1065,7 @@ export interface BuiltLeadsReport {
 }
 
 export async function buildLeadsReportPdf(
-  input: LeadsReportInput & { fonts?: ReportFonts }
+  input: LeadsReportInput & { fonts?: ReportFonts; agent?: AgentStats | null }
 ): Promise<BuiltLeadsReport> {
   const now = input.now ?? new Date();
   const summary = summarizeLeadsReport({ month: input.month, leads: input.leads, now });
@@ -875,8 +1127,6 @@ export async function buildLeadsReportPdf(
   sectionTitle(ctx, "Sorotan dan catatan analisis");
   drawHighlights(ctx, highlights);
 
-  /* ═══ Halaman 2 — rekap data harian ═══ */
-  ctx.page = doc.addPage([PAGE_W, PAGE_H]);
   const slimBand = (title: string, sub: string) => {
     rrect(ctx.page, { x: 0, y: PAGE_H - 56, w: PAGE_W, h: 56, fill: NAVY });
     rrect(ctx.page, { x: 0, y: PAGE_H - 56, w: PAGE_W, h: 2.5, fill: SKY });
@@ -886,6 +1136,18 @@ export async function buildLeadsReportPdf(
     textRight(ctx.page, bold, "SAMAQU", { right: MARGIN + CW, y: PAGE_H - 30, size: 10, color: "#ffffff" });
     ctx.y = PAGE_H - 56 - 18;
   };
+  /* ═══ Halaman 2 — Agent / Admin / dibantu Surya (hanya bila angka AI Performance tersedia) ═══ */
+  if (input.agent) {
+    const periodLeads = (input.leads || []).filter((l) => l.tanggal >= summary.periodStart && l.tanggal <= summary.periodEnd);
+    const nominalClosing = periodLeads.reduce((t, l) => (l.status === "closing" ? t + (Number(l.nominal) || 0) : t), 0);
+    const groups = buildGroupStats({ closing: summary.totals.closing, nominal: nominalClosing }, input.agent, periodLeads);
+    ctx.page = doc.addPage([PAGE_W, PAGE_H]);
+    slimBand("Agent, Admin, dan dibantu Surya", `${summary.periodLabel}${summary.running ? " · data berjalan" : ""} · satu sumber dengan AI Performance Center`);
+    drawGroupsPage(ctx, groups);
+  }
+
+  /* ═══ Halaman rekap data harian ═══ */
+  ctx.page = doc.addPage([PAGE_W, PAGE_H]);
   slimBand("Rekap Data Harian", `${summary.periodLabel}${summary.running ? " · data berjalan" : ""} · ${summary.dayCount} hari`);
 
   const headH = 28;
