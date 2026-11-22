@@ -998,106 +998,33 @@ function PanelHead({ title, subtitle, right }) {
   );
 }
 
-/* ───────────────────────── agent vs admin (per PIC) ───────────────────────── */
+/* ───────────────────────── agent vs admin (satu sumber: AI Performance) ───────────────────────── */
 
-const PIC_NONE_LABEL = "Belum tercatat";
 const AGENT_COLOR = "#0EA5E9";
-const ADMIN_COLOR = "#F97316";
-const NONE_COLOR = "#CBD5E1";
-/** Warna tiap admin (urut kemunculan). Admin baru otomatis kebagian warna berikutnya. */
-const PIC_PALETTE = ["#F97316", "#14B8A6", "#E11D48", "#8B5CF6", "#EAB308", "#22C55E", "#EC4899", "#6366F1"];
-
-/**
- * Kelompok dari kolom `leads.pic`: "Agent" = AI agent, kosong = belum tercatat (data lama), selain itu = admin.
- * Nama admin apa pun otomatis masuk "Admin", jadi admin baru tidak perlu mengubah kode.
- */
-const picKind = (pic) => {
-  const name = String(pic || "").trim();
-  if (!name) return "none";
-  return name.toLowerCase() === "agent" ? "agent" : "admin";
-};
-
-/**
- * Nama orang yang menyelesaikan closing Agent secara manual (tanpa catatan closing bot). Sistem tidak merekam siapa
- * yang membantu; labelnya disimpulkan dari "PIC Agent, closing, tapi bukan closing bot". Ganti di sini kalau admin
- * lain mulai ikut ambil alih (mis. jadi "admin").
- */
-const HELPER_NAME = "Surya";
-
-/** Kunci pencocokan nomor ke catatan closing bot: 9 digit terakhir (08xx, 628xx, dan 8xx dianggap sama). */
-const contactKey = (value) => {
-  const d = String(value || "").replace(/\D/g, "");
-  return d.length >= 8 ? d.slice(-9) : "";
-};
-
-/**
- * @param botKeys Set kunci nomor yang punya catatan closing bot bulan itu (dari /api/ops/leads/closing-bot),
- *   atau null kalau datanya tidak tersedia (pemisahan Agent disembunyikan, tampilan seperti biasa).
- */
-function buildPicAggregate(list, botKeys = null) {
-  const empty = () => ({ leads: 0, closing: 0, nominal: 0 });
-  const groups = { agent: empty(), admin: empty(), none: empty() };
-  const agentSplit = { botClosing: 0, botNominal: 0, helped: 0, helpedNominal: 0 };
-  const people = new Map();
-  /** Sumber × kelompok PIC, untuk perbandingan yang adil (sumber yang sama dibandingkan dengan sumber yang sama). */
-  const bySourceKind = {};
-  SOURCES.forEach((s) => {
-    bySourceKind[s] = { agent: empty(), admin: empty(), none: empty() };
-  });
-  (list || []).forEach((l) => {
-    const raw = String(l.pic || "").trim();
-    const kind = picKind(raw);
-    const key = raw.toLowerCase() || "__none__";
-    if (!people.has(key)) people.set(key, { key, name: raw || PIC_NONE_LABEL, kind, ...empty() });
-    const isClosing = l.status === "closing";
-    const value = isClosing ? Number(l.nominal) || 0 : 0;
-    // Closing PIC Agent dipisah: ada catatan closing bot untuk nomor itu = oleh bot, tidak ada = diselesaikan manual.
-    if (isClosing && kind === "agent" && botKeys) {
-      if (botKeys.has(contactKey(l.kontak))) {
-        agentSplit.botClosing += 1;
-        agentSplit.botNominal += value;
-      } else {
-        agentSplit.helped += 1;
-        agentSplit.helpedNominal += value;
-      }
-    }
-    if (SOURCES.includes(l.sumber)) {
-      const cell = bySourceKind[l.sumber][kind];
-      cell.leads += 1;
-      if (isClosing) {
-        cell.closing += 1;
-        cell.nominal += value;
-      }
-    }
-    [groups[kind], people.get(key)].forEach((g) => {
-      g.leads += 1;
-      if (isClosing) {
-        g.closing += 1;
-        g.nominal += value;
-      }
-    });
-  });
-  const kindOrder = { agent: 0, admin: 1, none: 2 };
-  const sorted = [...people.values()].sort((a, b) => kindOrder[a.kind] - kindOrder[b.kind] || b.nominal - a.nominal || b.leads - a.leads);
-  let adminIndex = 0;
-  sorted.forEach((p) => {
-    p.color = p.kind === "agent" ? AGENT_COLOR : p.kind === "none" ? NONE_COLOR : PIC_PALETTE[adminIndex++ % PIC_PALETTE.length];
-  });
-  return { groups, people: sorted, bySourceKind, agentSplit: botKeys ? agentSplit : null };
-}
+const REST_COLOR = "#F97316";
 
 const convOf = (g) => (g.leads ? (g.closing / g.leads) * 100 : 0);
 const avgOf = (g) => (g.closing ? g.nominal / g.closing : 0);
 
-function PicAvatar({ name, color, kind }) {
-  return (
-    <span
-      aria-hidden="true"
-      style={{ width: 38, height: 38, borderRadius: 999, background: color, color: "#FFFFFF", display: "grid", placeItems: "center", fontSize: 15, fontWeight: 800, flexShrink: 0 }}
-    >
-      {kind === "agent" ? <Bot size={19} /> : String(name || "?").trim().charAt(0).toUpperCase()}
-    </span>
-  );
+/**
+ * SATU SUMBER. Angka Agent diambil PERSIS dari AI Performance Center (`/api/ops/ai-performance`), bukan dihitung
+ * ulang dari kolom PIC: leads = "Leads dicatat AI" (lead yang nomornya ada di percakapan WA bulan itu),
+ * closing dan nominal = closing yang dicatat bot sendiri (`wa_closings`). Konversi = closing ÷ leads, sama dengan
+ * "54 dari 281 lead AI" di dashboard itu. "Admin & lainnya" = total halaman dikurangi Agent, jadi jumlahnya
+ * selalu nyambung ke total (termasuk lead Website yang order langsung tanpa chat).
+ */
+function buildAgentVsRest(totals, ai) {
+  const agent = {
+    leads: Number(ai?.leadsFromChat) || 0,
+    closing: Number(ai?.closing) || 0,
+    nominal: Number(ai?.nominal) || 0,
+  };
+  const rest = {
+    leads: Math.max(0, (Number(totals?.total) || 0) - agent.leads),
+    closing: Math.max(0, (Number(totals?.closing) || 0) - agent.closing),
+    nominal: Math.max(0, (Number(totals?.nominal) || 0) - agent.nominal),
+  };
+  return { agent, rest };
 }
 
 function MiniStat({ label, value }) {
@@ -1117,40 +1044,17 @@ function ConvBar({ value, color }) {
   );
 }
 
-/** Satu baris pemisahan closing Agent: titik warna, label, jumlah, nominal. */
-function SplitLine({ color, label, count, nominal, hint }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-        <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: 999, background: color, flexShrink: 0 }} />
-        <span style={{ minWidth: 0 }}>
-          <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: COLORS.ink }}>{label}</span>
-          {hint ? <span style={{ display: "block", fontSize: 11, color: COLORS.muted }}>{hint}</span> : null}
-        </span>
-      </span>
-      <span className="tabular-nums" style={{ fontSize: 13, fontWeight: 800, color: COLORS.ink, whiteSpace: "nowrap" }}>
-        {nfmt(count)} closing · {rpShort(nominal)}
-      </span>
-    </div>
-  );
-}
-
-function GroupCard({ title, subtitle, color, icon, data, best, extra = null }) {
+function GroupCard({ title, subtitle, color, icon, data }) {
   const conv = convOf(data);
   return (
     <div style={{ border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 18, minWidth: 0, background: "#FFFFFF", position: "relative", overflow: "hidden" }}>
       <span aria-hidden="true" style={{ position: "absolute", inset: "0 0 auto 0", height: 4, background: color }} />
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <span style={{ width: 38, height: 38, borderRadius: 12, background: color, color: "#FFFFFF", display: "grid", placeItems: "center", flexShrink: 0 }}>{icon}</span>
-          <div style={{ minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: COLORS.ink }}>{title}</p>
-            <p style={{ margin: 0, fontSize: 12, color: COLORS.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</p>
-          </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, minWidth: 0 }}>
+        <span style={{ width: 38, height: 38, borderRadius: 12, background: color, color: "#FFFFFF", display: "grid", placeItems: "center", flexShrink: 0 }}>{icon}</span>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: COLORS.ink }}>{title}</p>
+          <p style={{ margin: 0, fontSize: 12, color: COLORS.muted }}>{subtitle}</p>
         </div>
-        {best ? (
-          <span style={{ fontSize: 10.5, fontWeight: 800, color: "#15803D", background: "#DCFCE7", borderRadius: 999, padding: "4px 10px", whiteSpace: "nowrap" }}>Konversi tertinggi</span>
-        ) : null}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
         <MiniStat label="Leads" value={nfmt(data.leads)} />
@@ -1165,12 +1069,11 @@ function GroupCard({ title, subtitle, color, icon, data, best, extra = null }) {
         </div>
         <ConvBar value={conv} color={color} />
       </div>
-      {extra}
     </div>
   );
 }
 
-/** Satu batang bertumpuk: porsi Agent / Admin / Belum tercatat dari satu ukuran. */
+/** Satu batang bertumpuk: porsi Agent dan Admin & lainnya dari satu ukuran. */
 function ShareBar({ label, parts }) {
   const total = parts.reduce((s, p) => s + p.value, 0);
   return (
@@ -1198,193 +1101,16 @@ function ShareBar({ label, parts }) {
   );
 }
 
-/** Perbandingan dianggap belum meyakinkan kalau salah satu pihak punya lead kurang dari ini. */
-const MIN_SAMPLE = 10;
-
-function verdictOf(a, b) {
-  if (!a.leads || !b.leads) return { label: "-", bg: "#F3F4F6", fg: COLORS.muted, small: false };
-  const ca = convOf(a);
-  const cb = convOf(b);
-  const small = a.leads < MIN_SAMPLE || b.leads < MIN_SAMPLE;
-  if (Math.abs(ca - cb) < 1) return { label: "Seimbang", bg: "#F3F4F6", fg: COLORS.muted, small };
-  return ca > cb
-    ? { label: "Agent", bg: "#E0F2FE", fg: "#0369A1", small, agentWins: true }
-    : { label: "Admin", bg: "#FFEDD5", fg: "#C2410C", small, agentWins: false };
-}
-
-function PicTabs({ value, onChange, items }) {
-  return (
-    <div role="tablist" style={{ display: "inline-flex", gap: 4, padding: 4, background: "#F3F4F6", borderRadius: 12, alignSelf: "flex-start", maxWidth: "100%", overflowX: "auto" }}>
-      {items.map((it) => {
-        const on = it.id === value;
-        return (
-          <button
-            key={it.id}
-            type="button"
-            role="tab"
-            aria-selected={on}
-            onClick={() => onChange(it.id)}
-            style={{
-              border: 0,
-              cursor: "pointer",
-              borderRadius: 9,
-              padding: "8px 14px",
-              fontSize: 13,
-              fontWeight: 800,
-              whiteSpace: "nowrap",
-              background: on ? "#FFFFFF" : "transparent",
-              color: on ? COLORS.ink : COLORS.muted,
-              boxShadow: on ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
-            }}
-          >
-            {it.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Tabel sumber × PIC: tiap sumber membandingkan Agent dengan Admin pada sumber yang sama. */
-function SourceCompare({ bySourceKind, noneLeads }) {
-  const th = { fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted, padding: "8px 10px", whiteSpace: "nowrap", textAlign: "right" };
-  const td = { fontSize: 14, padding: "12px 10px", borderTop: `1px solid ${COLORS.rowLine}`, whiteSpace: "nowrap", textAlign: "right" };
-  const rows = SOURCES.map((s) => ({ source: s, agent: bySourceKind[s].agent, admin: bySourceKind[s].admin }));
-  const sum = (key) => rows.reduce((acc, r) => ({ leads: acc.leads + r[key].leads, closing: acc.closing + r[key].closing, nominal: acc.nominal + r[key].nominal }), { leads: 0, closing: 0, nominal: 0 });
-  const total = { source: null, agent: sum("agent"), admin: sum("admin") };
-
-  const renderRow = (r) => {
-    const v = verdictOf(r.agent, r.admin);
-    const ca = convOf(r.agent);
-    const cb = convOf(r.admin);
-    const both = r.agent.leads > 0 && r.admin.leads > 0;
-    const strong = { fontWeight: 800, color: COLORS.ink };
-    return (
-      <tr key={r.source || "total"} style={r.source ? undefined : { background: COLORS.totalBg }}>
-        <td style={{ ...td, textAlign: "left", fontWeight: 800, color: COLORS.ink, borderTop: r.source ? td.borderTop : `2px solid ${COLORS.border}` }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            {r.source ? <SourceDot source={r.source} size={9} /> : null}
-            {r.source ? SOURCE_LABEL[r.source] : "Semua sumber"}
-          </span>
-        </td>
-        <td style={{ ...td, color: COLORS.muted, borderLeft: `1px solid ${COLORS.rowLine}` }}>{nfmt(r.agent.leads)}</td>
-        <td style={{ ...td, color: COLORS.muted }}>{nfmt(r.agent.closing)}</td>
-        <td style={{ ...td, ...(both && ca > cb ? strong : { color: COLORS.muted }) }}>{r.agent.leads ? pct(ca) : "-"}</td>
-        <td style={{ ...td, color: COLORS.muted, borderLeft: `1px solid ${COLORS.rowLine}` }}>{nfmt(r.admin.leads)}</td>
-        <td style={{ ...td, color: COLORS.muted }}>{nfmt(r.admin.closing)}</td>
-        <td style={{ ...td, ...(both && cb > ca ? strong : { color: COLORS.muted }) }}>{r.admin.leads ? pct(cb) : "-"}</td>
-        <td style={{ ...td, borderLeft: `1px solid ${COLORS.rowLine}` }}>
-          <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 3 }}>
-            <span style={{ fontSize: 12, fontWeight: 800, background: v.bg, color: v.fg, borderRadius: 999, padding: "3px 12px" }}>{v.label}</span>
-            {v.small && v.label !== "-" ? <span style={{ fontSize: 10.5, fontWeight: 600, color: COLORS.faint }}>contoh masih kecil</span> : null}
-          </span>
-        </td>
-      </tr>
-    );
-  };
-
-  return (
-    <div>
-      <div style={{ overflowX: "auto" }}>
-        <table className="tabular-nums" style={{ width: "100%", borderCollapse: "collapse", minWidth: 680 }}>
-          <thead>
-            <tr>
-              <th scope="col" style={{ ...th, textAlign: "left" }} rowSpan={2}>Sumber</th>
-              <th scope="colgroup" colSpan={3} style={{ ...th, textAlign: "center", color: "#0369A1", background: "#F0F9FF", borderRadius: "10px 10px 0 0" }}>
-                Agent
-              </th>
-              <th scope="colgroup" colSpan={3} style={{ ...th, textAlign: "center", color: "#C2410C", background: "#FFF7ED", borderRadius: "10px 10px 0 0" }}>
-                Admin
-              </th>
-              <th scope="col" style={th} rowSpan={2}>Unggul</th>
-            </tr>
-            <tr>
-              <th scope="col" style={{ ...th, background: "#F0F9FF" }}>Lead</th>
-              <th scope="col" style={{ ...th, background: "#F0F9FF" }}>Closing</th>
-              <th scope="col" style={{ ...th, background: "#F0F9FF" }}>Konversi</th>
-              <th scope="col" style={{ ...th, background: "#FFF7ED" }}>Lead</th>
-              <th scope="col" style={{ ...th, background: "#FFF7ED" }}>Closing</th>
-              <th scope="col" style={{ ...th, background: "#FFF7ED" }}>Konversi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(renderRow)}
-            {renderRow(total)}
-          </tbody>
-        </table>
-      </div>
-      <p style={{ margin: "12px 0 0", fontSize: 12, color: COLORS.muted, lineHeight: 1.5 }}>
-        Tiap baris membandingkan Agent dan Admin pada sumber yang sama, jadi campuran sumber tidak mempengaruhi hasil. &quot;Contoh masih kecil&quot; muncul kalau salah satu pihak punya kurang dari {MIN_SAMPLE} lead.
-        {noneLeads > 0 ? ` ${nfmt(noneLeads)} lead tanpa PIC tidak ikut dibandingkan.` : ""}
-      </p>
-    </div>
-  );
-}
-
-function PicSection({ agg, botInfo = null }) {
-  const [tab, setTab] = useState("ringkasan");
-  const { groups, people, bySourceKind, agentSplit } = agg;
-  /** Pemisahan closing Agent: oleh bot sendiri (ada catatan closing bot) lawan diselesaikan manual. */
-  const agentExtra = agentSplit ? (
-    <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px dashed ${COLORS.border}`, display: "grid", gap: 10 }}>
-      <p style={{ margin: 0, fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted }}>
-        Closing Agent: siapa yang menyelesaikan
-      </p>
-      <SplitLine color={AGENT_COLOR} label="Oleh bot sendiri" count={agentSplit.botClosing} nominal={agentSplit.botNominal} />
-      <SplitLine
-        color="#94A3B8"
-        label={`Dibantu ${HELPER_NAME}`}
-        hint="bukan closing bot, diselesaikan manual"
-        count={agentSplit.helped}
-        nominal={agentSplit.helpedNominal}
-      />
-      <p style={{ margin: 0, fontSize: 12, color: COLORS.muted }}>
-        Konversi bot saja: <b style={{ color: COLORS.ink }}>{pct(groups.agent.leads ? (agentSplit.botClosing / groups.agent.leads) * 100 : 0)}</b>
-      </p>
-    </div>
-  ) : null;
-  const adminNames = people.filter((p) => p.kind === "admin").map((p) => p.name);
-  const agentConv = convOf(groups.agent);
-  const adminConv = convOf(groups.admin);
-  const bothHave = groups.agent.leads > 0 && groups.admin.leads > 0;
+function AgentVsRestSection({ agent, rest }) {
   const parts = (key, format) => [
-    { name: "Agent", value: groups.agent[key], color: AGENT_COLOR, format },
-    { name: "Admin", value: groups.admin[key], color: ADMIN_COLOR, format },
-    { name: PIC_NONE_LABEL, value: groups.none[key], color: NONE_COLOR, format },
+    { name: "Agent", value: agent[key], color: AGENT_COLOR, format },
+    { name: "Admin & lainnya", value: rest[key], color: REST_COLOR, format },
   ];
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <PicTabs
-        value={tab}
-        onChange={setTab}
-        items={[
-          { id: "ringkasan", label: "Ringkasan" },
-          { id: "sumber", label: "Per sumber" },
-          { id: "pic", label: "Per PIC" },
-        ]}
-      />
-
-      {tab === "ringkasan" ? (
-        <>
       <div className="grid gap-4 md:grid-cols-2">
-        <GroupCard
-          title="Agent"
-          subtitle="AI agent WhatsApp"
-          color={AGENT_COLOR}
-          icon={<Bot size={20} />}
-          data={groups.agent}
-          best={bothHave && agentConv > adminConv}
-          extra={agentExtra}
-        />
-        <GroupCard
-          title="Admin"
-          subtitle={adminNames.length ? adminNames.join(", ") : "Belum ada lead dengan PIC admin"}
-          color={ADMIN_COLOR}
-          icon={<Users size={20} />}
-          data={groups.admin}
-          best={bothHave && adminConv > agentConv}
-        />
+        <GroupCard title="Agent" subtitle="AI agent WhatsApp · angka AI Performance" color={AGENT_COLOR} icon={<Bot size={20} />} data={agent} />
+        <GroupCard title="Admin & lainnya" subtitle="Total dikurangi Agent (manual + Website langsung)" color={REST_COLOR} icon={<Users size={20} />} data={rest} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -1395,8 +1121,7 @@ function PicSection({ agg, botInfo = null }) {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
         {[
           ["Agent", AGENT_COLOR],
-          ["Admin", ADMIN_COLOR],
-          [PIC_NONE_LABEL, NONE_COLOR],
+          ["Admin & lainnya", REST_COLOR],
         ].map(([name, color]) => (
           <span key={name} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: COLORS.muted }}>
             <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: 999, background: color, display: "inline-block" }} />
@@ -1404,59 +1129,12 @@ function PicSection({ agg, botInfo = null }) {
           </span>
         ))}
       </div>
-      {agentSplit && botInfo ? (
-        <p style={{ margin: 0, fontSize: 12, color: COLORS.muted, lineHeight: 1.5 }}>
-          AI Performance mencatat {nfmt(botInfo.count)} closing bot bulan ini ({rpShort(botInfo.nominal)}). {nfmt(agentSplit.botClosing)} di antaranya
-          cocok dengan lead PIC Agent yang closing; sisanya ada di lead PIC lain, lead yang belum berstatus closing, atau lead di luar bulan ini.
-        </p>
-      ) : null}
 
-        </>
-      ) : null}
-
-      {tab === "sumber" ? <SourceCompare bySourceKind={bySourceKind} noneLeads={groups.none.leads} /> : null}
-
-      {tab === "pic" ? (
-      <div>
-        <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, color: COLORS.ink }}>Rincian per PIC</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {people.map((p) => {
-            const conv = convOf(p);
-            return (
-              <div
-                key={p.key}
-                style={{ display: "grid", gridTemplateColumns: "minmax(150px, 1.3fr) repeat(3, minmax(70px, 0.7fr)) minmax(120px, 1.2fr)", alignItems: "center", gap: 12, border: `1px solid ${COLORS.rowLine}`, borderRadius: 14, padding: "10px 14px", background: "#FFFFFF" }}
-                className="lp-pic-row"
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                  <PicAvatar name={p.name} color={p.color} kind={p.kind} />
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</p>
-                    <p style={{ margin: 0, fontSize: 11, color: COLORS.muted }}>
-                      {p.kind === "agent"
-                        ? `AI agent${agentSplit ? ` · ${agentSplit.botClosing} closing bot, ${agentSplit.helped} dibantu ${HELPER_NAME}` : ""}`
-                        : p.kind === "none"
-                          ? "Data lama tanpa PIC"
-                          : "Admin"}
-                    </p>
-                  </div>
-                </div>
-                <MiniStat label="Leads" value={nfmt(p.leads)} />
-                <MiniStat label="Closing" value={nfmt(p.closing)} />
-                <MiniStat label="Nominal" value={rpShort(p.nominal)} />
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 800, color: COLORS.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Konversi</span>
-                    <span className="tabular-nums" style={{ fontSize: 13, fontWeight: 800, color: COLORS.ink }}>{pct(conv)}</span>
-                  </div>
-                  <ConvBar value={conv} color={p.color} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      ) : null}
+      <p style={{ margin: 0, fontSize: 12, color: COLORS.muted, lineHeight: 1.5 }}>
+        Angka Agent sama dengan AI Performance Center. &quot;Leads&quot; di sana artinya lead yang nomornya ada di percakapan WhatsApp bulan ini
+        (termasuk chat yang diambil alih admin), sedangkan closing dan nominal hanya yang dicatat bot sendiri. &quot;Admin &amp; lainnya&quot; adalah sisa
+        dari total halaman ini, termasuk lead Website yang order langsung tanpa chat, jadi konversinya tidak sebanding langsung dengan Agent.
+      </p>
     </div>
   );
 }
@@ -1567,37 +1245,40 @@ export default function LaporanLeads() {
   const agg = useMemo(() => buildAggregate(leads), [leads]);
   const prevAgg = useMemo(() => buildAggregate(prevLeads), [prevLeads]);
   /**
-   * Closing yang dicatat bot sendiri bulan ini (Academy `wa_closings`, sumber yang sama dengan AI Performance).
-   * Tambahan saja: kalau gagal/tidak tersedia, pemisahan closing Agent disembunyikan dan halaman tampil seperti biasa.
+   * SATU SUMBER untuk angka Agent: endpoint AI Performance Center yang sama dengan dashboard AI Performance
+   * (`/api/ops/ai-performance`). Tidak ada fallback ke hitungan lain: kalau gagal dimuat, seksi Agent vs Admin
+   * menampilkan pesan, bukan angka yang berbeda dari dashboard itu.
    */
-  const { data: botClosing } = useQuery({
-    queryKey: ["leads_closing_bot", monthKey],
+  const {
+    data: aiPerf,
+    isLoading: aiLoading,
+    isError: aiError,
+    refetch: refetchAi,
+  } = useQuery({
+    queryKey: ["leads_ai_performance", monthKey],
     queryFn: async () => {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
-      const res = await fetch(`/api/ops/leads/closing-bot?bulan=${monthKey}`, {
+      const res = await fetch(`/api/ops/ai-performance?month=${monthKey}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      if (!res.ok) throw new Error(`closing bot ${res.status}`);
+      if (!res.ok) throw new Error(`ai-performance ${res.status}`);
       return res.json();
     },
     retry: false,
     throwOnError: false,
   });
-  const botKeys = useMemo(
-    () => (botClosing?.available && Array.isArray(botClosing.keys) ? new Set(botClosing.keys) : null),
-    [botClosing],
-  );
-  const botInfo = botClosing?.available ? { count: Number(botClosing.count) || 0, nominal: Number(botClosing.nominal) || 0 } : null;
-
-  /** Perbandingan Agent vs Admin dari kolom `pic` lead bulan terpilih. */
-  const picAgg = useMemo(() => buildPicAggregate(leads, botKeys), [leads, botKeys]);
 
   /** Batas hari yang ditampilkan di Rekap harian: bulan berjalan sampai hari ini (WIB), bulan lewat semua, bulan depan kosong. */
   const todayIso = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const dailyLimit = isCurrentMonth ? todayIso : monthKey > currentMonthKey() ? "" : null;
 
   const { totals, bySource, leaks } = agg;
+  /** Agent = angka AI Performance; Admin & lainnya = total halaman dikurangi Agent. */
+  const agentVsRest = useMemo(
+    () => (aiPerf?.stats ? buildAgentVsRest(totals, aiPerf.stats) : null),
+    [aiPerf, totals],
+  );
   const rate = totals.total ? (totals.closing / totals.total) * 100 : 0;
   const avgPerClosing = totals.closing ? totals.nominal / totals.closing : 0;
   const dayCount = Number(end.slice(8, 10));
@@ -1897,16 +1578,31 @@ export default function LaporanLeads() {
               <DailyTable days={allDays} totals={{ ...totals, bySource }} todayKey={dailyLimit} />
             </Panel>
 
-            {/* AGENT VS ADMIN (per PIC) */}
+            {/* AGENT VS ADMIN: satu sumber dengan dashboard AI Performance */}
             <Panel delay={0.1}>
               <PanelHead
                 title="Agent vs Admin"
-                subtitle="Perbandingan berdasarkan PIC lead. Admin baru otomatis muncul di sini."
+                subtitle="Angka Agent sama dengan AI Performance Center. Admin & lainnya = total dikurangi Agent."
               />
-              {picAgg.people.length === 0 ? (
-                <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>Belum ada lead di bulan ini.</p>
+              {agentVsRest ? (
+                <AgentVsRestSection agent={agentVsRest.agent} rest={agentVsRest.rest} />
+              ) : aiLoading ? (
+                <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>Memuat angka AI Performance…</p>
               ) : (
-                <PicSection agg={picAgg} botInfo={botInfo} />
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
+                  <p style={{ margin: 0, fontSize: 13, color: COLORS.muted }}>
+                    {aiError
+                      ? "Angka AI Performance belum bisa dimuat, jadi perbandingan disembunyikan supaya tidak berbeda dari dashboard itu."
+                      : "Belum ada data AI Performance untuk bulan ini."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => refetchAi()}
+                    style={{ border: `1px solid ${COLORS.border}`, background: "#FFFFFF", borderRadius: 10, padding: "7px 12px", fontSize: 12, fontWeight: 800, color: COLORS.ink, cursor: "pointer" }}
+                  >
+                    Coba lagi
+                  </button>
+                </div>
               )}
             </Panel>
 
