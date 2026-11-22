@@ -1021,6 +1021,11 @@ function buildPicAggregate(list) {
   const empty = () => ({ leads: 0, closing: 0, nominal: 0 });
   const groups = { agent: empty(), admin: empty(), none: empty() };
   const people = new Map();
+  /** Sumber × kelompok PIC, untuk perbandingan yang adil (sumber yang sama dibandingkan dengan sumber yang sama). */
+  const bySourceKind = {};
+  SOURCES.forEach((s) => {
+    bySourceKind[s] = { agent: empty(), admin: empty(), none: empty() };
+  });
   (list || []).forEach((l) => {
     const raw = String(l.pic || "").trim();
     const kind = picKind(raw);
@@ -1028,6 +1033,14 @@ function buildPicAggregate(list) {
     if (!people.has(key)) people.set(key, { key, name: raw || PIC_NONE_LABEL, kind, ...empty() });
     const isClosing = l.status === "closing";
     const value = isClosing ? Number(l.nominal) || 0 : 0;
+    if (SOURCES.includes(l.sumber)) {
+      const cell = bySourceKind[l.sumber][kind];
+      cell.leads += 1;
+      if (isClosing) {
+        cell.closing += 1;
+        cell.nominal += value;
+      }
+    }
     [groups[kind], people.get(key)].forEach((g) => {
       g.leads += 1;
       if (isClosing) {
@@ -1042,7 +1055,7 @@ function buildPicAggregate(list) {
   sorted.forEach((p) => {
     p.color = p.kind === "agent" ? AGENT_COLOR : p.kind === "none" ? NONE_COLOR : PIC_PALETTE[adminIndex++ % PIC_PALETTE.length];
   });
-  return { groups, people: sorted };
+  return { groups, people: sorted, bySourceKind };
 }
 
 const convOf = (g) => (g.leads ? (g.closing / g.leads) * 100 : 0);
@@ -1138,8 +1151,132 @@ function ShareBar({ label, parts }) {
   );
 }
 
+/** Perbandingan dianggap belum meyakinkan kalau salah satu pihak punya lead kurang dari ini. */
+const MIN_SAMPLE = 10;
+
+function verdictOf(a, b) {
+  if (!a.leads || !b.leads) return { label: "-", bg: "#F3F4F6", fg: COLORS.muted, small: false };
+  const ca = convOf(a);
+  const cb = convOf(b);
+  const small = a.leads < MIN_SAMPLE || b.leads < MIN_SAMPLE;
+  if (Math.abs(ca - cb) < 1) return { label: "Seimbang", bg: "#F3F4F6", fg: COLORS.muted, small };
+  return ca > cb
+    ? { label: "Agent", bg: "#E0F2FE", fg: "#0369A1", small, agentWins: true }
+    : { label: "Admin", bg: "#FFEDD5", fg: "#C2410C", small, agentWins: false };
+}
+
+function PicTabs({ value, onChange, items }) {
+  return (
+    <div role="tablist" style={{ display: "inline-flex", gap: 4, padding: 4, background: "#F3F4F6", borderRadius: 12, alignSelf: "flex-start", maxWidth: "100%", overflowX: "auto" }}>
+      {items.map((it) => {
+        const on = it.id === value;
+        return (
+          <button
+            key={it.id}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(it.id)}
+            style={{
+              border: 0,
+              cursor: "pointer",
+              borderRadius: 9,
+              padding: "8px 14px",
+              fontSize: 13,
+              fontWeight: 800,
+              whiteSpace: "nowrap",
+              background: on ? "#FFFFFF" : "transparent",
+              color: on ? COLORS.ink : COLORS.muted,
+              boxShadow: on ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
+            }}
+          >
+            {it.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Tabel sumber × PIC: tiap sumber membandingkan Agent dengan Admin pada sumber yang sama. */
+function SourceCompare({ bySourceKind, noneLeads }) {
+  const th = { fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.muted, padding: "8px 10px", whiteSpace: "nowrap", textAlign: "right" };
+  const td = { fontSize: 14, padding: "12px 10px", borderTop: `1px solid ${COLORS.rowLine}`, whiteSpace: "nowrap", textAlign: "right" };
+  const rows = SOURCES.map((s) => ({ source: s, agent: bySourceKind[s].agent, admin: bySourceKind[s].admin }));
+  const sum = (key) => rows.reduce((acc, r) => ({ leads: acc.leads + r[key].leads, closing: acc.closing + r[key].closing, nominal: acc.nominal + r[key].nominal }), { leads: 0, closing: 0, nominal: 0 });
+  const total = { source: null, agent: sum("agent"), admin: sum("admin") };
+
+  const renderRow = (r) => {
+    const v = verdictOf(r.agent, r.admin);
+    const ca = convOf(r.agent);
+    const cb = convOf(r.admin);
+    const both = r.agent.leads > 0 && r.admin.leads > 0;
+    const strong = { fontWeight: 800, color: COLORS.ink };
+    return (
+      <tr key={r.source || "total"} style={r.source ? undefined : { background: COLORS.totalBg }}>
+        <td style={{ ...td, textAlign: "left", fontWeight: 800, color: COLORS.ink, borderTop: r.source ? td.borderTop : `2px solid ${COLORS.border}` }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            {r.source ? <SourceDot source={r.source} size={9} /> : null}
+            {r.source ? SOURCE_LABEL[r.source] : "Semua sumber"}
+          </span>
+        </td>
+        <td style={{ ...td, color: COLORS.muted, borderLeft: `1px solid ${COLORS.rowLine}` }}>{nfmt(r.agent.leads)}</td>
+        <td style={{ ...td, color: COLORS.muted }}>{nfmt(r.agent.closing)}</td>
+        <td style={{ ...td, ...(both && ca > cb ? strong : { color: COLORS.muted }) }}>{r.agent.leads ? pct(ca) : "-"}</td>
+        <td style={{ ...td, color: COLORS.muted, borderLeft: `1px solid ${COLORS.rowLine}` }}>{nfmt(r.admin.leads)}</td>
+        <td style={{ ...td, color: COLORS.muted }}>{nfmt(r.admin.closing)}</td>
+        <td style={{ ...td, ...(both && cb > ca ? strong : { color: COLORS.muted }) }}>{r.admin.leads ? pct(cb) : "-"}</td>
+        <td style={{ ...td, borderLeft: `1px solid ${COLORS.rowLine}` }}>
+          <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 3 }}>
+            <span style={{ fontSize: 12, fontWeight: 800, background: v.bg, color: v.fg, borderRadius: 999, padding: "3px 12px" }}>{v.label}</span>
+            {v.small && v.label !== "-" ? <span style={{ fontSize: 10.5, fontWeight: 600, color: COLORS.faint }}>contoh masih kecil</span> : null}
+          </span>
+        </td>
+      </tr>
+    );
+  };
+
+  return (
+    <div>
+      <div style={{ overflowX: "auto" }}>
+        <table className="tabular-nums" style={{ width: "100%", borderCollapse: "collapse", minWidth: 680 }}>
+          <thead>
+            <tr>
+              <th scope="col" style={{ ...th, textAlign: "left" }} rowSpan={2}>Sumber</th>
+              <th scope="colgroup" colSpan={3} style={{ ...th, textAlign: "center", color: "#0369A1", background: "#F0F9FF", borderRadius: "10px 10px 0 0" }}>
+                Agent
+              </th>
+              <th scope="colgroup" colSpan={3} style={{ ...th, textAlign: "center", color: "#C2410C", background: "#FFF7ED", borderRadius: "10px 10px 0 0" }}>
+                Admin
+              </th>
+              <th scope="col" style={th} rowSpan={2}>Unggul</th>
+            </tr>
+            <tr>
+              <th scope="col" style={{ ...th, background: "#F0F9FF" }}>Lead</th>
+              <th scope="col" style={{ ...th, background: "#F0F9FF" }}>Closing</th>
+              <th scope="col" style={{ ...th, background: "#F0F9FF" }}>Konversi</th>
+              <th scope="col" style={{ ...th, background: "#FFF7ED" }}>Lead</th>
+              <th scope="col" style={{ ...th, background: "#FFF7ED" }}>Closing</th>
+              <th scope="col" style={{ ...th, background: "#FFF7ED" }}>Konversi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(renderRow)}
+            {renderRow(total)}
+          </tbody>
+        </table>
+      </div>
+      <p style={{ margin: "12px 0 0", fontSize: 12, color: COLORS.muted, lineHeight: 1.5 }}>
+        Tiap baris membandingkan Agent dan Admin pada sumber yang sama, jadi campuran sumber tidak mempengaruhi hasil. &quot;Contoh masih kecil&quot; muncul kalau salah satu pihak punya kurang dari {MIN_SAMPLE} lead.
+        {noneLeads > 0 ? ` ${nfmt(noneLeads)} lead tanpa PIC tidak ikut dibandingkan.` : ""}
+      </p>
+    </div>
+  );
+}
+
 function PicSection({ agg }) {
-  const { groups, people } = agg;
+  const [tab, setTab] = useState("ringkasan");
+  const { groups, people, bySourceKind } = agg;
   const adminNames = people.filter((p) => p.kind === "admin").map((p) => p.name);
   const agentConv = convOf(groups.agent);
   const adminConv = convOf(groups.admin);
@@ -1152,6 +1289,18 @@ function PicSection({ agg }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <PicTabs
+        value={tab}
+        onChange={setTab}
+        items={[
+          { id: "ringkasan", label: "Ringkasan" },
+          { id: "sumber", label: "Per sumber" },
+          { id: "pic", label: "Per PIC" },
+        ]}
+      />
+
+      {tab === "ringkasan" ? (
+        <>
       <div className="grid gap-4 md:grid-cols-2">
         <GroupCard
           title="Agent"
@@ -1189,6 +1338,12 @@ function PicSection({ agg }) {
         ))}
       </div>
 
+        </>
+      ) : null}
+
+      {tab === "sumber" ? <SourceCompare bySourceKind={bySourceKind} noneLeads={groups.none.leads} /> : null}
+
+      {tab === "pic" ? (
       <div>
         <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, color: COLORS.ink }}>Rincian per PIC</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1224,6 +1379,7 @@ function PicSection({ agg }) {
           })}
         </div>
       </div>
+      ) : null}
     </div>
   );
 }
