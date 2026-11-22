@@ -164,7 +164,8 @@ export async function POST(req: NextRequest) {
   const mediaUrl = String(body?.url ?? "").trim();
   const mediaFilename = String(body?.filename ?? "").trim().slice(0, 120);
 
-  if (!target || !message) {
+  // Pesan teks wajib; kalau ada lampiran, keterangan boleh kosong (foto saja dari inbox Academy).
+  if (!target || (!message && !mediaUrl)) {
     return NextResponse.json({ error: "target dan message wajib" }, { status: 400 });
   }
 
@@ -176,6 +177,10 @@ export async function POST(req: NextRequest) {
       /^https:\/\/samaqu-media\.samaqu\.workers\.dev\//.test(mediaUrl) ||
       // Media Product Knowledge Academy (bucket series-videos) — sumber foto/video bot WA.
       /^https:\/\/rbjxjdgqtcwwbvuwtlpg\.supabase\.co\/storage\/v1\/object\/public\/series-videos\//.test(
+        mediaUrl,
+      ) ||
+      // Foto yang dikirim admin dari inbox Academy (bucket wa-outgoing, publik).
+      /^https:\/\/rbjxjdgqtcwwbvuwtlpg\.supabase\.co\/storage\/v1\/object\/public\/wa-outgoing\//.test(
         mediaUrl,
       ) ||
       (Boolean(base) && mediaUrl.startsWith(`${base}/`)) ||
