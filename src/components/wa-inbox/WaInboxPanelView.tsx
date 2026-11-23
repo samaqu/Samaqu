@@ -94,14 +94,18 @@ function clock(iso: string): string {
   return `${p.day} ${p.month} · ${p.hour}.${p.minute}`;
 }
 
-/** Lama menunggu → teks + warna (HANYA informasi, tidak memicu apa pun). */
-function waitInfo(iso?: string | null): { text: string; color: string; bg: string } | null {
+/**
+ * Lama menunggu → teks + warna (HANYA informasi, tidak memicu apa pun). Batas warna mengikuti pengaturan SLA
+ * (Performa Admin): hijau sebelum batas warning, kuning sebelum batas terlambat, merah sesudahnya. Bawaan 5 dan 10 menit
+ * (dipakai juga bila pengaturan gagal dimuat), sama seperti sebelumnya.
+ */
+function waitInfo(iso?: string | null, warnMin = 5, lateMin = 10): { text: string; color: string; bg: string } | null {
   const t = Date.parse(String(iso || ""));
   if (!Number.isFinite(t)) return null;
   const min = Math.max(0, Math.floor((Date.now() - t) / 60000));
   const text = min < 60 ? `${min} mnt` : `${Math.floor(min / 60)} j ${min % 60} mnt`;
-  if (min < 5) return { text, color: "#166534", bg: "#dcfce7" };
-  if (min < 10) return { text, color: "#92400e", bg: "#fef3c7" };
+  if (min < warnMin) return { text, color: "#166534", bg: "#dcfce7" };
+  if (min < lateMin) return { text, color: "#92400e", bg: "#fef3c7" };
   return { text, color: "#991b1b", bg: "#fee2e2" };
 }
 
@@ -197,6 +201,27 @@ export default function WaInboxPanelView() {
       setTplError(e instanceof Error ? e.message : "Gagal memuat template.");
     }
   }, []);
+  /** Batas warna waktu tunggu (menit) dari pengaturan SLA; bawaan 5/10 bila gagal dimuat. */
+  const [sla, setSla] = useState({ warn: 5, late: 10 });
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { data: session } = await supabase.auth.getSession();
+        const token = session.session?.access_token;
+        if (!token) return;
+        const res = await fetch("/api/ops/performa/config", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+        const json = await res.json().catch(() => null);
+        if (alive && res.ok && Number.isFinite(json?.warningMin) && Number.isFinite(json?.lateMin)) setSla({ warn: json.warningMin, late: json.lateMin });
+      } catch {
+        /* tetap 5/10 */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   /** Tab daftar: milik saya / antrean (menunggu admin, belum ada PIC) / semua. Bawaan "semua" selama pembatasan server belum aktif. */
   const [tab, setTab] = useState<"mine" | "queue" | "all">("all");
 
@@ -578,7 +603,7 @@ export default function WaInboxPanelView() {
               <p style={{ padding: 20, color: SUB, fontSize: 13 }}>Tidak ada percakapan.</p>
             ) : (
               visible.map((c) => {
-                const wait = c.pending > 0 ? waitInfo(c.oldestPendingAt) : null;
+                const wait = c.pending > 0 ? waitInfo(c.oldestPendingAt, sla.warn, sla.late) : null;
                 const active = c.sender === selected;
                 return (
                   <button
