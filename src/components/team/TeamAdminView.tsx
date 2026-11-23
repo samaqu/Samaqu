@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { STATUS_CHANGED_EVENT, STATUS_STYLE, shownStatus, type WorkStatus } from "@/lib/admin-status";
 import { useOnlineAdmins } from "@/lib/use-admin-presence";
 import AbsensiView from "./AbsensiView";
+import ConfirmDialog from "@/components/ops/ConfirmDialog";
 
 type Role = "owner" | "leader" | "admin" | "admin_operasional" | "other";
 
@@ -88,6 +89,7 @@ export default function TeamAdminView() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editing, setEditing] = useState<{ id: string; title: string } | null>(null);
   const [linkShown, setLinkShown] = useState<{ name: string; link: string } | null>(null);
+  const [deactivate, setDeactivate] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -284,8 +286,12 @@ export default function TeamAdminView() {
                       style={{ ...btn(), color: m.active ? "#b91c1c" : "#166534" }}
                       disabled={busyId === m.id}
                       onClick={() => {
-                        if (m.active && !window.confirm(`Nonaktifkan ${m.name}? Akun ini tidak bisa login sampai diaktifkan lagi. Datanya tidak dihapus.`)) return;
-                        void act(m.id, () => api("PATCH", { id: m.id, active: !m.active }), m.active ? `${m.name} dinonaktifkan.` : `${m.name} diaktifkan lagi.`);
+                        // Menonaktifkan minta konfirmasi lewat modal; mengaktifkan lagi langsung jalan.
+                        if (m.active) {
+                          setDeactivate({ id: m.id, name: m.name });
+                          return;
+                        }
+                        void act(m.id, () => api("PATCH", { id: m.id, active: true }), `${m.name} diaktifkan lagi.`);
                       }}
                     >
                       {m.active ? "Nonaktifkan" : "Aktifkan"}
@@ -314,6 +320,21 @@ export default function TeamAdminView() {
           }}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={deactivate !== null}
+        tone="danger"
+        title={`Nonaktifkan ${deactivate?.name ?? "akun ini"}?`}
+        message="Akun ini tidak bisa login sampai diaktifkan lagi. Datanya tidak dihapus, dan Anda bisa mengaktifkannya kembali kapan saja."
+        confirmLabel="Ya, Nonaktifkan"
+        busy={deactivate !== null && busyId === deactivate.id}
+        onCancel={() => setDeactivate(null)}
+        onConfirm={() => {
+          const target = deactivate;
+          setDeactivate(null);
+          if (target) void act(target.id, () => api("PATCH", { id: target.id, active: false }), `${target.name} dinonaktifkan.`);
+        }}
+      />
     </div>
   );
 }
