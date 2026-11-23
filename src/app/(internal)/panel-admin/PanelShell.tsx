@@ -18,6 +18,8 @@ import { Toaster } from "@/components/ops/ui/toaster";
 import { OpsPageMapProvider } from "@/lib/ops-router";
 import { useWibLongDate } from "./wib-date";
 import styles from "./panel.module.css";
+import { useAdminPresenceTracker, useOnlineAdmins } from "@/lib/use-admin-presence";
+import { STATUS_CHANGED_EVENT, STATUS_OPTIONS, STATUS_STYLE, asWorkStatus, shownStatus, type WorkStatus } from "@/lib/admin-status";
 import { usePendingReviewCount } from "@/lib/use-pending-reviews";
 import { useResellerQueueCount } from "@/lib/use-reseller-queue";
 import { usePendingDraftCount } from "@/lib/use-pending-drafts";
@@ -240,7 +242,11 @@ export default function PanelShell({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [authorized, setAuthorized] = useState(false);
   /** Nama + label jabatan akun yang login (header kanan atas). Sebelum terbaca / kalau gagal, tampilan lama ("Lea") dipakai. */
-  const [me, setMe] = useState<{ name: string; title: string } | null>(null);
+  const [me, setMe] = useState<{ name: string; title: string; userId: string; status: WorkStatus | null } | null>(null);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
+  useAdminPresenceTracker(me?.userId);
+  const onlineIds = useOnlineAdmins();
   /** Ulasan menunggu persetujuan -> badge menu "Ulasan Pelanggan". */
   const pendingReviews = usePendingReviewCount(authorized);
   /** Antrean reseller yang perlu dicek -> badge menu "Reseller". */
@@ -390,7 +396,15 @@ export default function PanelShell({ children }: { children: ReactNode }) {
         const res = await fetch("/api/ops/me", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
         if (!res.ok) return;
         const json = await res.json();
-        if (!cancelled && json?.name) setMe({ name: String(json.name), title: String(json.title || "") });
+        if (!cancelled && json?.name) {
+          setMe({
+            name: String(json.name),
+            title: String(json.title || ""),
+            userId: String(json.userId || ""),
+            // null = kolom status belum ada di database (migrasi belum dijalankan): pemilih disembunyikan.
+            status: json.status == null ? null : asWorkStatus(json.status),
+          });
+        }
       } catch {
         /* header tetap memakai tampilan lama */
       }
@@ -399,6 +413,30 @@ export default function PanelShell({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [authorized]);
+
+  async function changeStatus(next: WorkStatus) {
+    if (statusBusy) return;
+    setStatusBusy(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) return;
+      const res = await fetch("/api/ops/status", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      });
+      if (res.ok) {
+        setMe((prev) => (prev ? { ...prev, status: next } : prev));
+        window.dispatchEvent(new Event(STATUS_CHANGED_EVENT));
+      }
+    } catch {
+      /* status lama tetap tampil */
+    } finally {
+      setStatusBusy(false);
+      setStatusOpen(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -737,6 +775,53 @@ export default function PanelShell({ children }: { children: ReactNode }) {
               <b>{me?.name || "Lea"}</b>
               <small>{me?.title || "SAMAQU"}</small>
             </div>
+            {me?.status ? (
+              <div style={{ position: "relative", marginLeft: 8 }}>
+                {(() => {
+                  const shown = STATUS_STYLE[shownStatus(me.status, onlineIds.has(me.userId))];
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => setStatusOpen((v) => !v)}
+                      title="Ubah status kerja"
+                      aria-haspopup="listbox"
+                      aria-expanded={statusOpen}
+                      style={{ border: 0, background: shown.bg, color: shown.fg, borderRadius: 999, padding: "5px 11px", fontSize: 12, fontWeight: 800, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
+                    >
+                      <i style={{ width: 8, height: 8, borderRadius: "50%", background: shown.dot, display: "inline-block" }} />
+                      {shown.label}
+                    </button>
+                  );
+                })()}
+                {statusOpen ? (
+                  <>
+                    <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setStatusOpen(false)} />
+                    <div role="listbox" style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 41, minWidth: 220, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: 6, boxShadow: "0 12px 32px rgba(15,23,42,0.14)" }}>
+                      {STATUS_OPTIONS.map((o) => {
+                        const st = STATUS_STYLE[o.value];
+                        return (
+                          <button
+                            key={o.value}
+                            type="button"
+                            role="option"
+                            aria-selected={me.status === o.value}
+                            disabled={statusBusy}
+                            onClick={() => void changeStatus(o.value)}
+                            style={{ width: "100%", textAlign: "left", border: 0, background: me.status === o.value ? "#f8fafc" : "transparent", borderRadius: 10, padding: "8px 10px", cursor: "pointer", display: "flex", gap: 10, alignItems: "center" }}
+                          >
+                            <i style={{ width: 10, height: 10, borderRadius: "50%", background: st.dot, display: "inline-block", flex: "none" }} />
+                            <span style={{ display: "grid" }}>
+                              <b style={{ fontSize: 13, color: "#1f2937" }}>{o.label}</b>
+                              <small style={{ fontSize: 11.5, color: "#6b7280" }}>{o.hint}</small>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
 

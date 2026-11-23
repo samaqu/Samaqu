@@ -10,6 +10,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { STATUS_CHANGED_EVENT, STATUS_STYLE, shownStatus, type WorkStatus } from "@/lib/admin-status";
+import { useOnlineAdmins } from "@/lib/use-admin-presence";
 
 type Role = "owner" | "leader" | "admin" | "admin_operasional" | "other";
 
@@ -20,6 +22,8 @@ interface Member {
   title: string;
   role: Role;
   active: boolean;
+  userId: string;
+  status: WorkStatus;
   invited: boolean;
   lastSignIn: string | null;
   isMe: boolean;
@@ -93,7 +97,13 @@ export default function TeamAdminView() {
 
   useEffect(() => {
     void load();
+    // Status diubah dari header (tab yang sama): muat ulang supaya kartu "Anda" ikut berubah.
+    const onChanged = () => void load();
+    window.addEventListener(STATUS_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(STATUS_CHANGED_EVENT, onChanged);
   }, [load]);
+
+  const onlineIds = useOnlineAdmins();
 
   const members = [...(data?.items || [])].sort(
     (a, b) => Number(b.active) - Number(a.active) || (ROLE_RANK[a.role] ?? 9) - (ROLE_RANK[b.role] ?? 9) || a.name.localeCompare(b.name),
@@ -197,6 +207,17 @@ export default function TeamAdminView() {
                 </span>
                 <span style={{ background: "#f1f5f9", color: SUB, borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 600 }}>Akses: {ROLE_LABEL[m.role] || "Admin"}</span>
                 {m.invited ? <span style={{ background: "#e0f2fe", color: "#075985", borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 700 }}>Menunggu undangan</span> : null}
+                {!m.invited && m.active
+                  ? (() => {
+                      const st = STATUS_STYLE[shownStatus(m.status, onlineIds.has(m.userId))];
+                      return (
+                        <span style={{ background: st.bg, color: st.fg, borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <i style={{ width: 8, height: 8, borderRadius: "50%", background: st.dot, display: "inline-block" }} />
+                          {st.label}
+                        </span>
+                      );
+                    })()
+                  : null}
                 {!m.active ? <span style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 700 }}>Nonaktif</span> : null}
               </div>
               <span style={{ fontSize: 12, color: SUB }}>{m.invited ? "Belum membuat password" : sinceLabel(m.lastSignIn)}</span>
