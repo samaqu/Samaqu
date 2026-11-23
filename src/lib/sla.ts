@@ -32,6 +32,8 @@ export interface SlaConfig {
   opDays: number[];
   queueAlertThreshold: number;
   countOutsideHours: boolean;
+  /** "YYYY-MM-DD" (WIB): chat yang MULAI sebelum tanggal ini tidak dihitung dalam performa admin (aturan baru berlaku mulai tanggal ini). */
+  effectiveFrom: string;
 }
 
 export const DEFAULT_SLA: SlaConfig = {
@@ -44,7 +46,15 @@ export const DEFAULT_SLA: SlaConfig = {
   opDays: [1, 2, 3, 4, 5, 6],
   queueAlertThreshold: 3,
   countOutsideHours: false,
+  effectiveFrom: "2026-11-24",
 };
+
+/** Tanggal "YYYY-MM-DD" yang nyata di kalender? */
+export function isRealDay(v: unknown): v is string {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}
 
 const hhmm = (v: unknown, fallback: string): string => {
   const m = String(v ?? "").match(/^(\d{1,2}):(\d{2})/);
@@ -77,6 +87,7 @@ export function parseSlaConfig(row: any): SlaConfig {
     opDays: days.length ? (days as number[]).sort((a, b) => a - b) : [...DEFAULT_SLA.opDays],
     queueAlertThreshold: num(row.queue_alert_threshold, DEFAULT_SLA.queueAlertThreshold, 1, 100),
     countOutsideHours: row.count_outside_hours === true,
+    effectiveFrom: isRealDay(String(row.effective_from ?? "").slice(0, 10)) ? String(row.effective_from).slice(0, 10) : DEFAULT_SLA.effectiveFrom,
   };
 }
 
@@ -365,6 +376,8 @@ export interface SlaDbValue {
   op_days: number[];
   queue_alert_threshold: number;
   count_outside_hours: boolean;
+  /** Hanya ada bila dikirim form; kalau tidak, kolom di database tidak diubah. */
+  effective_from?: string;
 }
 
 const strictInt = (v: unknown, min: number, max: number): number | null => {
@@ -394,6 +407,7 @@ export function validateSlaInput(body: any): { ok: true; value: SlaDbValue } | {
   const queue = strictInt(body.queueAlertThreshold, 1, 100);
   if (queue === null) return { ok: false, error: "Ambang alert antrean harus angka 1–100." };
   if (typeof body.countOutsideHours !== "boolean") return { ok: false, error: "Pilihan hitung di luar jam operasional tidak valid." };
+  if (body.effectiveFrom !== undefined && !isRealDay(body.effectiveFrom)) return { ok: false, error: "Tanggal mulai berlaku tidak valid." };
   return {
     ok: true,
     value: {
@@ -406,6 +420,7 @@ export function validateSlaInput(body: any): { ok: true; value: SlaDbValue } | {
       op_days: days,
       queue_alert_threshold: queue,
       count_outside_hours: body.countOutsideHours,
+      ...(body.effectiveFrom !== undefined ? { effective_from: body.effectiveFrom } : {}),
     },
   };
 }

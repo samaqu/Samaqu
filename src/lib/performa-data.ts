@@ -84,14 +84,22 @@ export async function loadEpisodes(db: Db, range: PerformaRange, cfg: SlaConfig,
   return { episodes: buildEpisodes(inbound, replies, cfg, nowMs).filter((e) => e.startAt >= range.startMs && e.startAt < range.endMs) };
 }
 
-/** Cakupan: siapa yang menjawab episode di rentang ini. */
-export function coverageCounts(episodes: Episode[]) {
+/** Awal hari (WIB) tanggal mulai berlaku: chat yang mulai sebelum ini tidak dihitung dalam performa admin. */
+export function effectiveStartMs(cfg: SlaConfig): number {
+  return wibDayStart(cfg.effectiveFrom);
+}
+
+/**
+ * Cakupan: siapa yang menjawab episode di rentang ini. Episode yang belum terjawab dan mulai SEBELUM `effectiveMs`
+ * dihitung "tidak tertutup" (bukan "belum terjawab"), karena aturan baru belum berlaku saat itu.
+ */
+export function coverageCounts(episodes: Episode[], effectiveMs = 0) {
   const c = { total: episodes.length, bot: 0, panel: 0, phone: 0, unanswered: 0, expired: 0 };
   for (const e of episodes) {
     if (e.responder.kind === "bot") c.bot++;
     else if (e.responder.kind === "admin") c.panel++;
     else if (e.responder.kind === "phone") c.phone++;
-    else if (e.stale) c.expired++;
+    else if (e.stale || e.startAt < effectiveMs) c.expired++;
     else c.unanswered++;
   }
   return c;

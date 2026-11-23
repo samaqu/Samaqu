@@ -24,6 +24,7 @@ interface Config {
   opDays: number[];
   queueAlertThreshold: number;
   countOutsideHours: boolean;
+  effectiveFrom: string;
 }
 interface Perf {
   handled: number;
@@ -106,6 +107,11 @@ const fmtDay = (day: string) => {
   const p = dayParts(day);
   return `${DAY_LONG[p.dow]}, ${p.date} ${p.month}`;
 };
+/** "2026-11-24" → "Selasa, 24 Nov 2026" */
+const fullDay = (day: string) => {
+  const p = dayParts(day);
+  return `${DAY_LONG[p.dow]}, ${p.date} ${p.month} ${p.year}`;
+};
 const periodLabel = (from: string, to: string) => {
   const a = dayParts(from);
   const b = dayParts(to);
@@ -125,6 +131,26 @@ function fmtPhone(s: string): string {
 
 const inputCls = "h-10 rounded-xl border bg-white px-3 text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-[#4a90c2]/40";
 const buttonCls = "inline-flex h-10 items-center gap-2 rounded-xl border bg-white px-3 text-xs font-bold disabled:opacity-50";
+
+/** Pilihan jam 24 jam (00–23) dan menit; pemilih waktu bawaan browser memakai AM/PM tergantung bahasa browser. */
+function TimeField({ value, onChange, label: text }: { value: string; onChange: (v: string) => void; label: string }) {
+  const [h, m] = value.split(":");
+  const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+  const minutes = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, "0"));
+  if (!minutes.includes(m)) minutes.push(m);
+  minutes.sort();
+  return (
+    <div className="flex items-center gap-2">
+      <select aria-label={`${text} (jam)`} value={h} onChange={(e) => onChange(`${e.target.value}:${m}`)} className={inputCls} style={{ borderColor: C.input, color: C.ink, flex: 1 }}>
+        {hours.map((x) => <option key={x} value={x}>{x}</option>)}
+      </select>
+      <b style={{ color: C.sub }}>:</b>
+      <select aria-label={`${text} (menit)`} value={m} onChange={(e) => onChange(`${h}:${e.target.value}`)} className={inputCls} style={{ borderColor: C.input, color: C.ink, flex: 1 }}>
+        {minutes.map((x) => <option key={x} value={x}>{x}</option>)}
+      </select>
+    </div>
+  );
+}
 
 function Pill({ tone, children }: { tone: keyof typeof PILL; children: React.ReactNode }) {
   return (
@@ -291,6 +317,11 @@ export default function PerformaView() {
 
       {data && cfg && perf && tab === "saya" ? (
         <>
+          {today < cfg.effectiveFrom ? (
+            <div className="rounded-xl border px-4 py-3 text-sm" style={{ background: PILL.info.bg, borderColor: "#cfe3f3", color: PILL.info.fg }}>
+              Aturan performa admin <b>mulai berlaku {fullDay(cfg.effectiveFrom)}</b>. Chat sebelum tanggal itu tidak dihitung, jadi angka di bawah masih kosong sampai hari itu.
+            </div>
+          ) : null}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
             <KpiCard label="Chat ditangani" value={String(perf.handled)} hint={<>{perf.finished} dibalas · {perf.pending} menunggu</>} icon={<MessageSquare size={16} />} />
             <KpiCard
@@ -317,7 +348,10 @@ export default function PerformaView() {
           </div>
 
           {data.waiting.length > 0 ? (
-            <Panel title="Chat yang menunggu Anda" sub="Diurutkan dari yang paling lama menunggu." right={<Pill tone="info">{data.waiting.length} chat</Pill>}>
+            <Panel title="Chat yang menunggu Anda" sub="Pelanggan yang pesannya belum tercatat dibalas, dan PIC-nya Anda. Diurutkan dari yang paling lama." right={<Pill tone="info">{data.waiting.length} chat</Pill>}>
+              <p className="mt-2 rounded-xl px-3 py-2 text-[11px] leading-relaxed" style={{ background: PILL.info.bg, color: PILL.info.fg }}>
+                Dianggap &quot;dibalas&quot; kalau Anda membalas lewat panel, bot yang menjawab, atau Anda menekan <b>Sudah dibalas di HP</b> di Inbox WA. Kalau chat ini sebenarnya sudah Anda jawab dari HP, buka Inbox WA lalu tandai supaya hilang dari daftar ini.
+              </p>
               <div className="mt-3">
                 {data.waiting.map((w, index) => {
                   const tone: keyof typeof PILL = w.level === "late" ? "late" : w.level === "warning" ? "warn" : w.level === "ok" ? "ok" : "neutral";
@@ -394,7 +428,7 @@ export default function PerformaView() {
           </Panel>
 
           <p className="text-[11px] leading-relaxed" style={{ color: C.sub }}>
-            SLA hanya dihitung untuk chat yang masuk pada jam operasional ({hoursText}), dan waktu tunggunya dihitung dalam <b>menit kerja</b>. Chat di luar jam itu tetap tercatat tetapi tidak masuk pencapaian. Balasan dari HP (lewat tombol &quot;Sudah dibalas di HP&quot;) dihitung sebagai <b>selesai</b>, tetapi jamnya tidak diketahui sehingga tidak masuk rata-rata dan SLA; balas lewat panel supaya waktunya terukur. Beberapa pesan beruntun dari pelanggan dihitung satu kali. Chat yang menunggu lebih dari 24 jam dianggap sudah tidak perlu dibalas.
+            SLA hanya dihitung untuk chat yang masuk pada jam operasional ({hoursText}), dan waktu tunggunya dihitung dalam <b>menit kerja</b>. Chat di luar jam itu tetap tercatat tetapi tidak masuk pencapaian. Balasan dari HP (lewat tombol &quot;Sudah dibalas di HP&quot;) dihitung sebagai <b>selesai</b>, tetapi jamnya tidak diketahui sehingga tidak masuk rata-rata dan SLA; balas lewat panel supaya waktunya terukur. Beberapa pesan beruntun dari pelanggan dihitung satu kali. Chat yang menunggu lebih dari 24 jam dianggap sudah tidak perlu dibalas. Aturan ini berlaku mulai {fullDay(cfg.effectiveFrom)}; chat sebelum tanggal itu tidak dihitung.
           </p>
         </>
       ) : null}
@@ -521,7 +555,7 @@ function BotVsAdmin({ data, cfg, from, to }: { data: Data; cfg: Config; from: st
         </div>
       </div>
       <p className="text-[11px] leading-relaxed" style={{ color: C.sub }}>
-        Bot dan admin bekerja di jam berbeda: bot membalas malam dan Minggu, admin membalas {daysText(cfg.opDays)} {cfg.openTime.replace(":", ".")}–{cfg.closeTime.replace(":", ".")}. Angkanya untuk gambaran umum, bukan lomba di chat yang sama. Beberapa pesan beruntun dari pelanggan dihitung satu kali. Ringkasan ini gabungan tanpa nama per orang. Chat yang masih menunggu saat ini: {c.unanswered}.
+        Bot dan admin bekerja di jam berbeda: bot membalas malam dan Minggu, admin membalas {daysText(cfg.opDays)} {cfg.openTime.replace(":", ".")}–{cfg.closeTime.replace(":", ".")}. Angkanya untuk gambaran umum, bukan lomba di chat yang sama. Beberapa pesan beruntun dari pelanggan dihitung satu kali. Ringkasan ini gabungan tanpa nama per orang. Data admin dihitung mulai {fullDay(cfg.effectiveFrom)} (chat sebelumnya tidak dihitung); data bot memakai seluruh periode. Chat yang masih menunggu saat ini: {c.unanswered}.
       </p>
     </>
   );
@@ -577,11 +611,13 @@ function SlaSettings({ cfg, onSaved }: { cfg: Config; onSaved: () => void }) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="grid content-start gap-1">
             <span className={fieldLabel} style={{ color: C.label }}>Jam operasional buka</span>
-            <input type="time" value={f.openTime} onChange={(e) => setF({ ...f, openTime: e.target.value })} className={inputCls} style={{ borderColor: C.input, color: C.ink }} />
+            <TimeField label="Jam buka" value={f.openTime} onChange={(v) => setF({ ...f, openTime: v })} />
+            <span className="text-[11px]" style={{ color: C.sub }}>Format 24 jam (contoh 08.00)</span>
           </label>
           <label className="grid content-start gap-1">
             <span className={fieldLabel} style={{ color: C.label }}>Jam operasional tutup</span>
-            <input type="time" value={f.closeTime} onChange={(e) => setF({ ...f, closeTime: e.target.value })} className={inputCls} style={{ borderColor: C.input, color: C.ink }} />
+            <TimeField label="Jam tutup" value={f.closeTime} onChange={(v) => setF({ ...f, closeTime: v })} />
+            <span className="text-[11px]" style={{ color: C.sub }}>Format 24 jam (contoh 16.30)</span>
           </label>
         </div>
         <div className="grid gap-1.5">
@@ -604,6 +640,13 @@ function SlaSettings({ cfg, onSaved }: { cfg: Config; onSaved: () => void }) {
           </div>
           <span className="text-[11px]" style={{ color: C.sub }}>Chat di luar hari dan jam ini tidak dihitung dalam SLA.</span>
         </div>
+        <label className="grid content-start gap-1">
+          <span className={fieldLabel} style={{ color: C.label }}>Aturan berlaku mulai</span>
+          <input type="date" value={f.effectiveFrom} onChange={(e) => e.target.value && setF({ ...f, effectiveFrom: e.target.value })} className={inputCls} style={{ borderColor: C.input, color: C.ink, maxWidth: 240 }} />
+          <span className="text-[11px]" style={{ color: C.sub }}>
+            Mulai {fullDay(f.effectiveFrom)}. Chat pelanggan yang masuk <b>sebelum</b> tanggal ini tidak dihitung dalam performa admin (ditangani, menunggu, terlambat, SLA). Data bot tetap dihitung penuh.
+          </span>
+        </label>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {num("queueAlertThreshold", "Ambang alert antrean", "Jumlah chat menunggu sebelum alert muncul")}
           <label className="grid content-start gap-1">

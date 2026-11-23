@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { forbidden, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { loadReportFonts } from "@/lib/leads-report-pdf";
-import { coverageCounts, loadEpisodes, loadSlaConfig, resolveRange } from "@/lib/performa-data";
+import { coverageCounts, effectiveStartMs, loadEpisodes, loadSlaConfig, resolveRange } from "@/lib/performa-data";
 import { buildPerformaReportPdf, performaReportFileName } from "@/lib/performa-report-pdf";
 import { summarizeBot, summarizeTeam } from "@/lib/sla";
 
@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
     const range = resolveRange(new URL(req.url).searchParams, nowMs);
     const db = getSupabaseAdmin();
     const config = await loadSlaConfig(db);
+    const effectiveMs = effectiveStartMs(config);
 
     const loaded = await loadEpisodes(db, range, config, nowMs);
     if ("error" in loaded) return NextResponse.json({ error: loaded.error }, { status: 500, headers: noStore });
@@ -44,9 +45,10 @@ export async function GET(req: NextRequest) {
       from: range.from,
       to: range.to,
       config,
+      // Bot: seluruh periode. Admin: hanya chat yang mulai sejak tanggal mulai berlaku.
       bot: summarizeBot(loaded.episodes),
-      team: summarizeTeam(loaded.episodes, config),
-      counts: coverageCounts(loaded.episodes),
+      team: summarizeTeam(loaded.episodes.filter((e) => e.startAt >= effectiveMs), config),
+      counts: coverageCounts(loaded.episodes, effectiveMs),
       fonts,
       now: new Date(nowMs),
     });

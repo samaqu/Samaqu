@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { forbidden, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { wibDay } from "@/lib/absensi";
-import { coverageCounts, loadEpisodes, loadSlaConfig, resolveRange } from "@/lib/performa-data";
+import { coverageCounts, effectiveStartMs, loadEpisodes, loadSlaConfig, resolveRange } from "@/lib/performa-data";
 import { summarizeAdmin, summarizeBot, summarizeTeam, validateSlaInput, type Episode } from "@/lib/sla";
 
 /**
@@ -34,7 +34,11 @@ export async function GET(req: NextRequest) {
 
   const loaded = await loadEpisodes(db, range, cfg, nowMs);
   if ("error" in loaded) return NextResponse.json({ error: loaded.error }, { status: 500, headers: noStore });
-  const episodes = loaded.episodes;
+  const allEpisodes = loaded.episodes;
+  // ATURAN BARU berlaku mulai `effectiveFrom`: statistik ADMIN hanya dari chat yang mulai sejak tanggal itu. Statistik
+  // BOT tetap memakai seluruh periode (bot sudah berjalan sebelum aturan ini).
+  const effectiveMs = effectiveStartMs(cfg);
+  const episodes = allEpisodes.filter((e) => e.startAt >= effectiveMs);
 
   // PIC chat: hanya milik pemanggil yang dibaca (data PIC orang lain tidak dibutuhkan).
   const { data: ownRows } = await db.from("wa_chat_owner").select("sender").eq("owner_user_id", me.userId).limit(5000);
@@ -89,11 +93,11 @@ export async function GET(req: NextRequest) {
 
   const comparison = canManage
     ? {
-        bot: summarizeBot(episodes),
+        bot: summarizeBot(allEpisodes),
         team: summarizeTeam(episodes, cfg),
-        episodes: episodes.length,
+        episodes: allEpisodes.length,
         unanswered: episodes.filter((e) => e.responder.kind === "none" && !e.stale).length,
-        counts: coverageCounts(episodes),
+        counts: coverageCounts(allEpisodes, effectiveMs),
       }
     : null;
 

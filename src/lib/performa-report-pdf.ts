@@ -108,6 +108,7 @@ export function methodNotes(c: SlaConfig): string[] {
     "Beberapa pesan beruntun dari pelanggan yang sama dihitung satu kali, dari pesan pertama sampai balasan pertama.",
     "Chat yang masuk di luar jam operasional tidak dihitung dalam SLA admin (dijawab bot). Balasan admin dari HP dihitung selesai tetapi tidak diukur.",
     `Target SLA: balasan pertama dalam ${c.targetResponseMin} menit, warning setelah ${c.warningMin} menit, terlambat setelah ${c.lateMin} menit.`,
+    `Data admin dihitung mulai ${dayLabel(c.effectiveFrom)}; chat sebelum tanggal itu tidak dihitung. Data bot memakai seluruh periode.`,
     "Ringkasan ini gabungan seluruh admin, tanpa nama per orang.",
   ];
 }
