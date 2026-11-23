@@ -867,7 +867,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
             </div>
             {me?.isBot ? (
               <span
-                title="Akun asisten: bekerja otomatis, tidak perlu absen"
+                title="Akun agent WhatsApp: bekerja otomatis, tidak perlu absen"
                 style={{ marginLeft: 8, background: "#dcfce7", color: "#166534", borderRadius: 999, padding: "5px 11px", fontSize: 12, fontWeight: 800, display: "inline-flex", alignItems: "center", gap: 6 }}
               >
                 <i style={{ width: 8, height: 8, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />

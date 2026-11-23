@@ -2,7 +2,7 @@
  * Label PIC chat di Inbox WA (murni, diuji).
  *  - Chat punya pemilik          → "PIC: nama".
  *  - Belum ada pemilik, menunggu → "Antrean (menunggu admin)".
- *  - Dijawab bot (tidak diambil alih admin, tidak menunggu, pesan terakhir dari kita) → "PIC: Asisten SAMAQU" (BOT_NAME).
+ *  - Dijawab bot (tidak diambil alih admin, tidak menunggu, pesan terakhir dari kita) → "PIC: Agent WhatsApp" (BOT_NAME).
  *  - Selain itu (mis. pesan pelanggan terakhir yang dilewati bot di jam kerja admin) → tidak ada label.
  * Hanya TAMPILAN: tidak ada pemilik palsu di database, jadi gembok PIC dan alur "membalas mengambil alih dari bot" tidak berubah.
  */
@@ -15,7 +15,7 @@ export interface PicLabelInput {
 }
 
 /** Nama akun bot di tampilan (sama dengan nama akun bot di tabel admins). */
-export const BOT_NAME = "Asisten SAMAQU";
+export const BOT_NAME = "Agent WhatsApp";
 
 export function picLabel(c: PicLabelInput): { text: string; color: string } | null {
   if (c.owner) return { text: `PIC: ${c.owner.name}`, color: "#4338ca" };

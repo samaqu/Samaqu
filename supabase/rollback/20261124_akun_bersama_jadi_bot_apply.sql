@@ -30,7 +30,7 @@ insert into public.wa_chat_owner_log (sender, from_user_id, to_user_id, reason)
 
 -- Jadikan akun bot.
 update public.admins
-   set display_name = 'Asisten SAMAQU', title = 'Asisten', is_bot = true, status = 'pulang', status_at = now()
+   set display_name = 'Agent WhatsApp', title = null, is_bot = true, status = 'pulang', status_at = now()
  where lower(email) = 'officialsamaqu@gmail.com';
 
 -- PENGAMAN: harus ada manusia (bukan bot) yang aktif dan berperan owner/leader, kalau tidak, batalkan semuanya.
