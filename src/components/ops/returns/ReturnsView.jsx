@@ -2859,9 +2859,18 @@ function ReturnDetailDrawer({ record, isPanel, accent, accentSoft, onClose, onCh
               {record.customer_whatsapp ? ` · ${record.customer_whatsapp}` : ""}
             </p>
             <p className="dp-catatan">
-              {[record.shipping_address, record.shipping_kecamatan, record.shipping_city, record.shipping_postal_code]
-                .filter(Boolean)
-                .join(", ") || "Alamat belum diisi."}
+              {(() => {
+                const own = [record.shipping_address, record.shipping_kecamatan, record.shipping_city, record.shipping_postal_code]
+                  .filter(Boolean)
+                  .join(", ");
+                if (own) return own;
+                // Retur dari pesanan memakai alamat pesanan asal (server menyertakannya sebagai `order_address`).
+                const oa = record.order_address;
+                const fromOrder = oa
+                  ? [oa.shipping_address, oa.shipping_kecamatan, oa.shipping_city, oa.shipping_postal_code].filter(Boolean).join(", ")
+                  : "";
+                return fromOrder ? `${fromOrder} (alamat dari pesanan ${record.order_number})` : "Alamat belum diisi.";
+              })()}
             </p>
             {record.reason ? <p className="dp-catatan">Alasan: {record.reason}</p> : null}
           </section>

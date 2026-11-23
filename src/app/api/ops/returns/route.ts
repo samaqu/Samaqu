@@ -57,6 +57,37 @@ async function itemsOf(admin: Admin, ids: string[]) {
   return grouped;
 }
 
+/**
+ * Retur yang dibuat dari PESANAN tidak menyimpan alamat sendiri: resi pengganti memakai alamat pesanan
+ * (lihat returns/resi). Hanya retur manual yang menyimpannya di record. Supaya Detail Retur tidak tampil
+ * "Alamat belum diisi", sertakan `order_address` (alamat pesanan asal) untuk retur yang alamatnya kosong.
+ * Hanya tambahan baca: kolom retur dan pesanan tidak diubah.
+ */
+async function withOrderAddress<T extends Record<string, any>>(admin: Admin, rows: T[]): Promise<T[]> {
+  const needs = rows.filter((row) => !String(row.shipping_address || "").trim() && row.order_number);
+  if (needs.length === 0) return rows;
+  const numbers = [...new Set(needs.map((row) => String(row.order_number)))];
+  const { data } = await admin
+    .from("orders")
+    .select("order_number, shipping_address, shipping_kecamatan, shipping_city, shipping_postal_code")
+    .in("order_number", numbers);
+  const byNumber = new Map<string, any>((data || []).map((order: any) => [String(order.order_number), order]));
+  return rows.map((row) => {
+    if (String(row.shipping_address || "").trim()) return row;
+    const order = byNumber.get(String(row.order_number));
+    if (!order || !String(order.shipping_address || "").trim()) return row;
+    return {
+      ...row,
+      order_address: {
+        shipping_address: order.shipping_address,
+        shipping_kecamatan: order.shipping_kecamatan,
+        shipping_city: order.shipping_city,
+        shipping_postal_code: order.shipping_postal_code,
+      },
+    };
+  });
+}
+
 async function detail(admin: Admin, returnNumber: string) {
   const { data: record, error } = await admin
     .from("returns")
@@ -68,7 +99,8 @@ async function detail(admin: Admin, returnNumber: string) {
   const id = String(record.id);
   const grouped = await itemsOf(admin, [id]);
   const items = await withReplacementProductInfo(admin, grouped[id] || []);
-  return { record: { ...record, items } };
+  const [withAddress] = await withOrderAddress(admin, [{ ...record, items }]);
+  return { record: withAddress };
 }
 
 /**
@@ -142,7 +174,7 @@ export async function GET(req: NextRequest) {
         items: await withReplacementProductInfo(admin, grouped[row.id] || []),
       })),
     );
-    return NextResponse.json({ items: withInfo });
+    return NextResponse.json({ items: await withOrderAddress(admin, withInfo) });
   } catch (error) {
     console.error("[OPS] returns GET:", error);
     return bad("Gagal mengambil data retur", 500);

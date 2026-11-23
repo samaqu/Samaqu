@@ -119,9 +119,25 @@ for (const r of JNT_AREAS) {
   if (!districtToSendSite.has(kjd)) districtToSendSite.set(kjd, r.jntCity);
 }
 
+/**
+ * Banyak pesanan menyimpan kota sebagai "Kecamatan, Kota" (mis. "Caringin, Bogor"). Format itu tidak cocok dengan
+ * dataset ("KAB. BOGOR"), dan untuk nama kecamatan yang ada di lebih dari satu kabupaten (Caringin: Bogor, Garut,
+ * Sukabumi) pencocokan hanya-kecamatan sengaja menolak menebak, sehingga ongkir/kode area kosong.
+ * Bila bagian depan sebelum koma SAMA dengan kecamatan, pakai bagian belakangnya ("Bogor") sebagai kota.
+ * Selain itu kota dikembalikan apa adanya (perilaku lama tidak berubah).
+ */
+export function cityWithoutDistrict(city: string, district: string): string {
+  const c = norm(city);
+  const idx = c.indexOf(",");
+  if (idx < 0) return city;
+  const head = c.slice(0, idx).trim();
+  const rest = c.slice(idx + 1).trim();
+  return head && rest && head === normDistrict(district) ? rest : city;
+}
+
 function findRow(city: string, district: string): JntAreaRow | null {
   const d = normDistrict(district);
-  const c = normCity(city);
+  const c = normCity(cityWithoutDistrict(city, district));
 
   // 1. Exact match: district + city
   const exact =
@@ -169,6 +185,12 @@ export function getOriginCode(city: string, district = ""): string | null {
       byLocalDistrict.get(`${normDistrict(district)}|${normCity(city)}`) ||
       byJntDistrict.get(`${normDistrict(district)}|${normCity(city)}`);
     if (row) return row.code3;
+  }
+
+  // Format "Kecamatan, Kota" (mis. "Caringin, Bogor"): ambil kode dari BARIS area yang tepat (kecamatan + kota), BUKAN dari
+  // nama kota saja ("Bogor" sendiri bisa berarti Kota Bogor = BGR, padahal Caringin ada di Kab. Bogor = CIB).
+  if (district && cityWithoutDistrict(city, district) !== city) {
+    return findRow(city, district)?.code3 ?? null;
   }
 
   return null;
