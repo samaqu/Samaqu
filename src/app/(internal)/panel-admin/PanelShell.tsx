@@ -15,6 +15,7 @@ import type { FormEvent, ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Toaster } from "@/components/ops/ui/toaster";
+import ConfirmDialog from "@/components/ops/ConfirmDialog";
 import { OpsPageMapProvider } from "@/lib/ops-router";
 import { useWibLongDate } from "./wib-date";
 import styles from "./panel.module.css";
@@ -245,6 +246,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<{ name: string; title: string; userId: string; status: WorkStatus | null; statusAt: string | null } | null>(null);
   const [statusOpen, setStatusOpen] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
+  const [pulangAsk, setPulangAsk] = useState(false);
   useAdminPresenceTracker(me?.userId);
   const onlineIds = useOnlineAdmins();
   /** Ulasan menunggu persetujuan -> badge menu "Ulasan Pelanggan". */
@@ -450,11 +452,12 @@ export default function PanelShell({ children }: { children: ReactNode }) {
 
   const checkInNeeded = me?.status ? needsCheckIn(me.status, me.statusAt) : false;
 
-  async function changeStatus(next: WorkStatus) {
+  async function changeStatus(next: WorkStatus, confirmed = false) {
     if (statusBusy) return;
-    // Absen Pulang tidak sengaja bisa memotong jam kerja; minta konfirmasi sekali.
-    if (next === "pulang" && !window.confirm("Absen pulang sekarang? Jam kerja hari ini berhenti dihitung.")) {
+    // Absen Pulang tidak sengaja bisa memotong jam kerja; minta konfirmasi lewat modal sendiri.
+    if (next === "pulang" && !confirmed) {
       setStatusOpen(false);
+      setPulangAsk(true);
       return;
     }
     setStatusBusy(true);
@@ -904,6 +907,19 @@ export default function PanelShell({ children }: { children: ReactNode }) {
             </button>
           </div>
         ) : null}
+
+        <ConfirmDialog
+          open={pulangAsk}
+          title="Absen pulang sekarang?"
+          message="Jam kerja hari ini akan berhenti dihitung. Kalau Anda masih bekerja, Anda bisa Absen Masuk lagi kapan saja."
+          confirmLabel="Ya, Absen Pulang"
+          busy={statusBusy}
+          onCancel={() => setPulangAsk(false)}
+          onConfirm={() => {
+            setPulangAsk(false);
+            void changeStatus("pulang", true);
+          }}
+        />
 
         <OpsPageMapProvider pages={PANEL_PAGES}>{children}</OpsPageMapProvider>
       </main>
