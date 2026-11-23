@@ -162,6 +162,7 @@ export default function WaInboxPanelView() {
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [sending, setSending] = useState(false);
   const [handoverBusy, setHandoverBusy] = useState(false);
+  const [repliedBusy, setRepliedBusy] = useState(false);
   const [actionError, setActionError] = useState("");
 
   const loadList = useCallback(async () => {
@@ -285,6 +286,20 @@ export default function WaInboxPanelView() {
       setActionError(e instanceof Error ? e.message : "Gagal mengubah status percakapan.");
     } finally {
       setHandoverBusy(false);
+    }
+  }
+
+  async function onMarkReplied() {
+    if (!current || repliedBusy) return;
+    setRepliedBusy(true);
+    setActionError("");
+    try {
+      await call({ action: "mark-replied", sender: current.sender });
+      await loadList();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Gagal menandai chat.");
+    } finally {
+      setRepliedBusy(false);
     }
   }
 
@@ -454,13 +469,34 @@ export default function WaInboxPanelView() {
                     +{current.sender} · {current.handover ? "ditangani admin" : "ditangani bot"}
                   </span>
                 </div>
+                {current.pending > 0 ? (
+                  <button
+                    type="button"
+                    onClick={onMarkReplied}
+                    disabled={repliedBusy}
+                    title="Chat ini sudah Anda balas lewat HP. Menutup status Belum dibalas tanpa mengirim apa pun ke pelanggan."
+                    style={{
+                      marginLeft: "auto",
+                      border: "1px solid #bbf7d0",
+                      background: "#f0fdf4",
+                      color: "#166534",
+                      borderRadius: 999,
+                      padding: "6px 14px",
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      cursor: repliedBusy ? "wait" : "pointer",
+                    }}
+                  >
+                    {repliedBusy ? "Menutup…" : "Sudah dibalas di HP"}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={onToggleHandover}
                   disabled={handoverBusy}
                   title={current.handover ? "Kembalikan chat ini ke bot" : "Ambil alih chat ini dari bot"}
                   style={{
-                    marginLeft: "auto",
+                    marginLeft: current.pending > 0 ? 0 : "auto",
                     border: `1px solid ${LINE}`,
                     background: current.handover ? "#fef3c7" : "#fff",
                     color: INK,

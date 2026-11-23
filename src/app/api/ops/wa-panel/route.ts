@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { opsIdentity, unauthorized } from "@/lib/ops-auth";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 /**
  * Penerus (proxy) Inbox WhatsApp untuk panel admin → fungsi `wa-admin` di Academy.
@@ -29,9 +30,45 @@ const PHOTO_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_PHOTO_B64 = 4_000_000;
 const MAX_TEXT = 4000;
 
+/**
+ * "Sudah dibalas di HP": admin membalas langsung dari aplikasi WhatsApp di HP, sehingga sistem tidak tahu chat itu
+ * sudah dijawab (webhook Fonnte hanya melaporkan pesan MASUK). Aksi ini menutup pesan `pending` chat tersebut
+ * TANPA mengirim apa pun ke pelanggan dan TANPA mengubah handover bot. Hanya menyentuh `wa_inbox` di database
+ * Samaqu (pola yang sama dengan penutupan pending saat "Ambil alih"), jadi Edge Function wa-admin dan bot tidak ikut berubah.
+ */
+async function markRepliedOnPhone(sender: string, adminName: string) {
+  const now = new Date().toISOString();
+  const { data, error } = await getSupabaseAdmin()
+    .from("wa_inbox")
+    .update({
+      status: "skipped",
+      error: `dibalas di HP (${adminName})`,
+      claimed_at: null,
+      updated_at: now,
+    })
+    .eq("sender", sender)
+    .in("status", ["pending", "processing"])
+    .select("id");
+  if (error) {
+    console.error("[WA-PANEL] gagal menandai dibalas di HP:", error.message);
+    return NextResponse.json({ ok: false, error: "Gagal menutup pesan. Coba lagi." }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true, closed: data?.length ?? 0 }, { headers: { "Cache-Control": "no-store, private" } });
+}
+
 export async function POST(req: NextRequest) {
   const identity = await opsIdentity(req);
   if (!identity) return unauthorized();
+
+  // Aksi lokal (database Samaqu), tidak lewat penerus ke Academy, jadi tidak butuh WA_ADMIN_PROXY_SECRET.
+  const rawBody = (await req.clone().json().catch(() => null)) as { action?: unknown; sender?: unknown } | null;
+  if (String(rawBody?.action ?? "") === "mark-replied") {
+    const sender = String(rawBody?.sender ?? "");
+    if (!/^\d{6,20}$/.test(sender)) {
+      return NextResponse.json({ ok: false, error: "Nomor pengirim tidak valid." }, { status: 400 });
+    }
+    return markRepliedOnPhone(sender, identity.name || identity.email);
+  }
 
   const secret = process.env.WA_ADMIN_PROXY_SECRET || "";
   if (!ACADEMY_URL || secret.length < 24) {
