@@ -6,7 +6,9 @@
  *
  * Aturan:
  *  - Calon pemilik = admin yang statusnya Aktif DAN online (sinyal panel < 5 menit lalu, jadi panelnya sedang terbuka).
- *  - Chat baru (belum punya pemilik) dibagi ke admin dengan beban paling sedikit (jumlah chat yang ditugaskan 24 jam terakhir).
+ *  - Hanya chat yang MASIH MENUNGGU balasan (>= 2 menit) yang diberi pemilik. Chat yang dijawab bot tidak perlu pemilik:
+ *    bot membalas di jam kerja AI (16.30-07.30, Minggu penuh), di luar itu admin yang membalas.
+ *  - Chat tanpa pemilik dibagi ke admin dengan beban paling sedikit (jumlah chat yang ditugaskan 24 jam terakhir).
  *  - Pelanggan lama otomatis kembali ke admin yang sama: pemilik tidak berubah selama belum ada kejadian pemindahan.
  *  - Tidak ada admin Aktif dan online: chat dibiarkan tanpa pemilik (Antrean) dan dibagi begitu ada yang masuk.
  *
@@ -19,6 +21,8 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const ONLINE_WINDOW_MS = 5 * 60_000;
 const CANDIDATE_WINDOW_MS = 24 * 3600_000;
+/** Pesan harus sudah menunggu sekian lama sebelum chatnya diberi pemilik (supaya chat yang sebentar lagi dibalas bot tidak ikut). */
+export const MIN_WAIT_MS = 2 * 60_000;
 const MIN_GAP_MS = 15_000;
 const CHUNK = 200;
 
@@ -65,7 +69,7 @@ export interface AssignResult {
   reason?: string;
 }
 
-/** Bagikan chat 24 jam terakhir yang belum punya pemilik. Aman dipanggil sering (dibatasi per 15 detik per instance). */
+/** Bagikan chat yang menunggu balasan (24 jam terakhir) dan belum punya pemilik. Aman dipanggil sering (dibatasi per 15 detik per instance). */
 export async function assignUnownedChats(): Promise<AssignResult> {
   const nowMs = Date.now();
   if (running || nowMs - lastRun < MIN_GAP_MS) return { assigned: 0, skipped: true };
@@ -80,10 +84,15 @@ export async function assignUnownedChats(): Promise<AssignResult> {
     if (eligibleAdmins.length === 0) return { assigned: 0, reason: "tidak ada admin Aktif dan online" };
 
     const since = new Date(nowMs - CANDIDATE_WINDOW_MS).toISOString();
+    // Hanya chat yang MASIH MENUNGGU balasan (pending/processing) dan sudah menunggu >= 2 menit: yang dijawab bot
+    // (jam kerja AI 16.30-07.30, Minggu penuh) tidak pernah menunggu selama itu, jadi tidak ikut diberi pemilik.
+    const waitedBefore = new Date(nowMs - MIN_WAIT_MS).toISOString();
     const { data: rows, error: rowsError } = await db
       .from("wa_inbox")
       .select("sender")
+      .in("status", ["pending", "processing"])
       .gte("created_at", since)
+      .lte("created_at", waitedBefore)
       .order("created_at", { ascending: false })
       .limit(3000);
     if (rowsError) return { assigned: 0, reason: rowsError.message };
