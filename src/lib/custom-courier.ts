@@ -63,3 +63,15 @@ export function customCourierLabel(value?: string | null): string {
   if (!isCustomCourier(text)) return text;
   return text.replace(/^kurir\s+lain\s*-?\s*/i, "").trim() || CUSTOM_COURIER_PREFIX;
 }
+
+/**
+ * Pecah teks tersimpan "Kurir Lain - Baraka Express (Cargo)" menjadi { name, service }. Bukan kurir lain → null.
+ * Dipakai form Transaksi (mengisi ulang isian saat Ubah) dan server (merapikan ulang sebelum disimpan).
+ */
+export function parseCustomCourier(value?: string | null): { name: string; service: string } | null {
+  const text = String(value ?? "").trim();
+  if (!isCustomCourier(text)) return null;
+  const rest = text.replace(/^kurir\s+lain\s*-?\s*/i, "").trim();
+  const match = /^(.*?)\s*\(([^()]*)\)\s*$/.exec(rest);
+  return match ? { name: match[1].trim(), service: match[2].trim() } : { name: rest, service: "" };
+}

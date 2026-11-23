@@ -38,7 +38,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Check, Clock, Info, Lightbulb, Loader2, Pencil, Plus, RotateCcw, Save, Shirt, Store, Trash2, Truck, UserRound, Wand2, X } from "lucide-react";
 import { base44 } from "@/lib/ops-api";
 import { GOSEND_CUSTOMER, GOSEND_SAMAQU, isGosend } from "@/lib/gosend";
-import { isCustomCourier } from "@/lib/custom-courier";
+import { buildCustomCourierMethod, CUSTOM_COURIER_NAME_MAX, CUSTOM_COURIER_SERVICE_MAX, isCustomCourier, parseCustomCourier } from "@/lib/custom-courier";
 import { MANUAL_PRICE_MAX, MANUAL_PRICE_MIN, MANUAL_SOURCE_KEYS, SOURCE_LABEL, manualPrice } from "@/lib/transaksi";
 import { PAKET_SIZE, isPaketKategori, variantName } from "@/lib/item-label";
 import {
@@ -525,7 +525,12 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         date: parts.date,
         time: parts.time,
         shipping_cost: String(initialData.shipping_cost || ""),
-        shipping_method: initialData.shipping_method || "",
+        // Kurir lain (ekspedisi pilihan customer) disimpan di tiga isian sendiri; shipping_method form dikosongkan
+        // supaya tidak bentrok dengan HBO/GoSend (nilainya disusun ulang saat simpan).
+        shipping_method: isCustomCourier(initialData.shipping_method) ? "" : initialData.shipping_method || "",
+        courier_on: isCustomCourier(initialData.shipping_method),
+        courier_name: parseCustomCourier(initialData.shipping_method)?.name || "",
+        courier_service: parseCustomCourier(initialData.shipping_method)?.service || "",
         discount: String(initialData.discount || ""),
         payment_status: initialData.payment_status === "unpaid" ? "unpaid" : "paid",
         is_preorder: initialData.is_preorder === true,
@@ -552,6 +557,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         time: now.time,
         shipping_cost: "",
         shipping_method: "",
+        courier_on: false,
+        courier_name: "",
+        courier_service: "",
         discount: "",
         payment_status: "paid",
         // Dibuka dari menu Pre-Order: saklar PO langsung menyala.
@@ -985,6 +993,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
   const discountValue = Number(digits(form?.discount)) || 0;
   // GoSend: ongkir tidak dicatat (diurus di luar sistem) → selalu 0, juga di total yang tampil.
   const gosendOn = isGosend(form?.shipping_method);
+  // Ekspedisi lain (pilihan customer): "Kurir Lain - <nama> (<layanan>)". Ongkirnya tetap diisi admin (tidak dikunci 0).
+  const courierBuilt = form?.courier_on ? buildCustomCourierMethod(form.courier_name, form.courier_service) : null;
+  const courierMethod = courierBuilt?.ok ? courierBuilt.method : "";
   const shippingValue = gosendOn ? 0 : Number(digits(form?.shipping_cost)) || 0;
   const total = Math.max(0, subtotal - Math.min(discountValue, subtotal)) + shippingValue;
 
@@ -1106,10 +1117,10 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     // HBO dibuat manual di J&T VIP: tarifnya tidak lewat Tariff Check, jadi ongkirnya tetap
     // diisi admin sendiri — yang disimpan hanya penanda layanannya.
     if (service?.manual) {
-      updateForm({ shipping_method: "J&T HBO" });
+      updateForm({ shipping_method: "J&T HBO", courier_on: false });
       return;
     }
-    updateForm({ shipping_cost: digits(service?.cost), shipping_method: "" });
+    updateForm({ shipping_cost: digits(service?.cost), shipping_method: "", courier_on: false });
   };
 
   /** Setelah resi dibuat dari panel "Transaksi tercatat", simpan nomor resinya di panel. */
@@ -1636,7 +1647,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         awb_no: initialData?.awb_no || "",
         shipping_status: initialData?.shipping_status || "",
         // Dipakai panel "Transaksi tercatat" untuk memilih aksi: resi J&T atau tombol GoSend.
-        shipping_method: form?.shipping_method || initialData?.shipping_method || "",
+        shipping_method: courierMethod || form?.shipping_method || (form?.courier_on ? "" : initialData?.shipping_method) || "",
         customer_name: form?.customer_name || initialData?.customer_name || "",
         // PO yang menunggu stok belum bisa dibuatkan resi (panel resi menampilkan penjelasan).
         is_preorder: isPo,
@@ -1690,6 +1701,12 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         return setSaveError("Alamat pengiriman wajib diisi lengkap.");
       }
     }
+    // Ekspedisi lain dipilih: nama ekspedisinya wajib (resi diinput manual setelah disimpan).
+    if (!managedSource && form.courier_on && courierBuilt && !courierBuilt.ok) {
+      if (isEdit) setStep(0);
+      setScrollKick((count) => count + 1);
+      return setSaveError(courierBuilt.error);
+    }
     const createdAt = wibToIso(form.date, form.time);
     if (!createdAt) return setSaveError("Tanggal/jam transaksi tidak valid.");
 
@@ -1701,7 +1718,11 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       source: form.source,
       created_at: createdAt,
       shipping_cost: shippingValue,
-      ...(form.shipping_method === "J&T HBO" || gosendOn ? { shipping_method: form.shipping_method } : {}),
+      ...(courierMethod
+        ? { shipping_method: courierMethod }
+        : form.shipping_method === "J&T HBO" || gosendOn
+          ? { shipping_method: form.shipping_method }
+          : {}),
       discount: Math.min(discountValue, subtotal),
       // "Belum Lunas" → server menyimpan status `pending` (di luar SALE_STATUSES, jadi tidak
       // ikut omset) dan otomatis mengirim invoice berisi nomor rekening ke WA pembeli.
@@ -3671,7 +3692,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                             updateForm(
                               active
                                 ? { shipping_method: "" }
-                                : { shipping_method: option.value, shipping_cost: "" },
+                                : { shipping_method: option.value, shipping_cost: "", courier_on: false },
                             );
                           }}
                           className={`flex items-center gap-3 rounded-xl border-2 px-3.5 py-3 text-left transition-colors ${
@@ -3717,6 +3738,92 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                       <Info size={13} className="mt-px shrink-0" />
                       Ongkir GoSend tidak dicatat, jadi dikunci Rp 0. Tidak ada resi J&T untuk pesanan ini.
                     </p>
+                  ) : null}
+                </div>
+
+                {/* Ekspedisi lain (pilihan customer, mis. Baraka / cargo): disimpan sebagai "Kurir Lain - <nama> (<layanan>)".
+                    Tidak ada resi J&T: nomor resinya diinput manual di Detail Transaksi (tanpa tracking/void J&T). Beda dengan
+                    GoSend, ongkirnya TIDAK dikunci 0 (diisi admin). Memilih GoSend, HBO, atau layanan J&T melepasnya. */}
+                <div className="pt-1" data-testid="courier-picker">
+                  <div className="flex items-center gap-3 mb-2.5">
+                    <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                    <p className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Atau kirim lewat ekspedisi lain
+                    </p>
+                    <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                  </div>
+                  <button
+                    type="button"
+                    aria-pressed={Boolean(form.courier_on)}
+                    onClick={() => {
+                      setTouched(true);
+                      setSelectedService("");
+                      updateForm(form.courier_on ? { courier_on: false } : { courier_on: true, shipping_method: "" });
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-xl border-2 px-3.5 py-3 text-left transition-colors ${
+                      form.courier_on
+                        ? isPanelForm
+                          ? "border-[#c2255c] bg-[#fdf3f7] dark:bg-rose-900/20"
+                          : "border-slate-900 bg-slate-100 dark:border-white dark:bg-slate-800"
+                        : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    <span
+                      className={`grid place-items-center w-9 h-9 shrink-0 rounded-lg transition-colors ${
+                        form.courier_on
+                          ? isPanelForm
+                            ? "bg-white text-[#c2255c] dark:bg-rose-900/40 dark:text-rose-300"
+                            : "bg-white text-slate-900 dark:bg-slate-700 dark:text-white"
+                          : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                      }`}
+                    >
+                      <Truck size={18} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-bold text-slate-900 dark:text-white truncate">Ekspedisi lain</span>
+                      <span className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate">Customer pilih sendiri (mis. Baraka, cargo)</span>
+                    </span>
+                    <span
+                      className={`grid place-items-center w-5 h-5 shrink-0 rounded-full border-2 transition-colors ${
+                        form.courier_on
+                          ? isPanelForm
+                            ? "border-[#c2255c] bg-[#c2255c] text-white"
+                            : "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900"
+                          : "border-slate-300 dark:border-slate-600 text-transparent"
+                      }`}
+                    >
+                      <Check size={12} strokeWidth={3} />
+                    </span>
+                  </button>
+                  {form.courier_on ? (
+                    <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div data-invalid={saveAttempted && courierBuilt && !courierBuilt.ok ? "true" : undefined}>
+                        <label className={labelClass}>Nama ekspedisi</label>
+                        <input
+                          type="text"
+                          value={form.courier_name}
+                          maxLength={CUSTOM_COURIER_NAME_MAX}
+                          onChange={(event) => updateForm({ courier_name: event.target.value })}
+                          placeholder="mis. Baraka Express"
+                          className={`${inputClass} ${saveAttempted && courierBuilt && !courierBuilt.ok ? "border-red-300 dark:border-red-900/60" : ""}`}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Layanan (opsional)</label>
+                        <input
+                          type="text"
+                          value={form.courier_service}
+                          maxLength={CUSTOM_COURIER_SERVICE_MAX}
+                          onChange={(event) => updateForm({ courier_service: event.target.value })}
+                          placeholder="mis. Cargo"
+                          className={inputClass}
+                        />
+                      </div>
+                      <p className="sm:col-span-2 flex items-start gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                        <Info size={13} className="mt-px shrink-0" />
+                        Ongkir tetap diisi di kolom Ongkir. Nomor resi diinput manual di Detail Transaksi setelah disimpan (tanpa tracking dan tanpa pembatalan ke J&T).
+                      </p>
+                    </div>
                   ) : null}
                 </div>
 

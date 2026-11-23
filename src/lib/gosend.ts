@@ -6,6 +6,10 @@
  *  - "GoSend SAMAQU"   : admin yang booking driver di aplikasi Gojek.
  *  - "GoSend Customer" : customer booking driver sendiri, driver mengambil ke tempat SAMAQU.
  *
+ * Kurir lain (ekspedisi pilihan customer, mis. "Kurir Lain - Baraka Express (Cargo)") juga boleh disimpan lewat
+ * form Transaksi (lihat lib/custom-courier.ts). Beda dengan GoSend: ongkirnya TIDAK dipaksa 0 dan resinya diinput
+ * manual (disimpan di awb_no, tanpa tracking/void J&T).
+ *
  * ATURAN PENTING (jangan dilanggar):
  *  - Pesanan GoSend TIDAK PERNAH punya `awb_no`. Pembatalan (`cancelOrderCompletely`) memakai
  *    `jnt_order_id || awb_no` untuk void ke J&T, jadi isi apa pun di `awb_no` membuat pembatalan
@@ -14,6 +18,8 @@
  *    aksi `gosendShip` / `gosendDone` di `/api/admin/orders`.
  *  - Ongkir GoSend tidak dicatat: `shipping_cost` dipaksa 0 oleh server.
  */
+
+import { buildCustomCourierMethod, isCustomCourier, parseCustomCourier } from "@/lib/custom-courier";
 
 export const GOSEND_SAMAQU = "GoSend SAMAQU";
 export const GOSEND_CUSTOMER = "GoSend Customer";
@@ -49,14 +55,21 @@ export function gosendCaption(value?: string | null): string {
 }
 
 /**
- * Nilai `shipping_method` yang BOLEH disimpan dari input form ops. Selain HBO dan dua nilai
- * GoSend, hasilnya "" (artinya: jangan ubah / pakai bawaan) — perilaku lama dipertahankan.
+ * Nilai `shipping_method` yang BOLEH disimpan dari input form ops: "J&T HBO", dua nilai GoSend, dan kurir lain
+ * ("Kurir Lain - <nama> (<layanan>)", dirapikan ulang lewat aturan baku; isian tidak valid → ""). Selain itu hasilnya ""
+ * (artinya: jangan ubah / pakai bawaan) — perilaku lama dipertahankan.
  */
 export function normalizeOpsShippingMethod(raw: unknown): string {
   const text = String(raw ?? "").trim();
   if (text === JNT_HBO) return JNT_HBO;
   const mode = gosendMode(text);
-  return mode ? gosendMethodFor(mode) : "";
+  if (mode) return gosendMethodFor(mode);
+  const custom = parseCustomCourier(text);
+  if (custom) {
+    const built = buildCustomCourierMethod(custom.name, custom.service);
+    return built.ok ? built.method : "";
+  }
+  return "";
 }
 
 /**
@@ -68,7 +81,7 @@ export function normalizeOpsShippingMethod(raw: unknown): string {
 export function shippingMethodForEdit(incoming: unknown, current?: string | null): string {
   const next = normalizeOpsShippingMethod(incoming);
   if (next) return next;
-  return isGosend(current) ? "reguler" : "";
+  return isGosend(current) || isCustomCourier(current) ? "reguler" : "";
 }
 
 /** Info untuk penanda `{info_driver}` pada WA "pesanan dikirim" GoSend. */
