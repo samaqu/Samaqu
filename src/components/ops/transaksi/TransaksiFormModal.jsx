@@ -175,6 +175,77 @@ const sizeRank = (size) => {
 const PO_STOCK_CAP = 99;
 const poStockText = (real) => (Number(real) > 0 ? `stok ${Number(real)}` : "stok 0 · PO");
 
+/**
+ * Isian "Kode affiliate" untuk order yang masuk lewat chat WA (tidak punya cookie link referral).
+ * Kode dicek ke server begitu selesai diketik: valid & aktif? nama pemiliknya? aturan pembelian sendiri ikut diperiksa
+ * terhadap nomor HP pembeli. Pesanan yang SUDAH punya affiliate menampilkan kodenya read-only.
+ */
+function AffiliateCodeField({ value, onChange, phone, existingCode }) {
+  const [state, setState] = useState({ status: "idle", text: "" });
+
+  useEffect(() => {
+    const code = String(value || "").trim();
+    if (!code) {
+      setState({ status: "idle", text: "" });
+      return undefined;
+    }
+    let cancelled = false;
+    setState({ status: "checking", text: "Memeriksa kode…" });
+    const timer = setTimeout(async () => {
+      try {
+        const result = await base44.entities.Transaction.checkAffiliate(code, phone);
+        if (cancelled) return;
+        setState(
+          result?.ok
+            ? { status: "ok", text: `${result.code} · ${result.name || "Affiliate"}${result.selfAllowed ? " (dikecualikan dari aturan pembelian sendiri)" : ""}` }
+            : { status: "error", text: result?.error || "Kode tidak valid." },
+        );
+      } catch (error) {
+        if (!cancelled) setState({ status: "error", text: error instanceof Error ? error.message : "Gagal memeriksa kode." });
+      }
+    }, 450);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [value, phone]);
+
+  if (existingCode) {
+    return (
+      <section className="space-y-2">
+        <h4 className={sectionClass}>Kode affiliate</h4>
+        <p className="rounded-xl bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200">
+          {existingCode} <span className="font-normal text-slate-400">· sudah terpasang di pesanan ini</span>
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-2">
+      <h4 className={sectionClass}>Kode affiliate (opsional)</h4>
+      <input
+        type="text"
+        value={value}
+        onChange={(event) => onChange(event.target.value.toUpperCase())}
+        placeholder="Mis. SAM-AF-00003"
+        autoComplete="off"
+        className={inputClass}
+      />
+      {state.status !== "idle" ? (
+        <p
+          className={`text-xs font-semibold ${state.status === "ok" ? "text-emerald-600" : state.status === "error" ? "text-red-600" : "text-slate-400"}`}
+          role={state.status === "error" ? "alert" : undefined}
+        >
+          {state.text}
+        </p>
+      ) : (
+        <p className="text-xs text-slate-400">Isi kalau pembeli datang lewat affiliate (mis. order WA), supaya komisinya tercatat.</p>
+      )}
+    </section>
+  );
+}
+
 export default function TransaksiFormModal({ isOpen, onClose, initialData = null, onSaved, variant = "ops", presetPreorder = false }) {
   const isEdit = !!initialData;
   /**
@@ -536,6 +607,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         is_preorder: initialData.is_preorder === true,
         preorder_estimate: initialData.preorder_estimate || "",
         notes: initialData.notes || "",
+        affiliate_code: "",
         // Alamat transaksi ini sudah tersimpan di pesanan, jadi isiannya langsung terisi.
         address_mode: "new",
         saved_address_id: "",
@@ -566,6 +638,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         is_preorder: presetPreorder === true,
         preorder_estimate: "",
         notes: "",
+        affiliate_code: "",
         address_mode: "saved",
         saved_address_id: "",
         address: "",
@@ -1623,15 +1696,31 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
   }, [scrollKick]);
 
   const mutation = useMutation({
-    mutationFn: (data) =>
-      isEdit
-        ? base44.entities.Transaction.updateManual({ order_number: initialData.order_number, ...data })
-        : base44.entities.Transaction.createManual(data),
+    mutationFn: async (data) => {
+      if (!isEdit) return base44.entities.Transaction.createManual(data);
+      // Ubah pesanan: kode affiliate dipasang lewat aksi sendiri SETELAH perubahan tersimpan (hanya bila belum ada affiliate).
+      const { affiliate_code: affiliateCode, ...rest } = data;
+      const result = await base44.entities.Transaction.updateManual({ order_number: initialData.order_number, ...rest });
+      if (affiliateCode && !initialData.affiliate_id) {
+        try {
+          const attached = await base44.entities.Transaction.setAffiliate(initialData.order_number, affiliateCode);
+          return { ...result, affiliate: attached?.affiliate };
+        } catch (error) {
+          return { ...result, warning: `Pesanan tersimpan, tapi kode affiliate gagal dipasang: ${error instanceof Error ? error.message : "coba lagi"}` };
+        }
+      }
+      return result;
+    },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["transaksi"] });
+      const affiliateNote = result?.affiliate
+        ? result.affiliate.commission === null
+          ? `Kode ${result.affiliate.code} terpasang, TAPI komisi gagal dicatat (cek manual)`
+          : `Komisi Rp ${Number(result.affiliate.commission).toLocaleString("id-ID")} untuk ${result.affiliate.name || result.affiliate.code}`
+        : "";
       toast({
         title: isEdit ? "✅ Transaksi diperbarui" : "✅ Transaksi tercatat",
-        description: [result?.order_number ? `No. Order ${result.order_number}` : "", result?.warning || ""]
+        description: [result?.order_number ? `No. Order ${result.order_number}` : "", affiliateNote, result?.warning || ""]
           .filter(Boolean)
           .join(" · "),
         variant: "success",
@@ -1730,6 +1819,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       // Pre-order: stok tidak dipotong, wajib Lunas, estimasi kosong = bawaan server ("7-10 hari kerja").
       ...(isPo ? { is_preorder: true, preorder_estimate: String(form.preorder_estimate || "").trim() } : {}),
       notes: form.notes.trim(),
+      // Kode affiliate (opsional): server memeriksa ulang dan mencatat komisinya.
+      ...(String(form.affiliate_code || "").trim() ? { affiliate_code: String(form.affiliate_code).trim() } : {}),
       // Alamat yang dipakai transaksi ini tersimpan di pesanan (dan di buku alamat kalau baru).
       shipping: {
         address: form.address.trim(),
@@ -3586,6 +3677,16 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                 </div>
               </section>
 
+              {/* Kode affiliate di panel Ubah Pesanan (mode ubah tidak menampilkan langkah 3) */}
+              {isPanelForm && isEdit && (
+                <AffiliateCodeField
+                  value={form.affiliate_code || ""}
+                  onChange={(value) => updateForm({ affiliate_code: value })}
+                  phone={form.customer_whatsapp}
+                  existingCode={initialData?.referral_code || ""}
+                />
+              )}
+
               {/* Catatan - hanya di panel Ubah Pesanan (mode ubah tidak menampilkan langkah 3) */}
               {isPanelForm && isEdit && (
                 <section className="space-y-2">
@@ -4018,6 +4119,14 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                   </div>
                 </section>
               )}
+
+              {/* Kode affiliate (order WA yang datang lewat affiliate) */}
+              <AffiliateCodeField
+                value={form.affiliate_code || ""}
+                onChange={(value) => updateForm({ affiliate_code: value })}
+                phone={form.customer_whatsapp}
+                existingCode={initialData?.referral_code || ""}
+              />
 
               {/* Catatan */}
               <section className="space-y-2">

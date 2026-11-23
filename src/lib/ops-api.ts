@@ -292,6 +292,22 @@ export const base44 = {
         return call<{ order_number: string; total: number }>("PATCH", TRANSAKSI, { action: "update", ...data });
       },
 
+      /** Cek kode affiliate (valid/aktif, nama pemilik, aturan pembelian sendiri) untuk isian di form Transaksi. */
+      async checkAffiliate(code: string, phone?: string) {
+        const params = new URLSearchParams({ code });
+        if (phone) params.set("phone", phone);
+        return call<{ ok: boolean; error?: string; code?: string; name?: string; selfAllowed?: boolean }>("GET", `${TRANSAKSI}/affiliate?${params.toString()}`);
+      },
+
+      /** Pasang kode affiliate pada pesanan yang sudah tercatat (belum punya affiliate). */
+      async setAffiliate(orderNumber: string, affiliateCode: string) {
+        return call<{ order_number: string; affiliate: { code: string; name: string; commission: number | null } }>("PATCH", TRANSAKSI, {
+          action: "set_affiliate",
+          order_number: orderNumber,
+          affiliate_code: affiliateCode,
+        });
+      },
+
       /** Batalkan transaksi (stok dikembalikan lewat jalur pembatalan yang sama dengan admin). */
       async cancel(orderNumber: string, why?: { reason?: string; reason_note?: string }) {
         // `why` wajib untuk pre-order (server menolak tanpa alasan); pesanan reguler mengabaikannya.

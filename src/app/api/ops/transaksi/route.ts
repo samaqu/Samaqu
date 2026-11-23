@@ -40,6 +40,7 @@ import {
 } from "@/lib/open-order-config";
 import { openOrderEffectivePrice } from "@/lib/open-order-offering";
 import { syncLeadOnOrderSaved } from "@/lib/ops-lead-sync";
+import { attributionColumns, recordManualAttribution, resolveManualAttribution, type ManualAttribution } from "@/lib/affiliate/manual-attribution";
 import {
   DUPLICATE_OPEN_STATUSES,
   POSSIBLE_DUPLICATE_CODE,
@@ -561,7 +562,7 @@ export async function GET(req: NextRequest) {
   let query = admin
     .from("orders")
     .select(
-      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, stock_reserved, shipping_pending, created_by_admin, is_preorder, preorder_estimate, preorder_ready_at, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel, reseller_id, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label",
+      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, stock_reserved, shipping_pending, created_by_admin, is_preorder, preorder_estimate, preorder_ready_at, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel, reseller_id, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label, affiliate_id, referral_code",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -788,6 +789,9 @@ export async function GET(req: NextRequest) {
       // Pesanan reseller "ongkir menyusul" (tahap "Menunggu Ongkir") + admin yang membuatkannya.
       shipping_pending: order.shipping_pending === true,
       created_by_admin: order.created_by_admin || null,
+      // Atribusi affiliate (kode yang sudah terpasang); form Ubah menampilkannya read-only.
+      affiliate_id: order.affiliate_id || null,
+      referral_code: order.referral_code || "",
     };
   });
 
@@ -824,6 +828,18 @@ export async function POST(req: NextRequest) {
     const shipping = shippingResult.shipping;
 
     const admin = getSupabaseAdmin();
+
+    // Kode affiliate (opsional): order yang masuk lewat chat WA tidak punya cookie link referral, jadi admin memasukkan kodenya.
+    // Dicek SEBELUM stok dipotong, supaya kode yang salah tidak meninggalkan pesanan setengah jadi.
+    const affiliateCode = String(body?.affiliate_code || "").trim();
+    let attribution: Extract<ManualAttribution, { ok: true }> | null = null;
+    if (affiliateCode) {
+      const checked = await resolveManualAttribution(admin, affiliateCode, { phone: customerWhatsapp });
+      if (!checked.ok) return bad(checked.error);
+      attribution = checked;
+    }
+    const actorEmail = (await opsIdentity(req))?.email || "admin";
+
     const snapshot = await buildSnapshot(admin, inputItems);
     if (snapshot.error || !snapshot.items) return bad(snapshot.error || "Produk tidak valid");
 
@@ -925,6 +941,7 @@ export async function POST(req: NextRequest) {
       source,
       created_at: createdAt.toISOString(),
       updated_at: createdAt.toISOString(),
+      ...(attribution ? attributionColumns(attribution, new Date().toISOString()) : {}),
     };
 
     let order: { id: string; order_number: string } | null = null;
@@ -975,6 +992,25 @@ export async function POST(req: NextRequest) {
       await snapshotOrderHpp(admin, order.id);
     } catch (snapshotError) {
       console.error("[OPS] snapshot HPP order:", order.order_number, snapshotError);
+    }
+
+    // Komisi affiliate (kolom atribusi sudah ikut tersimpan di baris pesanan). Gagal mencatat komisi tidak membatalkan
+    // pesanan; admin diberi peringatan supaya komisinya bisa dicek manual.
+    let affiliateInfo: { code: string; name: string; commission: number | null } | null = null;
+    if (attribution) {
+      try {
+        const commission = await recordManualAttribution(admin, {
+          orderId: order.id,
+          orderNumber: order.order_number,
+          attribution,
+          items: items.map((item) => ({ productId: String(item.product_id), price: Number(item.price) || 0, quantity: Number(item.quantity) || 0 })),
+          actor: actorEmail,
+        });
+        affiliateInfo = { code: attribution.code, name: attribution.name, commission };
+      } catch (affiliateError) {
+        console.error("[OPS] transaksi komisi affiliate:", order.order_number, affiliateError);
+        affiliateInfo = { code: attribution.code, name: attribution.name, commission: null };
+      }
     }
 
     // Alamat baru (kalau admin menambahkannya) ikut masuk buku alamat pelanggan.
@@ -1042,7 +1078,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ order_number: order.order_number, total, ...(wantsPreorder ? { is_preorder: true } : {}) });
+    return NextResponse.json({ order_number: order.order_number, total, ...(wantsPreorder ? { is_preorder: true } : {}), ...(affiliateInfo ? { affiliate: affiliateInfo } : {}) });
   } catch (e) {
     console.error("[OPS] transaksi POST:", e);
     return NextResponse.json({ error: "Gagal menyimpan transaksi" }, { status: 500 });
@@ -1068,12 +1104,32 @@ export async function PATCH(req: NextRequest) {
     const admin = getSupabaseAdmin();
     const { data: order, error } = await admin
       .from("orders")
-      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, promo_bonus_given, customer_name, customer_whatsapp, customer_id, shipping_status, weight, subtotal, total, discount, shipping_cost, paid_at, reseller_id, shipping_method, is_preorder, preorder_ready_at, shipping_address, shipping_city, shipping_kecamatan, shipping_province, shipping_postal_code")
+      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, promo_bonus_given, customer_name, customer_whatsapp, customer_id, shipping_status, weight, subtotal, total, discount, shipping_cost, paid_at, reseller_id, shipping_method, is_preorder, preorder_ready_at, shipping_address, shipping_city, shipping_kecamatan, shipping_province, shipping_postal_code, affiliate_id, customer_email")
       .eq("order_number", orderNumber)
       .maybeSingle();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!order) return bad("Pesanan tidak ditemukan");
+
+    // Pasang kode affiliate pada pesanan yang SUDAH tercatat (mis. order WA yang kodenya baru diketahui kemudian).
+    // Hanya bila pesanan belum punya affiliate dan belum dibatalkan; item pesanan tidak disentuh.
+    if (action === "set_affiliate") {
+      if (order.affiliate_id) return bad("Pesanan ini sudah punya affiliate.");
+      if (order.status === "dibatalkan") return bad("Pesanan yang dibatalkan tidak bisa dikreditkan ke affiliate");
+      const attribution = await resolveManualAttribution(admin, body?.affiliate_code, { phone: order.customer_whatsapp, email: order.customer_email });
+      if (!attribution.ok) return bad(attribution.error);
+      const { data: itemRows, error: itemErr } = await admin.from("order_items").select("product_id, price, quantity").eq("order_id", order.id);
+      if (itemErr) return NextResponse.json({ error: itemErr.message }, { status: 500 });
+      const commission = await recordManualAttribution(admin, {
+        orderId: order.id,
+        orderNumber: order.order_number,
+        attribution,
+        items: (itemRows || []).map((row: any) => ({ productId: String(row.product_id), price: Number(row.price) || 0, quantity: Number(row.quantity) || 0 })),
+        actor: (await opsIdentity(req))?.email || "admin",
+        writeOrderColumns: true,
+      });
+      return NextResponse.json({ order_number: order.order_number, affiliate: { code: attribution.code, name: attribution.name, commission } });
+    }
 
     if (action === "cancel") {
       // "Dibatalkan sebelum dikirim" — pesanan yang sudah jalan tidak bisa dibatalkan di sini.
