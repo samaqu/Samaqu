@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { computeAbsensi, wibDay, wibDayStart, type SeenRow, type StatusLogRow } from "@/lib/absensi";
+import { SCHEDULE, computeAbsensi, summarize, wibDay, wibDayStart, type SeenRow, type StatusLogRow } from "@/lib/absensi";
 
 /**
  * GET /api/ops/absensi?month=YYYY-MM → absensi harian semua admin untuk satu bulan (WIB).
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
     .limit(5000);
   if (seenError) return NextResponse.json({ error: seenError.message }, { status: 500, headers: noStore });
 
-  const { data: admins } = await db.from("admins").select("user_id, display_name, title, email, active");
+  const { data: admins } = await db.from("admins").select("user_id, display_name, title, email, active, status, status_at");
 
   const users = (admins || []).map((a) => ({
     userId: String(a.user_id),
@@ -76,10 +76,23 @@ export async function GET(req: NextRequest) {
     masuk: d.masuk,
     pulang: d.pulang,
     breakMs: d.breakMs,
+    late: d.late,
     forgotPulang: d.forgotPulang,
     ongoing: d.ongoing,
-    ...(canSeeHours ? { workMs: d.workMs } : {}),
+    ...(canSeeHours ? { workMs: d.workMs, overtimeMs: d.overtimeMs } : {}),
   }));
+
+  // Data PRIBADI (kartu "Absensi Saya"): jam kerja milik sendiri boleh dilihat sendiri, apa pun perannya.
+  // Data admin lain tetap mengikuti aturan canSeeHours di atas.
+  const mineRow = (admins || []).find((a) => String(a.user_id) === me.userId);
+  const myDays = days.filter((d) => d.userId === me.userId);
+  const mine = {
+    userId: me.userId,
+    status: mineRow?.status === "aktif" || mineRow?.status === "istirahat" ? mineRow.status : "pulang",
+    statusAt: mineRow?.status_at ? String(mineRow.status_at) : null,
+    today: myDays.find((d) => d.day === wibDay(nowMs)) || null,
+    summary: summarize(myDays, month, nowMs),
+  };
 
   let totals: { userId: string; workMs: number; days: number; forgot: number }[] | undefined;
   if (canSeeHours) {
@@ -94,5 +107,5 @@ export async function GET(req: NextRequest) {
     totals = [...map.values()];
   }
 
-  return NextResponse.json({ month, canSeeHours, users, days: out, ...(totals ? { totals } : {}) }, { headers: noStore });
+  return NextResponse.json({ month, canSeeHours, schedule: SCHEDULE, mine, users, days: out, ...(totals ? { totals } : {}) }, { headers: noStore });
 }

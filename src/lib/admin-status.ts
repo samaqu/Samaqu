@@ -57,3 +57,5 @@ export function shownStatus(status: WorkStatus, online: boolean): ShownStatus {
 
 /** Penanda antar komponen di tab yang sama: header mengabarkan "status berubah" agar Tim Admin memuat ulang. */
 export const STATUS_CHANGED_EVENT = "samaqu-admin-status-changed";
+/** Kebalikannya: komponen mana pun (mis. kartu Absensi Saya) MEMINTA header mengganti status; header yang mengerjakannya (satu jalur, termasuk konfirmasi Absen Pulang). detail = { status }. */
+export const STATUS_REQUEST_EVENT = "samaqu-admin-status-request";

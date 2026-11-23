@@ -29,13 +29,36 @@ export interface DayRow {
   masuk: string | null;
   pulang: string | null;
   breakMs: number;
+  /** Total waktu Aktif hari itu (sudah termasuk lembur). */
   workMs: number;
+  /** Bagian waktu Aktif setelah jam pulang jadwal (hanya di hari kerja). */
+  overtimeMs: number;
+  /** Masuk lewat jam jadwal + toleransi (hanya di hari kerja). */
+  late: boolean;
   forgotPulang: boolean;
   ongoing: boolean;
 }
 
 const WIB_MS = 7 * 3600_000;
 const DAY_MS = 86_400_000;
+
+/**
+ * Jadwal kerja admin panel (menit sejak 00:00 WIB). Satu tempat untuk mengubah jadwal.
+ * workDays: 0 = Minggu, 1 = Senin, ..., 6 = Sabtu.
+ */
+export const SCHEDULE = {
+  startMin: 8 * 60,
+  endMin: 16 * 60 + 30,
+  breakStartMin: 11 * 60 + 30,
+  breakEndMin: 13 * 60,
+  graceMin: 10,
+  workDays: [1, 2, 3, 4, 5, 6],
+} as const;
+
+/** Hari kerja menurut jadwal? `day` = tanggal kalender YYYY-MM-DD. */
+export const isWorkday = (day: string) => (SCHEDULE.workDays as readonly number[]).includes(new Date(`${day}T00:00:00Z`).getUTCDay());
+/** Menit sejak 00:00 WIB dari waktu epoch ms. */
+export const wibMinutes = (ms: number) => Math.floor((((ms + WIB_MS) % DAY_MS) + DAY_MS) % DAY_MS / 60_000);
 
 /** Tanggal WIB (YYYY-MM-DD) dari waktu epoch ms. */
 export const wibDay = (ms: number) => new Date(ms + WIB_MS).toISOString().slice(0, 10);
@@ -65,7 +88,7 @@ export function computeAbsensi(input: { logs: StatusLogRow[]; seen: SeenRow[]; m
     const key = `${userId}|${day}`;
     let r = rows.get(key);
     if (!r) {
-      r = { userId, day, masuk: null, pulang: null, breakMs: 0, workMs: 0, forgotPulang: false, ongoing: false };
+      r = { userId, day, masuk: null, pulang: null, breakMs: 0, workMs: 0, overtimeMs: 0, late: false, forgotPulang: false, ongoing: false };
       rows.set(key, r);
     }
     return r;
@@ -111,14 +134,76 @@ export function computeAbsensi(input: { logs: StatusLogRow[]; seen: SeenRow[]; m
         const d = wibDay(cursor);
         const segEnd = Math.min(end, wibDayStart(d) + DAY_MS);
         const r = rowOf(userId, d);
-        if (cur.status === "aktif") r.workMs += segEnd - cursor;
-        else r.breakMs += segEnd - cursor;
+        if (cur.status === "aktif") {
+          r.workMs += segEnd - cursor;
+          if (isWorkday(d)) {
+            const overtimeFrom = Math.max(cursor, wibDayStart(d) + SCHEDULE.endMin * 60_000);
+            if (segEnd > overtimeFrom) r.overtimeMs += segEnd - overtimeFrom;
+          }
+        } else {
+          r.breakMs += segEnd - cursor;
+        }
         cursor = segEnd;
       }
     }
   }
 
+  for (const r of rows.values()) {
+    r.late = Boolean(r.masuk) && isWorkday(r.day) && wibMinutes(Date.parse(r.masuk as string)) > SCHEDULE.startMin + SCHEDULE.graceMin;
+  }
+
   return [...rows.values()]
     .filter((r) => r.day.startsWith(month))
     .sort((a, b) => (a.day === b.day ? a.userId.localeCompare(b.userId) : a.day < b.day ? 1 : -1));
+}
+
+export interface AbsensiSummary {
+  /** Hari kerja yang sudah berjalan di bulan itu (hari ini ikut dihitung hanya bila sudah absen masuk atau harinya sudah lewat jam pulang). */
+  workdays: number;
+  /** Hari ada catatan masuk (hari apa pun). */
+  hadir: number;
+  /** Hari hadir yang jatuh di hari kerja (dasar persen). */
+  hadirWorkdays: number;
+  late: number;
+  forgot: number;
+  workMs: number;
+  overtimeMs: number;
+  /** 0–100, atau null bila belum ada hari kerja yang berjalan. */
+  kehadiran: number | null;
+}
+
+/** Rekap satu admin untuk satu bulan dari baris harian miliknya. */
+export function summarize(days: DayRow[], month: string, nowMs: number): AbsensiSummary {
+  const today = wibDay(nowMs);
+  const nowMin = wibMinutes(nowMs);
+  const todayRow = days.find((d) => d.day === today);
+
+  let workdays = 0;
+  const [y, m] = month.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  for (let i = 1; i <= last; i++) {
+    const day = `${month}-${String(i).padStart(2, "0")}`;
+    if (day > today || !isWorkday(day)) continue;
+    if (day === today && !todayRow?.masuk && nowMin < SCHEDULE.endMin) continue;
+    workdays += 1;
+  }
+
+  let hadir = 0;
+  let hadirWorkdays = 0;
+  let late = 0;
+  let forgot = 0;
+  let workMs = 0;
+  let overtimeMs = 0;
+  for (const d of days) {
+    if (d.masuk) {
+      hadir += 1;
+      if (isWorkday(d.day)) hadirWorkdays += 1;
+    }
+    if (d.late) late += 1;
+    if (d.forgotPulang) forgot += 1;
+    workMs += d.workMs;
+    overtimeMs += d.overtimeMs;
+  }
+  const kehadiran = workdays > 0 ? Math.min(100, Math.round((hadirWorkdays / workdays) * 100)) : null;
+  return { workdays, hadir, hadirWorkdays, late, forgot, workMs, overtimeMs, kehadiran };
 }

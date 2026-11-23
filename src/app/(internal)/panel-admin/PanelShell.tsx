@@ -8,7 +8,7 @@
  *
  * Catatan: menu Transaksi/Produk/Leads belum dibangun (badge `SOON`), jadi sengaja non-link.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
@@ -19,7 +19,7 @@ import { OpsPageMapProvider } from "@/lib/ops-router";
 import { useWibLongDate } from "./wib-date";
 import styles from "./panel.module.css";
 import { useAdminPresenceTracker, useOnlineAdmins } from "@/lib/use-admin-presence";
-import { STATUS_CHANGED_EVENT, STATUS_STYLE, asWorkStatus, needsCheckIn, optionsFor, shownStatus, type WorkStatus } from "@/lib/admin-status";
+import { STATUS_CHANGED_EVENT, STATUS_REQUEST_EVENT, STATUS_STYLE, asWorkStatus, needsCheckIn, optionsFor, shownStatus, type WorkStatus } from "@/lib/admin-status";
 import { usePendingReviewCount } from "@/lib/use-pending-reviews";
 import { useResellerQueueCount } from "@/lib/use-reseller-queue";
 import { usePendingDraftCount } from "@/lib/use-pending-drafts";
@@ -478,6 +478,18 @@ export default function PanelShell({ children }: { children: ReactNode }) {
       setStatusOpen(false);
     }
   }
+
+  // Komponen lain (kartu "Absensi Saya") meminta ganti status lewat event; satu jalur yang sama dengan tombol header.
+  const changeStatusRef = useRef(changeStatus);
+  changeStatusRef.current = changeStatus;
+  useEffect(() => {
+    const onRequest = (event: Event) => {
+      const next = (event as CustomEvent<{ status?: string }>).detail?.status;
+      if (next === "aktif" || next === "istirahat" || next === "pulang") void changeStatusRef.current(next);
+    };
+    window.addEventListener(STATUS_REQUEST_EVENT, onRequest);
+    return () => window.removeEventListener(STATUS_REQUEST_EVENT, onRequest);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
