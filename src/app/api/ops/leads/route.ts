@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { defaultFirstFollowup, normalizeKontak, formatTanggalId } from "@/lib/ops-followup";
-import { isOpsAdmin } from "@/lib/ops-auth";
+import { isOpsAdmin, opsIdentity } from "@/lib/ops-auth";
+import { canManageAllLeads, canModifyLead, describeLeadChanges, picValueFor, type LeadActor } from "@/lib/lead-guard";
 import { syncLeadOnLeadSaved } from "@/lib/ops-lead-sync";
 
 /**
@@ -54,6 +55,13 @@ function pickLead(input: Record<string, unknown>) {
 }
 
 const unauthorized = () => NextResponse.json({ error: "Tidak diizinkan" }, { status: 401 });
+
+/** Identitas admin yang login sebagai pelaku aturan kepemilikan lead (null = tidak login). */
+async function leadActor(req: NextRequest): Promise<LeadActor | null> {
+  const me = await opsIdentity(req);
+  return me ? { name: me.name, email: me.email, role: me.role, isBot: me.isBot } : null;
+}
+const forbiddenLead = (message: string) => NextResponse.json({ error: message, code: "lead_read_only" }, { status: 403 });
 
 export async function GET(req: NextRequest) {
   if (!(await isAdmin(req))) return unauthorized();
@@ -119,8 +127,12 @@ export async function POST(req: NextRequest) {
     // Setiap lead baru langsung punya jadwal follow-up sendiri (SOP: besok 10.00 WIB),
     // jadi tidak menumpuk di antrean "Perlu Dijadwalkan" tanpa tindak lanjut.
     const fallbackSchedule = defaultFirstFollowup();
+    // PIC lead baru: admin biasa SELALU atas namanya sendiri (diisi server, bukan dari form). Owner/Leader boleh menentukan
+    // PIC lain, kosong = namanya sendiri. Akun bot (wa-agent / MCP) memakai PIC yang dikirim apa adanya (mis. "Agent").
+    const actor = await leadActor(req);
     const prepared = rows.map((r: Record<string, unknown>) => ({
       ...r,
+      ...(actor && !actor.isBot && (!canManageAllLeads(actor) || !r.pic) ? { pic: picValueFor(actor) } : {}),
       followup_status: "dijadwalkan",
       next_followup_at: (r.next_followup_at as string) || fallbackSchedule,
       do_not_contact: false,
@@ -163,7 +175,7 @@ export async function POST(req: NextRequest) {
     if (data && data.length > 0) {
       const activities = data.map((l: any) => ({
         lead_id: l.id,
-        actor: "system",
+        actor: actor?.email || "system",
         action: "created",
         note: `Lead baru dari ${l.sumber || "-"}`,
         next_schedule: l.next_followup_at || null,
@@ -199,17 +211,33 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!(await isAdmin(req))) return unauthorized();
+  const actor = await leadActor(req);
+  if (!actor) return unauthorized();
 
   try {
     const body = await req.json();
-    const { id, ...patch } = body || {};
+    const { id, ...rawPatch } = body || {};
     if (!id) return NextResponse.json({ error: "id wajib" }, { status: 400 });
 
     const admin = getSupabaseAdmin();
+    const { data: before, error: readErr } = await admin.from("leads").select("*").eq("id", id).maybeSingle();
+    if (readErr) {
+      console.error("[OPS] leads PATCH baca:", readErr);
+      return NextResponse.json({ error: readErr.message }, { status: 500 });
+    }
+    if (!before) return NextResponse.json({ error: "Lead tidak ditemukan" }, { status: 404 });
+
+    // Read-only untuk lead milik admin lain / tanpa PIC (kecuali Owner dan Leader). Dicek di server, bukan hanya di tombol.
+    const access = canModifyLead(actor, before.pic);
+    if (!access.ok) return forbiddenLead(access.message);
+
+    const patch = pickLead(rawPatch);
+    // Hanya Owner/Leader yang boleh memindahkan PIC.
+    if (!canManageAllLeads(actor)) delete patch.pic;
+
     const { data, error } = await admin
       .from("leads")
-      .update({ ...pickLead(patch), updated_at: new Date().toISOString() })
+      .update({ ...patch, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select()
       .maybeSingle();
@@ -217,6 +245,19 @@ export async function PATCH(req: NextRequest) {
     if (error) {
       console.error("[OPS] leads PATCH error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Riwayat perubahan (tampil di Detail Lead). Gagal mencatat riwayat tidak boleh menggagalkan perubahan.
+    const changes = describeLeadChanges(before as Record<string, unknown>, patch);
+    if (changes.length > 0) {
+      const { error: actErr } = await admin.from("lead_activities").insert({
+        lead_id: id,
+        actor: actor.email,
+        action: "edited",
+        note: changes.join("; "),
+        source: "office",
+      });
+      if (actErr) console.error("[OPS] leads PATCH riwayat:", actErr.message);
     }
     return NextResponse.json({ item: data });
   } catch (e) {
@@ -226,7 +267,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!(await isAdmin(req))) return unauthorized();
+  const actor = await leadActor(req);
+  if (!actor) return unauthorized();
 
   try {
     const body = await req.json().catch(() => null);
@@ -234,6 +276,13 @@ export async function DELETE(req: NextRequest) {
     if (!id) return NextResponse.json({ error: "id wajib" }, { status: 400 });
 
     const admin = getSupabaseAdmin();
+    const { data: target } = await admin.from("leads").select("pic, kontak, tanggal").eq("id", id).maybeSingle();
+    if (target) {
+      const access = canModifyLead(actor, target.pic);
+      if (!access.ok) return forbiddenLead(access.message);
+      // Riwayat lead ikut terhapus bersama lead-nya (FK cascade), jadi jejak penghapusan disimpan di log server.
+      console.info(`[OPS] lead dihapus oleh ${actor.email}: ${target.kontak} (${target.tanggal}) PIC=${target.pic ?? "-"}`);
+    }
     const { error, count } = await admin.from("leads").delete({ count: "exact" }).eq("id", id);
     if (error) {
       console.error("[OPS] leads DELETE error:", error);

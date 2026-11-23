@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Clock, ExternalLink, FileDown, Gauge, Loader2, MessageSquare, RefreshCw, Target, Timer } from "lucide-react";
+import { AlertTriangle, CheckCircle, Clock, ExternalLink, FileDown, Gauge, Loader2, MessageSquare, RefreshCw, Target, Timer, UserPlus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { wibDay } from "@/lib/absensi";
 
@@ -42,6 +42,13 @@ interface Stats {
   medianMin: number | null;
   p90Min: number | null;
   avgMin: number | null;
+  within1Min: number;
+  within10Min: number;
+  maxMin: number | null;
+}
+interface LeadCount {
+  total: number;
+  closing: number;
 }
 interface Waiting {
   sender: string;
@@ -57,9 +64,17 @@ interface Data {
   canManage: boolean;
   me: { name: string; email: string };
   perf: Perf;
+  /** Lead yang PIC-nya pemanggil (null = gagal dibaca). */
+  leads: LeadCount | null;
   daily: { day: string; perf: Perf }[];
   waiting: Waiting[];
-  comparison: { bot: Stats; team: Stats & { viaPhone: number; slaPct: number | null }; episodes: number; unanswered: number } | null;
+  comparison: {
+    bot: Stats;
+    team: Stats & { viaPhone: number; slaPct: number | null };
+    episodes: number;
+    unanswered: number;
+    leads: { bot: LeadCount; team: LeadCount; unassigned: number } | null;
+  } | null;
 }
 
 /** Palet yang sama dengan AI Performance Center. Status: hijau = baik, kuning = warning, merah = terlambat, abu = netral. */
@@ -347,6 +362,26 @@ export default function PerformaView() {
             />
           </div>
 
+          {data.leads ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
+              <KpiCard
+                label="Lead dicatat"
+                value={String(data.leads.total)}
+                hint={today < cfg.effectiveFrom ? `dihitung mulai ${fullDay(cfg.effectiveFrom)}` : "lead yang PIC-nya Anda"}
+                tone={C.blue}
+                icon={<UserPlus size={16} />}
+              />
+              <KpiCard
+                label="Jadi closing"
+                value={String(data.leads.closing)}
+                secondary={data.leads.total ? `${id((data.leads.closing / data.leads.total) * 100)}% dari lead Anda` : undefined}
+                hint="lead berstatus Closing"
+                tone={C.green}
+                icon={<CheckCircle size={16} />}
+              />
+            </div>
+          ) : null}
+
           {data.waiting.length > 0 ? (
             <Panel title="Chat yang menunggu Anda" sub="Pelanggan yang pesannya belum tercatat dibalas, dan PIC-nya Anda. Diurutkan dari yang paling lama." right={<Pill tone="info">{data.waiting.length} chat</Pill>}>
               <p className="mt-2 rounded-xl px-3 py-2 text-[11px] leading-relaxed" style={{ background: PILL.info.bg, color: PILL.info.fg }}>
@@ -510,6 +545,10 @@ function BotVsAdmin({ data, cfg, from, to }: { data: Data; cfg: Config; from: st
     }
   }
 
+  /** "62 dari 73 (85%)" */
+  const within = (n: number, total: number) => (total ? `${n} dari ${total} (${Math.round((n / total) * 100)}%)` : "—");
+  /** "12 lead · 3 closing" */
+  const leadText = (l: LeadCount) => `${l.total} lead · ${l.closing} closing`;
   const row = (k: string, v: string) => (
     <div className="flex items-center justify-between gap-3 py-2.5 text-xs" style={{ borderTop: `1px solid ${C.divide}` }}>
       <span style={{ color: C.sub }}>{k}</span>
@@ -535,10 +574,15 @@ function BotVsAdmin({ data, cfg, from, to }: { data: Data; cfg: Config; from: st
             <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${C.purple}14`, color: C.purple }}><MessageSquare size={16} /></span>
           </div>
           <p className="mt-2 text-2xl font-black tabular-nums" style={{ color: C.ink }}>{fmtMin(c.bot.medianMin)}</p>
-          <p className="mb-2 mt-1 text-[11px] font-semibold" style={{ color: C.sub }}>kecepatan tengah (median) balasan pertama</p>
+          <p className="mb-2 mt-1 text-[11px] font-semibold" style={{ color: C.sub }}>chat biasanya dibalas bot dalam waktu ini</p>
           {row("Chat dibalas bot", String(c.bot.count))}
-          {row("9 dari 10 chat dibalas dalam", fmtMin(c.bot.p90Min))}
-          {row("Waktu hitung", "menit biasa (termasuk malam dan Minggu)")}
+          {row("Dibalas dalam 1 menit", within(c.bot.within1Min, c.bot.count))}
+          {row("Dibalas dalam 10 menit", within(c.bot.within10Min, c.bot.count))}
+          {row("Paling lama", fmtMin(c.bot.maxMin))}
+          {c.leads ? row("Lead dicatat bot", leadText(c.leads.bot)) : null}
+          <p className="mt-2 text-[10px] leading-relaxed" style={{ color: C.muted }}>
+            Dihitung dari pesan pertama pelanggan sampai bot membalas. Malam dan Minggu ikut dihitung karena bot memang bekerja di jam itu.
+          </p>
         </div>
         <div className="rounded-2xl border bg-white p-4 shadow-sm" style={{ borderColor: C.border }}>
           <div className="flex items-center justify-between gap-2">
@@ -546,16 +590,21 @@ function BotVsAdmin({ data, cfg, from, to }: { data: Data; cfg: Config; from: st
             <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${C.blue}14`, color: C.blue }}><Timer size={16} /></span>
           </div>
           <p className="mt-2 text-2xl font-black tabular-nums" style={{ color: C.ink }}>{fmtMin(c.team.medianMin)}</p>
-          <p className="mb-2 mt-1 text-[11px] font-semibold" style={{ color: C.sub }}>kecepatan tengah (median) balasan lewat panel</p>
+          <p className="mb-2 mt-1 text-[11px] font-semibold" style={{ color: C.sub }}>chat biasanya dibalas admin dalam waktu ini</p>
           {row("Chat dibalas lewat panel (terukur)", String(c.team.count))}
-          {row("9 dari 10 chat dibalas dalam", fmtMin(c.team.p90Min))}
-          {row("SLA tercapai", c.team.slaPct === null ? "—" : `${id(c.team.slaPct)}%`)}
+          {row("Dibalas dalam 1 menit", within(c.team.within1Min, c.team.count))}
+          {row("Dibalas dalam 10 menit", within(c.team.within10Min, c.team.count))}
+          {row("Paling lama", fmtMin(c.team.maxMin))}
+          {row("Sesuai target SLA", c.team.slaPct === null ? "—" : `${id(c.team.slaPct)}%`)}
           {row("Dibalas lewat HP (tidak terukur)", String(c.team.viaPhone))}
-          {row("Waktu hitung", "menit kerja (jam operasional)")}
+          {c.leads ? row("Lead dicatat admin", leadText(c.leads.team)) : null}
+          <p className="mt-2 text-[10px] leading-relaxed" style={{ color: C.muted }}>
+            Dihitung dari pesan pertama pelanggan sampai admin membalas lewat panel, dalam menit kerja (jam operasional saja).
+          </p>
         </div>
       </div>
       <p className="text-[11px] leading-relaxed" style={{ color: C.sub }}>
-        Bot dan admin bekerja di jam berbeda: bot membalas malam dan Minggu, admin membalas {daysText(cfg.opDays)} {cfg.openTime.replace(":", ".")}–{cfg.closeTime.replace(":", ".")}. Angkanya untuk gambaran umum, bukan lomba di chat yang sama. Beberapa pesan beruntun dari pelanggan dihitung satu kali. Ringkasan ini gabungan tanpa nama per orang. Data admin dihitung mulai {fullDay(cfg.effectiveFrom)} (chat sebelumnya tidak dihitung); data bot memakai seluruh periode. Chat yang masih menunggu saat ini: {c.unanswered}.
+        Bot dan admin bekerja di jam berbeda: bot membalas malam dan Minggu, admin membalas {daysText(cfg.opDays)} {cfg.openTime.replace(":", ".")}–{cfg.closeTime.replace(":", ".")}. Angkanya untuk gambaran umum, bukan lomba di chat yang sama. Beberapa pesan beruntun dari pelanggan dihitung satu kali. Ringkasan ini gabungan tanpa nama per orang. Data admin dihitung mulai {fullDay(cfg.effectiveFrom)} (chat sebelumnya tidak dihitung); data bot memakai seluruh periode. Chat yang masih menunggu saat ini: {c.unanswered}.{c.leads ? ` Lead dihitung dari kolom PIC: "Agent" = bot, nama admin = admin. Lead tanpa PIC (${c.leads.unassigned}) belum dihitung ke siapa pun.` : ""}
       </p>
     </>
   );

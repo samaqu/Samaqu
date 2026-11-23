@@ -336,9 +336,21 @@ export interface SpeedStats {
   medianMin: number | null;
   p90Min: number | null;
   avgMin: number | null;
+  /** Jumlah balasan yang masuk dalam 1 menit / 10 menit, dan yang paling lama (bahasa awam, pelengkap median). */
+  within1Min: number;
+  within10Min: number;
+  maxMin: number | null;
 }
 
-const speed = (values: number[]): SpeedStats => ({ count: values.length, medianMin: percentile(values, 50), p90Min: percentile(values, 90), avgMin: mean(values) });
+const speed = (values: number[]): SpeedStats => ({
+  count: values.length,
+  medianMin: percentile(values, 50),
+  p90Min: percentile(values, 90),
+  avgMin: mean(values),
+  within1Min: values.filter((v) => v <= 1).length,
+  within10Min: values.filter((v) => v <= 10).length,
+  maxMin: values.length ? Math.max(...values) : null,
+});
 
 /** Kecepatan BOT: episode yang dijawab bot, menit biasa (bot bekerja malam dan Minggu). */
 export function summarizeBot(episodes: Episode[]): SpeedStats {

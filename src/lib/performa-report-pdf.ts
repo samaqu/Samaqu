@@ -38,6 +38,7 @@ import {
   type ReportFonts,
 } from "@/lib/leads-report-pdf";
 import type { SlaConfig, SpeedStats, TeamSpeed } from "@/lib/sla";
+import type { LeadCount } from "@/lib/lead-stats";
 
 export interface PerformaReportInput {
   from: string;
@@ -46,6 +47,8 @@ export interface PerformaReportInput {
   bot: SpeedStats;
   team: TeamSpeed;
   counts: { total: number; bot: number; panel: number; phone: number; unanswered: number; expired: number };
+  /** Lead dicatat bot ("Agent") dan admin; null/tidak ada = tidak ditampilkan. */
+  leads?: { bot: LeadCount; team: LeadCount; unassigned: number } | null;
   fonts?: ReportFonts;
   now?: Date;
 }
@@ -76,17 +79,17 @@ export function fmtDuration(min: number | null): string {
 const hoursText = (c: SlaConfig) => `${c.opDays.length === 7 ? "setiap hari" : c.opDays.map((d) => DAY_NAMES[d]).join(", ")} ${c.openTime.replace(":", ".")}–${c.closeTime.replace(":", ".")}`;
 
 /** Kalimat kesimpulan yang mudah dipahami (diuji tanpa PDF). */
-export function insightLines(i: Pick<PerformaReportInput, "config" | "bot" | "team" | "counts">): string[] {
+export function insightLines(i: Pick<PerformaReportInput, "config" | "bot" | "team" | "counts"> & { leads?: PerformaReportInput["leads"] }): string[] {
   const out: string[] = [];
   const { bot, team, counts, config } = i;
   if (bot.count > 0) {
-    out.push(`Bot menjawab ${nfmt(bot.count)} chat dengan kecepatan tengah ${fmtDuration(bot.medianMin)}. Sembilan dari sepuluh chat dijawab dalam ${fmtDuration(bot.p90Min)}.`);
+    out.push(`Bot menjawab ${nfmt(bot.count)} chat. Biasanya chat dibalas dalam ${fmtDuration(bot.medianMin)}, dan 9 dari 10 chat sudah dibalas dalam ${fmtDuration(bot.p90Min)}. Paling lama ${fmtDuration(bot.maxMin)}.`);
   } else {
     out.push("Belum ada chat yang dijawab bot pada periode ini.");
   }
   if (team.count > 0) {
     out.push(
-      `Admin menjawab ${nfmt(team.count)} chat lewat panel yang bisa diukur, dengan kecepatan tengah ${fmtDuration(team.medianMin)} (menit kerja). ${team.slaPct === null ? "" : `${idn(team.slaPct)}% tercapai target ${config.targetResponseMin} menit.`}`.trim(),
+      `Admin menjawab ${nfmt(team.count)} chat lewat panel yang bisa diukur. Biasanya chat dibalas dalam ${fmtDuration(team.medianMin)} (menit kerja). ${team.slaPct === null ? "" : `${idn(team.slaPct)}% sesuai target ${config.targetResponseMin} menit.`}`.trim(),
     );
   } else {
     out.push("Belum ada balasan admin lewat panel yang bisa diukur pada periode ini, sehingga kecepatan admin belum bisa dibandingkan.");
@@ -97,6 +100,11 @@ export function insightLines(i: Pick<PerformaReportInput, "config" | "bot" | "te
   }
   if (counts.phone > 0) {
     out.push(`${nfmt(counts.phone)} chat dibalas admin lewat HP. Jam balasannya tidak diketahui, jadi tidak ikut dihitung kecepatannya.`);
+  }
+  if (i.leads) {
+    out.push(
+      `Lead yang dicatat: bot ${nfmt(i.leads.bot.total)} (${nfmt(i.leads.bot.closing)} closing), admin ${nfmt(i.leads.team.total)} (${nfmt(i.leads.team.closing)} closing).`,
+    );
   }
   return out;
 }
@@ -109,6 +117,7 @@ export function methodNotes(c: SlaConfig): string[] {
     "Chat yang masuk di luar jam operasional tidak dihitung dalam SLA admin (dijawab bot). Balasan admin dari HP dihitung selesai tetapi tidak diukur.",
     `Target SLA: balasan pertama dalam ${c.targetResponseMin} menit, warning setelah ${c.warningMin} menit, terlambat setelah ${c.lateMin} menit.`,
     `Data admin dihitung mulai ${dayLabel(c.effectiveFrom)}; chat sebelum tanggal itu tidak dihitung. Data bot memakai seluruh periode.`,
+    'Lead dihitung dari kolom PIC di menu Leads: "Agent" = dicatat bot, nama admin = dicatat admin tersebut. Lead tanpa PIC belum dihitung ke siapa pun.',
     "Ringkasan ini gabungan seluruh admin, tanpa nama per orang.",
   ];
 }
@@ -151,7 +160,7 @@ export async function buildPerformaReportPdf(input: PerformaReportInput): Promis
   /* ─── 1. Kesimpulan ─── */
   sectionTitle(ctx, "Kesimpulan", period);
   {
-    const lines = insightLines({ config, bot, team, counts });
+    const lines = insightLines({ config, bot, team, counts, leads: input.leads });
     const size = 9.6;
     const lh = 13.5;
     const wrapped = lines.map((l) => wrap(l, regular, size, CW - 44));
@@ -172,31 +181,42 @@ export async function buildPerformaReportPdf(input: PerformaReportInput): Promis
 
   /* ─── 2. Dua kartu ─── */
   {
-    const h = 122;
+    const h = 186;
     ensure(h + 24);
     const gap = 10;
     const w = (CW - gap) / 2;
-    const card = (x: number, fill: string, sub: string, title: string, big: string, rows: [string, string][]) => {
+    const card = (x: number, fill: string, sub: string, title: string, big: string, caption: string, rows: [string, string][]) => {
       const y = ctx.y - h;
       rrect(ctx.page, { x, y, w, h, r: 12, fill });
       text(ctx.page, regular, title, { x: x + 14, y: y + h - 20, size: 8.4, color: sub });
       text(ctx.page, bold, big, { x: x + 14, y: y + h - 52, size: fitSize(bold, big, w - 28, 28, 14), color: "#ffffff" });
-      text(ctx.page, regular, "kecepatan tengah (median) balasan pertama", { x: x + 14, y: y + h - 66, size: 7.6, color: sub });
+      text(ctx.page, regular, caption, { x: x + 14, y: y + h - 66, size: 7.6, color: sub });
       rows.forEach(([k, v], i) => {
-        const ry = y + 38 - i * 13;
+        const ry = y + h - 86 - i * 13;
         text(ctx.page, regular, k, { x: x + 14, y: ry, size: 8, color: sub });
         textRight(ctx.page, bold, v, { right: x + w - 14, y: ry, size: 8.6, color: "#ffffff" });
       });
     };
-    card(MARGIN, SKY, "#e0f2fe", "BOT WHATSAPP", fmtDuration(bot.medianMin), [
+    /** "62 dari 73 (85%)" */
+    const within = (n: number, total: number) => (total ? `${nfmt(n)} dari ${nfmt(total)} (${Math.round((n / total) * 100)}%)` : "—");
+    const leadText = (l: LeadCount) => `${nfmt(l.total)} lead · ${nfmt(l.closing)} closing`;
+    const botRows: [string, string][] = [
       ["Chat dibalas bot", nfmt(bot.count)],
-      ["9 dari 10 chat dibalas dalam", fmtDuration(bot.p90Min)],
-    ]);
-    card(MARGIN + w + gap, ORANGE, "#ffedd5", "ADMIN (GABUNGAN TIM)", fmtDuration(team.medianMin), [
+      ["Dibalas dalam 1 menit", within(bot.within1Min, bot.count)],
+      ["Dibalas dalam 10 menit", within(bot.within10Min, bot.count)],
+      ["Paling lama", fmtDuration(bot.maxMin)],
+    ];
+    if (input.leads) botRows.push(["Lead dicatat bot", leadText(input.leads.bot)]);
+    const adminRows: [string, string][] = [
       ["Chat dibalas lewat panel (terukur)", nfmt(team.count)],
-      ["9 dari 10 chat dibalas dalam", fmtDuration(team.p90Min)],
-      [`SLA tercapai (target ${config.targetResponseMin} menit)`, team.slaPct === null ? "—" : `${idn(team.slaPct)}%`],
-    ]);
+      ["Dibalas dalam 1 menit", within(team.within1Min, team.count)],
+      ["Dibalas dalam 10 menit", within(team.within10Min, team.count)],
+      ["Paling lama", fmtDuration(team.maxMin)],
+      [`Sesuai target SLA (${config.targetResponseMin} menit)`, team.slaPct === null ? "—" : `${idn(team.slaPct)}%`],
+    ];
+    if (input.leads) adminRows.push(["Lead dicatat admin", leadText(input.leads.team)]);
+    card(MARGIN, SKY, "#e0f2fe", "BOT WHATSAPP", fmtDuration(bot.medianMin), "chat biasanya dibalas bot dalam waktu ini", botRows);
+    card(MARGIN + w + gap, ORANGE, "#ffedd5", "ADMIN (GABUNGAN TIM)", fmtDuration(team.medianMin), "chat biasanya dibalas admin dalam waktu ini (menit kerja)", adminRows);
     ctx.y -= h + 18;
   }
 
@@ -205,8 +225,8 @@ export async function buildPerformaReportPdf(input: PerformaReportInput): Promis
     ensure(150);
     sectionTitle(ctx, "Perbandingan kecepatan", "makin pendek batang, makin cepat");
     const groups: { title: string; bot: number | null; admin: number | null }[] = [
-      { title: "Kecepatan tengah (median)", bot: bot.medianMin, admin: team.medianMin },
-      { title: "9 dari 10 chat dibalas dalam", bot: bot.p90Min, admin: team.p90Min },
+      { title: "Biasanya dibalas dalam", bot: bot.medianMin, admin: team.medianMin },
+      { title: "9 dari 10 chat sudah dibalas dalam", bot: bot.p90Min, admin: team.p90Min },
     ];
     const max = Math.max(1e-9, ...groups.flatMap((g) => [g.bot ?? 0, g.admin ?? 0]));
     const labelW = 150;

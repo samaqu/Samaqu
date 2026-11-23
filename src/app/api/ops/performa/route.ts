@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { forbidden, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { wibDay } from "@/lib/absensi";
-import { coverageCounts, effectiveStartMs, loadEpisodes, loadSlaConfig, resolveRange } from "@/lib/performa-data";
+import { coverageCounts, effectiveStartMs, loadEpisodes, loadLeadRows, loadSlaConfig, resolveRange } from "@/lib/performa-data";
+import { countBot, countMine, countTeam, countUnassigned } from "@/lib/lead-stats";
 import { summarizeAdmin, summarizeBot, summarizeTeam, validateSlaInput, type Episode } from "@/lib/sla";
 
 /**
@@ -47,6 +48,11 @@ export async function GET(req: NextRequest) {
 
   const identity = { email: me.email, name: me.name || me.email.split("@")[0], userId: me.userId };
   const perf = summarizeAdmin(episodes, cfg, identity, picOf);
+
+  // Lead yang dicatat (PIC = pemanggil) dan yang jadi closing. Gagal membaca lead tidak boleh menjatuhkan halaman (leads = null).
+  const leadLoad = await loadLeadRows(db, range);
+  const leadRows = "rows" in leadLoad ? leadLoad.rows : null;
+  const leads = leadRows ? countMine(leadRows, { name: identity.name, email: me.email, role: me.role, isBot: me.isBot }, cfg.effectiveFrom) : null;
 
   // Rincian per hari (hari mulai episode, WIB), terbaru di atas.
   const byDay = new Map<string, Episode[]>();
@@ -98,6 +104,7 @@ export async function GET(req: NextRequest) {
         episodes: allEpisodes.length,
         unanswered: episodes.filter((e) => e.responder.kind === "none" && !e.stale).length,
         counts: coverageCounts(allEpisodes, effectiveMs),
+        leads: leadRows ? { bot: countBot(leadRows), team: countTeam(leadRows, cfg.effectiveFrom), unassigned: countUnassigned(leadRows) } : null,
       }
     : null;
 
@@ -108,6 +115,7 @@ export async function GET(req: NextRequest) {
       canManage,
       me: { name: identity.name, email: me.email },
       perf,
+      leads,
       daily,
       waiting,
       comparison,

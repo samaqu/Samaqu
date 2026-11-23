@@ -22,6 +22,7 @@ import {
   Repeat,
   ClipboardPaste,
   Search,
+  Lock,
   X
 } from "lucide-react";
 import { useToast } from "@/components/ops/ui/use-toast";
@@ -30,6 +31,8 @@ import PasteImportModal from "@/components/ops/leads/PasteImportModal";
 import ConfirmDeleteModal from "@/components/ops/ConfirmDeleteModal";
 import LeadDetailDrawer from "@/components/ops/leads/LeadDetailDrawer";
 import { normalizeLeadPhone } from "@/lib/ops-lead-sync";
+import { canModifyLead } from "@/lib/lead-guard";
+import { supabase } from "@/lib/supabase";
 
 const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 
@@ -87,6 +90,22 @@ export default function Leads({ variant = "ops" }) {
   const [year, setYear] = useState(now.getFullYear());
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Siapa yang login: menentukan lead mana yang boleh diubah/dihapus (aturan di lib/lead-guard, dikunci juga di server).
+  const { data: me } = useQuery({
+    queryKey: ['opsMe'],
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      const res = await fetch('/api/ops/me', { headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: 'no-store' });
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+  /** Hasil aturan untuk satu lead; saat identitas belum terbaca, dianggap terkunci (aman). */
+  const accessOf = (lead) =>
+    me ? canModifyLead({ name: me.name, email: me.email, role: me.role, isBot: me.isBot }, lead.pic) : { ok: false, message: 'Memeriksa akses…' };
 
   const start = `${year}-${pad(month + 1)}-01`;
   const end = `${year}-${pad(month + 1)}-${pad(new Date(year, month + 1, 0).getDate())}`;
@@ -199,11 +218,17 @@ export default function Leads({ variant = "ops" }) {
 
   const handleDelete = async () => {
     setIsDeleting(true);
-    await base44.entities.Lead.delete(deleteTarget.id);
-    setIsDeleting(false);
-    setDeleteTarget(null);
-    queryClient.invalidateQueries(['leads']);
-    toast({ title: "✅ Lead dihapus", variant: "success" });
+    try {
+      await base44.entities.Lead.delete(deleteTarget.id);
+      queryClient.invalidateQueries(['leads']);
+      toast({ title: "✅ Lead dihapus", variant: "success" });
+    } catch (e) {
+      // Mis. 403 "Lead ini milik ..." bila aturan kepemilikan menolak di server.
+      toast({ title: "Lead tidak bisa dihapus", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
   };
 
   // Kartu ringkasan: palet netral (putih + border slate), sama seperti dashboard admin.
@@ -479,20 +504,31 @@ export default function Leads({ variant = "ops" }) {
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setEditing(lead); setFormOpen(true); }}
-                          className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                          aria-label="Edit lead"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(lead); }}
-                          className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                          aria-label="Hapus lead"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        {accessOf(lead).ok ? (
+                          <>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setEditing(lead); setFormOpen(true); }}
+                              className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                              aria-label="Edit lead"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setDeleteTarget(lead); }}
+                              className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                              aria-label="Hapus lead"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </>
+                        ) : (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-400 dark:bg-slate-800 dark:text-slate-500"
+                            title={accessOf(lead).message}
+                          >
+                            <Lock size={12} /> Hanya lihat
+                          </span>
+                        )}
                       </div>
                     </td>
                   </motion.tr>
@@ -537,20 +573,28 @@ export default function Leads({ variant = "ops" }) {
                 </div>
 
                 <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setEditing(lead); setFormOpen(true); }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    <Pencil size={14} /> Ubah
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(lead); }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 px-3 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20"
-                  >
-                    <Trash2 size={14} /> Hapus
-                  </button>
+                  {accessOf(lead).ok ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setEditing(lead); setFormOpen(true); }}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        <Pencil size={14} /> Ubah
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setDeleteTarget(lead); }}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 px-3 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 size={14} /> Hapus
+                      </button>
+                    </>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500">
+                      <Lock size={12} /> Hanya lihat · {accessOf(lead).message.startsWith('Lead ini milik') ? `milik ${lead.pic}` : 'belum ada PIC'}
+                    </span>
+                  )}
                 </div>
               </motion.div>
             ))}
@@ -564,6 +608,7 @@ export default function Leads({ variant = "ops" }) {
         lead={detailLead}
         history={detailLead ? histories[detailLead.id] : null}
         tema={isPanel ? 'warna' : 'mono'}
+        access={detailLead ? accessOf(detailLead) : { ok: false, message: '' }}
         onClose={() => setDetailLead(null)}
         onEdit={(l) => { setDetailLead(null); setEditing(l); setFormOpen(true); }}
       />
@@ -587,6 +632,7 @@ export default function Leads({ variant = "ops" }) {
         onClose={() => setFormOpen(false)}
         initialData={editing}
         defaultDate={todayWib()}
+        me={me}
       />
 
       <ConfirmDeleteModal

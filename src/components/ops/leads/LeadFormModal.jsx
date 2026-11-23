@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { X, Save, CalendarClock, CalendarDays, User, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ops/ui/use-toast";
 import { defaultFirstFollowup, isoToWibInput, wibInputToIso, formatTanggalId } from "@/lib/ops-followup";
+import { canManageAllLeads, picValueFor } from "@/lib/lead-guard";
 
 const SUMBER_OPTIONS = ["Website", "IG", "WA", "Meta ads"];
 
@@ -20,8 +21,12 @@ const parseRupiah = (value) => parseInt(value.replace(/\D/g, '')) || 0;
 /** Input datetime-local (WIB) dari tanggal + jam, mis. "2026-10-14" + 10 -> "2026-10-14T10:00" */
 const wibInputFrom = (daysAhead, hour) => isoToWibInput(defaultFirstFollowup(new Date(), daysAhead, hour));
 
-export default function LeadFormModal({ isOpen, onClose, initialData = null, defaultDate }) {
+export default function LeadFormModal({ isOpen, onClose, initialData = null, defaultDate, me = null }) {
   const isEdit = !!initialData;
+  // PIC otomatis atas nama admin yang login. Hanya Owner dan Leader yang boleh memilih PIC lain (server juga memaksa ini).
+  const actor = me ? { name: me.name, email: me.email, role: me.role, isBot: me.isBot } : null;
+  const ownPic = actor ? picValueFor(actor) : '';
+  const lockPic = !!actor && !canManageAllLeads(actor);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -94,12 +99,12 @@ export default function LeadFormModal({ isOpen, onClose, initialData = null, def
         });
         setDisplayNominal(initialData.nominal ? formatRupiah(initialData.nominal) : '');
       } else {
-        setForm({ ...emptyForm, tanggal: defaultDate || '', nextFollowupAt: wibInputFrom(1, 10) });
+        setForm({ ...emptyForm, tanggal: defaultDate || '', pic: ownPic, nextFollowupAt: wibInputFrom(1, 10) });
         setDisplayNominal('');
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, initialData, defaultDate]);
+  }, [isOpen, initialData, defaultDate, ownPic]);
 
   const saveMutation = useMutation({
     mutationFn: (data) => isEdit
@@ -238,15 +243,21 @@ export default function LeadFormModal({ isOpen, onClose, initialData = null, def
                 <input
                   type="text"
                   list="lead-pic-options"
-                  value={form.pic}
+                  value={lockPic && !isEdit ? ownPic : form.pic}
                   onChange={(e) => setForm({ ...form, pic: e.target.value })}
                   placeholder="Pilih atau ketik nama"
-                  className={inputClass}
+                  disabled={lockPic}
+                  readOnly={lockPic}
+                  className={`${inputClass}${lockPic ? ' cursor-not-allowed opacity-70' : ''}`}
                 />
                 <datalist id="lead-pic-options">
                   {picOptions.map((p) => <option key={p} value={p} />)}
                 </datalist>
-                <p className="mt-1 text-[10px] text-slate-400">Dipakai untuk filter & pembagian tugas di Follow-up Center.</p>
+                <p className="mt-1 text-[10px] text-slate-400">
+                  {lockPic
+                    ? 'Otomatis atas namamu. PIC hanya bisa dipindah oleh Owner atau Leader.'
+                    : 'Dipakai untuk filter & pembagian tugas di Follow-up Center.'}
+                </p>
               </div>
             </div>
 

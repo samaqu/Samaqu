@@ -15,7 +15,7 @@ const ADMIN_TTL_MS = 5 * 60 * 1000;
 export type OpsRole = "owner" | "leader" | "admin" | "admin_operasional" | "other";
 
 /** Identitas admin yang sedang login. Field tambahan (userId, name, title) dipakai Tim Admin dan header panel. */
-export type OpsIdentity = { email: string; role: OpsRole; userId: string; name: string; title: string };
+export type OpsIdentity = { email: string; role: OpsRole; userId: string; name: string; title: string; isBot: boolean };
 
 type CacheEntry = { ok: boolean; identity: OpsIdentity; exp: number };
 const adminCache = new Map<string, CacheEntry>();
@@ -59,7 +59,7 @@ async function readIdentity(req: NextRequest): Promise<OpsIdentity | null> {
     if (error || !user) return null;
     const { data } = await admin
       .from("admins")
-      .select("role, active, display_name, title")
+      .select("role, active, display_name, title, is_bot")
       .eq("user_id", user.id)
       .maybeSingle();
     if (!data) return null;
@@ -74,6 +74,7 @@ async function readIdentity(req: NextRequest): Promise<OpsIdentity | null> {
       userId: user.id,
       name: String(data.display_name || "").trim() || email.split("@")[0] || "Admin",
       title: String(data.title || "").trim(),
+      isBot: (data as { is_bot?: boolean }).is_bot === true,
     };
     // Hanya hasil positif yang di-cache, supaya error sesaat tidak bikin
     // admin terkunci 5 menit.

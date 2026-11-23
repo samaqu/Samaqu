@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { isOpsAdmin, unauthorized, opsActorEmail } from "@/lib/ops-auth";
+import { isOpsAdmin, unauthorized, opsActorEmail, opsIdentity } from "@/lib/ops-auth";
+import { canModifyLead } from "@/lib/lead-guard";
 import { OUTCOMES, jakartaDayBounds, isActiveTask } from "@/lib/ops-followup";
 
 /**
@@ -284,6 +285,11 @@ export async function POST(req: NextRequest) {
 
     // ── Set PIC ──
     if (action === "set_pic") {
+      // Memindahkan PIC mengubah kepemilikan lead, jadi aturannya sama dengan ubah lead: hanya pemilik, Owner, dan Leader.
+      const me = await opsIdentity(req);
+      if (!me) return unauthorized();
+      const access = canModifyLead({ name: me.name, email: me.email, role: me.role, isBot: me.isBot }, lead.pic);
+      if (!access.ok) return NextResponse.json({ error: access.message, code: "lead_read_only" }, { status: 403 });
       const pic = body.pic ? String(body.pic).trim() : null;
       const { error } = await admin.from("leads").update({ pic }).eq("id", leadId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });

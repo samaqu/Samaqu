@@ -13,7 +13,8 @@
  */
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, FileText, MapPin, MessageCircle, Pencil, Repeat, ShoppingBag, Users } from "lucide-react";
+import { CheckCircle2, Clock, FileText, History, Lock, MapPin, MessageCircle, Pencil, Repeat, ShoppingBag, Users } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import { PanelDetailShell, rupiah } from "@/components/ops/transaksi/PanelDetailPesanan";
 import { formatRupiah, formatTanggalSingkatID } from "@/components/ops/transaksi/transaksi-format";
 import { NEUTRAL_ITEM_PHOTO } from "@/lib/order-photo";
@@ -116,8 +117,44 @@ function KartuPesanan({ order, urutan }) {
   );
 }
 
-export default function LeadDetailDrawer({ open, lead, history, tema = "mono", onClose, onEdit }) {
+/** Tanggal + jam WIB singkat untuk baris riwayat, mis. "24 Nov 10.05". */
+function waktuRiwayat(iso) {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return "";
+  const w = new Date(ms + 7 * 3600_000);
+  const bulan = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"][w.getUTCMonth()];
+  return `${w.getUTCDate()} ${bulan} ${String(w.getUTCHours()).padStart(2, "0")}.${String(w.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+const AKSI_RIWAYAT = { created: "Lead dibuat", edited: "Diubah", set_pic: "PIC dipindah" };
+
+export default function LeadDetailDrawer({ open, lead, history, tema = "mono", access = { ok: true }, onClose, onEdit }) {
   const [tersalin, setTersalin] = useState(false);
+  const [riwayat, setRiwayat] = useState(null); // null = memuat, [] = kosong
+
+  // Riwayat perubahan lead (dibuat / diubah siapa dan apa yang berubah). Gagal memuat tidak mengganggu isi detail lainnya.
+  useEffect(() => {
+    setRiwayat(null);
+    if (!open || !lead?.id) return undefined;
+    let batal = false;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        const res = await fetch(`/api/ops/leads/riwayat?id=${encodeURIComponent(lead.id)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          cache: "no-store",
+        });
+        const json = res.ok ? await res.json() : null;
+        if (!batal) setRiwayat(json?.items || []);
+      } catch {
+        if (!batal) setRiwayat([]);
+      }
+    })();
+    return () => {
+      batal = true;
+    };
+  }, [open, lead?.id, lead?.updated_at]);
 
   // Tutup dengan Escape; scroll halaman dikunci selama drawer terbuka (sama seperti Transaksi).
   useEffect(() => {
@@ -271,6 +308,37 @@ export default function LeadDetailDrawer({ open, lead, history, tema = "mono", o
             ) : null}
           </section>
 
+          {/* Riwayat perubahan lead. */}
+          <section className="dp-kartu">
+            <div className="dp-kepala">
+              <div className="dp-kepala-kiri">
+                <span className="dp-kepala-ikon">
+                  <History size={14} strokeWidth={2} />
+                </span>
+                <span className="dp-kepala-judul">Riwayat Perubahan</span>
+              </div>
+            </div>
+            {riwayat === null ? <p className="dp-kosong-teks">Memuat riwayat…</p> : null}
+            {riwayat && riwayat.length === 0 ? <p className="dp-kosong-teks">Belum ada perubahan tercatat.</p> : null}
+            {riwayat
+              ? riwayat.map((r) => (
+                  <div className="dp-baris dp-baris-detail" key={r.id} style={{ alignItems: "flex-start" }}>
+                    <span className="dp-baris-label">{waktuRiwayat(r.createdAt)}</span>
+                    <span className="dp-baris-nilai" style={{ textAlign: "right" }}>
+                      <strong>{AKSI_RIWAYAT[r.action] || r.action}</strong> · {r.actor}
+                      {r.note && r.action !== "created"
+                        ? r.note.split("; ").map((baris) => (
+                            <span key={baris} style={{ display: "block", fontWeight: 500, opacity: 0.8 }}>
+                              {baris}
+                            </span>
+                          ))
+                        : null}
+                    </span>
+                  </div>
+                ))
+              : null}
+          </section>
+
           {/* Alamat pengiriman: dari transaksi terbaru nomor ini. */}
           <section className="dp-kartu">
             <div className="dp-kepala">
@@ -359,8 +427,15 @@ export default function LeadDetailDrawer({ open, lead, history, tema = "mono", o
           {/* Footer: Ubah Lead (sekunder) + Chat WhatsApp (utama). */}
           <div className="dp-footer">
             <div className="dp-footer-baris">
-              <button type="button" className="dp-tombol sekunder" onClick={() => onEdit?.(lead)}>
-                <Pencil size={13} /> Ubah Lead
+              <button
+                type="button"
+                className="dp-tombol sekunder"
+                onClick={() => onEdit?.(lead)}
+                disabled={!access.ok}
+                title={access.ok ? undefined : access.message}
+                style={access.ok ? undefined : { opacity: 0.55, cursor: "not-allowed" }}
+              >
+                {access.ok ? <Pencil size={13} /> : <Lock size={13} />} {access.ok ? "Ubah Lead" : "Hanya lihat"}
               </button>
             </div>
             <button

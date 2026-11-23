@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { forbidden, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { loadReportFonts } from "@/lib/leads-report-pdf";
-import { coverageCounts, effectiveStartMs, loadEpisodes, loadSlaConfig, resolveRange } from "@/lib/performa-data";
+import { coverageCounts, effectiveStartMs, loadEpisodes, loadLeadRows, loadSlaConfig, resolveRange } from "@/lib/performa-data";
+import { countBot, countTeam, countUnassigned } from "@/lib/lead-stats";
 import { buildPerformaReportPdf, performaReportFileName } from "@/lib/performa-report-pdf";
 import { summarizeBot, summarizeTeam } from "@/lib/sla";
 
@@ -33,6 +34,12 @@ export async function GET(req: NextRequest) {
     const loaded = await loadEpisodes(db, range, config, nowMs);
     if ("error" in loaded) return NextResponse.json({ error: loaded.error }, { status: 500, headers: noStore });
 
+    // Lead dicatat (PIC "Agent" = bot, nama admin = admin). Gagal membaca lead tidak menggagalkan PDF: bagian lead dilewati.
+    const leadLoad = await loadLeadRows(db, range);
+    const leads = "rows" in leadLoad
+      ? { bot: countBot(leadLoad.rows), team: countTeam(leadLoad.rows, config.effectiveFrom), unassigned: countUnassigned(leadLoad.rows) }
+      : null;
+
     let fonts;
     try {
       fonts = loadReportFonts();
@@ -49,6 +56,7 @@ export async function GET(req: NextRequest) {
       bot: summarizeBot(loaded.episodes),
       team: summarizeTeam(loaded.episodes.filter((e) => e.startAt >= effectiveMs), config),
       counts: coverageCounts(loaded.episodes, effectiveMs),
+      leads,
       fonts,
       now: new Date(nowMs),
     });

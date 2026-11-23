@@ -7,6 +7,7 @@
 import type { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { wibDay, wibDayStart } from "@/lib/absensi";
 import { buildEpisodes, parseSlaConfig, type AdminReplyRow, type Episode, type InboundRow, type SlaConfig } from "@/lib/sla";
+import type { LeadRow } from "@/lib/lead-stats";
 
 type Db = ReturnType<typeof getSupabaseAdmin>;
 
@@ -82,6 +83,24 @@ export async function loadEpisodes(db: Db, range: PerformaRange, cfg: SlaConfig,
   }
 
   return { episodes: buildEpisodes(inbound, replies, cfg, nowMs).filter((e) => e.startAt >= range.startMs && e.startAt < range.endMs) };
+}
+
+/** Lead yang tanggalnya jatuh di rentang (tanggal WIB, kolom `leads.tanggal`). Hanya kolom yang dibutuhkan. */
+export async function loadLeadRows(db: Db, range: PerformaRange): Promise<{ rows: LeadRow[] } | { error: string }> {
+  const rows: LeadRow[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const { data, error } = await db
+      .from("leads")
+      .select("tanggal, status, pic")
+      .gte("tanggal", range.from)
+      .lte("tanggal", range.to)
+      .order("tanggal", { ascending: true })
+      .range(page * PAGE, page * PAGE + PAGE - 1);
+    if (error) return { error: error.message };
+    for (const r of data || []) rows.push({ tanggal: String(r.tanggal), status: r.status ? String(r.status) : null, pic: r.pic ? String(r.pic) : null });
+    if (!data || data.length < PAGE) break;
+  }
+  return { rows };
 }
 
 /** Awal hari (WIB) tanggal mulai berlaku: chat yang mulai sebelum ini tidak dihitung dalam performa admin. */
