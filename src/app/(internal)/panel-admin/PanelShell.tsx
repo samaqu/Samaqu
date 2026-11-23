@@ -414,6 +414,33 @@ export default function PanelShell({ children }: { children: ReactNode }) {
     };
   }, [authorized]);
 
+  // "Terakhir terlihat": kirim sinyal ringan tiap 2 menit, HANYA saat tab terlihat (tab di latar belakang / layar terkunci tidak dihitung).
+  const seenUserId = me?.userId;
+  useEffect(() => {
+    if (!seenUserId) return;
+    let stopped = false;
+    const ping = async () => {
+      if (stopped || document.visibilityState !== "visible") return;
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (!token) return;
+        await fetch("/api/ops/heartbeat", { method: "POST", headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+      } catch {
+        /* sinyal berikutnya akan mencoba lagi */
+      }
+    };
+    void ping();
+    const id = setInterval(() => void ping(), 120_000);
+    const onVisible = () => void ping();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [seenUserId]);
+
   async function changeStatus(next: WorkStatus) {
     if (statusBusy) return;
     setStatusBusy(true);

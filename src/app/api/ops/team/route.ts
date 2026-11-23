@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("admins")
-    .select("id, user_id, email, role, display_name, title, active, status, status_at, created_at")
+    .select("id, user_id, email, role, display_name, title, active, status, status_at, last_seen_at, created_at")
     .order("created_at", { ascending: true });
   if (error) return fail(error.message, 500);
 
@@ -71,6 +71,7 @@ export async function GET(req: NextRequest) {
         userId: String(row.user_id),
         status: row.status === "aktif" || row.status === "istirahat" ? row.status : "pulang",
         statusAt: row.status_at || null,
+        lastSeen: row.last_seen_at || null,
         invited: !confirmed,
         lastSignIn,
         isMe: row.user_id === me.userId,

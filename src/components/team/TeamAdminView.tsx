@@ -26,6 +26,7 @@ interface Member {
   status: WorkStatus;
   invited: boolean;
   lastSignIn: string | null;
+  lastSeen: string | null;
   isMe: boolean;
   canManage: boolean;
 }
@@ -64,14 +65,16 @@ async function api<T>(method: "GET" | "POST" | "PATCH", body?: Record<string, un
   return json as T;
 }
 
-function sinceLabel(iso: string | null): string {
-  if (!iso) return "Belum pernah login";
+/** Teks "terakhir terlihat": online (tab terbuka sekarang) mengalahkan angka tersimpan; kosong = belum tercatat sejak fitur aktif. */
+function seenLabel(iso: string | null, online: boolean): string {
+  if (online) return "Online sekarang";
+  if (!iso) return "Terakhir terlihat: belum tercatat";
   const min = Math.floor((Date.now() - Date.parse(iso)) / 60000);
   if (!Number.isFinite(min)) return "";
-  if (min < 2) return "Baru saja login";
-  if (min < 60) return `Login ${min} menit lalu`;
-  if (min < 1440) return `Login ${Math.floor(min / 60)} jam lalu`;
-  return `Login ${Math.floor(min / 1440)} hari lalu`;
+  if (min < 3) return "Terakhir terlihat: baru saja";
+  if (min < 60) return `Terakhir terlihat ${min} menit lalu`;
+  if (min < 1440) return `Terakhir terlihat ${Math.floor(min / 60)} jam lalu`;
+  return `Terakhir terlihat ${Math.floor(min / 1440)} hari lalu`;
 }
 
 export default function TeamAdminView() {
@@ -220,7 +223,7 @@ export default function TeamAdminView() {
                   : null}
                 {!m.active ? <span style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 700 }}>Nonaktif</span> : null}
               </div>
-              <span style={{ fontSize: 12, color: SUB }}>{m.invited ? "Belum membuat password" : sinceLabel(m.lastSignIn)}</span>
+              <span style={{ fontSize: 12, color: SUB }}>{m.invited ? "Belum membuat password" : seenLabel(m.lastSeen, onlineIds.has(m.userId))}</span>
 
               {m.canManage ? (
                 editing?.id === m.id ? (
