@@ -192,6 +192,7 @@ const NAV: NavGroup[] = [
     icon: "chat",
     items: [
       { label: "Inbox WA", href: "/panel-admin/inbox-wa", icon: "chat" },
+      { label: "Template Chat", href: "/panel-admin/template-chat", icon: "clipboard" },
       { label: "Absensi", href: "/panel-admin/absensi", icon: "clock" },
       { label: "Tim Admin", href: "/panel-admin/tim-admin", icon: "users" },
     ],
