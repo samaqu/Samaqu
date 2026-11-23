@@ -23,7 +23,18 @@ interface Draft {
 
 const EMPTY: Draft = { id: null, title: "", category: "Umum", content: "" };
 
-export default function WaTemplatesManager({ open, onClose, onChanged }: { open: boolean; onClose: () => void; onChanged: () => void }) {
+export default function WaTemplatesManager({
+  open,
+  onClose,
+  onChanged,
+  initialEditId = null,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onChanged: () => void;
+  /** Bila diisi, pengelola langsung membuka form ubah untuk template ini (tombol pensil di kartu). */
+  initialEditId?: number | null;
+}) {
   const [items, setItems] = useState<WaTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -31,11 +42,15 @@ export default function WaTemplatesManager({ open, onClose, onChanged }: { open:
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState<WaTemplate | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (openId: number | null = null) => {
     try {
       const res = await loadTemplates(true);
       setItems(res.items);
       setError("");
+      if (openId !== null) {
+        const target = res.items.find((t) => t.id === openId);
+        if (target) setDraft({ id: target.id, title: target.title, category: target.category, content: target.content });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal memuat template.");
     } finally {
@@ -47,9 +62,9 @@ export default function WaTemplatesManager({ open, onClose, onChanged }: { open:
     if (open) {
       setLoading(true);
       setDraft(null);
-      void refresh();
+      void refresh(initialEditId);
     }
-  }, [open, refresh]);
+  }, [open, refresh, initialEditId]);
 
   const categories = useMemo(() => [...new Set(items.map((t) => t.category))].sort((a, b) => a.localeCompare(b)), [items]);
 
