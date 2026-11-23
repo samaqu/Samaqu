@@ -122,7 +122,9 @@ function legacyRedirects() {
     rules.push({ source: `/${locale}/wp-sitemap.xml`, destination: "/sitemap.xml", permanent: true });
   }
 
-  return rules;
+  // Redirect lama ini hanya untuk toko. Subdomain portal affiliate punya halamannya sendiri (middleware me-rewrite ke /affiliate/*),
+  // mis. /login: tanpa pengecualian ini `affiliate.samaqu.id/login` terlempar ke /akun/login (404) dan affiliate tidak bisa masuk.
+  return rules.map((rule) => ({ ...rule, missing: [{ type: "host" as const, value: "affiliate.samaqu.id" }] }));
 }
 
 const nextConfig: NextConfig = {

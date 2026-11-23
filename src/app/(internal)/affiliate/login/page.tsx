@@ -38,6 +38,55 @@ export default function AffiliateLoginPage() {
   const [err, setErr] = useState<{ email?: string; pw?: string; form?: string }>({});
   const [busy, setBusy] = useState(false);
 
+  // Tautan reset kata sandi dari email mendarat di sini dengan token di alamat (#access_token=...&type=recovery).
+  // Klien affiliate sengaja detectSessionInUrl:false, jadi tokennya dipasang manual, lalu orangnya membuat kata sandi baru.
+  const [recovery, setRecovery] = useState(false);
+  const [newPw, setNewPw] = useState("");
+  const [newPw2, setNewPw2] = useState("");
+  const [recBusy, setRecBusy] = useState(false);
+  const [recErr, setRecErr] = useState("");
+  useEffect(() => {
+    const hash = window.location.hash.replace(/^#/, "");
+    if (!hash) return;
+    const params = new URLSearchParams(hash);
+    const clearHash = () => window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    if (params.get("error")) {
+      setErr({ form: "Tautan reset kata sandi sudah kedaluwarsa atau sudah dipakai. Klik \"Lupa kata sandi?\" untuk meminta tautan baru." });
+      clearHash();
+      return;
+    }
+    const access = params.get("access_token");
+    const refresh = params.get("refresh_token");
+    if (params.get("type") !== "recovery" || !access || !refresh) return;
+    clearHash();
+    void supabase.auth.setSession({ access_token: access, refresh_token: refresh }).then(({ error }) => {
+      if (error) setErr({ form: "Tautan reset kata sandi tidak valid. Klik \"Lupa kata sandi?\" untuk meminta tautan baru." });
+      else setRecovery(true);
+    });
+  }, []);
+
+  const saveNewPassword = async () => {
+    if (newPw.length < 8 || !/\d/.test(newPw) || !/[a-zA-Z]/.test(newPw)) {
+      setRecErr("Kata sandi minimal 8 karakter, kombinasi huruf dan angka.");
+      return;
+    }
+    if (newPw !== newPw2) {
+      setRecErr("Konfirmasi kata sandi tidak sama.");
+      return;
+    }
+    setRecBusy(true);
+    setRecErr("");
+    const { error } = await supabase.auth.updateUser({ password: newPw });
+    setRecBusy(false);
+    if (error) {
+      setRecErr(error.message || "Gagal menyimpan kata sandi baru.");
+      return;
+    }
+    toast("Kata sandi baru tersimpan.");
+    router.push(portalPath(base));
+    router.refresh();
+  };
+
   const submit = async () => {
     const next: typeof err = {};
     if (!email.trim()) next.email = "Email wajib diisi.";
@@ -111,6 +160,54 @@ export default function AffiliateLoginPage() {
       }
       visualText="Cek performa link referral, riwayat transaksi, dan status komisimu dalam satu dashboard."
     >
+      {recovery ? (
+        <form
+          className="mt-10 grid gap-5"
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            void saveNewPassword();
+          }}
+        >
+          <div className="notice" role="status">
+            Buat kata sandi baru untuk akun affiliate-mu. Setelah tersimpan kamu langsung masuk ke portal.
+          </div>
+          {recErr ? (
+            <div className="notice" role="alert" style={{ background: "#fef2f2", color: "#b42318" }}>
+              {recErr}
+            </div>
+          ) : null}
+          <div className="field">
+            <label htmlFor="r-pw">Kata sandi baru</label>
+            <input
+              id="r-pw"
+              type={show ? "text" : "password"}
+              className="input"
+              placeholder="Minimal 8 karakter, huruf dan angka"
+              autoComplete="new-password"
+              value={newPw}
+              onChange={(e) => setNewPw(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="r-pw2">Ulangi kata sandi baru</label>
+            <input
+              id="r-pw2"
+              type={show ? "text" : "password"}
+              className="input"
+              autoComplete="new-password"
+              value={newPw2}
+              onChange={(e) => setNewPw2(e.target.value)}
+            />
+          </div>
+          <label className="check">
+            <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} /> Tampilkan kata sandi
+          </label>
+          <button type="submit" className="btn btn-primary w-full mt-2" disabled={recBusy}>
+            {recBusy ? "Menyimpan…" : "Simpan kata sandi baru"} <Arrow />
+          </button>
+        </form>
+      ) : (
       <form
         className="mt-10 grid gap-5"
         noValidate
@@ -195,6 +292,7 @@ export default function AffiliateLoginPage() {
           {busy ? "Memproses…" : "Masuk"} <Arrow />
         </button>
       </form>
+      )}
 
       <div className="notice mt-10">
         <svg
