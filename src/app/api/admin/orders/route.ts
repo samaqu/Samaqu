@@ -11,7 +11,7 @@ import {
   notifyCustomerOrderShippedGosend,
 } from "@/lib/fonnte";
 import { isGosend } from "@/lib/gosend";
-import { isCustomCourier } from "@/lib/custom-courier";
+import { buildCustomCourierMethod, isCustomCourier } from "@/lib/custom-courier";
 import { claimOrderNotification, recordShippedNotifyStatus, sendOnce } from "@/lib/order-notify";
 import { notifyResellerOrderPaid, notifyResellerOrderShipped } from "@/lib/reseller/notify";
 import { isCodOrderPayment } from "@/lib/payment-methods";
@@ -131,7 +131,7 @@ async function packOrderForResi(
 export async function PATCH(request: NextRequest) {
   if (!(await isOpsAdmin(request))) return unauthorized();
   try {
-    const { orderId, orderNumber, status, action, awbNo, shipped, packaging, reason, reasonNote } = await request.json();
+    const { orderId, orderNumber, status, action, awbNo, shipped, packaging, reason, reasonNote, courierName, courierService } = await request.json();
     const identity = await opsIdentity(request);
     const actor = identity?.email || "admin";
     const identifier = orderNumber || orderId;
@@ -363,7 +363,7 @@ export async function PATCH(request: NextRequest) {
       const { data: order, error: fetchError } = await supabaseAdmin
         .from("orders")
         .select(
-          "id, order_number, status, awb_no, shipping_status, shipping_method, customer_name, customer_whatsapp"
+          "id, order_number, status, awb_no, jnt_order_id, shipping_status, shipping_method, customer_name, customer_whatsapp"
         )
         .eq("order_number", identifier)
         .single();
@@ -374,6 +374,26 @@ export async function PATCH(request: NextRequest) {
 
       if (order.status === "dibatalkan") {
         return NextResponse.json({ error: "Pesanan sudah dibatalkan, resi tidak bisa disimpan." }, { status: 400 });
+      }
+
+      // Ekspedisi lain (mis. Baraka Express): bila nama ekspedisi dikirim, pesanan disimpan sebagai
+      // "Kurir Lain - <nama> (<layanan>)" (resi manual, tanpa tracking/void J&T), BUKAN dipaksa "J&T HBO".
+      // Dicek SEBELUM efek samping apa pun (kemasan, resi) supaya penolakan tidak meninggalkan perubahan setengah jalan.
+      let courierMethod = "";
+      if (String(courierName ?? "").trim()) {
+        const built = buildCustomCourierMethod(courierName, courierService);
+        if (!built.ok) {
+          return NextResponse.json({ error: built.error }, { status: 400 });
+        }
+        // Order J&T yang sudah dibuat (jnt_order_id) tidak boleh dialihkan: resinya masih hidup di J&T dan akan
+        // menggantung. Admin diarahkan membatalkannya dulu (resi ikut di-void).
+        if (order.jnt_order_id && !isCustomCourier(order.shipping_method)) {
+          return NextResponse.json(
+            { error: "Pesanan ini sudah punya order resi J&T, jadi tidak bisa dialihkan ke ekspedisi lain. Batalkan pesanan (resi J&T ikut dibatalkan) lalu buat pesanan baru." },
+            { status: 400 }
+          );
+        }
+        courierMethod = built.method;
       }
 
       // Aksi ini menulis paksa kurir "J&T HBO" dan mengisi awb_no. Untuk GoSend itu merusak kurirnya
@@ -436,7 +456,7 @@ export async function PATCH(request: NextRequest) {
         .update({
           awb_no: resi,
           // Kurir lain tetap kurir lain (nama ekspedisinya tidak boleh tertimpa); selain itu resi manual = HBO.
-          shipping_method: isCustomCourier(order.shipping_method) ? order.shipping_method : "J&T HBO",
+          shipping_method: courierMethod || (isCustomCourier(order.shipping_method) ? order.shipping_method : "J&T HBO"),
           status: nextStatus,
           shipping_status: nextShip,
           updated_at: new Date().toISOString(),
@@ -477,7 +497,8 @@ export async function PATCH(request: NextRequest) {
         awbNo: resi,
         status: nextStatus,
         shippingStatus: nextShip,
-        serviceCode: isCustomCourier(order.shipping_method) ? null : "HBO",
+        serviceCode: courierMethod || isCustomCourier(order.shipping_method) ? null : "HBO",
+        shippingMethod: courierMethod || undefined,
         packagingWarning: packResult.warning,
       });
     }

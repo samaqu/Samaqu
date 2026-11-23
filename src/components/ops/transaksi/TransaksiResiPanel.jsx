@@ -26,7 +26,7 @@ import { formatRupiah } from "@/components/ops/transaksi/transaksi-format";
 import { formatTrackingTime } from "@/lib/jnt/track-status";
 import { jntServiceCodeFromShippingMethod } from "@/lib/jnt/layanan";
 import { gosendCaption, isGosend } from "@/lib/gosend";
-import { customCourierLabel, isCustomCourier } from "@/lib/custom-courier";
+import { buildCustomCourierMethod, CUSTOM_COURIER_NAME_MAX, CUSTOM_COURIER_SERVICE_MAX, customCourierLabel, isCustomCourier } from "@/lib/custom-courier";
 
 /** Label status kirim yang dipakai layar (nilainya dari `orders.shipping_status`). */
 const SHIPPING_STATUS_LABEL = { menunggu_pickup: "Menunggu pickup", dikirim: "Dikirim", selesai: "Selesai" };
@@ -83,6 +83,9 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
    */
   const [manualOpen, setManualOpen] = useState(false);
   const [manualAwb, setManualAwb] = useState("");
+  /** Ekspedisi lain (mis. Baraka Express) untuk pesanan J&T/HBO yang dikirim lewat ekspedisi lain. Kosong = resi HBO biasa. */
+  const [manualCourier, setManualCourier] = useState("");
+  const [manualCourierService, setManualCourierService] = useState("");
   const [manualShipped, setManualShipped] = useState("belum");
   const [manualBusy, setManualBusy] = useState(false);
   const [packagingPreview, setPackagingPreview] = useState(null);
@@ -311,6 +314,17 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
       setManualError("Nomor resi wajib diisi.");
       return;
     }
+    // Ekspedisi lain hanya untuk pesanan yang BELUM kurir lain (yang sudah kurir lain tetap memakai namanya).
+    const courierText = isCustom ? "" : manualCourier.trim();
+    let courierMethod = "";
+    if (courierText) {
+      const built = buildCustomCourierMethod(courierText, manualCourierService);
+      if (!built.ok) {
+        setManualError(built.error);
+        return;
+      }
+      courierMethod = built.method;
+    }
     setManualBusy(true);
     try {
       const result = await base44.entities.Transaction.createManualResi(
@@ -318,6 +332,7 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
         resi,
         manualShipped === "sudah",
         getPackagingPayload(),
+        courierText ? { name: courierText, service: manualCourierService } : undefined,
       );
       const awbNo = result?.awbNo || resi;
       setPackagingWarning(Boolean(result?.packagingWarning));
@@ -328,7 +343,7 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
         shipping_status: result?.shippingStatus || (manualShipped === "sudah" ? "dikirim" : "menunggu_pickup"),
         ...(result?.status ? { status: result.status } : {}),
         // Kurir lain tetap kurir lain (server juga tidak menimpanya); selain itu resi manual = HBO.
-        shipping_method: isCustom ? order.shipping_method : "J&T HBO",
+        shipping_method: courierMethod || (isCustom ? order.shipping_method : "J&T HBO"),
       });
     } catch (error) {
       setManualError(error instanceof Error ? error.message : "Gagal menyimpan nomor resi. Coba lagi.");
@@ -465,11 +480,43 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
       <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
         {isCustom
           ? `Kurir lain (bukan J&T): ${customCourierLabel(order.shipping_method)}. Masukkan nomor resi dari ekspedisi di sini. Tidak ada tracking otomatis.`
-          : "Pesanan HBO dibuat manual di J&T VIP, masukkan nomor resi di sini."}
+          : "Pesanan HBO dibuat manual di J&T VIP, masukkan nomor resi di sini. Kalau paket dikirim lewat ekspedisi lain (mis. Baraka Express), isi nama ekspedisinya di bawah."}
       </p>
+      {!isCustom ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <label className="block">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Ekspedisi lain (opsional)
+            </span>
+            <input
+              type="text"
+              value={manualCourier}
+              onChange={(event) => setManualCourier(event.target.value)}
+              maxLength={CUSTOM_COURIER_NAME_MAX}
+              placeholder="Kosongkan untuk resi HBO"
+              disabled={manualBusy}
+              className={inputClass}
+            />
+          </label>
+          <label className="block">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Layanan (opsional)
+            </span>
+            <input
+              type="text"
+              value={manualCourierService}
+              onChange={(event) => setManualCourierService(event.target.value)}
+              maxLength={CUSTOM_COURIER_SERVICE_MAX}
+              placeholder="Mis. Cargo"
+              disabled={manualBusy || !manualCourier.trim()}
+              className={inputClass}
+            />
+          </label>
+        </div>
+      ) : null}
       <label className="block">
         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          {isCustom ? "Nomor Resi Ekspedisi" : "Nomor Resi HBO"}
+          {isCustom || manualCourier.trim() ? "Nomor Resi Ekspedisi" : "Nomor Resi HBO"}
         </span>
         <input
           type="text"
@@ -703,7 +750,7 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
             }}
             className="w-full text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 transition-colors"
           >
-            Input resi manual (HBO)
+            Input resi manual (HBO / ekspedisi lain)
           </button>
         </>
       ) : (

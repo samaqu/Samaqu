@@ -358,11 +358,25 @@ export const base44 = {
        * dikirim (status langsung `dikirim` + notifikasi), false = resi dibuat, menunggu pickup.
        * Memakai route admin yang sama: `PATCH /api/admin/orders { action: "manualResi" }`.
        */
-      async createManualResi(orderNumber: string, awbNo: string, shipped: boolean, packaging?: any) {
-        return call<{ success: boolean; awbNo: string; status: string; shippingStatus: string; serviceCode?: string; packagingWarning?: boolean }>(
+      async createManualResi(
+        orderNumber: string,
+        awbNo: string,
+        shipped: boolean,
+        packaging?: any,
+        /** Ekspedisi lain (mis. Baraka Express). Dikosongkan = perilaku lama (J&T HBO, atau tetap kurir lain yang sudah tersimpan). */
+        courier?: { name?: string; service?: string },
+      ) {
+        return call<{ success: boolean; awbNo: string; status: string; shippingStatus: string; serviceCode?: string | null; shippingMethod?: string; packagingWarning?: boolean }>(
           "PATCH",
           ADMIN_ORDERS,
-          { orderNumber, action: "manualResi", awbNo, shipped, packaging },
+          {
+            orderNumber,
+            action: "manualResi",
+            awbNo,
+            shipped,
+            packaging,
+            ...(courier?.name?.trim() ? { courierName: courier.name.trim(), courierService: (courier.service || "").trim() } : {}),
+          },
         );
       },
 
