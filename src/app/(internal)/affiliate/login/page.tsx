@@ -119,19 +119,68 @@ export default function AffiliateLoginPage() {
     router.refresh();
   };
 
+  // Reset lewat kode: email berisi kode (dan tombol); kode dimasukkan di sini lalu orangnya membuat kata sandi baru.
+  // Jeda kirim ulang 60 detik: setiap permintaan baru membatalkan kode/tautan sebelumnya, jadi menekan berkali-kali
+  // justru membuat semua email lama tidak berlaku.
+  const RESEND_SECONDS = 60;
+  const [forgotStep, setForgotStep] = useState<"none" | "code">("none");
+  const [code, setCode] = useState("");
+  const [codeErr, setCodeErr] = useState("");
+  const [codeBusy, setCodeBusy] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
+
   const forgotPassword = async () => {
-    if (!email.trim()) {
-      setErr({ email: "Isi email dulu untuk kirim tautan reset kata sandi." });
+    if (sending || cooldown > 0) return;
+    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setErr({ email: "Isi email yang benar dulu untuk kirim kode reset kata sandi." });
       return;
     }
+    setErr({});
+    setSending(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${window.location.origin}${portalPath(base, "login")}`,
     });
+    setSending(false);
     if (error) {
-      toast(error.message || "Gagal mengirim tautan reset.", "err");
+      const wait = /(\d+)\s*seconds?/i.exec(error.message || "");
+      if (/rate|security purposes|only request/i.test(error.message || "")) {
+        setCooldown(wait ? Number(wait[1]) + 1 : 15);
+        toast("Terlalu cepat. Tunggu sebentar lalu coba lagi.", "err");
+      } else {
+        toast(error.message || "Gagal mengirim kode reset.", "err");
+      }
       return;
     }
-    toast("Tautan reset kata sandi dikirim ke email kamu.");
+    setCooldown(RESEND_SECONDS);
+    setCode("");
+    setCodeErr("");
+    setForgotStep("code");
+    toast("Kode reset dikirim ke email kamu.");
+  };
+
+  const verifyCode = async () => {
+    const token = code.replace(/\D/g, "");
+    if (token.length < 6) {
+      setCodeErr("Masukkan kode dari email (6 digit).");
+      return;
+    }
+    setCodeBusy(true);
+    setCodeErr("");
+    const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token, type: "recovery" });
+    setCodeBusy(false);
+    if (error) {
+      setCodeErr("Kode salah atau sudah tidak berlaku. Pakai kode dari email yang PALING BARU, atau kirim ulang kode.");
+      return;
+    }
+    // Sesi sudah terpasang oleh verifyOtp: lanjut ke layar kata sandi baru.
+    setForgotStep("none");
+    setRecovery(true);
   };
 
   return (
@@ -207,6 +256,55 @@ export default function AffiliateLoginPage() {
             {recBusy ? "Menyimpan…" : "Simpan kata sandi baru"} <Arrow />
           </button>
         </form>
+      ) : forgotStep === "code" ? (
+        <form
+          className="mt-10 grid gap-5"
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            void verifyCode();
+          }}
+        >
+          <div className="notice" role="status">
+            Email reset dikirim ke <b>{email.trim()}</b>. Buka email <b>yang paling baru</b> (cek juga folder Spam), lalu masukkan kodenya di bawah. Kalau di email hanya ada tombol, klik tombolnya. Kode dan tombol dari email yang lebih lama tidak berlaku lagi.
+          </div>
+          {codeErr ? (
+            <div className="notice" role="alert" style={{ background: "#fef2f2", color: "#b42318" }}>
+              {codeErr}
+            </div>
+          ) : null}
+          <div className="field">
+            <label htmlFor="c-code">Kode dari email</label>
+            <input
+              id="c-code"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              className="input"
+              placeholder="123456"
+              autoComplete="one-time-code"
+              maxLength={10}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+            />
+          </div>
+          <button type="submit" className="btn btn-primary w-full mt-2" disabled={codeBusy}>
+            {codeBusy ? "Memeriksa…" : "Lanjut"} <Arrow />
+          </button>
+          <div className="flex items-center justify-between text-sm">
+            <button
+              type="button"
+              className="font-semibold text-black underline-offset-4 hover:underline disabled:opacity-50 disabled:no-underline"
+              onClick={forgotPassword}
+              disabled={sending || cooldown > 0}
+            >
+              {cooldown > 0 ? `Kirim ulang kode (${cooldown} dtk)` : sending ? "Mengirim…" : "Kirim ulang kode"}
+            </button>
+            <button type="button" className="underline-offset-4 hover:underline" onClick={() => setForgotStep("none")}>
+              Kembali masuk
+            </button>
+          </div>
+        </form>
       ) : (
       <form
         className="mt-10 grid gap-5"
@@ -249,9 +347,10 @@ export default function AffiliateLoginPage() {
             <button
               type="button"
               onClick={forgotPassword}
-              className="text-sm font-semibold text-black underline-offset-4 hover:underline"
+              disabled={sending || cooldown > 0}
+              className="text-sm font-semibold text-black underline-offset-4 hover:underline disabled:opacity-50 disabled:no-underline"
             >
-              Lupa kata sandi?
+              {sending ? "Mengirim…" : cooldown > 0 ? `Tunggu ${cooldown} dtk` : "Lupa kata sandi?"}
             </button>
           </div>
           <div className="pw-wrap">
