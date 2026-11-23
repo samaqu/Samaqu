@@ -59,14 +59,16 @@ export async function GET(req: NextRequest) {
 
   const { data: admins } = await db.from("admins").select("user_id, display_name, title, email, active");
 
-  const days = computeAbsensi({ logs, seen: (seenData || []) as SeenRow[], month, nowMs });
-
   const users = (admins || []).map((a) => ({
     userId: String(a.user_id),
     name: String(a.display_name || "").trim() || String(a.email || "").split("@")[0],
     title: String(a.title || "").trim(),
     active: a.active !== false,
   }));
+
+  // Akun yang sudah dihapus dari tabel admins tidak ditampilkan (catatannya tetap tersimpan di database, hanya tidak dikirim).
+  const known = new Set(users.map((u) => u.userId));
+  const days = computeAbsensi({ logs, seen: (seenData || []) as SeenRow[], month, nowMs }).filter((d) => known.has(d.userId));
 
   const out = days.map((d) => ({
     userId: d.userId,
