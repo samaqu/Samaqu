@@ -354,6 +354,7 @@ export default function AbsensiView() {
               {summary.workdays > 0
                 ? `Hadir ${summary.hadirWorkdays} hari dari ${summary.workdays} hari kerja yang sudah berjalan.`
                 : "Belum ada hari kerja yang berjalan di bulan ini."}
+              {summary.hadir > summary.hadirWorkdays ? ` Ditambah ${summary.hadir - summary.hadirWorkdays} hari masuk di luar jadwal kerja.` : ""}
             </span>
           </div>
 
@@ -362,7 +363,6 @@ export default function AbsensiView() {
               { k: "Total jam kerja", v: durationLong(summary.workMs), sub: summary.overtimeMs > 0 ? `Termasuk lembur ${durationLong(summary.overtimeMs)}` : "Dihitung dari waktu berstatus Aktif" },
               { k: "Terlambat", v: `${summary.late} kali`, sub: `Absen masuk lewat pukul ${hm(SCHEDULE.startMin + SCHEDULE.graceMin)} WIB` },
               { k: "Lupa absen pulang", v: `${summary.forgot} kali`, sub: "Hari yang jam pulangnya perlu dikoreksi" },
-              { k: "Hari ada absen masuk", v: `${summary.hadir} hari`, sub: "Termasuk hari di luar jadwal kerja" },
             ].map((c) => (
               <div key={c.k} style={{ background: "#f8fafc", borderRadius: 14, padding: "12px 14px", display: "grid", gap: 3, alignContent: "start" }}>
                 <span style={{ fontSize: 12.5, color: SUB, fontWeight: 700 }}>{c.k}</span>
