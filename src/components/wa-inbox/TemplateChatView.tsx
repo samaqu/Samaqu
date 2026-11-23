@@ -1,10 +1,11 @@
 "use client";
 
 /**
- * Halaman "Template Chat" (menu Tim & Chat): banner tipis, pencarian + chip kategori dalam satu baris, dan kartu template
- * yang padat (Salin teks; pensil untuk Owner/Leader) supaya banyak template terlihat sekaligus saat dipakai kerja.
- * SEMUA warna memakai variabel tema panel (--pink, --pink-d, --plum, --line, --green/--orange/--purple beserta -bg),
- * jadi otomatis mengikuti tema Berry, Bunga Matahari, dan Tropical Beach.
+ * Halaman "Template Chat" (menu Tim & Chat), mengikuti pola Script Library di Academy: kategori di panel kiri,
+ * kartu 2 kolom dengan isi dipotong 3 baris (tanpa scrollbar), klik kartu membuka detail lengkap di modal,
+ * tombol Salin di tiap kartu (Ubah hanya untuk Owner/Leader).
+ * SEMUA warna memakai variabel tema panel (--pink, --pink-d, --plum, --line, --card-line, --mut, --green/--orange/--purple
+ * beserta -bg), jadi otomatis mengikuti tema Berry, Bunga Matahari, dan Tropical Beach.
  * Placeholder ({nama}, {admin}) tidak diisi di sini karena tidak ada pelanggan terpilih.
  */
 
@@ -40,6 +41,33 @@ const ICON_SEARCH = "M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16zM21 21l-4.3-4.3";
 const ICON_PLUS = "M12 5v14M5 12h14";
 const ICON_CHECK = "M5 12l5 5L20 7";
 
+/** Gaya yang butuh media query / hover / line-clamp (tidak bisa lewat style inline). Semua warna tetap variabel tema. */
+const CSS = `
+.tc-body{display:grid;grid-template-columns:210px minmax(0,1fr);gap:22px;align-items:start}
+.tc-cats{display:grid;gap:2px;position:sticky;top:12px}
+.tc-cat{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid transparent;background:transparent;color:var(--plum);font:inherit;font-size:14px;font-weight:600;padding:9px 12px;border-radius:12px;cursor:pointer;text-align:left}
+.tc-cat span{color:var(--mut);font-weight:600;font-size:13px}
+.tc-cat:hover{background:rgba(255,255,255,.55)}
+.tc-cat.on{background:#fff;border-color:var(--card-line);font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.tc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.tc-card{background:#fff;border:1px solid var(--card-line);border-radius:18px;padding:16px 18px;display:grid;gap:10px;align-content:start;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.04);transition:box-shadow .15s,transform .15s}
+.tc-card:hover{box-shadow:0 10px 24px rgba(0,0,0,.08);transform:translateY(-1px)}
+.tc-card:focus-visible{outline:2px solid var(--pink-d);outline-offset:2px}
+.tc-clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.tc-btn{border:1px solid var(--card-line);background:#fff;color:var(--plum);border-radius:10px;height:34px;padding:0 12px;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.tc-btn:hover{background:var(--pink-bg)}
+.tc-btn.ok{color:var(--green);border-color:var(--green)}
+.tc-btn.solid{background:var(--plum);color:#fff;border-color:var(--plum)}
+.tc-btn.solid:hover{opacity:.92;background:var(--plum)}
+@media (max-width:900px){
+  .tc-body{grid-template-columns:minmax(0,1fr);gap:12px}
+  .tc-cats{display:flex;overflow-x:auto;position:static;gap:6px;padding-bottom:4px}
+  .tc-cat{white-space:nowrap;flex:0 0 auto;gap:6px}
+  .tc-cats-label{display:none}
+}
+@media (max-width:760px){.tc-grid{grid-template-columns:minmax(0,1fr)}}
+`;
+
 export default function TemplateChatView() {
   const [items, setItems] = useState<WaTemplate[] | null>(null);
   const [canManage, setCanManage] = useState(false);
@@ -49,6 +77,7 @@ export default function TemplateChatView() {
   const [manage, setManage] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [detail, setDetail] = useState<WaTemplate | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -64,6 +93,16 @@ export default function TemplateChatView() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Esc menutup detail.
+  useEffect(() => {
+    if (!detail) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDetail(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [detail]);
 
   const categories = useMemo(() => {
     const counts = new Map<string, number>();
@@ -94,130 +133,167 @@ export default function TemplateChatView() {
       setCopiedId(t.id);
       setTimeout(() => setCopiedId((id) => (id === t.id ? null : id)), 1800);
     } catch {
-      setError("Gagal menyalin. Blok teksnya lalu salin manual.");
+      setError("Gagal menyalin. Buka detailnya lalu blok teksnya untuk disalin manual.");
     }
   }
 
   const openManager = (id: number | null) => {
+    setDetail(null);
     setEditId(id);
     setManage(true);
   };
 
+  const catList: [string, number][] = [["Semua", items?.length ?? 0], ...categories];
+
   return (
-    <div style={{ display: "grid", gap: 12, fontFamily: "var(--font)", color: "var(--plum)" }}>
-      {/* banner tipis: satu baris */}
-      <section
-        style={{
-          borderRadius: 18,
-          padding: "12px 18px",
-          color: "#fff",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 12,
-          flexWrap: "wrap",
-          backgroundImage: "radial-gradient(circle at 92% 0%, rgba(255,255,255,0.22), transparent 45%), linear-gradient(120deg, var(--pink-d) 0%, var(--pink) 100%)",
-          boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, lineHeight: 1.2, color: "#fff" }}>Template Chat</h1>
-          <span style={{ fontSize: 12.5, opacity: 0.92 }}>Balasan siap pakai · {"{nama}"} terisi otomatis saat dipakai di Inbox WA</span>
+    <div style={{ display: "grid", gap: 16, fontFamily: "var(--font)", color: "var(--plum)" }}>
+      <style>{CSS}</style>
+
+      {/* judul + aksi */}
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14, flexWrap: "wrap" }}>
+        <div style={{ display: "grid", gap: 4, maxWidth: 560 }}>
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, lineHeight: 1.15, color: "var(--plum)" }}>Template Chat</h1>
+          <p style={{ margin: 0, fontSize: 14, color: "var(--mut)" }}>
+            Balasan siap pakai. Sesuaikan dengan percakapan; {"{nama}"} terisi otomatis saat dipakai di Inbox WA.
+          </p>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ background: "rgba(255,255,255,0.20)", border: "1px solid rgba(255,255,255,0.30)", borderRadius: 999, padding: "5px 12px", fontSize: 12.5, fontWeight: 700 }}>
-            {items?.length ?? 0} template · {categories.length} kategori
-          </span>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid var(--card-line)", borderRadius: 12, padding: "0 12px", height: 40, color: "var(--mut)", width: 280, maxWidth: "100%" }}>
+            {icon(ICON_SEARCH, 16)}
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari judul atau isi template…"
+              aria-label="Cari template"
+              style={{ border: 0, outline: "none", background: "transparent", flex: 1, fontSize: 14, color: "var(--plum)", fontFamily: "inherit", minWidth: 0 }}
+            />
+          </label>
           {canManage ? (
-            <button
-              type="button"
-              onClick={() => openManager(null)}
-              style={{ border: 0, background: "#fff", color: "var(--pink-d)", borderRadius: 12, padding: "0 14px", height: 34, fontSize: 13.5, fontWeight: 800, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
-            >
-              {icon(ICON_PLUS, 15)}
+            <button type="button" className="tc-btn solid" style={{ height: 40, padding: "0 16px", borderRadius: 12 }} onClick={() => openManager(null)}>
+              {icon(ICON_PLUS, 16)}
               Kelola
             </button>
           ) : null}
         </div>
-      </section>
+      </header>
 
-      {/* pencarian + kategori: satu baris */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <label style={{ flex: "1 1 220px", maxWidth: 340, display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid var(--card-line)", borderRadius: 12, padding: "0 12px", height: 38, color: "var(--mut)" }}>
-          {icon(ICON_SEARCH, 16)}
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari judul atau isi template…"
-            aria-label="Cari template"
-            style={{ border: 0, outline: "none", background: "transparent", flex: 1, fontSize: 13.5, color: "var(--plum)", fontFamily: "inherit", minWidth: 0 }}
-          />
-        </label>
-        <div style={{ flex: "1 1 320px", display: "flex", gap: 4, flexWrap: "wrap", background: "#fff", border: "1px solid var(--card-line)", borderRadius: 12, padding: 3 }}>
-          {[["Semua", items?.length ?? 0] as [string, number], ...categories].map(([name, count]) => {
-            const active = category === name;
-            return (
-              <button
-                key={name}
-                type="button"
-                onClick={() => setCategory(name)}
-                style={{ border: 0, cursor: "pointer", borderRadius: 9, padding: "6px 11px", fontSize: 13, fontWeight: 700, fontFamily: "inherit", background: active ? "var(--plum)" : "transparent", color: active ? "#fff" : "var(--plum)" }}
-              >
-                {name} <span style={{ opacity: active ? 0.85 : 0.6, fontWeight: 600 }}>{count}</span>
-              </button>
-            );
-          })}
+      {error ? <div style={{ background: "var(--pink-bg)", color: "var(--pink-d)", borderRadius: 12, padding: "9px 14px", fontSize: 13.5, fontWeight: 700 }}>{error}</div> : null}
+
+      <div className="tc-body">
+        {/* kategori */}
+        <nav className="tc-cats" aria-label="Kategori template">
+          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 1.2, color: "var(--mut)", padding: "0 12px 6px" }} className="tc-cats-label">
+            KATEGORI
+          </div>
+          {catList.map(([name, count]) => (
+            <button key={name} type="button" className={`tc-cat${category === name ? " on" : ""}`} onClick={() => setCategory(name)}>
+              {name === "Semua" ? "Semua kategori" : name}
+              <span>{count}</span>
+            </button>
+          ))}
+        </nav>
+
+        {/* kartu */}
+        <div>
+          {items === null && !error ? (
+            <p style={{ color: "var(--mut)", fontSize: 14 }}>Memuat…</p>
+          ) : visible.length === 0 ? (
+            <div style={{ border: "1px dashed var(--line)", borderRadius: 16, padding: 18, color: "var(--mut)", fontSize: 14, background: "#fff" }}>
+              {items && items.length === 0 ? "Belum ada template." : "Tidak ada template yang cocok."}
+            </div>
+          ) : (
+            <div className="tc-grid">
+              {visible.map((t) => {
+                const tone = toneOf(t.category);
+                const version = versionOf(t.title);
+                const copied = copiedId === t.id;
+                return (
+                  <article
+                    key={t.id}
+                    className="tc-card"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Buka template ${t.title}`}
+                    onClick={() => setDetail(t)}
+                    onKeyDown={(e) => {
+                      if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                        e.preventDefault();
+                        setDetail(t);
+                      }
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                      <span style={{ background: tone.bg, color: tone.fg, borderRadius: 999, padding: "3px 11px", fontSize: 12.5, fontWeight: 800 }}>{t.category}</span>
+                      {version ? <span style={{ fontSize: 12.5, color: "var(--mut)", fontWeight: 600 }}>Versi {version}</span> : null}
+                    </div>
+                    <h3 style={{ margin: 0, fontSize: 16, lineHeight: 1.3, fontWeight: 800, color: "var(--plum)" }}>{t.title}</h3>
+                    {/* Pemotongan 3 baris di elemen dalam (tanpa padding), supaya baris ke-4 tidak mengintip di area padding. */}
+                    <div style={{ background: tone.bg, borderRadius: 12, padding: "11px 14px", fontSize: 14, lineHeight: 1.55, color: "var(--plum)" }}>
+                      <div className="tc-clamp">{t.content}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }} onClick={(e) => e.stopPropagation()}>
+                      <button type="button" className={`tc-btn${copied ? " ok" : ""}`} onClick={() => void copy(t)}>
+                        {icon(copied ? ICON_CHECK : ICON_COPY, 15)}
+                        {copied ? "Tersalin" : "Salin"}
+                      </button>
+                      {canManage ? (
+                        <button type="button" className="tc-btn" onClick={() => openManager(t.id)} aria-label={`Ubah template ${t.title}`}>
+                          {icon(ICON_EDIT, 15)}
+                          Ubah
+                        </button>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
-      {error ? <div style={{ background: "var(--pink-bg)", color: "var(--pink-d)", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 700 }}>{error}</div> : null}
-
-      {items === null && !error ? (
-        <p style={{ color: "var(--mut)", fontSize: 13.5 }}>Memuat…</p>
-      ) : visible.length === 0 ? (
-        <div style={{ border: "1px dashed var(--line)", borderRadius: 14, padding: 16, color: "var(--mut)", fontSize: 13.5, background: "#fff" }}>
-          {items && items.length === 0 ? "Belum ada template." : "Tidak ada template yang cocok."}
-        </div>
-      ) : (
-        <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
-          {visible.map((t) => {
-            const tone = toneOf(t.category);
-            const version = versionOf(t.title);
-            const copied = copiedId === t.id;
-            return (
-              <article key={t.id} style={{ background: "#fff", border: "1px solid var(--card-line)", borderRadius: 16, padding: 12, display: "grid", gap: 8, alignContent: "start", boxShadow: "0 3px 10px rgba(0,0,0,0.035)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                  <span style={{ background: tone.bg, color: tone.fg, borderRadius: 999, padding: "2px 10px", fontSize: 12, fontWeight: 800 }}>{t.category}</span>
-                  {version ? <span style={{ fontSize: 12, color: "var(--mut)", fontWeight: 600 }}>Versi {version}</span> : null}
-                </div>
-                <h3 style={{ margin: 0, fontSize: 14, lineHeight: 1.3, fontWeight: 700, color: "var(--plum)" }}>{t.title}</h3>
-                <div style={{ background: tone.bg, borderRadius: 10, padding: "8px 10px", fontSize: 12.5, lineHeight: 1.5, color: "var(--plum)", whiteSpace: "pre-wrap", maxHeight: 112, overflowY: "auto" }}>{t.content}</div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button
-                    type="button"
-                    onClick={() => void copy(t)}
-                    style={{ flex: 1, border: 0, cursor: "pointer", borderRadius: 10, height: 34, background: copied ? "var(--green)" : "var(--plum)", color: "#fff", fontSize: 13.5, fontWeight: 800, fontFamily: "inherit", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-                  >
-                    {icon(copied ? ICON_CHECK : ICON_COPY, 15)}
-                    {copied ? "Tersalin" : "Salin teks"}
-                  </button>
-                  {canManage ? (
-                    <button
-                      type="button"
-                      onClick={() => openManager(t.id)}
-                      title="Ubah template"
-                      aria-label={`Ubah template ${t.title}`}
-                      style={{ width: 34, height: 34, border: "1px solid var(--card-line)", cursor: "pointer", borderRadius: 10, background: "var(--pink-bg)", color: "var(--pink-d)", display: "grid", placeItems: "center" }}
-                    >
-                      {icon(ICON_EDIT, 15)}
+      {/* detail lengkap */}
+      {detail ? (
+        <div role="presentation" onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(15,23,42,0.45)", display: "grid", placeItems: "center", padding: 16 }}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={detail.title}
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "100%", maxWidth: 640, maxHeight: "86vh", overflow: "auto", background: "#fff", borderRadius: 22, padding: 22, display: "grid", gap: 14, boxShadow: "0 24px 60px rgba(15,23,42,0.28)", color: "var(--plum)", fontFamily: "var(--font)" }}
+          >
+            {(() => {
+              const tone = toneOf(detail.category);
+              const version = versionOf(detail.title);
+              const copied = copiedId === detail.id;
+              return (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                    <span style={{ background: tone.bg, color: tone.fg, borderRadius: 999, padding: "3px 12px", fontSize: 13, fontWeight: 800 }}>{detail.category}</span>
+                    {version ? <span style={{ fontSize: 13, color: "var(--mut)", fontWeight: 600 }}>Versi {version}</span> : null}
+                  </div>
+                  <h2 style={{ margin: 0, fontSize: 20, lineHeight: 1.3, fontWeight: 800 }}>{detail.title}</h2>
+                  <div style={{ background: tone.bg, borderRadius: 14, padding: "14px 16px", fontSize: 15, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{detail.content}</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <button type="button" className="tc-btn" onClick={() => setDetail(null)}>
+                      Tutup
                     </button>
-                  ) : null}
-                </div>
-              </article>
-            );
-          })}
+                    {canManage ? (
+                      <button type="button" className="tc-btn" onClick={() => openManager(detail.id)}>
+                        {icon(ICON_EDIT, 15)}
+                        Ubah
+                      </button>
+                    ) : null}
+                    <button type="button" className={`tc-btn solid${copied ? " ok" : ""}`} onClick={() => void copy(detail)} style={copied ? { background: "var(--green)", borderColor: "var(--green)", color: "#fff" } : undefined}>
+                      {icon(copied ? ICON_CHECK : ICON_COPY, 15)}
+                      {copied ? "Tersalin" : "Salin teks"}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
         </div>
-      )}
+      ) : null}
 
       <WaTemplatesManager
         open={manage}
