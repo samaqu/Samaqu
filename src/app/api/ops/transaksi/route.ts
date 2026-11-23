@@ -17,7 +17,7 @@ import { isLayananCategory } from "@/lib/layanan";
 import { kotaFromShipping } from "@/lib/kota";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { resolveItemPhotos } from "@/lib/order-photo";
-import { cleanErrorMessage, recordAnomalyFromError, recordStockAnomaly, resolveFailureReason, stockFailureMessage } from "@/lib/stock-guard";
+import { cleanErrorMessage, recordAnomalyFromError, recordStockAnomaly, resolveFailureReason, restoreItemsStrict, stockFailureMessage } from "@/lib/stock-guard";
 import { isGosend, normalizeOpsShippingMethod, shippingMethodForEdit } from "@/lib/gosend";
 import {
   productWeightMapFromRows,
@@ -1551,18 +1551,26 @@ export async function DELETE(req: NextRequest) {
       .eq("order_id", order.id);
 
     // Stok dikembalikan hanya kalau memang pernah terpotong dan belum dikembalikan pembatalan.
+    // Hasil pengembalian DIPERIKSA: kalau ada yang gagal, transaksi tidak boleh terhapus diam-diam sementara
+    // stoknya hilang. Yang gagal tercatat di Anomali Stok.
     if (order.stock_reserved === true && order.status !== "dibatalkan") {
-      for (const item of items || []) {
-        if (!item?.product_id || !item?.color || !item?.size || !item?.quantity) continue;
-        await admin.rpc("samaqu_restore_stock", {
-          p_product_id: item.product_id,
-          p_color: item.color,
-          p_size: item.size,
-          p_qty: item.quantity,
-          // Ref order WAJIB: tanpa ini komponen (box kabak / cover & hanger) tidak kembali.
-          p_ref_type: "component",
-          p_ref_id: order.id,
-        });
+      const { restored, failed } = await restoreItemsStrict(admin, items || [], order.id, "ops-transaksi-hapus");
+      if (failed.length > 0) {
+        if (restored.length > 0) {
+          // Sebagian sudah kembali: tandai stok tidak lagi tertahan supaya percobaan Hapus berikutnya tidak
+          // mengembalikan item yang sama dua kali. Sisanya dikoreksi manual lewat Anomali Stok.
+          await admin.from("orders").update({ stock_reserved: false }).eq("id", order.id);
+          return NextResponse.json(
+            {
+              error: `Sebagian stok sudah dikembalikan, tetapi ini gagal: ${failed.join(", ")}. Transaksi belum dihapus. Yang gagal tercatat di Anomali Stok, koreksi manual lalu hapus lagi (stok yang sudah kembali tidak dikembalikan dua kali).`,
+            },
+            { status: 500 },
+          );
+        }
+        return NextResponse.json(
+          { error: `Stok gagal dikembalikan, jadi transaksi TIDAK dihapus. Tidak ada yang berubah, coba lagi sebentar lagi. (${failed.join(", ")})` },
+          { status: 500 },
+        );
       }
     }
 

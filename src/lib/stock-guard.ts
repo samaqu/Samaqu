@@ -127,6 +127,70 @@ export async function recordStockAnomaly(
   }
 }
 
+export interface StrictRestoreItem {
+  product_id: string | null;
+  color: string | null;
+  size: string | null;
+  quantity: number | null;
+}
+
+export interface StrictRestoreResult {
+  /** Label item yang stoknya BERHASIL dikembalikan. */
+  restored: string[];
+  /** Label item yang GAGAL dikembalikan (juga sudah dicatat ke anomali stok). */
+  failed: string[];
+}
+
+/**
+ * Kembalikan stok tiap item pesanan dan PERIKSA hasilnya satu per satu. Dipakai jalur hapus transaksi, supaya
+ * pesanan tidak terhapus diam-diam sementara stoknya gagal kembali. Tidak pernah melempar; item yang gagal
+ * dicatat ke `stock_anomaly_log` (alasan `rollback_restore_failed`, tampil di daftar Anomali Stok).
+ * Item tanpa product_id/warna/ukuran/qty dilewati (tidak pernah memotong stok).
+ */
+export async function restoreItemsStrict(
+  client: SupabaseClient,
+  items: StrictRestoreItem[],
+  orderId: string,
+  source: string
+): Promise<StrictRestoreResult> {
+  const result: StrictRestoreResult = { restored: [], failed: [] };
+  for (const item of items) {
+    if (!item?.product_id || !item?.color || !item?.size || !item?.quantity) continue;
+    const label = `${item.product_id} ${item.color} ${item.size} ×${item.quantity}`;
+    let failure: string | null = null;
+    try {
+      const { error } = await client.rpc("samaqu_restore_stock", {
+        p_product_id: item.product_id,
+        p_color: item.color,
+        p_size: item.size,
+        p_qty: item.quantity,
+        // Ref order WAJIB: tanpa ini komponen (box kabak / cover & hanger) tidak kembali.
+        p_ref_type: "component",
+        p_ref_id: orderId,
+      });
+      if (error) failure = error.message || "rpc error";
+    } catch (e) {
+      failure = e instanceof Error ? e.message : "rpc error";
+    }
+    if (failure) {
+      console.error("[STOCK] Pengembalian stok gagal:", { orderId, label, message: failure });
+      await recordStockAnomaly(client, {
+        productId: item.product_id,
+        color: item.color,
+        size: item.size,
+        qty: item.quantity,
+        reason: "rollback_restore_failed",
+        orderId,
+        source,
+      });
+      result.failed.push(label);
+    } else {
+      result.restored.push(label);
+    }
+  }
+  return result;
+}
+
 /** Pesan untuk admin — dibedakan menurut penyebab (poin 4 brief). */
 export function stockFailureMessage(
   reason: DbFailureReason | string,
