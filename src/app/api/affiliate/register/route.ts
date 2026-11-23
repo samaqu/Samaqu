@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getAffiliateSettings } from "@/lib/affiliate/settings";
@@ -103,16 +104,42 @@ export async function POST(req: NextRequest) {
   }
 
   // 1. Buat akun auth (alur sama dengan akun pelanggan: verifikasi email bila diaktifkan).
-  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
+  let { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
+  let reusedAccount = false;
   if (signUpError) {
     const msg = signUpError.message || "";
     if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("registered")) {
-      return NextResponse.json(
-        { error: "Email sudah terdaftar. Silakan masuk atau gunakan email lain." },
-        { status: 400 },
-      );
+      // Syarat program = pernah belanja, dan saat belanja akun pelanggan sudah dibuat. Jadi email yang SUDAH punya akun adalah
+      // kasus biasa, bukan kesalahan: pakai akun itu setelah kata sandinya terbukti benar (bukti pemilik email).
+      // Klien terpisah tanpa penyimpanan sesi, supaya login ini tidak menempel ke klien bersama di server.
+      const probe = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY!, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data: signInData, error: signInError } = await probe.auth.signInWithPassword({ email, password });
+      if (signInError || !signInData?.user) {
+        return NextResponse.json(
+          {
+            error:
+              "Email ini sudah punya akun SAMAQU (dari belanja sebelumnya). Isi kolom kata sandi dengan kata sandi akun itu. Kalau lupa, atur ulang lewat \"Lupa kata sandi?\" di halaman masuk, lalu daftar lagi.",
+            code: "EXISTING_ACCOUNT_WRONG_PASSWORD",
+          },
+          { status: 400 },
+        );
+      }
+      const { data: byUser } = await admin.from("affiliates").select("id").eq("user_id", signInData.user.id).limit(1).maybeSingle();
+      const { data: byEmail } = byUser ? { data: null } : await admin.from("affiliates").select("id").eq("email", email).limit(1).maybeSingle();
+      if (byUser || byEmail) {
+        return NextResponse.json(
+          { error: "Email ini sudah terdaftar sebagai affiliate. Silakan masuk ke portal affiliate.", code: "ALREADY_AFFILIATE" },
+          { status: 400 },
+        );
+      }
+      signUpData = { user: signInData.user, session: null };
+      signUpError = null;
+      reusedAccount = true;
+    } else {
+      return NextResponse.json({ error: msg || "Gagal membuat akun." }, { status: 400 });
     }
-    return NextResponse.json({ error: msg || "Gagal membuat akun." }, { status: 400 });
   }
 
   const user = signUpData?.user;
@@ -171,7 +198,7 @@ export async function POST(req: NextRequest) {
     actor_id: user.id,
     action: "daftar",
     to_status: "menunggu",
-    note: `Pendaftaran akun affiliate ${email}. Verifikasi pembelian: ${eligibility.status}.`,
+    note: `Pendaftaran akun affiliate ${email}${reusedAccount ? " (memakai akun pelanggan yang sudah ada)" : ""}. Verifikasi pembelian: ${eligibility.status}.`,
   });
 
   return NextResponse.json({
@@ -179,6 +206,7 @@ export async function POST(req: NextRequest) {
     email,
     affiliateCode,
     eligibility,
-    needsVerification: !signUpData?.session,
+    // Akun yang sudah ada terverifikasi emailnya; yang baru menunggu verifikasi bila belum ada sesi.
+    needsVerification: reusedAccount ? false : !signUpData?.session,
   });
 }

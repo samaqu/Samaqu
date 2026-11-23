@@ -511,7 +511,7 @@ export default function AffiliateRegisterPage() {
                         id="d-pw"
                         type={show ? "text" : "password"}
                         className={`${s.input} ${s.pwInput}`}
-                        placeholder="Minimal 8 karakter"
+                        placeholder="Minimal 8 karakter, atau kata sandi akun SAMAQU-mu"
                         autoComplete="new-password"
                         value={password}
                         aria-invalid={Boolean(err.pw)}
