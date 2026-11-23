@@ -17,6 +17,7 @@ import { isLayananCategory } from "@/lib/layanan";
 import { kotaFromShipping } from "@/lib/kota";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { resolveItemPhotos } from "@/lib/order-photo";
+import { changedRecipientFields, resiLockedMessage } from "@/lib/resi-lock";
 import { cleanErrorMessage, recordAnomalyFromError, recordStockAnomaly, resolveFailureReason, restoreItemsStrict, stockFailureMessage } from "@/lib/stock-guard";
 import { isGosend, normalizeOpsShippingMethod, shippingMethodForEdit } from "@/lib/gosend";
 import {
@@ -1067,7 +1068,7 @@ export async function PATCH(req: NextRequest) {
     const admin = getSupabaseAdmin();
     const { data: order, error } = await admin
       .from("orders")
-      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, promo_bonus_given, customer_name, customer_whatsapp, customer_id, shipping_status, weight, subtotal, total, discount, shipping_cost, paid_at, reseller_id, shipping_method, is_preorder, preorder_ready_at")
+      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, promo_bonus_given, customer_name, customer_whatsapp, customer_id, shipping_status, weight, subtotal, total, discount, shipping_cost, paid_at, reseller_id, shipping_method, is_preorder, preorder_ready_at, shipping_address, shipping_city, shipping_kecamatan, shipping_province, shipping_postal_code")
       .eq("order_number", orderNumber)
       .maybeSingle();
 
@@ -1288,6 +1289,32 @@ export async function PATCH(req: NextRequest) {
       const shippingResult = readShipping(body);
       if (shippingResult.error || !shippingResult.shipping) return bad(shippingResult.error || "Alamat belum lengkap");
       shipping = shippingResult.shipping;
+
+      // Resi J&T sudah terbit: penerima dan alamat TIDAK boleh berubah (resi di J&T tidak ikut berubah). Dicek SEBELUM
+      // ada yang disimpan, jadi penolakan tidak meninggalkan perubahan setengah jalan.
+      if ((order.awb_no || order.jnt_order_id) && order.status !== "dibatalkan") {
+        const changed = changedRecipientFields(
+          {
+            name: order.customer_name,
+            whatsapp: order.customer_whatsapp,
+            address: order.shipping_address,
+            city: order.shipping_city,
+            kecamatan: order.shipping_kecamatan,
+            province: order.shipping_province,
+            postal: order.shipping_postal_code,
+          },
+          {
+            name: customerName,
+            whatsapp: customerWhatsapp,
+            address: shipping.address,
+            city: shippingCityValue(shipping),
+            kecamatan: shipping.kecamatan,
+            province: shipping.province,
+            postal: shipping.postal_code,
+          },
+        );
+        if (changed.length > 0) return bad(resiLockedMessage(order.awb_no, changed));
+      }
     }
 
     const snapshot = await buildEditSnapshot(admin, inputItems, oldItems, group);
