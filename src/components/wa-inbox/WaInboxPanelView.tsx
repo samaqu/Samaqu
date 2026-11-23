@@ -171,6 +171,29 @@ export default function WaInboxPanelView() {
   const [loadedAt, setLoadedAt] = useState(0);
   const [bulkTarget, setBulkTarget] = useState<{ senders: string[]; chats: number; messages: number; before: string } | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  /** Siapa saya (untuk tab "Milik saya" dan kunci balasan chat PIC lain). */
+  const [me, setMe] = useState<{ userId: string; role: string } | null>(null);
+  /** Tab daftar: milik saya / antrean (menunggu admin, belum ada PIC) / semua. Bawaan "semua" selama pembatasan server belum aktif. */
+  const [tab, setTab] = useState<"mine" | "queue" | "all">("all");
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { data: session } = await supabase.auth.getSession();
+        const token = session.session?.access_token;
+        if (!token) return;
+        const res = await fetch("/api/ops/me", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+        const json = await res.json().catch(() => null);
+        if (alive && res.ok && json?.userId) setMe({ userId: String(json.userId), role: String(json.role || "") });
+      } catch {
+        /* tanpa identitas, tab "Milik saya" kosong dan tidak ada chat yang terkunci */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const loadList = useCallback(async () => {
     try {
@@ -228,14 +251,26 @@ export default function WaInboxPanelView() {
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return items.filter((c) => {
+      if (tab === "mine" && !(me && c.owner?.userId === me.userId)) return false;
+      if (tab === "queue" && !(!c.owner && c.pending > 0)) return false;
       if (filter === "belum" && c.pending === 0) return false;
       if (filter === "admin" && !c.handover) return false;
       if (!q) return true;
       return c.name.toLowerCase().includes(q) || c.sender.includes(q.replace(/\D/g, "") || "\u0000") || c.lastMessage.toLowerCase().includes(q);
     });
-  }, [items, search, filter]);
+  }, [items, search, filter, tab, me]);
 
   const current = items.find((c) => c.sender === selected) || null;
+
+  // Owner dan Leader boleh menangani semua chat; admin biasa hanya chat miliknya atau yang belum ada PIC-nya.
+  const canManageAll = me?.role === "owner" || me?.role === "leader";
+  const isLocked = (c: Conversation) => Boolean(me && c.owner && c.owner.userId !== me.userId && !canManageAll);
+  const currentLocked = current ? isLocked(current) : false;
+  const tabCounts = {
+    mine: me ? items.filter((c) => c.owner?.userId === me.userId).length : 0,
+    queue: items.filter((c) => !c.owner && c.pending > 0).length,
+    all: items.length,
+  };
 
   // Jam pesan pelanggan terakhir di chat yang dibuka: dasar centang biru (sudah dibaca).
   const lastCustomerMs = useMemo(
@@ -313,7 +348,7 @@ export default function WaInboxPanelView() {
   }
 
   // "Tandai semua dibalas": hanya chat yang TAMPIL di layar (mengikuti filter/pencarian) dan berstatus Belum dibalas.
-  const waitingVisible = visible.filter((c) => c.pending > 0);
+  const waitingVisible = visible.filter((c) => c.pending > 0 && !isLocked(c));
 
   function openBulk() {
     if (waitingVisible.length === 0 || !loadedAt) return;
@@ -414,6 +449,36 @@ export default function WaInboxPanelView() {
         {/* daftar chat */}
         <div style={{ display: "flex", flexDirection: "column", minHeight: 0, borderRight: `1px solid ${LINE}` }}>
           <div style={{ padding: 12, display: "grid", gap: 8, borderBottom: `1px solid ${LINE}` }}>
+            <div role="tablist" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", background: "#f1f5f9", borderRadius: 12, padding: 3, gap: 2 }}>
+              {(
+                [
+                  { key: "mine", label: "Milik saya" },
+                  { key: "queue", label: "Antrean" },
+                  { key: "all", label: "Semua" },
+                ] as const
+              ).map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.key}
+                  onClick={() => setTab(t.key)}
+                  style={{
+                    border: 0,
+                    borderRadius: 9,
+                    padding: "7px 4px",
+                    fontSize: 12.5,
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    background: tab === t.key ? "#fff" : "transparent",
+                    color: tab === t.key ? INK : SUB,
+                    boxShadow: tab === t.key ? "0 1px 3px rgba(15,23,42,0.12)" : "none",
+                  }}
+                >
+                  {t.label} {tabCounts[t.key]}
+                </button>
+              ))}
+            </div>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -538,7 +603,15 @@ export default function WaInboxPanelView() {
                     ) : null}
                   </span>
                 </div>
-                {current.pending > 0 ? (
+                {currentLocked ? (
+                  <span
+                    title="Chat ini milik admin lain. Anda hanya bisa melihatnya."
+                    style={{ marginLeft: "auto", background: "#f1f5f9", color: SUB, borderRadius: 999, padding: "6px 14px", fontSize: 12.5, fontWeight: 700 }}
+                  >
+                    Hanya lihat
+                  </span>
+                ) : null}
+                {!currentLocked && current.pending > 0 ? (
                   <button
                     type="button"
                     onClick={onMarkReplied}
@@ -559,6 +632,7 @@ export default function WaInboxPanelView() {
                     {repliedBusy ? "Menutup…" : "Sudah dibalas di HP"}
                   </button>
                 ) : null}
+                {!currentLocked ? (
                 <button
                   type="button"
                   onClick={onToggleHandover}
@@ -576,8 +650,9 @@ export default function WaInboxPanelView() {
                     cursor: handoverBusy ? "wait" : "pointer",
                   }}
                 >
-                  {handoverBusy ? "Memproses…" : current.handover ? "Kembalikan ke bot" : "Ambil alih"}
+                  {handoverBusy ? "Memproses…" : current.handover ? "Kembalikan ke bot" : "Ambil alih dari bot"}
                 </button>
+                ) : null}
               </div>
               <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px", display: "grid", gap: 6, alignContent: "start" }}>
                 {threadLoading ? <p style={{ color: SUB, fontSize: 13 }}>Memuat riwayat…</p> : null}
@@ -606,6 +681,16 @@ export default function WaInboxPanelView() {
                 ))}
                 <div ref={endRef} />
               </div>
+              {currentLocked ? (
+                <div style={{ background: "#fff", borderTop: `1px solid ${LINE}`, padding: "14px 16px", fontSize: 13.5, color: SUB, display: "flex", gap: 10, alignItems: "center" }}>
+                  <span aria-hidden="true" style={{ fontSize: 18 }}>
+                    🔒
+                  </span>
+                  <span>
+                    Chat ini PIC-nya <b style={{ color: INK }}>{current?.owner?.name}</b>. Hanya {current?.owner?.name} (atau Owner dan Leader) yang bisa membalasnya.
+                  </span>
+                </div>
+              ) : (
               <div style={{ background: "#fff", borderTop: `1px solid ${LINE}`, padding: "10px 12px", display: "grid", gap: 8 }}>
                 {actionError ? (
                   <div style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, fontWeight: 600 }}>
@@ -672,6 +757,7 @@ export default function WaInboxPanelView() {
                   </button>
                 </div>
               </div>
+              )}
             </>
           )}
         </div>
