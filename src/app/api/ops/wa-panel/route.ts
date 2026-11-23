@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { assignUnownedChats, ownersFor } from "@/lib/wa-assign";
+import { assignUnownedChats, filterBulkSenders, guardPic, ownersFor, picRestrictionOff, takePic } from "@/lib/wa-assign";
 
 /**
  * Penerus (proxy) Inbox WhatsApp untuk panel admin → fungsi `wa-admin` di Academy.
@@ -17,6 +17,12 @@ import { assignUnownedChats, ownersFor } from "@/lib/wa-assign";
  *   ACADEMY_SUPABASE_URL      — sudah dipakai route wa-inbox
  *   WA_ADMIN_PROXY_SECRET     — kunci acak (min. 24 karakter) yang SAMA dengan secret Edge Function wa-admin
  * Saklar darurat: hapus WA_ADMIN_PROXY_SECRET → jalur ini mati, bot dan inbox Academy tidak terpengaruh.
+ *
+ * Gembok PIC (tahap 5b-2, `lib/wa-assign.ts`): reply, takeover, release, mark-replied ditolak (403) bila chat itu PIC-nya
+ * admin lain; Owner/Leader harus "Ambil alih" dulu (`take-pic`, tercatat di wa_chat_owner_log). Chat tanpa PIC boleh
+ * ditangani siapa saja dan yang menangani jadi PIC. "Tandai semua dibalas": admin biasa hanya chat miliknya/tanpa PIC.
+ * Saklar darurat gembok: env `WA_PIC_RESTRICT=off` (tanpa deploy). Gagal membaca tabel PIC = diizinkan (fail-open).
+ * Inbox Academy TIDAK dibatasi.
  */
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -66,7 +72,7 @@ const BULK_CHUNK = 100;
  *  - hanya pesan yang masuk SEBELUM `before` (saat daftar dimuat), jadi pelanggan yang menulis sesudahnya tidak ikut tertutup;
  *  - batas 500 nomor per permintaan; tiap nomor divalidasi.
  */
-async function markAllRepliedOnPhone(senders: string[], before: string, adminName: string) {
+async function markAllRepliedOnPhone(senders: string[], before: string, adminName: string, skipped = 0) {
   const now = new Date().toISOString();
   const db = getSupabaseAdmin();
   let closed = 0;
@@ -86,8 +92,10 @@ async function markAllRepliedOnPhone(senders: string[], before: string, adminNam
     closed += data?.length ?? 0;
     for (const row of data || []) touched.add(String(row.sender));
   }
-  return NextResponse.json({ ok: true, closed, chats: touched.size }, { headers: { "Cache-Control": "no-store, private" } });
+  return NextResponse.json({ ok: true, closed, chats: touched.size, skipped }, { headers: { "Cache-Control": "no-store, private" } });
 }
+
+const forbiddenJson = (error: string) => NextResponse.json({ ok: false, error }, { status: 403, headers: { "Cache-Control": "no-store, private" } });
 
 export async function POST(req: NextRequest) {
   const identity = await opsIdentity(req);
@@ -109,14 +117,40 @@ export async function POST(req: NextRequest) {
     if (!Number.isFinite(beforeMs)) return NextResponse.json({ ok: false, error: "Waktu batas tidak valid." }, { status: 400 });
     // Batas tidak boleh di masa depan: pesan yang belum masuk tidak mungkin sudah dibalas.
     const before = new Date(Math.min(beforeMs, Date.now())).toISOString();
-    return markAllRepliedOnPhone(senders, before, identity.name || identity.email);
+
+    // Gembok PIC: admin biasa hanya boleh menutup chat miliknya atau yang belum bertuan; Owner/Leader semua.
+    let allowed = senders;
+    let skipped = 0;
+    if (!picRestrictionOff()) {
+      try {
+        const owners = await ownersFor(senders);
+        const ownerOf = new Map([...owners].map(([sender, owner]) => [sender, owner.userId] as [string, string]));
+        ({ allowed, skipped } = filterBulkSenders(senders, ownerOf, identity.userId, identity.role));
+      } catch (error) {
+        console.error("[WA-PANEL] gembok massal gagal dibaca, diizinkan:", error); // fail-open
+      }
+      if (allowed.length === 0) return forbiddenJson("Semua chat yang dipilih milik admin lain, jadi tidak bisa ditutup oleh Anda.");
+    }
+    return markAllRepliedOnPhone(allowed, before, identity.name || identity.email, skipped);
   }
   if (String(rawBody?.action ?? "") === "mark-replied") {
     const sender = String(rawBody?.sender ?? "");
     if (!/^\d{6,20}$/.test(sender)) {
       return NextResponse.json({ ok: false, error: "Nomor pengirim tidak valid." }, { status: 400 });
     }
+    const guard = await guardPic(sender, identity.userId, identity.role, { claim: true });
+    if (!guard.ok) return forbiddenJson(guard.error);
     return markRepliedOnPhone(sender, identity.name || identity.email);
+  }
+  if (String(rawBody?.action ?? "") === "take-pic") {
+    // "Ambil alih dari [nama]": PIC chat pindah ke pemanggil dan tercatat (Owner/Leader untuk chat milik orang lain).
+    const sender = String(rawBody?.sender ?? "");
+    if (!/^\d{6,20}$/.test(sender)) {
+      return NextResponse.json({ ok: false, error: "Nomor pengirim tidak valid." }, { status: 400 });
+    }
+    const result = await takePic(sender, identity.userId, identity.role);
+    if (!result.ok) return forbiddenJson(result.error);
+    return NextResponse.json({ ok: true, from: result.from }, { headers: { "Cache-Control": "no-store, private" } });
   }
 
   const secret = process.env.WA_ADMIN_PROXY_SECRET || "";
@@ -154,6 +188,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Nomor pengirim tidak valid." }, { status: 400 });
     }
     payload.sender = sender;
+    // Gembok PIC: chat milik admin lain ditolak (Owner/Leader harus "Ambil alih" dulu). Membalas atau mengambil alih
+    // dari bot pada chat yang belum bertuan membuat pemanggil jadi PIC; mengembalikan ke bot tidak mengklaim.
+    const guard = await guardPic(sender, identity.userId, identity.role, { claim: action !== "release" });
+    if (!guard.ok) return forbiddenJson(guard.error);
   }
   if (action === "reply") {
     const message = String(body?.message ?? "").trim();

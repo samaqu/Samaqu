@@ -191,3 +191,138 @@ export async function ownersFor(senders: string[]): Promise<Map<string, ChatOwne
   }
   return result;
 }
+
+/* ───────────── Tahap 5b-2: gembok PIC di server ───────────── */
+
+/** Owner dan Leader boleh menangani chat milik admin lain, tapi HARUS lewat "Ambil alih dari [nama]" (PIC berpindah dan tercatat). */
+export const canManageAllChats = (role: string): boolean => role === "owner" || role === "leader";
+
+/** Saklar darurat: `WA_PIC_RESTRICT=off` di Vercel mematikan semua gembok dan klaim PIC (tanpa deploy ulang kode). */
+export const picRestrictionOff = (): boolean => (process.env.WA_PIC_RESTRICT || "").trim().toLowerCase() === "off";
+
+export type PicDecision = "allow" | "claim" | "deny";
+
+/**
+ * Putusan untuk aksi pada satu chat (murni, diuji):
+ *  - belum ada PIC: boleh; bila `claim`, yang bertindak otomatis jadi PIC ("klaim");
+ *  - PIC = saya: boleh;
+ *  - PIC orang lain: ditolak untuk SEMUA peran. Owner/Leader harus mengambil alih dulu (take-pic), supaya perpindahannya tercatat.
+ */
+export function decidePic(input: { ownerId: string | null; userId: string; claim: boolean }): PicDecision {
+  if (!input.ownerId) return input.claim ? "claim" : "allow";
+  return input.ownerId === input.userId ? "allow" : "deny";
+}
+
+/** Penutupan massal: admin biasa hanya chat miliknya atau yang belum ada PIC; Owner/Leader boleh semua (hanya merapikan daftar, tidak membalas pelanggan). */
+export function filterBulkSenders(senders: string[], ownerOf: Map<string, string>, userId: string, role: string): { allowed: string[]; skipped: number } {
+  if (canManageAllChats(role)) return { allowed: senders, skipped: 0 };
+  const allowed = senders.filter((s) => {
+    const owner = ownerOf.get(s);
+    return !owner || owner === userId;
+  });
+  return { allowed, skipped: senders.length - allowed.length };
+}
+
+async function nameOfAdmin(userId: string): Promise<string> {
+  const { data } = await getSupabaseAdmin().from("admins").select("display_name, email").eq("user_id", userId).maybeSingle();
+  return String(data?.display_name || "").trim() || String(data?.email || "").split("@")[0] || "admin lain";
+}
+
+async function writePicLog(sender: string, fromUserId: string | null, toUserId: string, reason: string, byUserId: string) {
+  const { error } = await getSupabaseAdmin()
+    .from("wa_chat_owner_log")
+    .insert({ sender, from_user_id: fromUserId, to_user_id: toUserId, reason, by_user_id: byUserId });
+  if (error) console.error("[WA-PIC] gagal menulis riwayat:", error.message);
+}
+
+export type PicGuard = { ok: true; claimed?: boolean } | { ok: false; error: string };
+
+/**
+ * Gembok PIC untuk satu chat: dipanggil route wa-panel SEBELUM aksi yang mengubah sesuatu (reply, takeover, release,
+ * mark-replied). `claim` = aksi ini membuat yang bertindak jadi PIC bila chat belum bertuan.
+ * Gagal membaca tabel = DIIZINKAN (fail-open): masalah di tabel PIC tidak boleh mengunci admin dari pekerjaannya.
+ */
+export async function guardPic(sender: string, userId: string, role: string, opts: { claim: boolean }): Promise<PicGuard> {
+  if (picRestrictionOff()) return { ok: true };
+  try {
+    const db = getSupabaseAdmin();
+    const read = async () => {
+      const { data, error } = await db.from("wa_chat_owner").select("owner_user_id").eq("sender", sender).maybeSingle();
+      if (error) throw new Error(error.message);
+      return data?.owner_user_id ? String(data.owner_user_id) : null;
+    };
+    let ownerId = await read();
+    let decision = decidePic({ ownerId, userId, claim: opts.claim });
+
+    if (decision === "claim") {
+      const { data: inserted, error } = await db
+        .from("wa_chat_owner")
+        .upsert({ sender, owner_user_id: userId, assigned_by: "manual" }, { onConflict: "sender", ignoreDuplicates: true })
+        .select("owner_user_id");
+      if (error) throw new Error(error.message);
+      if (inserted && inserted.length > 0) {
+        await writePicLog(sender, null, userId, "diklaim saat menangani chat", userId);
+        return { ok: true, claimed: true };
+      }
+      // Admin lain lebih dulu mengklaim: baca ulang pemiliknya.
+      ownerId = await read();
+      decision = decidePic({ ownerId, userId, claim: false });
+    }
+
+    if (decision === "deny") {
+      const name = await nameOfAdmin(String(ownerId));
+      return {
+        ok: false,
+        error: canManageAllChats(role)
+          ? `Chat ini PIC-nya ${name}. Klik "Ambil alih dari ${name}" dulu supaya perpindahannya tercatat.`
+          : `Chat ini PIC-nya ${name}. Hanya ${name} (atau Owner dan Leader) yang bisa menanganinya.`,
+      };
+    }
+    return { ok: true };
+  } catch (error) {
+    console.error("[WA-PIC] gembok gagal dibaca, diizinkan:", error);
+    return { ok: true };
+  }
+}
+
+export type TakePicResult = { ok: true; from: string | null } | { ok: false; error: string };
+
+/**
+ * "Ambil alih dari [nama]": PIC pindah ke pemanggil dan tercatat. Hanya Owner dan Leader untuk chat milik orang lain;
+ * chat yang belum bertuan boleh diambil siapa saja (klaim). Memakai perubahan bersyarat (pemilik lama harus masih sama)
+ * supaya dua orang yang menekan bersamaan tidak saling menimpa.
+ */
+export async function takePic(sender: string, userId: string, role: string): Promise<TakePicResult> {
+  const db = getSupabaseAdmin();
+  const { data: row, error } = await db.from("wa_chat_owner").select("owner_user_id").eq("sender", sender).maybeSingle();
+  if (error) return { ok: false, error: "Gagal membaca PIC chat ini. Coba lagi." };
+  const oldOwner = row?.owner_user_id ? String(row.owner_user_id) : null;
+
+  if (oldOwner === userId) return { ok: true, from: null };
+  if (!oldOwner) {
+    const { data: inserted, error: insertError } = await db
+      .from("wa_chat_owner")
+      .upsert({ sender, owner_user_id: userId, assigned_by: "manual" }, { onConflict: "sender", ignoreDuplicates: true })
+      .select("sender");
+    if (insertError) return { ok: false, error: "Gagal menjadi PIC chat ini. Coba lagi." };
+    if (inserted && inserted.length > 0) {
+      await writePicLog(sender, null, userId, "diklaim", userId);
+      return { ok: true, from: null };
+    }
+    return { ok: false, error: "Chat ini baru saja mendapat PIC. Muat ulang daftar." };
+  }
+  if (!canManageAllChats(role)) {
+    return { ok: false, error: `Hanya Owner dan Leader yang bisa mengambil alih chat milik ${await nameOfAdmin(oldOwner)}.` };
+  }
+  const { data: updated, error: updateError } = await db
+    .from("wa_chat_owner")
+    .update({ owner_user_id: userId, assigned_by: "takeover", assigned_at: new Date().toISOString() })
+    .eq("sender", sender)
+    .eq("owner_user_id", oldOwner)
+    .select("sender");
+  if (updateError) return { ok: false, error: "Gagal mengambil alih. Coba lagi." };
+  if (!updated || updated.length === 0) return { ok: false, error: "PIC chat ini baru saja berubah. Muat ulang daftar." };
+  const fromName = await nameOfAdmin(oldOwner);
+  await writePicLog(sender, oldOwner, userId, `diambil alih dari ${fromName}`, userId);
+  return { ok: true, from: fromName };
+}

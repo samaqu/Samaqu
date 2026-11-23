@@ -171,6 +171,8 @@ export default function WaInboxPanelView() {
   const [loadedAt, setLoadedAt] = useState(0);
   const [bulkTarget, setBulkTarget] = useState<{ senders: string[]; chats: number; messages: number; before: string } | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [picBusy, setPicBusy] = useState(false);
+  const [picError, setPicError] = useState("");
   /** Siapa saya (untuk tab "Milik saya" dan kunci balasan chat PIC lain). */
   const [me, setMe] = useState<{ userId: string; role: string } | null>(null);
   /** Tab daftar: milik saya / antrean (menunggu admin, belum ada PIC) / semua. Bawaan "semua" selama pembatasan server belum aktif. */
@@ -262,9 +264,10 @@ export default function WaInboxPanelView() {
 
   const current = items.find((c) => c.sender === selected) || null;
 
-  // Owner dan Leader boleh menangani semua chat; admin biasa hanya chat miliknya atau yang belum ada PIC-nya.
+  // Chat yang PIC-nya orang lain terkunci untuk SEMUA peran (dijaga juga di server). Owner dan Leader membukanya lewat
+  // "Ambil alih dari [nama]" (PIC pindah dan tercatat); admin biasa tidak punya jalan itu.
   const canManageAll = me?.role === "owner" || me?.role === "leader";
-  const isLocked = (c: Conversation) => Boolean(me && c.owner && c.owner.userId !== me.userId && !canManageAll);
+  const isLocked = (c: Conversation) => Boolean(me && c.owner && c.owner.userId !== me.userId);
   const currentLocked = current ? isLocked(current) : false;
   const tabCounts = {
     mine: me ? items.filter((c) => c.owner?.userId === me.userId).length : 0,
@@ -283,6 +286,7 @@ export default function WaInboxPanelView() {
     setDraft("");
     setPhoto(null);
     setActionError("");
+    setPicError("");
   }, [selected]);
 
   async function refreshThread(sender: string) {
@@ -348,7 +352,8 @@ export default function WaInboxPanelView() {
   }
 
   // "Tandai semua dibalas": hanya chat yang TAMPIL di layar (mengikuti filter/pencarian) dan berstatus Belum dibalas.
-  const waitingVisible = visible.filter((c) => c.pending > 0 && !isLocked(c));
+  // Admin biasa tidak bisa menutup chat milik admin lain; Owner/Leader boleh (hanya merapikan daftar).
+  const waitingVisible = visible.filter((c) => c.pending > 0 && (!isLocked(c) || canManageAll));
 
   function openBulk() {
     if (waitingVisible.length === 0 || !loadedAt) return;
@@ -358,6 +363,21 @@ export default function WaInboxPanelView() {
       messages: waitingVisible.reduce((sum, c) => sum + c.pending, 0),
       before: new Date(loadedAt).toISOString(),
     });
+  }
+
+  // "Ambil alih dari [nama]" (Owner/Leader): PIC chat pindah ke saya dan tercatat di server.
+  async function onTakePic() {
+    if (!current || picBusy) return;
+    setPicBusy(true);
+    setPicError("");
+    try {
+      await call({ action: "take-pic", sender: current.sender });
+      await loadList();
+    } catch (e) {
+      setPicError(e instanceof Error ? e.message : "Gagal mengambil alih.");
+    } finally {
+      setPicBusy(false);
+    }
   }
 
   async function onConfirmBulk() {
@@ -682,13 +702,29 @@ export default function WaInboxPanelView() {
                 <div ref={endRef} />
               </div>
               {currentLocked ? (
-                <div style={{ background: "#fff", borderTop: `1px solid ${LINE}`, padding: "14px 16px", fontSize: 13.5, color: SUB, display: "flex", gap: 10, alignItems: "center" }}>
-                  <span aria-hidden="true" style={{ fontSize: 18 }}>
-                    🔒
-                  </span>
-                  <span>
-                    Chat ini PIC-nya <b style={{ color: INK }}>{current?.owner?.name}</b>. Hanya {current?.owner?.name} (atau Owner dan Leader) yang bisa membalasnya.
-                  </span>
+                <div style={{ background: "#fff", borderTop: `1px solid ${LINE}`, padding: "14px 16px", fontSize: 13.5, color: SUB, display: "grid", gap: 10 }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    <span aria-hidden="true" style={{ fontSize: 18 }}>
+                      🔒
+                    </span>
+                    <span style={{ flex: 1, minWidth: 200 }}>
+                      Chat ini PIC-nya <b style={{ color: INK }}>{current?.owner?.name}</b>.{" "}
+                      {canManageAll
+                        ? "Ambil alih dulu supaya Anda bisa membalas; perpindahan PIC tercatat."
+                        : `Hanya ${current?.owner?.name} (atau Owner dan Leader) yang bisa membalasnya.`}
+                    </span>
+                    {canManageAll ? (
+                      <button
+                        type="button"
+                        onClick={() => void onTakePic()}
+                        disabled={picBusy}
+                        style={{ border: 0, background: INK, color: "#fff", borderRadius: 12, padding: "10px 16px", fontSize: 13.5, fontWeight: 800, cursor: picBusy ? "wait" : "pointer" }}
+                      >
+                        {picBusy ? "Memproses…" : `Ambil alih dari ${current?.owner?.name}`}
+                      </button>
+                    ) : null}
+                  </div>
+                  {picError ? <div style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, fontWeight: 600 }}>{picError}</div> : null}
                 </div>
               ) : (
               <div style={{ background: "#fff", borderTop: `1px solid ${LINE}`, padding: "10px 12px", display: "grid", gap: 8 }}>
