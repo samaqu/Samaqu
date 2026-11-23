@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * Halaman "Template Chat" (menu Tim & Chat): banner dengan ringkasan, pencarian, chip kategori, dan kartu template
- * (Salin teks; pensil untuk Owner/Leader). SEMUA warna memakai variabel tema panel (--pink, --pink-d, --plum, --line,
- * --green/--orange/--purple beserta -bg), jadi otomatis mengikuti tema Berry, Bunga Matahari, dan Tropical Beach.
+ * Halaman "Template Chat" (menu Tim & Chat): banner tipis, pencarian + chip kategori dalam satu baris, dan kartu template
+ * yang padat (Salin teks; pensil untuk Owner/Leader) supaya banyak template terlihat sekaligus saat dipakai kerja.
+ * SEMUA warna memakai variabel tema panel (--pink, --pink-d, --plum, --line, --green/--orange/--purple beserta -bg),
+ * jadi otomatis mengikuti tema Berry, Bunga Matahari, dan Tropical Beach.
  * Placeholder ({nama}, {admin}) tidak diisi di sini karena tidak ada pelanggan terpilih.
  */
 
@@ -103,63 +104,56 @@ export default function TemplateChatView() {
   };
 
   return (
-    <div style={{ display: "grid", gap: 16, fontFamily: "var(--font)", color: "var(--plum)" }}>
-      {/* banner */}
+    <div style={{ display: "grid", gap: 12, fontFamily: "var(--font)", color: "var(--plum)" }}>
+      {/* banner tipis: satu baris */}
       <section
         style={{
-          borderRadius: 24,
-          padding: "26px 30px",
+          borderRadius: 18,
+          padding: "12px 18px",
           color: "#fff",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          gap: 20,
+          gap: 12,
           flexWrap: "wrap",
-          backgroundImage: "radial-gradient(circle at 88% 12%, rgba(255,255,255,0.24), transparent 42%), linear-gradient(120deg, var(--pink-d) 0%, var(--pink) 100%)",
-          boxShadow: "0 14px 34px rgba(0,0,0,0.10)",
+          backgroundImage: "radial-gradient(circle at 92% 0%, rgba(255,255,255,0.22), transparent 45%), linear-gradient(120deg, var(--pink-d) 0%, var(--pink) 100%)",
+          boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
         }}
       >
-        <div style={{ display: "grid", gap: 6, maxWidth: 560 }}>
-          <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: 1.6, opacity: 0.85 }}>TIM &amp; CHAT</span>
-          <h1 style={{ margin: 0, fontSize: 34, fontWeight: 800, lineHeight: 1.1, color: "#fff" }}>Template Chat</h1>
-          <p style={{ margin: 0, fontSize: 14.5, opacity: 0.92 }}>Balasan siap pakai. {"{nama}"} terisi otomatis saat dipakai di Inbox WA.</p>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, lineHeight: 1.2, color: "#fff" }}>Template Chat</h1>
+          <span style={{ fontSize: 12.5, opacity: 0.92 }}>Balasan siap pakai · {"{nama}"} terisi otomatis saat dipakai di Inbox WA</span>
         </div>
-        <div style={{ display: "flex", gap: 12, alignItems: "stretch", flexWrap: "wrap" }}>
-          {[
-            { n: items?.length ?? 0, l: "Template" },
-            { n: categories.length, l: "Kategori" },
-          ].map((s) => (
-            <div key={s.l} style={{ minWidth: 112, padding: "14px 18px", borderRadius: 18, background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.30)", display: "grid", gap: 2 }}>
-              <b style={{ fontSize: 30, lineHeight: 1 }}>{s.n}</b>
-              <span style={{ fontSize: 13, opacity: 0.9 }}>{s.l}</span>
-            </div>
-          ))}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ background: "rgba(255,255,255,0.20)", border: "1px solid rgba(255,255,255,0.30)", borderRadius: 999, padding: "5px 12px", fontSize: 12.5, fontWeight: 700 }}>
+            {items?.length ?? 0} template · {categories.length} kategori
+          </span>
           {canManage ? (
             <button
               type="button"
               onClick={() => openManager(null)}
-              style={{ border: 0, background: "#fff", color: "var(--pink-d)", borderRadius: 18, padding: "0 26px", minHeight: 62, fontSize: 15, fontWeight: 800, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}
+              style={{ border: 0, background: "#fff", color: "var(--pink-d)", borderRadius: 12, padding: "0 14px", height: 34, fontSize: 13.5, fontWeight: 800, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
             >
-              {icon(ICON_PLUS, 18)}
+              {icon(ICON_PLUS, 15)}
               Kelola
             </button>
           ) : null}
         </div>
       </section>
 
-      {/* pencarian + kategori */}
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-        <label style={{ flex: "1 1 280px", maxWidth: 440, display: "flex", alignItems: "center", gap: 10, background: "#fff", border: "1px solid var(--card-line)", borderRadius: 16, padding: "0 16px", height: 52, color: "var(--mut)" }}>
-          {icon(ICON_SEARCH, 18)}
+      {/* pencarian + kategori: satu baris */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <label style={{ flex: "1 1 220px", maxWidth: 340, display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid var(--card-line)", borderRadius: 12, padding: "0 12px", height: 38, color: "var(--mut)" }}>
+          {icon(ICON_SEARCH, 16)}
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari judul atau isi template…"
             aria-label="Cari template"
-            style={{ border: 0, outline: "none", background: "transparent", flex: 1, fontSize: 14.5, color: "var(--plum)", fontFamily: "inherit" }}
+            style={{ border: 0, outline: "none", background: "transparent", flex: 1, fontSize: 13.5, color: "var(--plum)", fontFamily: "inherit", minWidth: 0 }}
           />
         </label>
-        <div style={{ flex: "1 1 360px", display: "flex", gap: 6, flexWrap: "wrap", background: "#fff", border: "1px solid var(--card-line)", borderRadius: 16, padding: 6 }}>
+        <div style={{ flex: "1 1 320px", display: "flex", gap: 4, flexWrap: "wrap", background: "#fff", border: "1px solid var(--card-line)", borderRadius: 12, padding: 3 }}>
           {[["Semua", items?.length ?? 0] as [string, number], ...categories].map(([name, count]) => {
             const active = category === name;
             return (
@@ -167,7 +161,7 @@ export default function TemplateChatView() {
                 key={name}
                 type="button"
                 onClick={() => setCategory(name)}
-                style={{ border: 0, cursor: "pointer", borderRadius: 12, padding: "9px 16px", fontSize: 14, fontWeight: 700, fontFamily: "inherit", background: active ? "var(--plum)" : "transparent", color: active ? "#fff" : "var(--plum)" }}
+                style={{ border: 0, cursor: "pointer", borderRadius: 9, padding: "6px 11px", fontSize: 13, fontWeight: 700, fontFamily: "inherit", background: active ? "var(--plum)" : "transparent", color: active ? "#fff" : "var(--plum)" }}
               >
                 {name} <span style={{ opacity: active ? 0.85 : 0.6, fontWeight: 600 }}>{count}</span>
               </button>
@@ -176,35 +170,35 @@ export default function TemplateChatView() {
         </div>
       </div>
 
-      {error ? <div style={{ background: "var(--pink-bg)", color: "var(--pink-d)", borderRadius: 14, padding: "10px 14px", fontSize: 13.5, fontWeight: 700 }}>{error}</div> : null}
+      {error ? <div style={{ background: "var(--pink-bg)", color: "var(--pink-d)", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontWeight: 700 }}>{error}</div> : null}
 
       {items === null && !error ? (
-        <p style={{ color: "var(--mut)", fontSize: 14 }}>Memuat…</p>
+        <p style={{ color: "var(--mut)", fontSize: 13.5 }}>Memuat…</p>
       ) : visible.length === 0 ? (
-        <div style={{ border: "1px dashed var(--line)", borderRadius: 18, padding: 22, color: "var(--mut)", fontSize: 14, background: "#fff" }}>
+        <div style={{ border: "1px dashed var(--line)", borderRadius: 14, padding: 16, color: "var(--mut)", fontSize: 13.5, background: "#fff" }}>
           {items && items.length === 0 ? "Belum ada template." : "Tidak ada template yang cocok."}
         </div>
       ) : (
-        <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
+        <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
           {visible.map((t) => {
             const tone = toneOf(t.category);
             const version = versionOf(t.title);
             const copied = copiedId === t.id;
             return (
-              <article key={t.id} style={{ background: "#fff", border: "1px solid var(--card-line)", borderRadius: 22, padding: 18, display: "grid", gap: 12, alignContent: "start", boxShadow: "0 6px 18px rgba(0,0,0,0.04)" }}>
+              <article key={t.id} style={{ background: "#fff", border: "1px solid var(--card-line)", borderRadius: 16, padding: 12, display: "grid", gap: 8, alignContent: "start", boxShadow: "0 3px 10px rgba(0,0,0,0.035)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                  <span style={{ background: tone.bg, color: tone.fg, borderRadius: 999, padding: "6px 14px", fontSize: 13, fontWeight: 800 }}>{t.category}</span>
-                  {version ? <span style={{ fontSize: 13, color: "var(--mut)", fontWeight: 600 }}>Versi {version}</span> : null}
+                  <span style={{ background: tone.bg, color: tone.fg, borderRadius: 999, padding: "2px 10px", fontSize: 12, fontWeight: 800 }}>{t.category}</span>
+                  {version ? <span style={{ fontSize: 12, color: "var(--mut)", fontWeight: 600 }}>Versi {version}</span> : null}
                 </div>
-                <h3 style={{ margin: 0, fontSize: 18, lineHeight: 1.3, fontWeight: 700, color: "var(--plum)" }}>{t.title}</h3>
-                <div style={{ background: tone.bg, borderRadius: 16, padding: "14px 16px", fontSize: 14.5, lineHeight: 1.6, color: "var(--plum)", whiteSpace: "pre-wrap", maxHeight: 300, overflowY: "auto" }}>{t.content}</div>
-                <div style={{ display: "flex", gap: 8 }}>
+                <h3 style={{ margin: 0, fontSize: 14, lineHeight: 1.3, fontWeight: 700, color: "var(--plum)" }}>{t.title}</h3>
+                <div style={{ background: tone.bg, borderRadius: 10, padding: "8px 10px", fontSize: 12.5, lineHeight: 1.5, color: "var(--plum)", whiteSpace: "pre-wrap", maxHeight: 112, overflowY: "auto" }}>{t.content}</div>
+                <div style={{ display: "flex", gap: 6 }}>
                   <button
                     type="button"
                     onClick={() => void copy(t)}
-                    style={{ flex: 1, border: 0, cursor: "pointer", borderRadius: 14, height: 46, background: copied ? "var(--green)" : "var(--plum)", color: "#fff", fontSize: 15, fontWeight: 800, fontFamily: "inherit", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                    style={{ flex: 1, border: 0, cursor: "pointer", borderRadius: 10, height: 34, background: copied ? "var(--green)" : "var(--plum)", color: "#fff", fontSize: 13.5, fontWeight: 800, fontFamily: "inherit", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
                   >
-                    {icon(copied ? ICON_CHECK : ICON_COPY, 17)}
+                    {icon(copied ? ICON_CHECK : ICON_COPY, 15)}
                     {copied ? "Tersalin" : "Salin teks"}
                   </button>
                   {canManage ? (
@@ -213,9 +207,9 @@ export default function TemplateChatView() {
                       onClick={() => openManager(t.id)}
                       title="Ubah template"
                       aria-label={`Ubah template ${t.title}`}
-                      style={{ width: 46, height: 46, border: "1px solid var(--card-line)", cursor: "pointer", borderRadius: 14, background: "var(--pink-bg)", color: "var(--pink-d)", display: "grid", placeItems: "center" }}
+                      style={{ width: 34, height: 34, border: "1px solid var(--card-line)", cursor: "pointer", borderRadius: 10, background: "var(--pink-bg)", color: "var(--pink-d)", display: "grid", placeItems: "center" }}
                     >
-                      {icon(ICON_EDIT, 18)}
+                      {icon(ICON_EDIT, 15)}
                     </button>
                   ) : null}
                 </div>
