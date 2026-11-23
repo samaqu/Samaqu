@@ -352,3 +352,60 @@ export function summarizeTeam(episodes: Episode[], cfg: SlaConfig): TeamSpeed {
     slaPct: panel.length ? Math.round((hit / panel.length) * 1000) / 10 : null,
   };
 }
+
+/* ───────────────────────────── validasi pengaturan ───────────────────────────── */
+
+export interface SlaDbValue {
+  name: string;
+  target_response_min: number;
+  warning_min: number;
+  late_min: number;
+  open_time: string;
+  close_time: string;
+  op_days: number[];
+  queue_alert_threshold: number;
+  count_outside_hours: boolean;
+}
+
+const strictInt = (v: unknown, min: number, max: number): number | null => {
+  const n = typeof v === "string" && v.trim() !== "" ? Number(v) : v;
+  return typeof n === "number" && Number.isInteger(n) && n >= min && n <= max ? n : null;
+};
+
+/** Validasi ketat input form pengaturan SLA. Mengembalikan nilai siap simpan (nama kolom database) atau pesan galat. */
+export function validateSlaInput(body: any): { ok: true; value: SlaDbValue } | { ok: false; error: string } {
+  if (!body || typeof body !== "object") return { ok: false, error: "Data pengaturan tidak valid." };
+  const name = String(body.name ?? "").trim();
+  if (name.length < 1 || name.length > 60) return { ok: false, error: "Nama konfigurasi harus 1–60 karakter." };
+  const target = strictInt(body.targetResponseMin, 1, 240);
+  if (target === null) return { ok: false, error: "Target respons harus angka 1–240 menit." };
+  const warning = strictInt(body.warningMin, 1, 240);
+  if (warning === null) return { ok: false, error: "Batas warning harus angka 1–240 menit." };
+  const late = strictInt(body.lateMin, 1, 480);
+  if (late === null) return { ok: false, error: "Batas terlambat harus angka 1–480 menit." };
+  if (late < warning) return { ok: false, error: "Batas terlambat tidak boleh lebih kecil dari batas warning." };
+  const open = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(body.openTime ?? "")) ? String(body.openTime) : null;
+  const close = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(body.closeTime ?? "")) ? String(body.closeTime) : null;
+  if (!open || !close) return { ok: false, error: "Jam operasional harus berformat JJ:MM." };
+  if (open >= close) return { ok: false, error: "Jam buka harus lebih awal dari jam tutup." };
+  const rawDays: unknown[] = Array.isArray(body.opDays) ? body.opDays : [];
+  const days = [...new Set(rawDays.map((d) => Number(d)))].filter((d) => Number.isInteger(d) && d >= 0 && d <= 6).sort((a, b) => a - b);
+  if (days.length === 0 || days.length !== new Set(rawDays.map((d) => Number(d))).size) return { ok: false, error: "Pilih minimal satu hari operasional (Min–Sab)." };
+  const queue = strictInt(body.queueAlertThreshold, 1, 100);
+  if (queue === null) return { ok: false, error: "Ambang alert antrean harus angka 1–100." };
+  if (typeof body.countOutsideHours !== "boolean") return { ok: false, error: "Pilihan hitung di luar jam operasional tidak valid." };
+  return {
+    ok: true,
+    value: {
+      name,
+      target_response_min: target,
+      warning_min: warning,
+      late_min: late,
+      open_time: open,
+      close_time: close,
+      op_days: days,
+      queue_alert_threshold: queue,
+      count_outside_hours: body.countOutsideHours,
+    },
+  };
+}

@@ -194,6 +194,7 @@ const NAV: NavGroup[] = [
       { label: "Inbox WA", href: "/panel-admin/inbox-wa", icon: "chat" },
       { label: "Template Chat", href: "/panel-admin/template-chat", icon: "clipboard" },
       { label: "Absensi", href: "/panel-admin/absensi", icon: "clock" },
+      { label: "Performa Admin", href: "/panel-admin/performa-admin", icon: "dashboard" },
       { label: "Tim Admin", href: "/panel-admin/tim-admin", icon: "users" },
     ],
   },
