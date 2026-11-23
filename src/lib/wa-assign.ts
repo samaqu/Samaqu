@@ -6,7 +6,7 @@
  *
  * Aturan:
  *  - Calon pemilik = admin yang statusnya Aktif DAN online (sinyal panel < 5 menit lalu, jadi panelnya sedang terbuka).
- *  - Hanya chat yang MASIH MENUNGGU balasan (>= 2 menit) yang diberi pemilik. Chat yang dijawab bot tidak perlu pemilik:
+ *  - Hanya chat yang MASIH MENUNGGU balasan yang diberi PIC (langsung di jam kerja admin, 2 menit di luar jam admin). Chat yang dijawab bot tidak perlu pemilik:
  *    bot membalas di jam kerja AI (16.30-07.30, Minggu penuh), di luar itu admin yang membalas.
  *  - Chat tanpa pemilik dibagi ke admin dengan beban paling sedikit (jumlah chat yang ditugaskan 24 jam terakhir).
  *  - Pelanggan lama otomatis kembali ke admin yang sama: pemilik tidak berubah selama belum ada kejadian pemindahan.
@@ -21,8 +21,31 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const ONLINE_WINDOW_MS = 5 * 60_000;
 const CANDIDATE_WINDOW_MS = 24 * 3600_000;
-/** Pesan harus sudah menunggu sekian lama sebelum chatnya diberi pemilik (supaya chat yang sebentar lagi dibalas bot tidak ikut). */
-export const MIN_WAIT_MS = 2 * 60_000;
+/**
+ * Berapa lama pesan harus menunggu sebelum chatnya diberi PIC.
+ *  - Pesan yang masuk di jam kerja admin (Senin-Sabtu 07.30-16.40 WIB): LANGSUNG (0). Bot tidak membalas di jam itu
+ *    (dan pengaman wa-agent melewati pesannya), jadi tidak ada risiko memberi PIC ke chat yang sebentar lagi dibalas bot.
+ *  - Di luar jam admin: 2 menit, supaya chat yang dijawab bot dalam hitungan detik tidak ikut diberi PIC.
+ * Jam admin SAMA dengan `isAdminHoursMessage` di repo Academy (`_shared/wa/schedule.mjs`); ubah keduanya bersama.
+ */
+export const OUTSIDE_HOURS_WAIT_MS = 2 * 60_000;
+export const ADMIN_START_MIN = 7 * 60 + 30;
+export const ADMIN_HANDOFF_MIN = 16 * 60 + 40;
+const WIB_MS = 7 * 3600_000;
+
+/** Apakah waktu `ms` (epoch) jatuh di jam kerja admin (WIB, Senin-Sabtu 07.30-16.40)? */
+export function isAdminHours(ms: number): boolean {
+  const w = new Date(ms + WIB_MS);
+  if (w.getUTCDay() === 0) return false; // Minggu: admin libur
+  const minutes = w.getUTCHours() * 60 + w.getUTCMinutes();
+  return minutes >= ADMIN_START_MIN && minutes < ADMIN_HANDOFF_MIN;
+}
+
+/** Pesan yang masuk pada `createdMs` sudah cukup lama menunggu untuk diberi PIC pada `nowMs`? */
+export function isReadyForPic(createdMs: number, nowMs: number): boolean {
+  const wait = isAdminHours(createdMs) ? 0 : OUTSIDE_HOURS_WAIT_MS;
+  return nowMs - createdMs >= wait;
+}
 const MIN_GAP_MS = 15_000;
 const CHUNK = 200;
 
@@ -84,19 +107,21 @@ export async function assignUnownedChats(): Promise<AssignResult> {
     if (eligibleAdmins.length === 0) return { assigned: 0, reason: "tidak ada admin Aktif dan online" };
 
     const since = new Date(nowMs - CANDIDATE_WINDOW_MS).toISOString();
-    // Hanya chat yang MASIH MENUNGGU balasan (pending/processing) dan sudah menunggu >= 2 menit: yang dijawab bot
-    // (jam kerja AI 16.30-07.30, Minggu penuh) tidak pernah menunggu selama itu, jadi tidak ikut diberi pemilik.
-    const waitedBefore = new Date(nowMs - MIN_WAIT_MS).toISOString();
+    // Hanya chat yang MASIH MENUNGGU balasan (pending/processing). Waktu tunggunya mengikuti jam masuk pesan
+    // (`isReadyForPic`): langsung di jam kerja admin, 2 menit di luar jam admin (chat yang dijawab bot tidak ikut).
     const { data: rows, error: rowsError } = await db
       .from("wa_inbox")
-      .select("sender")
+      .select("sender, created_at")
       .in("status", ["pending", "processing"])
       .gte("created_at", since)
-      .lte("created_at", waitedBefore)
       .order("created_at", { ascending: false })
       .limit(3000);
     if (rowsError) return { assigned: 0, reason: rowsError.message };
-    const senders = [...new Set((rows || []).map((r) => String(r.sender || "")).filter((s) => /^\d{6,20}$/.test(s)))];
+    const ready = (rows || []).filter((r) => {
+      const created = Date.parse(String(r.created_at));
+      return Number.isFinite(created) && isReadyForPic(created, nowMs);
+    });
+    const senders = [...new Set(ready.map((r) => String(r.sender || "")).filter((s) => /^\d{6,20}$/.test(s)))];
     if (senders.length === 0) return { assigned: 0 };
 
     const owned = new Set<string>();

@@ -489,7 +489,7 @@ export default function WaInboxPanelView() {
                       </span>
                       {c.owner || c.pending > 0 ? (
                         <span style={{ display: "block", marginTop: 2, fontSize: 11, fontWeight: 700, color: c.owner ? "#4338ca" : "#b45309" }}>
-                          {c.owner ? `Pemilik: ${c.owner.name}` : "Antrean (menunggu admin)"}
+                          {c.owner ? `PIC: ${c.owner.name}` : "Antrean (menunggu admin)"}
                         </span>
                       ) : null}
                     </span>
@@ -533,7 +533,7 @@ export default function WaInboxPanelView() {
                     {current.owner || current.pending > 0 ? (
                       <>
                         {" "}
-                        · <b style={{ color: current.owner ? "#4338ca" : "#b45309" }}>{current.owner ? `Pemilik: ${current.owner.name}` : "Antrean (menunggu admin)"}</b>
+                        · <b style={{ color: current.owner ? "#4338ca" : "#b45309" }}>{current.owner ? `PIC: ${current.owner.name}` : "Antrean (menunggu admin)"}</b>
                       </>
                     ) : null}
                   </span>
