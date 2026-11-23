@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 /**
  * POST /api/ops/status {status} → ubah status kerja AKUN SENDIRI (aktif | istirahat | pulang).
  * Siapa pun tidak bisa mengubah status admin lain lewat route ini: baris yang diubah selalu milik pemanggil.
+ * Tiap perubahan juga dicatat di `admin_status_log` (dasar absensi). Klik status yang sama tidak dicatat dobel.
  */
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,14 +23,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Status tidak valid." }, { status: 400 });
   }
 
+  const admin = getSupabaseAdmin();
+  const { data: current } = await admin.from("admins").select("status").eq("user_id", me.userId).maybeSingle();
+  if (current?.status === status) {
+    return NextResponse.json({ ok: true, status, unchanged: true }, { headers: { "Cache-Control": "no-store, private" } });
+  }
+
   const now = new Date().toISOString();
-  const { error } = await getSupabaseAdmin()
-    .from("admins")
-    .update({ status, status_at: now })
-    .eq("user_id", me.userId);
+  const { error } = await admin.from("admins").update({ status, status_at: now }).eq("user_id", me.userId);
   if (error) {
     console.error("[OPS-STATUS] gagal mengubah status:", error.message);
     return NextResponse.json({ error: "Gagal mengubah status." }, { status: 500 });
   }
+
+  // Catatan riwayat. Kalau gagal, perubahan status tetap berlaku (lebih penting daripada log); galatnya dicatat di log server.
+  const { error: logError } = await admin.from("admin_status_log").insert({ user_id: me.userId, status, at: now });
+  if (logError) console.error("[OPS-STATUS] gagal menulis admin_status_log:", logError.message);
+
   return NextResponse.json({ ok: true, status, statusAt: now }, { headers: { "Cache-Control": "no-store, private" } });
 }
