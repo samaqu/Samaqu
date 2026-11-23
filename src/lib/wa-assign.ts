@@ -6,8 +6,9 @@
  *
  * Aturan:
  *  - Calon pemilik = admin yang statusnya Aktif DAN online (sinyal panel < 5 menit lalu, jadi panelnya sedang terbuka).
- *  - Hanya chat yang MASIH MENUNGGU balasan yang diberi PIC (langsung di jam kerja admin, 2 menit di luar jam admin). Chat yang dijawab bot tidak perlu pemilik:
- *    bot membalas di jam kerja AI (16.30-07.30, Minggu penuh), di luar itu admin yang membalas.
+ *  - Hanya chat yang MASIH MENUNGGU balasan yang diberi PIC, dan HANYA di jam kerja admin (Senin-Sabtu 07.30-16.40 WIB, langsung).
+ *    Sore sampai pagi dan Minggu PIC-nya bot (tidak ada PIC admin); chat yang sampai pagi belum dibalas dibagi begitu jam admin mulai.
+ *    Chat yang dijawab bot tidak perlu pemilik.
  *  - Chat tanpa pemilik dibagi ke admin dengan beban paling sedikit (jumlah chat yang ditugaskan 24 jam terakhir).
  *  - Pelanggan lama otomatis kembali ke admin yang sama: pemilik tidak berubah selama belum ada kejadian pemindahan.
  *  - Tidak ada admin Aktif dan online: chat dibiarkan tanpa pemilik (Antrean) dan dibagi begitu ada yang masuk.
@@ -21,32 +22,21 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const ONLINE_WINDOW_MS = 5 * 60_000;
 const CANDIDATE_WINDOW_MS = 24 * 3600_000;
+// Jam admin dipindah ke modul murni (aman dipakai tampilan); diekspor ulang di sini supaya pemanggil lama tetap jalan.
+import { isAdminHours } from "@/lib/admin-hours";
+export { ADMIN_HANDOFF_MIN, ADMIN_START_MIN, isAdminHours } from "@/lib/admin-hours";
+
 /**
- * Berapa lama pesan harus menunggu sebelum chatnya diberi PIC.
- *  - Pesan yang masuk di jam kerja admin (Senin-Sabtu 07.30-16.40 WIB): LANGSUNG (0). Bot tidak membalas di jam itu
- *    (dan pengaman wa-agent melewati pesannya), jadi tidak ada risiko memberi PIC ke chat yang sebentar lagi dibalas bot.
- *  - Di luar jam admin: 10 menit, supaya chat yang dijawab bot tidak ikut diberi PIC. (Dulu 2 menit; ternyata bot kadang
- *    butuh lebih lama, 9 dari 10 pesan dibalas dalam ±5,5 menit, jadi chat yang dijawab bot sempat keburu diberi PIC.)
- *    Yang tetap lolos dan sudah dijawab bot dilepas otomatis oleh `releaseBotAnsweredOwners`.
- * Jam admin SAMA dengan `isAdminHoursMessage` di repo Academy (`_shared/wa/schedule.mjs`); ubah keduanya bersama.
+ * Kapan chat yang menunggu boleh diberi PIC ADMIN: HANYA saat jam kerja admin (Senin-Sabtu 07.30-16.40 WIB).
+ *  - Sore sampai pagi (dan Minggu) PIC-nya BOT: tidak ada pemberian PIC admin sama sekali. Admin yang kebetulan online
+ *    malam hari tidak kebanjiran chat yang sebenarnya dijawab bot (dulu: tunggu 2 menit, lalu 10 menit, tetap saja ada
+ *    chat bot yang keburu diberi PIC).
+ *  - Chat yang sampai pagi belum dibalas tidak hilang: begitu jam admin mulai (07.30) dan ada admin Aktif yang online,
+ *    chat itu otomatis dibagi (pesan yang masuk saat jam admin tetap langsung).
+ * `createdMs` dipertahankan di tanda tangan fungsi demi kompatibilitas, tidak lagi menentukan hasil.
  */
-export const OUTSIDE_HOURS_WAIT_MS = 10 * 60_000;
-export const ADMIN_START_MIN = 7 * 60 + 30;
-export const ADMIN_HANDOFF_MIN = 16 * 60 + 40;
-const WIB_MS = 7 * 3600_000;
-
-/** Apakah waktu `ms` (epoch) jatuh di jam kerja admin (WIB, Senin-Sabtu 07.30-16.40)? */
-export function isAdminHours(ms: number): boolean {
-  const w = new Date(ms + WIB_MS);
-  if (w.getUTCDay() === 0) return false; // Minggu: admin libur
-  const minutes = w.getUTCHours() * 60 + w.getUTCMinutes();
-  return minutes >= ADMIN_START_MIN && minutes < ADMIN_HANDOFF_MIN;
-}
-
-/** Pesan yang masuk pada `createdMs` sudah cukup lama menunggu untuk diberi PIC pada `nowMs`? */
 export function isReadyForPic(createdMs: number, nowMs: number): boolean {
-  const wait = isAdminHours(createdMs) ? 0 : OUTSIDE_HOURS_WAIT_MS;
-  return nowMs - createdMs >= wait;
+  return Number.isFinite(createdMs) && nowMs >= createdMs && isAdminHours(nowMs);
 }
 const MIN_GAP_MS = 15_000;
 const CHUNK = 200;
@@ -139,7 +129,7 @@ export async function assignUnownedChats(): Promise<AssignResult> {
 
     const since = new Date(nowMs - CANDIDATE_WINDOW_MS).toISOString();
     // Hanya chat yang MASIH MENUNGGU balasan (pending/processing). Waktu tunggunya mengikuti jam masuk pesan
-    // (`isReadyForPic`): langsung di jam kerja admin, 2 menit di luar jam admin (chat yang dijawab bot tidak ikut).
+    // (`isReadyForPic`): hanya saat jam kerja admin berjalan; di luar jam itu PIC-nya bot dan tidak ada pembagian.
     const { data: rows, error: rowsError } = await db
       .from("wa_inbox")
       .select("sender, created_at")

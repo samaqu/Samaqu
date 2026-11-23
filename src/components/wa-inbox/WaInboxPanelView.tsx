@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { picLabel } from "@/lib/pic-label";
+import { isAdminQueue, picLabel } from "@/lib/pic-label";
 import ConfirmDialog from "@/components/ops/ConfirmDialog";
 import WaTemplatesManager from "./WaTemplatesManager";
 import { customerNameFor, fillTemplate, type WaTemplate } from "@/lib/wa-template";
@@ -303,17 +303,19 @@ export default function WaInboxPanelView() {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [thread, selected]);
 
+  // Antrean admin bergantung pada JAM (di luar jam admin yang bertanggung jawab adalah bot): hitung ulang tiap menit.
+  const nowMin = Math.floor(Date.now() / 60_000);
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return items.filter((c) => {
       if (tab === "mine" && !(me && c.owner?.userId === me.userId)) return false;
-      if (tab === "queue" && !(!c.owner && c.pending > 0)) return false;
+      if (tab === "queue" && !isAdminQueue(c, nowMin * 60_000)) return false;
       if (filter === "belum" && c.pending === 0) return false;
       if (filter === "admin" && !c.handover) return false;
       if (!q) return true;
       return c.name.toLowerCase().includes(q) || c.sender.includes(q.replace(/\D/g, "") || "\u0000") || c.lastMessage.toLowerCase().includes(q);
     });
-  }, [items, search, filter, tab, me]);
+  }, [items, search, filter, tab, me, nowMin]);
 
   const current = items.find((c) => c.sender === selected) || null;
 
@@ -324,7 +326,7 @@ export default function WaInboxPanelView() {
   const currentLocked = current ? isLocked(current) : false;
   const tabCounts = {
     mine: me ? items.filter((c) => c.owner?.userId === me.userId).length : 0,
-    queue: items.filter((c) => !c.owner && c.pending > 0).length,
+    queue: items.filter((c) => isAdminQueue(c, nowMin * 60_000)).length,
     all: items.length,
   };
 
