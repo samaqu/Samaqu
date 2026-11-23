@@ -446,88 +446,195 @@ function matrixLayout(s: TransaksiSummary) {
   return { sizeW, sizeX, qtyRight: MARGIN + CW - 10 };
 }
 
-function drawMatrixHeader(ctx: Ctx, s: TransaksiSummary) {
-  const h = 24;
+/** Campur warna dengan putih (0 = putih, 1 = warna asli): untuk latar lembut di tabel. */
+function tint(color: string, amount: number): string {
+  const h = color.replace("#", "");
+  const mix = (i: number) => Math.round(255 - (255 - parseInt(h.slice(i, i + 2), 16)) * amount);
+  return `#${[0, 2, 4].map((i) => mix(i).toString(16).padStart(2, "0")).join("")}`;
+}
+
+export interface SizeInsight {
+  /** Qty per ukuran untuk satu kelompok (semua baris dijumlah). */
+  totals: Record<string, number>;
+  /** Ukuran terlaris (lebih dari satu bila seri). Kosong bila tidak ada ukuran yang bisa dibandingkan. */
+  top: string[];
+  topQty: number;
+  /** Persen dari total pcs kelompok, dibulatkan. */
+  topShare: number;
+  /** Dua ukuran berikutnya (qty turun). */
+  runnersUp: { size: string; qty: number }[];
+}
+
+/**
+ * Insight ukuran terlaris satu kelompok. "ALL SIZE" tidak ikut dibandingkan kecuali satu-satunya ukuran yang ada
+ * (produk all size tidak punya ukuran untuk dibandingkan).
+ */
+export function seriesSizeInsight(g: ProductGroup, sizeColumns: string[]): SizeInsight {
+  const totals: Record<string, number> = {};
+  for (const r of g.rows) for (const [z, v] of Object.entries(r.sizes)) totals[z] = (totals[z] || 0) + v;
+  const sold = sizeColumns.filter((z) => (totals[z] || 0) > 0);
+  const real = sold.filter((z) => z !== ALL_SIZE);
+  const pool = real.length > 0 ? real : sold;
+  if (pool.length === 0) return { totals, top: [], topQty: 0, topShare: 0, runnersUp: [] };
+  const max = Math.max(...pool.map((z) => totals[z]));
+  const top = pool.filter((z) => totals[z] === max);
+  const runnersUp = pool
+    .filter((z) => totals[z] < max)
+    .sort((a, b) => totals[b] - totals[a] || sizeColumns.indexOf(a) - sizeColumns.indexOf(b))
+    .slice(0, 2)
+    .map((z) => ({ size: z, qty: totals[z] }));
+  return { totals, top, topQty: max, topShare: g.qty > 0 ? Math.round((max / g.qty) * 100) : 0, runnersUp };
+}
+
+const GROUP_H = 22;
+const ROW_H = 17.5;
+const HEAD_H = 15;
+const TOTAL_H = 19;
+const INSIGHT_H = 18;
+
+/** Header ukuran kecil, dipakai di SETIAP series (dan diulang di halaman lanjutan) supaya kolom selalu terbaca. */
+function drawSizeHeader(ctx: Ctx, s: TransaksiSummary, color: string, label = "Produk") {
   const { sizeW, sizeX, qtyRight } = matrixLayout(s);
-  rrect(ctx.page, { x: MARGIN, y: ctx.y - h, w: CW, h, r: 8, fill: NAVY });
-  const o = { size: 7.6, color: "#e2e8f0" };
-  const base = ctx.y - h / 2 - 2.6;
-  text(ctx.page, ctx.bold, "Produk", { x: MARGIN + 12, y: base, ...o });
+  const y = ctx.y - HEAD_H;
+  rrect(ctx.page, { x: MARGIN + 4, y, w: CW - 8, h: HEAD_H, r: 5, fill: tint(color, 0.10) });
+  const base = y + 4.6;
+  const o = { size: 7.2, color: SUB };
+  text(ctx.page, ctx.bold, label, { x: MARGIN + 14, y: base, ...o });
   text(ctx.page, ctx.bold, "Kain", { x: MARGIN + NAME_W, y: base, ...o });
   s.sizeColumns.forEach((z, i) => {
     textCenter(ctx.page, ctx.bold, z === ALL_SIZE ? "ALL" : z, { center: sizeX(i) + sizeW / 2, y: base, ...o });
   });
   textRight(ctx.page, ctx.bold, "Qty", { right: qtyRight, y: base, ...o });
-  ctx.y -= h + 2;
+  ctx.y = y;
 }
 
 function drawProductTable(ctx: Ctx, s: TransaksiSummary) {
   const { sizeW, sizeX, qtyRight } = matrixLayout(s);
-  const groupH = 22;
-  const rowH = 17.5;
   const sub = `${s.monthLabel} · ${nfmt(s.pcs)} pcs terjual`;
-  const ensure = (need: number) => {
-    if (ctx.y - need < FOOTER_TOP) {
-      newPage(ctx, "Produk Terjual (lanjutan)", sub);
-      drawMatrixHeader(ctx, s);
-    }
-  };
 
-  drawMatrixHeader(ctx, s);
   if (s.groups.length === 0) {
     text(ctx.page, ctx.regular, "Belum ada produk terjual pada bulan ini.", { x: MARGIN + 12, y: ctx.y - 16, size: 10, color: SUB });
     ctx.y -= 28;
     return;
   }
 
+  // Kelompok yang sedang digambar: dipakai supaya halaman lanjutan membawa nama kelompok + header ukuran lagi.
+  let current: { g: ProductGroup; color: string } | null = null;
+  const ensure = (need: number) => {
+    if (ctx.y - need >= FOOTER_TOP) return;
+    newPage(ctx, "Produk Terjual (lanjutan)", sub);
+    if (current) {
+      const gy = ctx.y - 18;
+      rrect(ctx.page, { x: MARGIN, y: gy, w: CW, h: 18, r: 7, fill: SOFT, border: LINE });
+      rrect(ctx.page, { x: MARGIN + 6, y: gy + 4, w: 3.5, h: 10, r: 1.75, fill: current.color });
+      text(ctx.page, ctx.bold, `${current.g.name} (lanjutan)`, { x: MARGIN + 16, y: gy + 5.6, size: 9, color: INK });
+      ctx.y = gy - 2;
+      drawSizeHeader(ctx, s, current.color);
+    }
+  };
+
   let seriesIdx = 0;
   s.groups.forEach((g) => {
-    const color = groupColor(g, g.kind === "series" ? seriesIdx : 0);
-    if (g.kind === "series") seriesIdx += 1;
-    ensure(groupH + rowH * 2);
-    // header kelompok
-    const gy = ctx.y - groupH;
-    rrect(ctx.page, { x: MARGIN, y: gy, w: CW, h: groupH, r: 8, fill: SOFT, border: LINE });
-    rrect(ctx.page, { x: MARGIN + 6, y: gy + 5, w: 3.5, h: groupH - 10, r: 1.75, fill: color });
+    const isSeries = g.kind === "series";
+    const color = groupColor(g, isSeries ? seriesIdx : 0);
+    if (isSeries) seriesIdx += 1;
+    const accent = color === MUTED_GROUP ? INK : color;
+
+    current = null;
+    ensure(GROUP_H + HEAD_H + ROW_H * 2 + 8);
+
+    // pita kelompok
+    const gy = ctx.y - GROUP_H;
+    rrect(ctx.page, { x: MARGIN, y: gy, w: CW, h: GROUP_H, r: 8, fill: SOFT, border: LINE });
+    rrect(ctx.page, { x: MARGIN + 6, y: gy + 5, w: 3.5, h: GROUP_H - 10, r: 1.75, fill: color });
     text(ctx.page, ctx.bold, g.name, { x: MARGIN + 16, y: gy + 7, size: 10, color: INK });
     const share = s.pcs > 0 ? ((g.qty / s.pcs) * 100).toFixed(1) : "0.0";
     textRight(ctx.page, ctx.bold, `${nfmt(g.qty)} pcs`, { right: qtyRight, y: gy + 7, size: 9, color: INK });
     textRight(ctx.page, ctx.regular, `${share}% dari total`, { right: qtyRight - 52, y: gy + 7.3, size: 7.5, color: FAINT });
     ctx.y = gy - 2;
 
+    current = { g, color };
+    drawSizeHeader(ctx, s, color);
+
     g.rows.forEach((r, ri) => {
-      ensure(rowH + 4);
-      const y = ctx.y - rowH;
-      if (ri % 2 === 1) rrect(ctx.page, { x: MARGIN + 4, y, w: CW - 8, h: rowH, fill: "#fafbfc" });
-      const base = y + (rowH - 8) / 2 + 0.5;
+      // Baris terakhir series dibawa bersama total + insight-nya, supaya keduanya tidak terpisah halaman.
+      ensure(ROW_H + 4 + (isSeries && ri === g.rows.length - 1 ? TOTAL_H + INSIGHT_H + 8 : 0));
+      const y = ctx.y - ROW_H;
+      if (ri % 2 === 1) rrect(ctx.page, { x: MARGIN + 4, y, w: CW - 8, h: ROW_H, fill: "#fafbfc" });
+      const base = y + (ROW_H - 8) / 2 + 0.5;
       text(ctx.page, ctx.regular, ellipsize(ctx.regular, r.product, 8.8, NAME_W - 22), { x: MARGIN + 14, y: base, size: 8.8, color: INK });
       text(ctx.page, ctx.regular, r.kain || "·", { x: MARGIN + NAME_W, y: base, size: 8, color: r.kain ? SUB : "#cbd5e1" });
+
+      // Ukuran terlaris di baris ini diberi latar warna (hanya bila ada lebih dari satu ukuran untuk dibandingkan).
+      const rowSizes = s.sizeColumns.filter((z) => z !== ALL_SIZE && (r.sizes[z] || 0) > 0);
+      const rowMax = rowSizes.length > 1 ? Math.max(...rowSizes.map((z) => r.sizes[z])) : 0;
       s.sizeColumns.forEach((z, i) => {
         const v = r.sizes[z] || 0;
+        const isTop = isSeries && rowMax > 0 && z !== ALL_SIZE && v === rowMax;
+        if (isTop) rrect(ctx.page, { x: sizeX(i) + sizeW / 2 - 10.5, y: y + 2.4, w: 21, h: ROW_H - 4.8, r: 6, fill: tint(color, 0.2) });
         textCenter(ctx.page, v > 0 ? ctx.bold : ctx.regular, v > 0 ? nfmt(v) : "·", {
           center: sizeX(i) + sizeW / 2,
           y: base,
           size: 8.8,
-          color: v > 0 ? INK : "#cbd5e1",
+          color: v > 0 ? (isTop ? accent : INK) : "#cbd5e1",
         });
       });
-      textRight(ctx.page, ctx.bold, nfmt(r.qty), { right: qtyRight, y: base, size: 9, color: color === MUTED_GROUP ? INK : color });
+      textRight(ctx.page, ctx.bold, nfmt(r.qty), { right: qtyRight, y: base, size: 9, color: accent });
       ctx.y = y;
     });
-    ctx.y -= 8;
+
+    // Total per ukuran + insight ukuran terlaris (hanya untuk series; paket/jasa tidak bermakna per ukuran).
+    if (isSeries) {
+      const ins = seriesSizeInsight(g, s.sizeColumns);
+      ensure(TOTAL_H + INSIGHT_H + 6);
+      const ty = ctx.y - TOTAL_H - 2;
+      rrect(ctx.page, { x: MARGIN + 4, y: ty, w: CW - 8, h: TOTAL_H, r: 6, fill: tint(color, 0.08) });
+      const tbase = ty + 5.6;
+      text(ctx.page, ctx.bold, "Total per ukuran", { x: MARGIN + 14, y: tbase, size: 8.2, color: INK });
+      s.sizeColumns.forEach((z, i) => {
+        const v = ins.totals[z] || 0;
+        const isTop = ins.top.includes(z) && v > 0;
+        if (isTop) rrect(ctx.page, { x: sizeX(i) + sizeW / 2 - 12, y: ty + 2.6, w: 24, h: TOTAL_H - 5.2, r: 6.5, fill: tint(color, 0.3) });
+        textCenter(ctx.page, ctx.bold, v > 0 ? nfmt(v) : "·", { center: sizeX(i) + sizeW / 2, y: tbase, size: 8.8, color: v > 0 ? (isTop ? accent : INK) : "#cbd5e1" });
+      });
+      textRight(ctx.page, ctx.bold, nfmt(g.qty), { right: qtyRight, y: tbase, size: 9.4, color: accent });
+      ctx.y = ty;
+
+      if (ins.top.length > 0) {
+        const iy = ctx.y - INSIGHT_H;
+        const head = `Ukuran terlaris: ${ins.top.join(" & ")}`;
+        const detail = `${nfmt(ins.topQty)} pcs${ins.top.length > 1 ? " masing-masing" : ""} · ${ins.topShare}% dari ${g.name}`;
+        rrect(ctx.page, { x: MARGIN + 4, y: iy + 3, w: 3, h: INSIGHT_H - 6, r: 1.5, fill: color });
+        text(ctx.page, ctx.bold, head, { x: MARGIN + 14, y: iy + 6, size: 8.4, color: accent });
+        const headW = ctx.bold.widthOfTextAtSize(head, 8.4);
+        text(ctx.page, ctx.regular, ` ·  ${detail}`, { x: MARGIN + 14 + headW, y: iy + 6, size: 8, color: SUB });
+        if (ins.runnersUp.length > 0) {
+          textRight(ctx.page, ctx.regular, `Berikutnya: ${ins.runnersUp.map((r) => `${r.size === ALL_SIZE ? "ALL" : r.size} ${nfmt(r.qty)}`).join(" · ")}`, {
+            right: qtyRight,
+            y: iy + 6,
+            size: 8,
+            color: SUB,
+          });
+        }
+        ctx.y = iy;
+      }
+    }
+    ctx.y -= 10;
   });
 
-  // baris total
-  ensure(26);
+  // Total seluruh produk, dengan header ukuran sendiri.
+  current = null;
+  ensure(HEAD_H + 26);
+  drawSizeHeader(ctx, s, SKY, "Total");
   const th = 22;
-  rrect(ctx.page, { x: MARGIN, y: ctx.y - th, w: CW, h: th, r: 8, fill: SKY_SOFT });
-  text(ctx.page, ctx.bold, "Total terjual", { x: MARGIN + 12, y: ctx.y - th + 7, size: 9.5, color: INK });
+  rrect(ctx.page, { x: MARGIN, y: ctx.y - th - 1, w: CW, h: th, r: 8, fill: SKY_SOFT });
+  text(ctx.page, ctx.bold, "Total terjual", { x: MARGIN + 12, y: ctx.y - th + 6, size: 9.5, color: INK });
   s.sizeColumns.forEach((z, i) => {
     const v = s.groups.reduce((t, g) => t + g.rows.reduce((tt, r) => tt + (r.sizes[z] || 0), 0), 0);
-    textCenter(ctx.page, ctx.bold, nfmt(v), { center: sizeX(i) + sizeW / 2, y: ctx.y - th + 7, size: 9, color: INK });
+    textCenter(ctx.page, ctx.bold, nfmt(v), { center: sizeX(i) + sizeW / 2, y: ctx.y - th + 6, size: 9, color: INK });
   });
-  textRight(ctx.page, ctx.bold, nfmt(s.pcs), { right: qtyRight, y: ctx.y - th + 7, size: 10, color: INK });
-  ctx.y -= th;
+  textRight(ctx.page, ctx.bold, nfmt(s.pcs), { right: qtyRight, y: ctx.y - th + 6, size: 10, color: INK });
+  ctx.y -= th + 1;
 }
 
 /* ── daftar transaksi ── */
