@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { STATUS_CHANGED_EVENT } from "@/lib/admin-status";
 
 interface AbsensiDay {
   userId: string;
@@ -92,6 +93,16 @@ export default function AbsensiView() {
 
   useEffect(() => {
     void load(month);
+    // Segarkan saat status diganti dari header (tab yang sama) dan tiap menit, supaya durasi "Berjalan" ikut bergerak.
+    const refresh = () => void load(month);
+    window.addEventListener(STATUS_CHANGED_EVENT, refresh);
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") refresh();
+    }, 60_000);
+    return () => {
+      window.removeEventListener(STATUS_CHANGED_EVENT, refresh);
+      clearInterval(id);
+    };
   }, [load, month]);
 
   const nameOf = useMemo(() => {
@@ -184,7 +195,7 @@ export default function AbsensiView() {
                 <tbody>
                   {rows.map((r) => (
                     <tr key={`${r.day}-${r.userId}`}>
-                      <td style={{ ...td, fontWeight: 700 }}>{nameOf.get(r.userId)?.name || "Admin"}</td>
+                      <td style={{ ...td, fontWeight: 700 }}>{nameOf.get(r.userId)?.name || "(akun dihapus)"}</td>
                       <td style={td}>{clock(r.masuk)}</td>
                       <td style={td}>{duration(r.breakMs)}</td>
                       <td style={td}>{clock(r.pulang)}</td>

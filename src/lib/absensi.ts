@@ -88,6 +88,8 @@ export function computeAbsensi(input: { logs: StatusLogRow[]; seen: SeenRow[]; m
 
       const r0 = rowOf(userId, startDay);
       if (cur.status === "aktif" && !r0.masuk) r0.masuk = cur.at;
+      // Bekerja lagi setelah klik Pulang: hari itu belum selesai, jam Pulang sebelumnya tidak berlaku.
+      r0.pulang = null;
 
       const next = list[i + 1];
       let end: number;
