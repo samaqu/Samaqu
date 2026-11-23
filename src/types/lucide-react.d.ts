@@ -18,6 +18,9 @@ declare module "lucide-react" {
   export const ChevronUp: FC<IconProps>;
   export const ChevronUpIcon: FC<IconProps>;
   export const Clock: FC<IconProps>;
+  export const FileDown: FC<IconProps>;
+  export const Gauge: FC<IconProps>;
+  export const Timer: FC<IconProps>;
   export const Copy: FC<IconProps>;
   export const DollarSign: FC<IconProps>;
   export const Edit: FC<IconProps>;
