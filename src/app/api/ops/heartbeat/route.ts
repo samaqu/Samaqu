@@ -6,7 +6,7 @@ import { assignUnownedChats } from "@/lib/wa-assign";
 
 /**
  * POST /api/ops/heartbeat → catat "terakhir terlihat" AKUN SENDIRI.
- * Dipanggil panel tiap ±2 menit selama tab terlihat. Baris yang diubah selalu milik pemanggil.
+ * Dipanggil panel tiap ±2 menit selama panel terbuka (tab di latar belakang tetap dihitung; tab/browser ditutup atau laptop tidur = berhenti). Baris yang diubah selalu milik pemanggil.
  *
  * Yang dikerjakan:
  *  1. Lupa klik Pulang kemarin? Status yang tersisa dari hari WIB sebelumnya ditutup otomatis jadi 'pulang'

@@ -424,13 +424,14 @@ export default function PanelShell({ children }: { children: ReactNode }) {
     };
   }, [authorized]);
 
-  // "Terakhir terlihat": kirim sinyal ringan tiap 2 menit, HANYA saat tab terlihat (tab di latar belakang / layar terkunci tidak dihitung).
+  // "Online" = panel masih TERBUKA: kirim sinyal ringan tiap 2 menit selama tab ada, juga saat tab di latar belakang
+  // (pindah tab tidak membuat admin dianggap offline). Tab/browser ditutup, laptop tidur, atau internet putus = sinyal berhenti.
   const seenUserId = me?.userId;
   useEffect(() => {
     if (!seenUserId) return;
     let stopped = false;
     const ping = async () => {
-      if (stopped || document.visibilityState !== "visible") return;
+      if (stopped) return;
       try {
         const { data } = await supabase.auth.getSession();
         const token = data.session?.access_token;
@@ -448,7 +449,10 @@ export default function PanelShell({ children }: { children: ReactNode }) {
     };
     void ping();
     const id = setInterval(() => void ping(), 120_000);
-    const onVisible = () => void ping();
+    // Kembali ke tab ini: kirim sinyal segera (timer latar belakang bisa tertunda oleh browser).
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void ping();
+    };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       stopped = true;
