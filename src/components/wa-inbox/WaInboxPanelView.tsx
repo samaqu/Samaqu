@@ -162,6 +162,11 @@ export default function WaInboxPanelView() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"semua" | "belum" | "admin">("semua");
   const [selected, setSelected] = useState<string>("");
+  // Tautan dari Performa Admin ("Buka chat"): /panel-admin/inbox-wa?chat=<nomor> langsung membuka chat itu.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("chat") || "";
+    if (/^\d{6,20}$/.test(q)) setSelected(q);
+  }, []);
   const [thread, setThread] = useState<Message[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
   const [threadError, setThreadError] = useState("");

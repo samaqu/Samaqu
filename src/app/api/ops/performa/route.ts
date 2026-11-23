@@ -22,8 +22,6 @@ export const runtime = "nodejs";
 
 const noStore = { "Cache-Control": "no-store, private" };
 
-const maskSender = (s: string) => `•••• ${String(s).slice(-4)}`;
-
 export async function GET(req: NextRequest) {
   const me = await opsIdentity(req);
   if (!me) return unauthorized();
@@ -59,13 +57,30 @@ export async function GET(req: NextRequest) {
     .filter((d) => d.perf.handled > 0)
     .sort((a, b) => (a.day < b.day ? 1 : -1));
 
-  // Chat yang sedang menunggu dan PIC-nya pemanggil (nomor disamarkan).
-  const waiting = episodes
+  // Chat yang sedang menunggu dan PIC-nya pemanggil. Nomor dan nama pelanggan ditampilkan LENGKAP: ini daftar kerja
+  // milik admin itu sendiri (bukan data orang lain), dan ia perlu tahu siapa yang harus dibalas.
+  const waitingEps = episodes
     .filter((e) => e.responder.kind === "none" && !e.stale && picOf(e.sender) === me.userId)
     .sort((a, b) => b.bizMin - a.bizMin)
-    .slice(0, 20)
+    .slice(0, 20);
+  const names = new Map<string, string>();
+  if (waitingEps.length > 0) {
+    const { data: nameRows } = await db
+      .from("wa_inbox")
+      .select("sender, sender_name")
+      .in("sender", waitingEps.map((e) => e.sender))
+      .order("created_at", { ascending: false })
+      .limit(600);
+    for (const r of nameRows || []) {
+      const s = String(r.sender);
+      const n = String(r.sender_name || "").trim();
+      if (n && !names.has(s)) names.set(s, n);
+    }
+  }
+  const waiting = waitingEps
     .map((e) => ({
-      chat: maskSender(e.sender),
+      sender: e.sender,
+      name: names.get(e.sender) || "",
       startAt: new Date(e.startAt).toISOString(),
       waitMin: Math.round(e.bizMin * 10) / 10,
       inHours: e.startedInHours,
