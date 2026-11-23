@@ -39,8 +39,9 @@ begin
   if (select count(*) from public.admins where is_bot is not true and active is not false and role in ('owner', 'leader')) < 1 then
     raise exception 'DIBATALKAN: tidak ada akun manusia berperan owner/leader. Naikkan satu akun (mis. Surya) ke leader dulu.';
   end if;
+  -- Akun Lea sendiri belum ada: dijalankan atas keputusan Surya (23 Nov 2026 malam, "Flip sekarang"). Hanya peringatan.
   if (select count(*) from public.admins where is_bot is not true and active is not false) < 2 then
-    raise exception 'DIBATALKAN: akun Lea (admin manusia kedua) belum ada.';
+    raise notice 'PERINGATAN: belum ada akun admin manusia kedua (akun Lea). Login akun bersama akan tampil sebagai asisten dan tidak bisa absen/menerima PIC.';
   end if;
 end $$;
 
