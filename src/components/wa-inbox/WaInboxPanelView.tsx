@@ -11,6 +11,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import ConfirmDialog from "@/components/ops/ConfirmDialog";
+import WaTemplatesManager from "./WaTemplatesManager";
+import { customerNameFor, fillTemplate, type WaTemplate } from "@/lib/wa-template";
+import { loadTemplates } from "@/lib/wa-templates-client";
 
 interface Conversation {
   sender: string;
@@ -174,7 +177,26 @@ export default function WaInboxPanelView() {
   const [picBusy, setPicBusy] = useState(false);
   const [picError, setPicError] = useState("");
   /** Siapa saya (untuk tab "Milik saya" dan kunci balasan chat PIC lain). */
-  const [me, setMe] = useState<{ userId: string; role: string } | null>(null);
+  const [me, setMe] = useState<{ userId: string; role: string; name: string } | null>(null);
+  // Template chat: daftar dimuat saat tombol Template pertama kali dibuka; pengelola hanya untuk Owner/Leader.
+  const draftRef = useRef<HTMLTextAreaElement | null>(null);
+  const [tplOpen, setTplOpen] = useState(false);
+  const [tplItems, setTplItems] = useState<WaTemplate[] | null>(null);
+  const [tplCanManage, setTplCanManage] = useState(false);
+  const [tplError, setTplError] = useState("");
+  const [tplSearch, setTplSearch] = useState("");
+  const [tplManage, setTplManage] = useState(false);
+
+  const refreshTemplates = useCallback(async () => {
+    try {
+      const res = await loadTemplates();
+      setTplItems(res.items);
+      setTplCanManage(res.canManage);
+      setTplError("");
+    } catch (e) {
+      setTplError(e instanceof Error ? e.message : "Gagal memuat template.");
+    }
+  }, []);
   /** Tab daftar: milik saya / antrean (menunggu admin, belum ada PIC) / semua. Bawaan "semua" selama pembatasan server belum aktif. */
   const [tab, setTab] = useState<"mine" | "queue" | "all">("all");
 
@@ -187,7 +209,7 @@ export default function WaInboxPanelView() {
         if (!token) return;
         const res = await fetch("/api/ops/me", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
         const json = await res.json().catch(() => null);
-        if (alive && res.ok && json?.userId) setMe({ userId: String(json.userId), role: String(json.role || "") });
+        if (alive && res.ok && json?.userId) setMe({ userId: String(json.userId), role: String(json.role || ""), name: String(json.name || "") });
       } catch {
         /* tanpa identitas, tab "Milik saya" kosong dan tidak ada chat yang terkunci */
       }
@@ -351,6 +373,31 @@ export default function WaInboxPanelView() {
     }
   }
 
+  function toggleTemplates() {
+    const next = !tplOpen;
+    setTplOpen(next);
+    if (next) {
+      setTplSearch("");
+      if (tplItems === null) void refreshTemplates();
+    }
+  }
+
+  // Isi template masuk ke kolom balasan (BELUM terkirim): {nama} = nama pelanggan, {admin} = nama admin ini.
+  function insertTemplate(t: WaTemplate) {
+    const text = fillTemplate(t.content, { nama: customerNameFor(current?.name), admin: me?.name || "" });
+    setDraft((prev) => (prev.trim() ? `${prev}${prev.endsWith("\n") ? "" : "\n\n"}${text}` : text));
+    setTplOpen(false);
+    setTimeout(() => draftRef.current?.focus(), 0);
+  }
+
+  const tplGroups = useMemo(() => {
+    const q = tplSearch.trim().toLowerCase();
+    const list = (tplItems || []).filter((t) => !q || t.title.toLowerCase().includes(q) || t.content.toLowerCase().includes(q) || t.category.toLowerCase().includes(q));
+    const groups = new Map<string, WaTemplate[]>();
+    for (const t of list) groups.set(t.category, [...(groups.get(t.category) || []), t]);
+    return [...groups.entries()];
+  }, [tplItems, tplSearch]);
+
   // "Tandai semua dibalas": hanya chat yang TAMPIL di layar (mengikuti filter/pencarian) dan berstatus Belum dibalas.
   // Admin biasa tidak bisa menutup chat milik admin lain; Owner/Leader boleh (hanya merapikan daftar).
   const waitingVisible = visible.filter((c) => c.pending > 0 && (!isLocked(c) || canManageAll));
@@ -443,6 +490,8 @@ export default function WaInboxPanelView() {
           {error}
         </div>
       ) : null}
+
+      <WaTemplatesManager open={tplManage} onClose={() => setTplManage(false)} onChanged={() => void refreshTemplates()} />
 
       <ConfirmDialog
         open={bulkTarget !== null}
@@ -727,7 +776,56 @@ export default function WaInboxPanelView() {
                   {picError ? <div style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, fontWeight: 600 }}>{picError}</div> : null}
                 </div>
               ) : (
-              <div style={{ background: "#fff", borderTop: `1px solid ${LINE}`, padding: "10px 12px", display: "grid", gap: 8 }}>
+              <div style={{ position: "relative", background: "#fff", borderTop: `1px solid ${LINE}`, padding: "10px 12px", display: "grid", gap: 8 }}>
+                {tplOpen ? (
+                  <div
+                    role="dialog"
+                    aria-label="Pilih template"
+                    style={{ position: "absolute", left: 12, right: 12, bottom: "calc(100% + 6px)", zIndex: 30, background: "#fff", border: `1px solid ${LINE}`, borderRadius: 14, boxShadow: "0 12px 32px rgba(15,23,42,0.18)", maxHeight: 340, display: "flex", flexDirection: "column", overflow: "hidden" }}
+                  >
+                    <div style={{ display: "flex", gap: 8, padding: 10, borderBottom: `1px solid ${LINE}`, alignItems: "center" }}>
+                      <input
+                        autoFocus
+                        value={tplSearch}
+                        onChange={(e) => setTplSearch(e.target.value)}
+                        placeholder="Cari template…"
+                        aria-label="Cari template"
+                        style={{ flex: 1, border: `1px solid ${LINE}`, borderRadius: 10, padding: "7px 12px", fontSize: 13, outline: "none", background: SOFT }}
+                      />
+                      {tplCanManage ? (
+                        <button type="button" onClick={() => setTplManage(true)} style={{ border: `1px solid ${LINE}`, background: "#fff", color: INK, borderRadius: 999, padding: "6px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+                          Kelola
+                        </button>
+                      ) : null}
+                      <button type="button" onClick={() => setTplOpen(false)} aria-label="Tutup daftar template" style={{ border: 0, background: "transparent", color: SUB, fontSize: 18, cursor: "pointer" }}>
+                        ×
+                      </button>
+                    </div>
+                    <div style={{ overflowY: "auto", padding: 6 }}>
+                      {tplError ? <p style={{ margin: 8, color: "#991b1b", fontSize: 13 }}>{tplError}</p> : null}
+                      {tplItems === null && !tplError ? <p style={{ margin: 8, color: SUB, fontSize: 13 }}>Memuat…</p> : null}
+                      {tplItems !== null && tplGroups.length === 0 ? (
+                        <p style={{ margin: 8, color: SUB, fontSize: 13 }}>{tplItems.length === 0 ? "Belum ada template." : "Tidak ada template yang cocok."}</p>
+                      ) : null}
+                      {tplGroups.map(([category, list]) => (
+                        <div key={category} style={{ marginBottom: 4 }}>
+                          <div style={{ padding: "6px 8px", fontSize: 11.5, fontWeight: 800, color: SUB, textTransform: "uppercase", letterSpacing: 0.3 }}>{category}</div>
+                          {list.map((t) => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => insertTemplate(t)}
+                              style={{ display: "grid", gap: 2, width: "100%", textAlign: "left", border: 0, background: "transparent", borderRadius: 10, padding: "8px 10px", cursor: "pointer" }}
+                            >
+                              <b style={{ fontSize: 13.5, color: INK }}>{t.title}</b>
+                              <span style={{ fontSize: 12, color: SUB, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.content.replace(/\s+/g, " ")}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 {actionError ? (
                   <div style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, fontWeight: 600 }}>
                     {actionError}
@@ -758,7 +856,19 @@ export default function WaInboxPanelView() {
                   >
                     📎
                   </button>
+                  <button
+                    type="button"
+                    onClick={toggleTemplates}
+                    disabled={sending}
+                    title="Pilih template balasan"
+                    aria-label="Pilih template balasan"
+                    aria-expanded={tplOpen}
+                    style={{ border: `1px solid ${tplOpen ? INK : LINE}`, background: tplOpen ? INK : "#fff", color: tplOpen ? "#fff" : INK, borderRadius: 10, height: 40, padding: "0 12px", fontSize: 13, fontWeight: 800, cursor: "pointer" }}
+                  >
+                    Template
+                  </button>
                   <textarea
+                    ref={draftRef}
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => {
