@@ -491,6 +491,8 @@ const ROW_H = 17.5;
 const HEAD_H = 15;
 const TOTAL_H = 19;
 const INSIGHT_H = 18;
+/** Jumlah baris minimal yang ikut ke halaman lanjutan saat satu series terpotong. */
+const MIN_TAIL = 3;
 
 /** Header ukuran kecil, dipakai di SETIAP series (dan diulang di halaman lanjutan) supaya kolom selalu terbaca. */
 function drawSizeHeader(ctx: Ctx, s: TransaksiSummary, color: string, label = "Produk") {
@@ -541,7 +543,9 @@ function drawProductTable(ctx: Ctx, s: TransaksiSummary) {
     const accent = color === MUTED_GROUP ? INK : color;
 
     current = null;
-    ensure(GROUP_H + HEAD_H + ROW_H * 2 + 8);
+    // Series kecil (≤ MIN_TAIL baris) pindah utuh ke halaman berikutnya, tidak dipotong.
+    const small = isSeries && g.rows.length <= MIN_TAIL;
+    ensure(GROUP_H + HEAD_H + ROW_H * (small ? g.rows.length : 2) + (small ? TOTAL_H + INSIGHT_H : 0) + 8);
 
     // pita kelompok
     const gy = ctx.y - GROUP_H;
@@ -557,8 +561,11 @@ function drawProductTable(ctx: Ctx, s: TransaksiSummary) {
     drawSizeHeader(ctx, s, color);
 
     g.rows.forEach((r, ri) => {
-      // Baris terakhir series dibawa bersama total + insight-nya, supaya keduanya tidak terpisah halaman.
-      ensure(ROW_H + 4 + (isSeries && ri === g.rows.length - 1 ? TOTAL_H + INSIGHT_H + 8 : 0));
+      // Kalau series terpotong di pergantian halaman, halaman lanjutan membawa minimal MIN_TAIL baris terakhir
+      // bersama total + insight-nya (tidak ada baris yatim sendirian, tidak ada total terpisah dari barisnya).
+      const tailStart = Math.max(1, g.rows.length - MIN_TAIL);
+      const tailNeed = isSeries && ri === tailStart ? (g.rows.length - tailStart) * ROW_H + TOTAL_H + INSIGHT_H + 8 : 0;
+      ensure(ROW_H + 4 + Math.max(0, tailNeed - ROW_H));
       const y = ctx.y - ROW_H;
       if (ri % 2 === 1) rrect(ctx.page, { x: MARGIN + 4, y, w: CW - 8, h: ROW_H, fill: "#fafbfc" });
       const base = y + (ROW_H - 8) / 2 + 0.5;
