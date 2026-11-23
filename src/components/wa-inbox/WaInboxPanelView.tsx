@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { picLabel } from "@/lib/pic-label";
 import ConfirmDialog from "@/components/ops/ConfirmDialog";
 import WaTemplatesManager from "./WaTemplatesManager";
 import { customerNameFor, fillTemplate, type WaTemplate } from "@/lib/wa-template";
@@ -651,11 +652,12 @@ export default function WaInboxPanelView() {
                         {c.lastFrom === "kita" ? <Ticks read={false} /> : null}
                         {c.lastMessage || "—"}
                       </span>
-                      {c.owner || c.pending > 0 ? (
-                        <span style={{ display: "block", marginTop: 2, fontSize: 11, fontWeight: 700, color: c.owner ? "#4338ca" : "#b45309" }}>
-                          {c.owner ? `PIC: ${c.owner.name}` : "Antrean (menunggu admin)"}
-                        </span>
-                      ) : null}
+                      {(() => {
+                        const pic = picLabel(c);
+                        return pic ? (
+                          <span style={{ display: "block", marginTop: 2, fontSize: 11, fontWeight: 700, color: pic.color }}>{pic.text}</span>
+                        ) : null;
+                      })()}
                     </span>
                     <span style={{ display: "grid", justifyItems: "end", gap: 4 }}>
                       <span style={{ fontSize: 11, color: SUB }}>{timeLabel(c.lastAt)}</span>
@@ -694,12 +696,15 @@ export default function WaInboxPanelView() {
                   <b style={{ display: "block", fontSize: 14, color: INK }}>{current.name || `+${current.sender}`}</b>
                   <span style={{ fontSize: 12, color: SUB }}>
                     +{current.sender} · {current.handover ? "ditangani admin" : "ditangani bot"}
-                    {current.owner || current.pending > 0 ? (
-                      <>
-                        {" "}
-                        · <b style={{ color: current.owner ? "#4338ca" : "#b45309" }}>{current.owner ? `PIC: ${current.owner.name}` : "Antrean (menunggu admin)"}</b>
-                      </>
-                    ) : null}
+                    {(() => {
+                      const pic = picLabel(current);
+                      return pic ? (
+                        <>
+                          {" "}
+                          · <b style={{ color: pic.color }}>{pic.text}</b>
+                        </>
+                      ) : null;
+                    })()}
                   </span>
                 </div>
                 {currentLocked ? (

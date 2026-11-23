@@ -57,10 +57,12 @@ export async function GET(req: NextRequest) {
   const { data: seenData, error: seenError } = await seenQuery;
   if (seenError) return NextResponse.json({ error: seenError.message }, { status: 500, headers: noStore });
 
-  const { data: admins } = await db.from("admins").select("user_id, display_name, title, email, active, status, status_at");
+  const { data: admins } = await db.from("admins").select("user_id, display_name, title, email, active, status, status_at, is_bot");
 
   // Akun yang sudah dihapus dari tabel admins tidak ditampilkan (catatannya tetap tersimpan, hanya tidak dikirim).
+  // Akun bot (is_bot) tidak punya absensi: dikecualikan.
   const users = (admins || [])
+    .filter((a) => a.is_bot !== true)
     .map((a) => ({
       userId: String(a.user_id),
       name: String(a.display_name || "").trim() || String(a.email || "").split("@")[0],

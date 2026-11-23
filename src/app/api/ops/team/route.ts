@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("admins")
-    .select("id, user_id, email, role, display_name, title, active, status, status_at, last_seen_at, created_at")
+    .select("id, user_id, email, role, display_name, title, active, status, status_at, last_seen_at, created_at, is_bot")
     .order("created_at", { ascending: true });
   if (error) return fail(error.message, 500);
 
@@ -75,7 +75,9 @@ export async function GET(req: NextRequest) {
         invited: !confirmed,
         lastSignIn,
         isMe: row.user_id === me.userId,
-        canManage: manageable(me.role, role) && row.user_id !== me.userId,
+        /** Akun bot (wa-agent): hanya tampil, tidak bisa dikelola dari sini. */
+        isBot: row.is_bot === true,
+        canManage: row.is_bot !== true && manageable(me.role, role) && row.user_id !== me.userId,
       };
     }),
   );
@@ -101,8 +103,9 @@ export async function POST(req: NextRequest) {
   // — tautan atur-password baru —
   if (String(body?.action ?? "") === "link") {
     const id = String(body?.id ?? "");
-    const { data: row } = await admin.from("admins").select("email, role").eq("id", id).maybeSingle();
+    const { data: row } = await admin.from("admins").select("email, role, is_bot").eq("id", id).maybeSingle();
     if (!row) return fail("Admin tidak ditemukan.", 404);
+    if (row.is_bot === true) return forbidden("Akun bot tidak bisa dikelola dari sini");
     if (!manageable(me.role, normalizeOpsRole(row.role))) return forbidden("Tidak boleh mengelola akun ini");
     const { data, error } = await admin.auth.admin.generateLink({
       type: "recovery",
@@ -162,8 +165,9 @@ export async function PATCH(req: NextRequest) {
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   const id = String(body?.id ?? "");
   const admin = getSupabaseAdmin();
-  const { data: row } = await admin.from("admins").select("id, user_id, role").eq("id", id).maybeSingle();
+  const { data: row } = await admin.from("admins").select("id, user_id, role, is_bot").eq("id", id).maybeSingle();
   if (!row) return fail("Admin tidak ditemukan.", 404);
+  if (row.is_bot === true) return forbidden("Akun bot tidak bisa dikelola dari sini");
   if (!manageable(me.role, normalizeOpsRole(row.role))) return forbidden("Tidak boleh mengelola akun ini");
 
   const patch: Record<string, unknown> = {};

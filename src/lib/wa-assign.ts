@@ -25,10 +25,12 @@ const CANDIDATE_WINDOW_MS = 24 * 3600_000;
  * Berapa lama pesan harus menunggu sebelum chatnya diberi PIC.
  *  - Pesan yang masuk di jam kerja admin (Senin-Sabtu 07.30-16.40 WIB): LANGSUNG (0). Bot tidak membalas di jam itu
  *    (dan pengaman wa-agent melewati pesannya), jadi tidak ada risiko memberi PIC ke chat yang sebentar lagi dibalas bot.
- *  - Di luar jam admin: 2 menit, supaya chat yang dijawab bot dalam hitungan detik tidak ikut diberi PIC.
+ *  - Di luar jam admin: 10 menit, supaya chat yang dijawab bot tidak ikut diberi PIC. (Dulu 2 menit; ternyata bot kadang
+ *    butuh lebih lama, 9 dari 10 pesan dibalas dalam ±5,5 menit, jadi chat yang dijawab bot sempat keburu diberi PIC.)
+ *    Yang tetap lolos dan sudah dijawab bot dilepas otomatis oleh `releaseBotAnsweredOwners`.
  * Jam admin SAMA dengan `isAdminHoursMessage` di repo Academy (`_shared/wa/schedule.mjs`); ubah keduanya bersama.
  */
-export const OUTSIDE_HOURS_WAIT_MS = 2 * 60_000;
+export const OUTSIDE_HOURS_WAIT_MS = 10 * 60_000;
 export const ADMIN_START_MIN = 7 * 60 + 30;
 export const ADMIN_HANDOFF_MIN = 16 * 60 + 40;
 const WIB_MS = 7 * 3600_000;
@@ -60,10 +62,13 @@ export interface AdminRow {
   active?: boolean | null;
   status?: string | null;
   last_seen_at?: string | null;
+  /** Akun bot: tidak pernah menerima PIC chat. */
+  is_bot?: boolean | null;
 }
 
-/** Admin boleh menerima chat baru: akun aktif, status Aktif, dan panel terbuka (sinyal < 5 menit). */
+/** Admin boleh menerima chat baru: bukan akun bot, akun aktif, status Aktif, dan panel terbuka (sinyal < 5 menit). */
 export function isEligible(admin: AdminRow, nowMs: number): boolean {
+  if (admin.is_bot === true) return false;
   if (admin.active === false) return false;
   if (admin.status !== "aktif") return false;
   const seen = admin.last_seen_at ? Date.parse(admin.last_seen_at) : 0;
@@ -85,6 +90,29 @@ export function pickOwners(senders: string[], eligible: Eligible[]): Map<string,
 
 let lastRun = 0;
 let running = false;
+let lastRelease = 0;
+const RELEASE_GAP_MS = 60_000;
+
+/**
+ * Lepas PIC otomatis yang SALAH: chat diberi PIC lalu ternyata bot yang menjawab (tanpa balasan admin, tanpa penandaan
+ * "dibalas di HP", tanpa pesan menunggu atau gagal). Satu fungsi SQL atomik (`wa_release_bot_answered_owners`), dibatasi
+ * sekali per menit per instance. Gagal = dicatat saja, tidak pernah menghalangi pembagian.
+ */
+export async function releaseBotAnsweredOwners(db = getSupabaseAdmin(), nowMs = Date.now()): Promise<number> {
+  if (nowMs - lastRelease < RELEASE_GAP_MS) return 0;
+  lastRelease = nowMs;
+  try {
+    const { data, error } = await db.rpc("wa_release_bot_answered_owners");
+    if (error) {
+      console.error("[WA-ASSIGN] gagal melepas PIC yang dijawab bot:", error.message);
+      return 0;
+    }
+    return Number(data) || 0;
+  } catch (e) {
+    console.error("[WA-ASSIGN] gagal melepas PIC yang dijawab bot:", e);
+    return 0;
+  }
+}
 
 export interface AssignResult {
   assigned: number;
@@ -101,7 +129,10 @@ export async function assignUnownedChats(): Promise<AssignResult> {
   try {
     const db = getSupabaseAdmin();
 
-    const { data: admins, error: adminError } = await db.from("admins").select("user_id, active, status, last_seen_at");
+    // Dijalankan SEBELUM pengecekan admin online: PIC yang salah tetap harus dilepas walau tidak ada admin yang bisa menerima chat.
+    await releaseBotAnsweredOwners(db, nowMs);
+
+    const { data: admins, error: adminError } = await db.from("admins").select("user_id, active, status, last_seen_at, is_bot");
     if (adminError) return { assigned: 0, reason: adminError.message };
     const eligibleAdmins = (admins || []).filter((a) => isEligible(a as AdminRow, nowMs));
     if (eligibleAdmins.length === 0) return { assigned: 0, reason: "tidak ada admin Aktif dan online" };
