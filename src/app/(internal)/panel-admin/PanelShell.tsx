@@ -252,7 +252,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [authorized, setAuthorized] = useState(false);
   /** Nama + label jabatan akun yang login (header kanan atas). Sebelum terbaca / kalau gagal, tampilan lama ("Lea") dipakai. */
-  const [me, setMe] = useState<{ name: string; title: string; userId: string; status: WorkStatus | null; statusAt: string | null } | null>(null);
+  const [me, setMe] = useState<{ name: string; title: string; userId: string; status: WorkStatus | null; statusAt: string | null; isBot?: boolean } | null>(null);
   const [statusOpen, setStatusOpen] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const [pulangAsk, setPulangAsk] = useState(false);
@@ -413,8 +413,10 @@ export default function PanelShell({ children }: { children: ReactNode }) {
             title: String(json.title || ""),
             userId: String(json.userId || ""),
             // null = kolom status belum ada di database (migrasi belum dijalankan): pemilih disembunyikan.
-            status: json.status == null ? null : asWorkStatus(json.status),
+            // Akun bot (is_bot) tidak punya status kerja/absensi: pemilih dan tombol Absen Masuk disembunyikan.
+            status: json.isBot === true || json.status == null ? null : asWorkStatus(json.status),
             statusAt: json.statusAt ? String(json.statusAt) : null,
+            isBot: json.isBot === true,
           });
         }
       } catch {
@@ -839,11 +841,39 @@ export default function PanelShell({ children }: { children: ReactNode }) {
             </svg>
           </div>
           <div className={styles.user}>
-            <img className={styles.av} src={AVATAR} alt={me?.name || "Lea"} width={40} height={40} />
+            {me?.isBot ? (
+              <span
+                className={styles.av}
+                role="img"
+                aria-label={me.name}
+                style={{ width: 40, height: 40, borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--pink-bg)", color: "var(--pink-d)", flex: "0 0 auto" }}
+              >
+                <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 3.6V6" />
+                  <circle cx="12" cy="2.9" r="0.9" fill="currentColor" stroke="none" />
+                  <rect x="4" y="6" width="16" height="12.5" rx="4.2" />
+                  <circle cx="9" cy="11.6" r="1.25" fill="currentColor" stroke="none" />
+                  <circle cx="15" cy="11.6" r="1.25" fill="currentColor" stroke="none" />
+                  <path d="M9.4 15.1c1.4 1 3.8 1 5.2 0" />
+                  <path d="M2 10.8v3.2M22 10.8v3.2" />
+                </svg>
+              </span>
+            ) : (
+              <img className={styles.av} src={AVATAR} alt={me?.name || "Lea"} width={40} height={40} />
+            )}
             <div>
               <b>{me?.name || "Lea"}</b>
               <small>{me?.title || "SAMAQU"}</small>
             </div>
+            {me?.isBot ? (
+              <span
+                title="Akun asisten: bekerja otomatis, tidak perlu absen"
+                style={{ marginLeft: 8, background: "#dcfce7", color: "#166534", borderRadius: 999, padding: "5px 11px", fontSize: 12, fontWeight: 800, display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <i style={{ width: 8, height: 8, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
+                Otomatis
+              </span>
+            ) : null}
             {me?.status && checkInNeeded ? (
               <button
                 type="button"
