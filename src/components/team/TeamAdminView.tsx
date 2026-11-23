@@ -213,7 +213,7 @@ export default function TeamAdminView() {
                   {m.title || ROLE_LABEL[m.role] || "Admin"}
                 </span>
                 <span style={{ background: "#f1f5f9", color: SUB, borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 600 }}>Akses: {ROLE_LABEL[m.role] || "Admin"}</span>
-                {m.isBot ? <span style={{ background: "#ccfbf1", color: "#0f766e", borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 700 }}>Akun bot</span> : null}
+                {m.isBot ? <span style={{ background: "#ccfbf1", color: "#0f766e", borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 700 }}>Akun asisten</span> : null}
                 {m.invited ? <span style={{ background: "#e0f2fe", color: "#075985", borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 700 }}>Menunggu undangan</span> : null}
                 {!m.invited && m.active && !m.isBot
                   ? (() => {
