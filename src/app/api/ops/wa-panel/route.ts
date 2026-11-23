@@ -57,12 +57,60 @@ async function markRepliedOnPhone(sender: string, adminName: string) {
   return NextResponse.json({ ok: true, closed: data?.length ?? 0 }, { headers: { "Cache-Control": "no-store, private" } });
 }
 
+const MAX_BULK_SENDERS = 500;
+const BULK_CHUNK = 100;
+
+/**
+ * "Tandai semua dibalas": versi massal dari markRepliedOnPhone. Pengaman:
+ *  - hanya nomor yang DIKIRIM pemanggil (yang tampil di layarnya), bukan "semua pesan pending";
+ *  - hanya pesan yang masuk SEBELUM `before` (saat daftar dimuat), jadi pelanggan yang menulis sesudahnya tidak ikut tertutup;
+ *  - batas 500 nomor per permintaan; tiap nomor divalidasi.
+ */
+async function markAllRepliedOnPhone(senders: string[], before: string, adminName: string) {
+  const now = new Date().toISOString();
+  const db = getSupabaseAdmin();
+  let closed = 0;
+  const touched = new Set<string>();
+  for (let i = 0; i < senders.length; i += BULK_CHUNK) {
+    const { data, error } = await db
+      .from("wa_inbox")
+      .update({ status: "skipped", error: `dibalas di HP (${adminName})`, claimed_at: null, updated_at: now })
+      .in("sender", senders.slice(i, i + BULK_CHUNK))
+      .in("status", ["pending", "processing"])
+      .lte("created_at", before)
+      .select("id, sender");
+    if (error) {
+      console.error("[WA-PANEL] gagal menandai massal dibalas di HP:", error.message);
+      return NextResponse.json({ ok: false, error: "Gagal menutup sebagian pesan. Muat ulang lalu coba lagi.", closed }, { status: 500 });
+    }
+    closed += data?.length ?? 0;
+    for (const row of data || []) touched.add(String(row.sender));
+  }
+  return NextResponse.json({ ok: true, closed, chats: touched.size }, { headers: { "Cache-Control": "no-store, private" } });
+}
+
 export async function POST(req: NextRequest) {
   const identity = await opsIdentity(req);
   if (!identity) return unauthorized();
 
   // Aksi lokal (database Samaqu), tidak lewat penerus ke Academy, jadi tidak butuh WA_ADMIN_PROXY_SECRET.
-  const rawBody = (await req.clone().json().catch(() => null)) as { action?: unknown; sender?: unknown } | null;
+  const rawBody = (await req.clone().json().catch(() => null)) as { action?: unknown; sender?: unknown; senders?: unknown; before?: unknown } | null;
+  if (String(rawBody?.action ?? "") === "mark-replied-all") {
+    const list = Array.isArray(rawBody?.senders) ? (rawBody?.senders as unknown[]).map((s) => String(s)) : [];
+    const senders = [...new Set(list)];
+    if (senders.length === 0) return NextResponse.json({ ok: false, error: "Tidak ada chat yang dipilih." }, { status: 400 });
+    if (senders.length > MAX_BULK_SENDERS) {
+      return NextResponse.json({ ok: false, error: `Terlalu banyak chat sekaligus (maks ${MAX_BULK_SENDERS}).` }, { status: 400 });
+    }
+    if (!senders.every((s) => /^\d{6,20}$/.test(s))) {
+      return NextResponse.json({ ok: false, error: "Ada nomor pengirim yang tidak valid." }, { status: 400 });
+    }
+    const beforeMs = Date.parse(String(rawBody?.before ?? ""));
+    if (!Number.isFinite(beforeMs)) return NextResponse.json({ ok: false, error: "Waktu batas tidak valid." }, { status: 400 });
+    // Batas tidak boleh di masa depan: pesan yang belum masuk tidak mungkin sudah dibalas.
+    const before = new Date(Math.min(beforeMs, Date.now())).toISOString();
+    return markAllRepliedOnPhone(senders, before, identity.name || identity.email);
+  }
   if (String(rawBody?.action ?? "") === "mark-replied") {
     const sender = String(rawBody?.sender ?? "");
     if (!/^\d{6,20}$/.test(sender)) {

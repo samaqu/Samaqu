@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import ConfirmDialog from "@/components/ops/ConfirmDialog";
 
 interface Conversation {
   sender: string;
@@ -166,10 +167,16 @@ export default function WaInboxPanelView() {
   const [handoverBusy, setHandoverBusy] = useState(false);
   const [repliedBusy, setRepliedBusy] = useState(false);
   const [actionError, setActionError] = useState("");
+  /** Saat permintaan daftar terakhir DIMULAI: batas aman untuk "tandai semua" (pesan sesudahnya tidak ikut tertutup). */
+  const [loadedAt, setLoadedAt] = useState(0);
+  const [bulkTarget, setBulkTarget] = useState<{ senders: string[]; chats: number; messages: number; before: string } | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const loadList = useCallback(async () => {
     try {
+      const startedAt = Date.now();
       const res = await call<{ items: Conversation[]; stats: Stats }>({ action: "conversations" });
+      setLoadedAt(startedAt);
       setItems(res.items || []);
       setStats(res.stats || null);
       setError("");
@@ -305,6 +312,35 @@ export default function WaInboxPanelView() {
     }
   }
 
+  // "Tandai semua dibalas": hanya chat yang TAMPIL di layar (mengikuti filter/pencarian) dan berstatus Belum dibalas.
+  const waitingVisible = visible.filter((c) => c.pending > 0);
+
+  function openBulk() {
+    if (waitingVisible.length === 0 || !loadedAt) return;
+    setBulkTarget({
+      senders: waitingVisible.map((c) => c.sender),
+      chats: waitingVisible.length,
+      messages: waitingVisible.reduce((sum, c) => sum + c.pending, 0),
+      before: new Date(loadedAt).toISOString(),
+    });
+  }
+
+  async function onConfirmBulk() {
+    const target = bulkTarget;
+    if (!target || bulkBusy) return;
+    setBulkBusy(true);
+    try {
+      await call({ action: "mark-replied-all", senders: target.senders, before: target.before });
+      setBulkTarget(null);
+      await loadList();
+    } catch (e) {
+      setBulkTarget(null);
+      setError(e instanceof Error ? e.message : "Gagal menandai chat.");
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   const chip = (key: typeof filter, label: string, count?: number) => (
     <button
       key={key}
@@ -353,6 +389,16 @@ export default function WaInboxPanelView() {
         </div>
       ) : null}
 
+      <ConfirmDialog
+        open={bulkTarget !== null}
+        title={`Tandai ${bulkTarget?.chats ?? 0} chat sudah dibalas?`}
+        message={`${bulkTarget?.messages ?? 0} pesan di chat yang sedang tampil akan ditandai sudah dibalas lewat HP. Tidak ada pesan yang dikirim ke pelanggan dan bot tidak diubah. Hanya pesan yang masuk sebelum daftar ini dimuat yang ditutup; pesan baru tetap menunggu.`}
+        confirmLabel="Ya, tandai semua"
+        busy={bulkBusy}
+        onCancel={() => setBulkTarget(null)}
+        onConfirm={() => void onConfirmBulk()}
+      />
+
       <div
         style={{
           display: "grid",
@@ -380,6 +426,16 @@ export default function WaInboxPanelView() {
               {chip("belum", "Belum dibalas", items.filter((c) => c.pending > 0).length)}
               {chip("admin", "Diambil alih", items.filter((c) => c.handover).length)}
             </div>
+            {waitingVisible.length > 0 ? (
+              <button
+                type="button"
+                onClick={openBulk}
+                title="Tutup status Belum dibalas untuk semua chat yang tampil di daftar ini (tidak mengirim apa pun ke pelanggan)"
+                style={{ border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#166534", borderRadius: 10, padding: "7px 12px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", textAlign: "left" }}
+              >
+                Tandai semua dibalas ({waitingVisible.length} chat)
+              </button>
+            ) : null}
           </div>
           <div style={{ overflowY: "auto", flex: 1 }}>
             {loading ? (
