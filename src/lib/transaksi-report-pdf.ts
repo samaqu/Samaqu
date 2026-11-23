@@ -491,8 +491,10 @@ const ROW_H = 17.5;
 const HEAD_H = 15;
 const TOTAL_H = 19;
 const INSIGHT_H = 18;
-/** Jumlah baris minimal yang ikut ke halaman lanjutan saat satu series terpotong. */
+/** Jumlah baris minimal yang ikut ke halaman lanjutan saat satu series terpotong (hanya bila lebih tinggi dari 1 halaman). */
 const MIN_TAIL = 3;
+/** Tinggi area isi satu halaman lanjutan (dari bawah band judul sampai batas footer). */
+const PAGE_BODY_H = PAGE_H - 56 - 18 - FOOTER_TOP;
 
 /** Header ukuran kecil, dipakai di SETIAP series (dan diulang di halaman lanjutan) supaya kolom selalu terbaca. */
 function drawSizeHeader(ctx: Ctx, s: TransaksiSummary, color: string, label = "Produk") {
@@ -543,9 +545,12 @@ function drawProductTable(ctx: Ctx, s: TransaksiSummary) {
     const accent = color === MUTED_GROUP ? INK : color;
 
     current = null;
-    // Series kecil (≤ MIN_TAIL baris) pindah utuh ke halaman berikutnya, tidak dipotong.
-    const small = isSeries && g.rows.length <= MIN_TAIL;
-    ensure(GROUP_H + HEAD_H + ROW_H * (small ? g.rows.length : 2) + (small ? TOTAL_H + INSIGHT_H : 0) + 8);
+    // ATURAN UTAMA: satu series/kelompok TIDAK dipisah antar halaman. Bila sisa halaman tidak cukup tapi
+    // kelompok itu muat di satu halaman penuh, seluruhnya pindah ke halaman berikutnya (tanpa band "lanjutan").
+    // Hanya kelompok yang lebih tinggi dari satu halaman yang terpaksa dipotong (aturan MIN_TAIL di bawah).
+    const fullNeed = GROUP_H + 2 + HEAD_H + g.rows.length * ROW_H + (isSeries ? 2 + TOTAL_H + INSIGHT_H : 0) + 10;
+    if (fullNeed <= PAGE_BODY_H) ensure(fullNeed);
+    else ensure(GROUP_H + HEAD_H + ROW_H * 2 + 8);
 
     // pita kelompok
     const gy = ctx.y - GROUP_H;
@@ -631,17 +636,28 @@ function drawProductTable(ctx: Ctx, s: TransaksiSummary) {
 
   // Total seluruh produk, dengan header ukuran sendiri.
   current = null;
-  ensure(HEAD_H + 26);
-  drawSizeHeader(ctx, s, SKY, "Total");
-  const th = 22;
-  rrect(ctx.page, { x: MARGIN, y: ctx.y - th - 1, w: CW, h: th, r: 8, fill: SKY_SOFT });
-  text(ctx.page, ctx.bold, "Total terjual", { x: MARGIN + 12, y: ctx.y - th + 6, size: 9.5, color: INK });
+  // Rekap seluruh produk: SATU kartu (judul ukuran di atas, angka total di bawahnya), tidak pernah terpisah dari
+  // catatan kaki di bawahnya. Ruang catatan (±30) ikut dihitung supaya semuanya pindah halaman bersama-sama.
+  const recapRow = 24;
+  const recapH = HEAD_H + recapRow + 4;
+  ensure(recapH + 34);
+  const top = ctx.y - 4;
+  rrect(ctx.page, { x: MARGIN, y: top - recapH, w: CW, h: recapH, r: 10, fill: SKY_SOFT });
+  const hb = top - HEAD_H + 3.6;
+  const ho = { size: 7.2, color: SUB };
+  text(ctx.page, ctx.bold, "REKAP SEMUA PRODUK PER UKURAN", { x: MARGIN + 12, y: hb, ...ho });
+  s.sizeColumns.forEach((z, i) => {
+    textCenter(ctx.page, ctx.bold, z === ALL_SIZE ? "ALL" : z, { center: sizeX(i) + sizeW / 2, y: hb, ...ho });
+  });
+  textRight(ctx.page, ctx.bold, "Qty", { right: qtyRight, y: hb, ...ho });
+  const rb = top - HEAD_H - recapRow + 8;
+  text(ctx.page, ctx.bold, "Total terjual", { x: MARGIN + 12, y: rb, size: 10, color: INK });
   s.sizeColumns.forEach((z, i) => {
     const v = s.groups.reduce((t, g) => t + g.rows.reduce((tt, r) => tt + (r.sizes[z] || 0), 0), 0);
-    textCenter(ctx.page, ctx.bold, nfmt(v), { center: sizeX(i) + sizeW / 2, y: ctx.y - th + 6, size: 9, color: INK });
+    textCenter(ctx.page, ctx.bold, nfmt(v), { center: sizeX(i) + sizeW / 2, y: rb, size: 9.5, color: INK });
   });
-  textRight(ctx.page, ctx.bold, nfmt(s.pcs), { right: qtyRight, y: ctx.y - th + 6, size: 10, color: INK });
-  ctx.y -= th + 1;
+  textRight(ctx.page, ctx.bold, nfmt(s.pcs), { right: qtyRight, y: rb, size: 11, color: INK });
+  ctx.y = top - recapH;
 }
 
 /* ── daftar transaksi ── */
