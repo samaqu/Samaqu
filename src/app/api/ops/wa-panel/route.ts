@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { assignUnownedChats, ownersFor } from "@/lib/wa-assign";
 
 /**
  * Penerus (proxy) Inbox WhatsApp untuk panel admin → fungsi `wa-admin` di Academy.
@@ -146,6 +147,18 @@ export async function POST(req: NextRequest) {
         { ok: false, error: data?.error || `Inbox tidak merespons (HTTP ${res.status})` },
         { status: res.status >= 400 && res.status < 600 ? res.status : 502, headers: { "Cache-Control": "no-store" } },
       );
+    }
+
+    // Tahap 5a: sisipkan pemilik chat (nama admin penanggung jawab) ke tiap percakapan. Kegagalan di sini tidak boleh
+    // merusak Inbox: tanpa info pemilik, daftar tetap tampil seperti biasa.
+    if (action === "conversations" && Array.isArray(data.items)) {
+      try {
+        await assignUnownedChats();
+        const owners = await ownersFor(data.items.map((c: { sender?: unknown }) => String(c.sender ?? "")));
+        data.items = data.items.map((c: { sender?: unknown }) => ({ ...c, owner: owners.get(String(c.sender ?? "")) ?? null }));
+      } catch (ownerError) {
+        console.error("[WA-PANEL] gagal menambahkan pemilik chat:", ownerError);
+      }
     }
     return NextResponse.json(data, { headers: { "Cache-Control": "no-store, private" } });
   } catch (error) {

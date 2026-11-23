@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { wibDay, wibDayStart } from "@/lib/absensi";
+import { assignUnownedChats } from "@/lib/wa-assign";
 
 /**
  * POST /api/ops/heartbeat → catat "terakhir terlihat" AKUN SENDIRI.
@@ -75,6 +76,13 @@ export async function POST(req: NextRequest) {
     .from("admin_seen_daily")
     .upsert({ user_id: me.userId, day: today, last_seen: nowIso }, { onConflict: "user_id,day" });
   if (dailyError) console.error("[OPS-HEARTBEAT] gagal menulis admin_seen_daily:", dailyError.message);
+
+  // 3) Bagikan chat yang belum punya pemilik ke admin Aktif dan online (tahap 5a). Tidak boleh mengganggu sinyal.
+  try {
+    await assignUnownedChats();
+  } catch (assignError) {
+    console.error("[OPS-HEARTBEAT] pembagian chat gagal:", assignError);
+  }
 
   // `closedPrevious` memberi tahu panel bahwa status kemarin baru saja ditutup, supaya banner "belum absen masuk" langsung tampil.
   return NextResponse.json({ ok: !error, ...(closedPrevious ? { closedPrevious } : {}) }, { headers: noStore });

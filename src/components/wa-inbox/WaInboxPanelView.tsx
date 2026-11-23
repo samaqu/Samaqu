@@ -21,6 +21,8 @@ interface Conversation {
   oldestPendingAt?: string | null;
   total: number;
   handover: boolean;
+  /** Admin penanggung jawab chat (tahap 5a); null = belum ada pemilik (Antrean). */
+  owner?: { userId: string; name: string } | null;
 }
 
 interface Message {
@@ -429,6 +431,9 @@ export default function WaInboxPanelView() {
                         {c.lastFrom === "kita" ? <Ticks read={false} /> : null}
                         {c.lastMessage || "—"}
                       </span>
+                      <span style={{ display: "block", marginTop: 2, fontSize: 11, fontWeight: 700, color: c.owner ? "#4338ca" : "#b45309" }}>
+                        {c.owner ? `Pemilik: ${c.owner.name}` : "Antrean (belum ada pemilik)"}
+                      </span>
                     </span>
                     <span style={{ display: "grid", justifyItems: "end", gap: 4 }}>
                       <span style={{ fontSize: 11, color: SUB }}>{timeLabel(c.lastAt)}</span>
@@ -466,7 +471,8 @@ export default function WaInboxPanelView() {
                 <div style={{ minWidth: 0 }}>
                   <b style={{ display: "block", fontSize: 14, color: INK }}>{current.name || `+${current.sender}`}</b>
                   <span style={{ fontSize: 12, color: SUB }}>
-                    +{current.sender} · {current.handover ? "ditangani admin" : "ditangani bot"}
+                    +{current.sender} · {current.handover ? "ditangani admin" : "ditangani bot"} ·{" "}
+                    <b style={{ color: current.owner ? "#4338ca" : "#b45309" }}>{current.owner ? `Pemilik: ${current.owner.name}` : "Antrean (belum ada pemilik)"}</b>
                   </span>
                 </div>
                 {current.pending > 0 ? (
