@@ -177,7 +177,7 @@ export default function TeamAdminView() {
       ) : (
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
           {members.map((m, i) => (
-            <div key={m.id} style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: "#fff", padding: 16, display: "grid", gap: 10, opacity: m.active ? 1 : 0.6 }}>
+            <div key={m.id} style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: "#fff", padding: 16, display: "grid", gap: 10, alignContent: "start", opacity: m.active ? 1 : 0.6 }}>
               <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                 <span style={{ width: 46, height: 46, borderRadius: "50%", background: AVATAR_COLORS[i % AVATAR_COLORS.length], display: "grid", placeItems: "center", fontWeight: 800, fontSize: 18, color: INK }}>
                   {m.name.charAt(0).toUpperCase()}
