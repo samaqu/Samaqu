@@ -231,7 +231,7 @@ export default function PerformaView() {
         </>
       ) : null}
 
-      {data && cfg && tab === "bot" && data.comparison ? <BotVsAdmin data={data} cfg={cfg} /> : null}
+      {data && cfg && tab === "bot" && data.comparison ? <BotVsAdmin data={data} cfg={cfg} from={from} to={to} /> : null}
       {data && cfg && tab === "sla" && canManage ? <SlaSettings cfg={cfg} onSaved={() => void load(from, to)} /> : null}
     </div>
   );
@@ -239,8 +239,39 @@ export default function PerformaView() {
 
 /* ───────────── Bot vs Admin (Owner/Leader) ───────────── */
 
-function BotVsAdmin({ data, cfg }: { data: Data; cfg: Config }) {
+function BotVsAdmin({ data, cfg, from, to }: { data: Data; cfg: Config; from: string; to: string }) {
   const c = data.comparison!;
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+
+  /** PDF untuk Ardo: dibuat server dari data yang sama dengan halaman ini, mengikuti rentang tanggal terpilih. */
+  async function exportPdf() {
+    setExporting(true);
+    setExportError("");
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const token = session.session?.access_token;
+      const res = await fetch(`/api/ops/performa/report?from=${from}&to=${to}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(payload?.error || `Gagal membuat PDF (${res.status})`);
+      }
+      const blob = await res.blob();
+      const match = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = match?.[1] || "Perbandingan-Respons-Bot-vs-Admin-SAMAQU.pdf";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "Export PDF gagal.");
+    } finally {
+      setExporting(false);
+    }
+  }
   const row = (k: string, v: string) => (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "9px 0", borderTop: "1px solid var(--card-line)", fontSize: 14 }}>
       <span style={{ color: "var(--mut)" }}>{k}</span>
@@ -249,6 +280,13 @@ function BotVsAdmin({ data, cfg }: { data: Data; cfg: Config }) {
   );
   return (
     <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13.5, color: "var(--mut)" }}>Ringkasan gabungan untuk dibawa ke Ardo. Mengikuti rentang tanggal di atas.</span>
+        <button type="button" onClick={() => void exportPdf()} disabled={exporting} style={{ ...btn, background: "var(--plum)", color: "#fff", borderColor: "var(--plum)", opacity: exporting ? 0.7 : 1 }}>
+          {exporting ? "Membuat PDF…" : "Export PDF"}
+        </button>
+      </div>
+      {exportError ? <div style={{ background: LATE.bg, color: LATE.fg, borderRadius: 12, padding: "9px 14px", fontSize: 13.5, fontWeight: 700 }}>{exportError}</div> : null}
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
         <div style={card}>
           <span style={label}>Bot WhatsApp</span>
