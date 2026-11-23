@@ -3,12 +3,12 @@
 /**
  * Tab Absensi (di halaman Tim Admin).
  *
- *  1. "Absensi Saya": jam besar, status, jam masuk/pulang, jadwal, tombol Absen Masuk / Istirahat / Absen Pulang,
- *     dan rekap bulan berjalan (hari hadir, jam kerja, terlambat, lupa pulang, kehadiran %).
- *  2. Tabel tim per hari (transparansi): masuk, istirahat, pulang semua admin.
+ *  1. "Absensi Saya": jam besar, status, jam masuk/pulang, jadwal, tombol Absen Masuk / Istirahat / Absen Pulang.
+ *  2. Rekap bulanan (hari hadir, jam kerja, terlambat, lupa absen pulang, kehadiran %), ditulis dengan kalimat jelas.
+ *  3. Riwayat per hari berbentuk kartu (tanpa singkatan, rapi juga di HP).
  *
- * Data dihitung server (/api/ops/absensi). Jam kerja admin LAIN hanya dikirim server ke Owner dan Leader;
- * jam kerja milik sendiri selalu terlihat di kartu pribadi.
+ * Admin biasa hanya menerima data dirinya sendiri; Owner dan Leader menerima semua admin dan bisa memilih
+ * siapa yang dilihat. Pembatasan ini dijaga di SERVER (/api/ops/absensi), bukan hanya di tampilan.
  * Tombol kartu tidak mengganti status sendiri: ia MEMINTA header (STATUS_REQUEST_EVENT) supaya satu jalur,
  * termasuk konfirmasi Absen Pulang.
  */
@@ -24,11 +24,11 @@ interface AbsensiDay {
   masuk: string | null;
   pulang: string | null;
   breakMs: number;
+  workMs: number;
+  overtimeMs: number;
   late: boolean;
   forgotPulang: boolean;
   ongoing: boolean;
-  workMs?: number;
-  overtimeMs?: number;
 }
 interface AbsensiUser {
   userId: string;
@@ -36,7 +36,7 @@ interface AbsensiUser {
   title: string;
   active: boolean;
 }
-interface MySummary {
+interface Summary {
   workdays: number;
   hadir: number;
   hadirWorkdays: number;
@@ -48,17 +48,16 @@ interface MySummary {
 }
 interface AbsensiResponse {
   month: string;
-  canSeeHours: boolean;
+  canSeeOthers: boolean;
   mine: {
     userId: string;
     status: WorkStatus;
     statusAt: string | null;
-    today: { masuk: string | null; pulang: string | null; breakMs: number; workMs: number; overtimeMs: number; late: boolean; forgotPulang: boolean; ongoing: boolean } | null;
-    summary: MySummary;
+    today: AbsensiDay | null;
   };
   users: AbsensiUser[];
+  summaries: Record<string, Summary>;
   days: AbsensiDay[];
-  totals?: { userId: string; workMs: number; days: number; forgot: number }[];
 }
 
 const INK = "#1f2937";
@@ -77,23 +76,37 @@ const monthLabel = (month: string) =>
   new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-01T00:00:00Z`));
 
 const dayLabel = (day: string) =>
-  new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "numeric", month: "short", timeZone: "Asia/Jakarta" }).format(new Date(`${day}T12:00:00+07:00`));
+  new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date(`${day}T12:00:00+07:00`));
 
-const clock = (iso: string | null) =>
-  iso ? new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Jakarta" }).format(new Date(iso)) : "–";
+/** "10.02 WIB" atau null bila belum ada. */
+const clockWib = (iso: string | null | undefined) =>
+  iso ? `${new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Jakarta" }).format(new Date(iso))} WIB` : null;
 
-const hm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+/** Menit sejak 00:00 → "08.00". */
+const hm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}.${String(min % 60).padStart(2, "0")}`;
 
-function duration(ms: number | undefined): string {
-  if (ms === undefined) return "";
+/** Durasi ditulis lengkap: "1 jam 22 menit", "3 menit", "2 jam". */
+function durationLong(ms: number): string {
   const min = Math.round(ms / 60000);
-  if (min <= 0) return "–";
+  if (min <= 0) return ms > 0 ? "Kurang dari 1 menit" : "0 menit";
   const h = Math.floor(min / 60);
   const m = min % 60;
-  return h ? `${h}j ${m}m` : `${m}m`;
+  if (h && m) return `${h} jam ${m} menit`;
+  if (h) return `${h} jam`;
+  return `${m} menit`;
 }
 
-const chip = (bg: string, fg: string): React.CSSProperties => ({ background: bg, color: fg, borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 700, display: "inline-block" });
+const chip = (bg: string, fg: string): React.CSSProperties => ({ background: bg, color: fg, borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 700, display: "inline-block", whiteSpace: "nowrap" });
+const card: React.CSSProperties = { border: `1px solid ${LINE}`, borderRadius: 18, background: "#fff" };
+
+function Field({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+  return (
+    <div style={{ display: "grid", gap: 2, alignContent: "start" }}>
+      <span style={{ fontSize: 11.5, fontWeight: 700, color: SUB, textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</span>
+      <b style={{ fontSize: 15, color: muted ? SUB : INK, fontWeight: muted ? 600 : 800 }}>{value}</b>
+    </div>
+  );
+}
 
 export default function AbsensiView() {
   const [month, setMonth] = useState(jakartaMonth());
@@ -102,6 +115,8 @@ export default function AbsensiView() {
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
+  /** "me" = diri sendiri, "all" = semua admin (Owner/Leader), selain itu = user id admin tertentu. */
+  const [viewing, setViewing] = useState<string>("me");
 
   const load = useCallback(async (target: string) => {
     setLoading(true);
@@ -126,7 +141,7 @@ export default function AbsensiView() {
 
   useEffect(() => {
     void load(month);
-    // Segarkan saat status diganti (header/kartu) dan tiap menit, supaya durasi "Berjalan" ikut bergerak.
+    // Segarkan saat status diganti (header/kartu) dan tiap menit, supaya durasi yang berjalan ikut bergerak.
     const refresh = () => void load(month);
     window.addEventListener(STATUS_CHANGED_EVENT, refresh);
     const id = setInterval(() => {
@@ -144,24 +159,22 @@ export default function AbsensiView() {
     return () => clearInterval(id);
   }, []);
 
+  const mine = data?.mine;
   const nameOf = useMemo(() => {
-    const map = new Map<string, AbsensiUser>();
-    for (const u of data?.users || []) map.set(u.userId, u);
+    const map = new Map<string, string>();
+    for (const u of data?.users || []) map.set(u.userId, u.name);
     return map;
   }, [data]);
 
-  const grouped = useMemo(() => {
-    const byDay = new Map<string, AbsensiDay[]>();
-    for (const d of data?.days || []) {
-      const list = byDay.get(d.day) || [];
-      list.push(d);
-      byDay.set(d.day, list);
-    }
-    return [...byDay.entries()];
-  }, [data]);
-
-  const canSeeHours = Boolean(data?.canSeeHours);
+  const canSeeOthers = Boolean(data?.canSeeOthers);
+  const selectedId = viewing === "all" ? null : viewing === "me" ? mine?.userId ?? null : viewing;
+  const isSelf = selectedId !== null && selectedId === mine?.userId;
   const isCurrent = month === jakartaMonth();
+
+  const shownDays = useMemo(() => {
+    const list = (data?.days || []).filter((d) => selectedId === null || d.userId === selectedId);
+    return list.sort((a, b) => (a.day === b.day ? 0 : a.day < b.day ? 1 : -1));
+  }, [data, selectedId]);
 
   function requestStatus(status: WorkStatus) {
     if (busy) return;
@@ -171,19 +184,7 @@ export default function AbsensiView() {
     setTimeout(() => setBusy(false), 4000);
   }
 
-  const navBtn: React.CSSProperties = {
-    border: `1px solid ${LINE}`,
-    background: "#fff",
-    color: INK,
-    borderRadius: 999,
-    width: 34,
-    height: 34,
-    fontSize: 16,
-    fontWeight: 800,
-    cursor: "pointer",
-  };
-  const th: React.CSSProperties = { textAlign: "left", fontSize: 11.5, color: SUB, fontWeight: 700, padding: "8px 10px", textTransform: "uppercase", letterSpacing: 0.3 };
-  const td: React.CSSProperties = { padding: "9px 10px", fontSize: 13.5, color: INK, borderTop: `1px solid ${LINE}` };
+  const navBtn: React.CSSProperties = { border: `1px solid ${LINE}`, background: "#fff", color: INK, borderRadius: 999, width: 34, height: 34, fontSize: 16, fontWeight: 800, cursor: "pointer" };
   const bigBtn = (primary: boolean): React.CSSProperties => ({
     border: primary ? 0 : `1px solid ${LINE}`,
     background: primary ? INK : "#fff",
@@ -195,9 +196,18 @@ export default function AbsensiView() {
     cursor: busy ? "wait" : "pointer",
     opacity: busy ? 0.7 : 1,
   });
+  const pickBtn = (active: boolean): React.CSSProperties => ({
+    border: `1px solid ${active ? INK : LINE}`,
+    background: active ? INK : "#fff",
+    color: active ? "#fff" : INK,
+    borderRadius: 999,
+    padding: "6px 14px",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+  });
 
   // — kartu Absensi Saya —
-  const mine = data?.mine;
   const today = wibDay(now);
   const workToday = isWorkday(today);
   const nowMin = wibMinutes(now);
@@ -207,19 +217,22 @@ export default function AbsensiView() {
     : mine.status === "aktif"
       ? { label: "Sedang Bekerja", bg: "#dcfce7", fg: "#166534" }
       : mine.status === "istirahat"
-        ? { label: "Istirahat", bg: "#fef3c7", fg: "#92400e" }
+        ? { label: "Sedang Istirahat", bg: "#fef3c7", fg: "#92400e" }
         : belumMasuk
           ? { label: "Belum Masuk", bg: "#f1f5f9", fg: "#475569" }
           : { label: "Sudah Pulang", bg: "#e0e7ff", fg: "#3730a3" };
   const lateNow = Boolean(mine?.today?.late) || (belumMasuk && workToday && nowMin > SCHEDULE.startMin + SCHEDULE.graceMin);
 
-  const s = mine?.summary;
-  const kehadiranTone = s?.kehadiran == null ? { bg: "#f1f5f9", fg: "#475569" } : s.kehadiran >= 90 ? { bg: "#dcfce7", fg: "#166534" } : s.kehadiran >= 75 ? { bg: "#fef3c7", fg: "#92400e" } : { bg: "#fee2e2", fg: "#991b1b" };
+  // — rekap —
+  const summary = selectedId ? data?.summaries[selectedId] : undefined;
+  const tone =
+    summary?.kehadiran == null ? { bg: "#f1f5f9", fg: "#475569", bar: "#94a3b8" } : summary.kehadiran >= 90 ? { bg: "#dcfce7", fg: "#166534", bar: "#16a34a" } : summary.kehadiran >= 75 ? { bg: "#fef3c7", fg: "#92400e", bar: "#f59e0b" } : { bg: "#fee2e2", fg: "#991b1b", bar: "#ef4444" };
+  const rekapTitle = isCurrent ? "Rekap Bulan Berjalan" : `Rekap ${monthLabel(month)}`;
 
   return (
-    <div style={{ display: "grid", gap: 14 }}>
+    <div style={{ display: "grid", gap: 16 }}>
       {isCurrent && mine && statusChip ? (
-        <div style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: "#fff", padding: "20px 22px", display: "grid", gap: 14 }}>
+        <div style={{ ...card, padding: "20px 22px", display: "grid", gap: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
             <div style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 12, fontWeight: 800, color: SUB, textTransform: "uppercase", letterSpacing: 0.4 }}>Absensi saya</span>
@@ -235,13 +248,13 @@ export default function AbsensiView() {
                 <span style={chip(statusChip.bg, statusChip.fg)}>{statusChip.label}</span>
                 {lateNow ? <span style={chip("#fee2e2", "#991b1b")}>Terlambat</span> : null}
               </span>
-              <span style={{ fontSize: 12.5, color: SUB }}>
-                Masuk: <b style={{ color: INK }}>{clock(mine.today?.masuk ?? null)}</b> · Pulang: <b style={{ color: INK }}>{clock(mine.today?.pulang ?? null)}</b>
+              <span style={{ fontSize: 13, color: SUB }}>
+                Masuk: <b style={{ color: INK }}>{clockWib(mine.today?.masuk) ?? "Belum masuk"}</b> · Pulang: <b style={{ color: INK }}>{clockWib(mine.today?.pulang) ?? "Belum pulang"}</b>
               </span>
               {mine.today ? (
-                <span style={{ fontSize: 12.5, color: SUB }}>
-                  Kerja hari ini: <b style={{ color: INK }}>{duration(mine.today.workMs)}</b>
-                  {mine.today.breakMs > 0 ? ` · istirahat ${duration(mine.today.breakMs)}` : ""}
+                <span style={{ fontSize: 13, color: SUB }}>
+                  Sudah bekerja: <b style={{ color: INK }}>{durationLong(mine.today.workMs)}</b>
+                  {mine.today.breakMs > 0 ? ` · istirahat ${durationLong(mine.today.breakMs)}` : ""}
                 </span>
               ) : null}
             </div>
@@ -251,8 +264,8 @@ export default function AbsensiView() {
             <b style={{ fontSize: 13, color: INK }}>Jadwal hari ini</b>
             <span style={{ fontSize: 13, color: "#92400e" }}>
               {workToday
-                ? `${hm(SCHEDULE.startMin)}–${hm(SCHEDULE.endMin)} · istirahat ${hm(SCHEDULE.breakStartMin)}–${hm(SCHEDULE.breakEndMin)} · toleransi ${SCHEDULE.graceMin} menit`
-                : "Hari ini di luar jadwal kerja (Senin–Sabtu)."}
+                ? `Jam kerja ${hm(SCHEDULE.startMin)}–${hm(SCHEDULE.endMin)} WIB · Istirahat ${hm(SCHEDULE.breakStartMin)}–${hm(SCHEDULE.breakEndMin)} WIB · Toleransi terlambat ${SCHEDULE.graceMin} menit`
+                : "Hari ini di luar jadwal kerja (jadwal kerja Senin sampai Sabtu)."}
             </span>
           </div>
 
@@ -286,110 +299,147 @@ export default function AbsensiView() {
         </div>
       ) : null}
 
-      {mine && s ? (
-        <div style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: "#fff", padding: "18px 22px", display: "grid", gap: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <b style={{ fontSize: 16, color: INK }}>{isCurrent ? "Rekap Bulan Berjalan" : `Rekap ${monthLabel(month)}`}</b>
-            <span style={chip(kehadiranTone.bg, kehadiranTone.fg)}>{s.kehadiran == null ? "Kehadiran –" : `Kehadiran ${s.kehadiran}%`}</span>
+      {/* pemilih bulan + (Owner/Leader) pemilih admin */}
+      <div style={{ display: "grid", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <button type="button" style={navBtn} aria-label="Bulan sebelumnya" onClick={() => setMonth((m) => shiftMonth(m, -1))}>
+            ‹
+          </button>
+          <b style={{ fontSize: 16, color: INK, minWidth: 150, textAlign: "center" }}>{monthLabel(month)}</b>
+          <button type="button" style={{ ...navBtn, opacity: isCurrent ? 0.4 : 1 }} aria-label="Bulan berikutnya" disabled={isCurrent} onClick={() => setMonth((m) => shiftMonth(m, 1))}>
+            ›
+          </button>
+          <span style={{ fontSize: 12.5, color: SUB }}>Semua jam dalam WIB.</span>
+        </div>
+        {canSeeOthers && data && data.users.length > 1 ? (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 12.5, color: SUB, fontWeight: 700, marginRight: 4 }}>Lihat absensi:</span>
+            <button type="button" style={pickBtn(viewing === "me")} onClick={() => setViewing("me")}>
+              Saya
+            </button>
+            {data.users
+              .filter((u) => u.userId !== mine?.userId)
+              .map((u) => (
+                <button key={u.userId} type="button" style={pickBtn(viewing === u.userId)} onClick={() => setViewing(u.userId)}>
+                  {u.name}
+                </button>
+              ))}
+            <button type="button" style={pickBtn(viewing === "all")} onClick={() => setViewing("all")}>
+              Semua admin
+            </button>
           </div>
-          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
+        ) : null}
+      </div>
+
+      {error ? <div style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 12, padding: "10px 14px", fontSize: 13, fontWeight: 600 }}>{error}</div> : null}
+
+      {/* rekap satu admin */}
+      {data && selectedId && summary ? (
+        <div style={{ ...card, padding: "20px 22px", display: "grid", gap: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ display: "grid", gap: 2 }}>
+              <b style={{ fontSize: 17, color: INK }}>{rekapTitle}</b>
+              <span style={{ fontSize: 13, color: SUB }}>
+                {isSelf ? `${monthLabel(month)}, atas nama Anda` : `${monthLabel(month)}, atas nama ${nameOf.get(selectedId) || "admin"}`}
+              </span>
+            </div>
+            <span style={chip(tone.bg, tone.fg)}>{summary.kehadiran == null ? "Kehadiran belum bisa dihitung" : `Kehadiran ${summary.kehadiran}%`}</span>
+          </div>
+
+          <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ height: 10, background: "#f1f5f9", borderRadius: 999, overflow: "hidden" }}>
+              <div style={{ width: `${summary.kehadiran ?? 0}%`, height: "100%", background: tone.bar, borderRadius: 999 }} />
+            </div>
+            <span style={{ fontSize: 13.5, color: INK }}>
+              {summary.workdays > 0
+                ? `Hadir ${summary.hadirWorkdays} hari dari ${summary.workdays} hari kerja yang sudah berjalan.`
+                : "Belum ada hari kerja yang berjalan di bulan ini."}
+            </span>
+          </div>
+
+          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
             {[
-              { k: "Hari hadir", v: `${s.hadirWorkdays} / ${s.workdays}`, sub: "hari kerja" },
-              { k: "Jam kerja", v: duration(s.workMs), sub: s.overtimeMs > 0 ? `termasuk lembur ${duration(s.overtimeMs)}` : "total bulan ini" },
-              { k: "Terlambat", v: `${s.late}×`, sub: `lewat ${hm(SCHEDULE.startMin + SCHEDULE.graceMin)}` },
-              { k: "Lupa pulang", v: `${s.forgot}×`, sub: "perlu dikoreksi" },
+              { k: "Total jam kerja", v: durationLong(summary.workMs), sub: summary.overtimeMs > 0 ? `Termasuk lembur ${durationLong(summary.overtimeMs)}` : "Dihitung dari waktu berstatus Aktif" },
+              { k: "Terlambat", v: `${summary.late} kali`, sub: `Absen masuk lewat pukul ${hm(SCHEDULE.startMin + SCHEDULE.graceMin)} WIB` },
+              { k: "Lupa absen pulang", v: `${summary.forgot} kali`, sub: "Hari yang jam pulangnya perlu dikoreksi" },
+              { k: "Hari ada absen masuk", v: `${summary.hadir} hari`, sub: "Termasuk hari di luar jadwal kerja" },
             ].map((c) => (
-              <div key={c.k} style={{ border: `1px solid ${LINE}`, borderRadius: 14, padding: "12px 14px", display: "grid", gap: 2 }}>
-                <span style={{ fontSize: 12, color: SUB, fontWeight: 700 }}>{c.k}</span>
-                <b style={{ fontSize: 22, color: INK }}>{c.v}</b>
-                <span style={{ fontSize: 11.5, color: SUB }}>{c.sub}</span>
+              <div key={c.k} style={{ background: "#f8fafc", borderRadius: 14, padding: "12px 14px", display: "grid", gap: 3, alignContent: "start" }}>
+                <span style={{ fontSize: 12.5, color: SUB, fontWeight: 700 }}>{c.k}</span>
+                <b style={{ fontSize: 20, color: INK }}>{c.v}</b>
+                <span style={{ fontSize: 12.5, color: SUB }}>{c.sub}</span>
               </div>
             ))}
           </div>
         </div>
       ) : null}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
-        <b style={{ fontSize: 15, color: INK, marginRight: 6 }}>Absensi tim</b>
-        <button type="button" style={navBtn} aria-label="Bulan sebelumnya" onClick={() => setMonth((m) => shiftMonth(m, -1))}>
-          ‹
-        </button>
-        <b style={{ fontSize: 15, color: INK, minWidth: 140, textAlign: "center" }}>{monthLabel(month)}</b>
-        <button type="button" style={{ ...navBtn, opacity: isCurrent ? 0.4 : 1 }} aria-label="Bulan berikutnya" disabled={isCurrent} onClick={() => setMonth((m) => shiftMonth(m, 1))}>
-          ›
-        </button>
-        <span style={{ fontSize: 12, color: SUB }}>Jam dalam WIB. Status dipilih admin sendiri.</span>
-      </div>
-
-      {error ? <div style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 12, padding: "10px 14px", fontSize: 13, fontWeight: 600 }}>{error}</div> : null}
-
-      {canSeeHours && data?.totals && data.totals.length > 0 ? (
-        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
-          {data.totals.map((t) => {
-            const u = nameOf.get(t.userId);
-            return (
-              <div key={t.userId} style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: "#fff", padding: 14, display: "grid", gap: 4, alignContent: "start" }}>
-                <span style={{ fontSize: 12, color: SUB, fontWeight: 700 }}>{u?.name || "Admin"}</span>
-                <b style={{ fontSize: 22, color: INK }}>{duration(t.workMs)}</b>
-                <span style={{ fontSize: 12, color: SUB }}>
-                  {t.days} hari kerja{t.forgot ? ` · ${t.forgot}× lupa pulang` : ""}
-                </span>
-              </div>
-            );
-          })}
+      {/* ringkasan semua admin (Owner/Leader) */}
+      {data && selectedId === null ? (
+        <div style={{ ...card, padding: "18px 22px", display: "grid", gap: 12 }}>
+          <b style={{ fontSize: 17, color: INK }}>{rekapTitle}: semua admin</b>
+          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+            {data.users.map((u) => {
+              const s = data.summaries[u.userId];
+              if (!s) return null;
+              return (
+                <div key={u.userId} style={{ background: "#f8fafc", borderRadius: 14, padding: "12px 14px", display: "grid", gap: 4 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                    <b style={{ fontSize: 15, color: INK }}>{u.name}</b>
+                    <span style={chip("#fff", INK)}>{s.kehadiran == null ? "Kehadiran –" : `Kehadiran ${s.kehadiran}%`}</span>
+                  </div>
+                  <span style={{ fontSize: 13, color: SUB }}>Jam kerja: <b style={{ color: INK }}>{durationLong(s.workMs)}</b></span>
+                  <span style={{ fontSize: 13, color: SUB }}>
+                    Terlambat <b style={{ color: INK }}>{s.late} kali</b> · Lupa absen pulang <b style={{ color: INK }}>{s.forgot} kali</b>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : null}
 
-      {loading && !data ? (
-        <p style={{ color: SUB, fontSize: 13 }}>Memuat…</p>
-      ) : grouped.length === 0 ? (
-        <div style={{ border: `1px dashed ${LINE}`, borderRadius: 14, padding: 18, color: SUB, fontSize: 13.5, background: "#fff" }}>
-          Belum ada catatan absensi di bulan ini. Catatan terkumpul dari tombol Absen Masuk, Istirahat, dan Absen Pulang.
-        </div>
-      ) : (
-        <div style={{ display: "grid", gap: 12 }}>
-          {grouped.map(([day, rows]) => (
-            <div key={day} style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: "#fff", overflowX: "auto" }}>
-              <div style={{ padding: "10px 14px", fontWeight: 800, color: INK, fontSize: 14, background: "#f8fafc", borderBottom: `1px solid ${LINE}`, borderRadius: "14px 14px 0 0" }}>{dayLabel(day)}</div>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 520 }}>
-                <thead>
-                  <tr>
-                    <th style={th}>Admin</th>
-                    <th style={th}>Masuk</th>
-                    <th style={th}>Istirahat</th>
-                    <th style={th}>Pulang</th>
-                    {canSeeHours ? <th style={th}>Jam kerja</th> : null}
-                    <th style={th}>Catatan</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={`${r.day}-${r.userId}`}>
-                      <td style={{ ...td, fontWeight: 700 }}>{nameOf.get(r.userId)?.name || "(akun dihapus)"}</td>
-                      <td style={td}>{clock(r.masuk)}</td>
-                      <td style={td}>{duration(r.breakMs)}</td>
-                      <td style={td}>{clock(r.pulang)}</td>
-                      {canSeeHours ? (
-                        <td style={{ ...td, fontWeight: 700 }}>
-                          {duration(r.workMs)}
-                          {r.overtimeMs ? <span style={{ fontWeight: 600, color: SUB, fontSize: 12 }}> (+{duration(r.overtimeMs)} lembur)</span> : null}
-                        </td>
-                      ) : null}
-                      <td style={td}>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {r.ongoing ? <span style={chip("#e0f2fe", "#075985")}>Berjalan</span> : null}
-                          {r.late ? <span style={chip("#fef3c7", "#92400e")}>Terlambat</span> : null}
-                          {r.forgotPulang ? <span style={chip("#fee2e2", "#991b1b")}>Lupa pulang</span> : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* riwayat per hari */}
+      <div style={{ display: "grid", gap: 10 }}>
+        <b style={{ fontSize: 17, color: INK }}>
+          Riwayat {selectedId === null ? "semua admin" : isSelf ? "saya" : nameOf.get(selectedId) || "admin"}
+        </b>
+        {loading && !data ? (
+          <p style={{ color: SUB, fontSize: 13 }}>Memuat…</p>
+        ) : shownDays.length === 0 ? (
+          <div style={{ border: `1px dashed ${LINE}`, borderRadius: 14, padding: 18, color: SUB, fontSize: 13.5, background: "#fff" }}>
+            Belum ada catatan absensi di bulan ini. Catatan terkumpul dari tombol Absen Masuk, Istirahat, dan Absen Pulang.
+          </div>
+        ) : (
+          shownDays.map((d) => {
+            const workday = isWorkday(d.day);
+            const onTime = Boolean(d.masuk) && workday && !d.late;
+            return (
+              <div key={`${d.day}-${d.userId}`} style={{ ...card, borderRadius: 16, padding: "14px 18px", display: "grid", gap: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <b style={{ fontSize: 15, color: INK }}>{dayLabel(d.day)}</b>
+                    {selectedId === null ? <span style={chip("#e0e7ff", "#3730a3")}>{nameOf.get(d.userId) || "Admin"}</span> : null}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {d.ongoing ? <span style={chip("#e0f2fe", "#075985")}>Sedang berjalan</span> : null}
+                    {d.late ? <span style={chip("#fef3c7", "#92400e")}>Terlambat</span> : null}
+                    {onTime ? <span style={chip("#dcfce7", "#166534")}>Tepat waktu</span> : null}
+                    {d.overtimeMs > 0 ? <span style={chip("#ede9fe", "#5b21b6")}>Lembur {durationLong(d.overtimeMs)}</span> : null}
+                    {d.forgotPulang ? <span style={chip("#fee2e2", "#991b1b")}>Lupa absen pulang</span> : null}
+                  </div>
+                </div>
+                <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+                  <Field label="Masuk" value={clockWib(d.masuk) ?? "Belum masuk"} muted={!d.masuk} />
+                  <Field label="Istirahat" value={d.breakMs > 0 ? durationLong(d.breakMs) : d.ongoing ? "Belum istirahat" : "Tidak istirahat"} muted={d.breakMs <= 0} />
+                  <Field label="Pulang" value={clockWib(d.pulang) ?? (d.masuk ? "Belum pulang" : "–")} muted={!d.pulang} />
+                  <Field label="Jam kerja" value={durationLong(d.workMs)} />
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
