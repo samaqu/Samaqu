@@ -19,7 +19,7 @@ import { OpsPageMapProvider } from "@/lib/ops-router";
 import { useWibLongDate } from "./wib-date";
 import styles from "./panel.module.css";
 import { useAdminPresenceTracker, useOnlineAdmins } from "@/lib/use-admin-presence";
-import { STATUS_CHANGED_EVENT, STATUS_OPTIONS, STATUS_STYLE, asWorkStatus, shownStatus, type WorkStatus } from "@/lib/admin-status";
+import { STATUS_CHANGED_EVENT, STATUS_STYLE, asWorkStatus, needsCheckIn, optionsFor, shownStatus, type WorkStatus } from "@/lib/admin-status";
 import { usePendingReviewCount } from "@/lib/use-pending-reviews";
 import { useResellerQueueCount } from "@/lib/use-reseller-queue";
 import { usePendingDraftCount } from "@/lib/use-pending-drafts";
@@ -242,7 +242,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [authorized, setAuthorized] = useState(false);
   /** Nama + label jabatan akun yang login (header kanan atas). Sebelum terbaca / kalau gagal, tampilan lama ("Lea") dipakai. */
-  const [me, setMe] = useState<{ name: string; title: string; userId: string; status: WorkStatus | null } | null>(null);
+  const [me, setMe] = useState<{ name: string; title: string; userId: string; status: WorkStatus | null; statusAt: string | null } | null>(null);
   const [statusOpen, setStatusOpen] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   useAdminPresenceTracker(me?.userId);
@@ -403,6 +403,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
             userId: String(json.userId || ""),
             // null = kolom status belum ada di database (migrasi belum dijalankan): pemilih disembunyikan.
             status: json.status == null ? null : asWorkStatus(json.status),
+            statusAt: json.statusAt ? String(json.statusAt) : null,
           });
         }
       } catch {
@@ -425,7 +426,13 @@ export default function PanelShell({ children }: { children: ReactNode }) {
         const { data } = await supabase.auth.getSession();
         const token = data.session?.access_token;
         if (!token) return;
-        await fetch("/api/ops/heartbeat", { method: "POST", headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+        const res = await fetch("/api/ops/heartbeat", { method: "POST", headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+        const json = await res.json().catch(() => null);
+        if (!stopped && json?.closedPrevious) {
+          // Status kemarin ditutup otomatis (lupa Absen Pulang): hari ini mulai dari "belum absen masuk".
+          setMe((prev) => (prev ? { ...prev, status: "pulang", statusAt: String(json.closedPrevious) } : prev));
+          window.dispatchEvent(new Event(STATUS_CHANGED_EVENT));
+        }
       } catch {
         /* sinyal berikutnya akan mencoba lagi */
       }
@@ -441,8 +448,15 @@ export default function PanelShell({ children }: { children: ReactNode }) {
     };
   }, [seenUserId]);
 
+  const checkInNeeded = me?.status ? needsCheckIn(me.status, me.statusAt) : false;
+
   async function changeStatus(next: WorkStatus) {
     if (statusBusy) return;
+    // Absen Pulang tidak sengaja bisa memotong jam kerja; minta konfirmasi sekali.
+    if (next === "pulang" && !window.confirm("Absen pulang sekarang? Jam kerja hari ini berhenti dihitung.")) {
+      setStatusOpen(false);
+      return;
+    }
     setStatusBusy(true);
     try {
       const { data } = await supabase.auth.getSession();
@@ -454,7 +468,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
         body: JSON.stringify({ status: next }),
       });
       if (res.ok) {
-        setMe((prev) => (prev ? { ...prev, status: next } : prev));
+        setMe((prev) => (prev ? { ...prev, status: next, statusAt: new Date().toISOString() } : prev));
         window.dispatchEvent(new Event(STATUS_CHANGED_EVENT));
       }
     } catch {
@@ -802,7 +816,17 @@ export default function PanelShell({ children }: { children: ReactNode }) {
               <b>{me?.name || "Lea"}</b>
               <small>{me?.title || "SAMAQU"}</small>
             </div>
-            {me?.status ? (
+            {me?.status && checkInNeeded ? (
+              <button
+                type="button"
+                onClick={() => void changeStatus("aktif")}
+                disabled={statusBusy}
+                title="Catat jam masuk Anda hari ini"
+                style={{ marginLeft: 8, border: 0, background: "#16a34a", color: "#fff", borderRadius: 999, padding: "7px 14px", fontSize: 12.5, fontWeight: 800, cursor: statusBusy ? "wait" : "pointer" }}
+              >
+                {statusBusy ? "Mencatat…" : "Absen Masuk"}
+              </button>
+            ) : me?.status ? (
               <div style={{ position: "relative", marginLeft: 8 }}>
                 {(() => {
                   const shown = STATUS_STYLE[shownStatus(me.status, onlineIds.has(me.userId))];
@@ -824,17 +848,17 @@ export default function PanelShell({ children }: { children: ReactNode }) {
                   <>
                     <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setStatusOpen(false)} />
                     <div role="listbox" style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 41, minWidth: 220, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: 6, boxShadow: "0 12px 32px rgba(15,23,42,0.14)" }}>
-                      {STATUS_OPTIONS.map((o) => {
+                      {optionsFor(me.status).map((o) => {
                         const st = STATUS_STYLE[o.value];
                         return (
                           <button
                             key={o.value}
                             type="button"
                             role="option"
-                            aria-selected={me.status === o.value}
+                            aria-selected={false}
                             disabled={statusBusy}
                             onClick={() => void changeStatus(o.value)}
-                            style={{ width: "100%", textAlign: "left", border: 0, background: me.status === o.value ? "#f8fafc" : "transparent", borderRadius: 10, padding: "8px 10px", cursor: "pointer", display: "flex", gap: 10, alignItems: "center" }}
+                            style={{ width: "100%", textAlign: "left", border: 0, background: "transparent", borderRadius: 10, padding: "8px 10px", cursor: "pointer", display: "flex", gap: 10, alignItems: "center" }}
                           >
                             <i style={{ width: 10, height: 10, borderRadius: "50%", background: st.dot, display: "inline-block", flex: "none" }} />
                             <span style={{ display: "grid" }}>
@@ -851,6 +875,23 @@ export default function PanelShell({ children }: { children: ReactNode }) {
             ) : null}
           </div>
         </div>
+
+        {checkInNeeded ? (
+          <div
+            role="status"
+            style={{ margin: "0 0 14px", background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e", borderRadius: 14, padding: "10px 14px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", fontSize: 13.5, fontWeight: 600 }}
+          >
+            <span>Anda belum absen masuk hari ini. Jam kerja baru tercatat setelah Absen Masuk.</span>
+            <button
+              type="button"
+              onClick={() => void changeStatus("aktif")}
+              disabled={statusBusy}
+              style={{ marginLeft: "auto", border: 0, background: "#16a34a", color: "#fff", borderRadius: 999, padding: "6px 14px", fontSize: 12.5, fontWeight: 800, cursor: statusBusy ? "wait" : "pointer" }}
+            >
+              Absen Masuk
+            </button>
+          </div>
+        ) : null}
 
         <OpsPageMapProvider pages={PANEL_PAGES}>{children}</OpsPageMapProvider>
       </main>

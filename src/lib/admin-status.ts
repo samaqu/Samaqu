@@ -6,6 +6,8 @@
  * ditampilkan sebagai Offline. Status Istirahat dan Pulang tidak berubah oleh Presence.
  */
 
+import { wibDay } from "@/lib/absensi";
+
 export type WorkStatus = "aktif" | "istirahat" | "pulang";
 export type ShownStatus = WorkStatus | "offline";
 
@@ -21,6 +23,30 @@ export const STATUS_STYLE: Record<ShownStatus, { label: string; dot: string; bg:
   pulang: { label: "Pulang", dot: "#94a3b8", bg: "#f1f5f9", fg: "#475569" },
   offline: { label: "Offline", dot: "#ef4444", bg: "#fee2e2", fg: "#991b1b" },
 };
+
+/**
+ * Pilihan di menu status, bahasanya mengikuti keadaan sekarang (seperti mesin absen):
+ * dari Pulang → "Absen Masuk"; dari Istirahat → "Lanjut kerja"; dari Aktif → "Istirahat" atau "Absen Pulang".
+ * Pilihan yang sama dengan status sekarang tidak ditampilkan.
+ */
+export function optionsFor(current: WorkStatus): { value: WorkStatus; label: string; hint: string }[] {
+  const masuk = { value: "aktif" as const, label: current === "istirahat" ? "Lanjut kerja" : "Absen Masuk", hint: current === "istirahat" ? "Selesai istirahat" : "Mulai bekerja" };
+  const istirahat = { value: "istirahat" as const, label: "Istirahat", hint: "Sementara tidak menerima chat baru" };
+  const pulang = { value: "pulang" as const, label: "Absen Pulang", hint: "Selesai bekerja hari ini" };
+  if (current === "pulang") return [masuk];
+  if (current === "istirahat") return [masuk, pulang];
+  return [istirahat, pulang];
+}
+
+/**
+ * Belum absen masuk hari ini: status Pulang, dan Pulang itu BUKAN dipilih hari ini (WIB).
+ * Admin yang sudah Absen Pulang sore ini tidak diminta masuk lagi; yang belum pernah absen hari ini diminta.
+ */
+export function needsCheckIn(status: WorkStatus, statusAt: string | null, nowMs: number = Date.now()): boolean {
+  if (status !== "pulang") return false;
+  const at = statusAt ? Date.parse(statusAt) : NaN;
+  return !Number.isFinite(at) || wibDay(at) !== wibDay(nowMs);
+}
 
 export const asWorkStatus = (v: unknown): WorkStatus => (v === "aktif" || v === "istirahat" ? v : "pulang");
 

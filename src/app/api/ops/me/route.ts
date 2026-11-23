@@ -16,11 +16,15 @@ export async function GET(req: NextRequest) {
 
   // Kolom `status` baru ada setelah migrasi 20261124; kalau belum ada, status dikosongkan dan pemilihnya tidak tampil.
   let status: string | null = null;
-  const { data } = await getSupabaseAdmin().from("admins").select("status").eq("user_id", me.userId).maybeSingle();
-  if (data && typeof data.status === "string") status = data.status;
+  let statusAt: string | null = null;
+  const { data } = await getSupabaseAdmin().from("admins").select("status, status_at").eq("user_id", me.userId).maybeSingle();
+  if (data && typeof data.status === "string") {
+    status = data.status;
+    statusAt = data.status_at ? String(data.status_at) : null;
+  }
 
   return NextResponse.json(
-    { name: me.name, title: me.title, role: me.role, email: me.email, userId: me.userId, status },
+    { name: me.name, title: me.title, role: me.role, email: me.email, userId: me.userId, status, statusAt },
     { headers: { "Cache-Control": "no-store, private" } },
   );
 }

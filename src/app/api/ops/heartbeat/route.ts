@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
   const today = wibDay(nowMs);
 
   // 1) Status sisa dari hari sebelumnya (lupa klik Pulang) → tutup otomatis.
+  let closedPrevious: string | null = null;
   const statusAtMs = row?.status_at ? Date.parse(String(row.status_at)) : 0;
   if ((row?.status === "aktif" || row?.status === "istirahat") && statusAtMs && statusAtMs < wibDayStart(today)) {
     // Batas wajar: jam terakhir terlihat; kalau tidak ada yang lebih baru dari status itu, pakai saat status dipasang.
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
         .from("admin_status_log")
         .insert({ user_id: me.userId, status: "pulang", at: closeAt, source: "auto" });
       if (logError) console.error("[OPS-HEARTBEAT] gagal mencatat Pulang otomatis:", logError.message);
+      closedPrevious = closeAt;
     }
   }
 
@@ -74,5 +76,6 @@ export async function POST(req: NextRequest) {
     .upsert({ user_id: me.userId, day: today, last_seen: nowIso }, { onConflict: "user_id,day" });
   if (dailyError) console.error("[OPS-HEARTBEAT] gagal menulis admin_seen_daily:", dailyError.message);
 
-  return NextResponse.json({ ok: !error }, { headers: noStore });
+  // `closedPrevious` memberi tahu panel bahwa status kemarin baru saja ditutup, supaya banner "belum absen masuk" langsung tampil.
+  return NextResponse.json({ ok: !error, ...(closedPrevious ? { closedPrevious } : {}) }, { headers: noStore });
 }
