@@ -12,7 +12,6 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { STATUS_CHANGED_EVENT, STATUS_STYLE, shownStatus, type WorkStatus } from "@/lib/admin-status";
 import { useOnlineAdmins } from "@/lib/use-admin-presence";
-import AbsensiView from "./AbsensiView";
 import ConfirmDialog from "@/components/ops/ConfirmDialog";
 
 type Role = "owner" | "leader" | "admin" | "admin_operasional" | "other";
@@ -85,7 +84,6 @@ export default function TeamAdminView() {
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState("");
-  const [tab, setTab] = useState<"tim" | "absensi">("tim");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editing, setEditing] = useState<{ id: string; title: string } | null>(null);
   const [linkShown, setLinkShown] = useState<{ name: string; link: string } | null>(null);
@@ -177,30 +175,6 @@ export default function TeamAdminView() {
         ) : null}
       </div>
 
-      <div role="tablist" style={{ display: "flex", gap: 6 }}>
-        {(["tim", "absensi"] as const).map((key) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={tab === key}
-            onClick={() => setTab(key)}
-            style={{
-              border: `1px solid ${tab === key ? INK : LINE}`,
-              background: tab === key ? INK : "#fff",
-              color: tab === key ? "#fff" : INK,
-              borderRadius: 999,
-              padding: "6px 16px",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            {key === "tim" ? "Tim" : "Absensi"}
-          </button>
-        ))}
-      </div>
-
       {error ? <div style={{ background: "#fee2e2", color: "#991b1b", borderRadius: 12, padding: "10px 14px", fontSize: 13, fontWeight: 600 }}>{error}</div> : null}
       {notice ? <div style={{ background: "#dcfce7", color: "#166534", borderRadius: 12, padding: "10px 14px", fontSize: 13, fontWeight: 600 }}>{notice}</div> : null}
       {linkShown ? (
@@ -213,9 +187,7 @@ export default function TeamAdminView() {
         </div>
       ) : null}
 
-      {tab === "absensi" ? (
-        <AbsensiView />
-      ) : loading ? (
+      {loading ? (
         <p style={{ color: SUB, fontSize: 13 }}>Memuat…</p>
       ) : (
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>

@@ -188,11 +188,18 @@ const NAV: NavGroup[] = [
     ],
   },
   {
+    section: "Tim & Chat",
+    icon: "chat",
+    items: [
+      { label: "Inbox WA", href: "/panel-admin/inbox-wa", icon: "chat" },
+      { label: "Absensi", href: "/panel-admin/absensi", icon: "clock" },
+      { label: "Tim Admin", href: "/panel-admin/tim-admin", icon: "users" },
+    ],
+  },
+  {
     section: "Pelanggan",
     icon: "users",
     items: [
-      { label: "Inbox WA", href: "/panel-admin/inbox-wa", icon: "chat" },
-      { label: "Tim Admin", href: "/panel-admin/tim-admin", icon: "users" },
       { label: "Leads", href: "/panel-admin/leads", icon: "users" },
       { label: "Reseller", href: "/panel-admin/reseller", icon: "reseller", badge: "reseller" },
       { label: "Promo", href: "/panel-admin/promo", icon: "tag" },
