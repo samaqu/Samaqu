@@ -47,12 +47,33 @@ function isAbortError(e: unknown): boolean {
  * Catatan: `AbortError` (mis. admin menekan Stop) langsung dilempar tanpa retry, supaya
  * pembatalan tidak berubah menjadi panggilan model baru. `TimeoutError` tetap di-retry
  * seperti sebelumnya.
+ *
+ * `connectTimeoutMs` (opsional): batas menunggu RESPONS PERTAMA untuk SETIAP percobaan. Tanpa ini,
+ * `init.signal` (timeout total) dipakai bersama semua percobaan, jadi kalau penyedia AI macet,
+ * percobaan ke-2 dan ke-3 langsung gagal karena sinyalnya sudah habis (retry tidak menolong).
+ * Dengan ini, penyedia yang macet dicoba lagi dengan batas baru. Setelah respons pertama diterima
+ * batas ini dilepas; pembacaan stream tetap dibatasi `init.signal` seperti biasa.
  */
-export async function fetchWithRetry(url: string, init: RequestInit, attempts = DEFAULT_ATTEMPTS): Promise<Response> {
+export async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  attempts = DEFAULT_ATTEMPTS,
+  connectTimeoutMs?: number
+): Promise<Response> {
   let lastError: unknown;
   for (let i = 0; i < attempts; i++) {
+    const attemptCtl = connectTimeoutMs ? new AbortController() : null;
+    const timer = attemptCtl
+      ? setTimeout(
+          () => attemptCtl.abort(new DOMException("Penyedia AI tidak merespons tepat waktu", "TimeoutError")),
+          connectTimeoutMs
+        )
+      : null;
     try {
-      const res = await fetch(url, init);
+      const res = await fetch(
+        url,
+        attemptCtl ? { ...init, signal: combineSignals([init.signal ?? undefined, attemptCtl.signal]) } : init
+      );
       if ((res.status === 429 || res.status >= 500) && i < attempts - 1) {
         lastError = new Error(`HTTP ${res.status}`);
         await new Promise((r) => setTimeout(r, 300 * (i + 1)));
@@ -67,6 +88,8 @@ export async function fetchWithRetry(url: string, init: RequestInit, attempts = 
         continue;
       }
       throw e;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
   throw lastError instanceof Error ? lastError : new Error("Gagal menghubungi penyedia AI");
@@ -83,6 +106,11 @@ export interface ChatCompletionOptions {
   maxTokens?: number;
   timeoutMs?: number;
   attempts?: number;
+  /**
+   * Batas menunggu respons pertama PER percobaan (opsional, mati bila kosong). Lihat `fetchWithRetry`.
+   * Dipakai chat customer supaya penyedia AI yang macet sesaat dicoba ulang, bukan langsung gagal.
+   */
+  connectTimeoutMs?: number;
   /**
    * Sinyal tambahan dari pemanggil (mis. `req.signal` saat admin menekan Stop).
    * Digabung dengan timeout: mana pun yang lebih dulu membatalkan panggilan.
@@ -141,7 +169,8 @@ export function streamChatCompletion(options: ChatCompletionOptions): Promise<Re
       }),
       signal: combineSignals([options.signal, AbortSignal.timeout(timeoutMs)]),
     },
-    options.attempts ?? DEFAULT_ATTEMPTS
+    options.attempts ?? DEFAULT_ATTEMPTS,
+    options.connectTimeoutMs
   );
 }
 

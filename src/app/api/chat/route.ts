@@ -25,6 +25,11 @@ const ERROR_REPLY = "Maaf, asisten sedang tidak bisa menjawab. Coba lagi ya \u{1
 const MEDIA_ERROR_REPLY =
   "Maaf Kak, gambarnya belum bisa dibaca. Coba kirim ulang atau tulis pertanyaannya ya \u{1F64F}";
 
+// Batas menunggu respons pertama dari penyedia AI untuk SETIAP percobaan. Penyedia yang macet
+// sesaat (kasus 24 Nov 2026: satu pesan gagal TimeoutError setelah 60 dtk) dicoba ulang setelah
+// ini, bukan menunggu sampai timeout total habis. Respons pertama biasanya datang dalam hitungan detik.
+const CONNECT_TIMEOUT_MS = 25_000;
+
 // Kartu produk hanya relevan untuk pertanyaan produk. Saat customer sudah masuk
 // ongkir/total/checkout, kartu produk justru bikin layar penuh dan mengaburkan jawaban.
 const SHIPPING_INTENT_RE = /\b(ongkir|ongkos|kirim|pengiriman|total|checkout|bayar|pembayaran)\b/i;
@@ -221,6 +226,7 @@ export async function POST(req: NextRequest) {
             temperature: profile.temperature,
             maxTokens: profile.maxTokens,
             timeoutMs: profile.timeoutMs,
+            connectTimeoutMs: CONNECT_TIMEOUT_MS,
           });
 
         const toolCache = new Map<string, Awaited<ReturnType<typeof executeChatTool>>>();
@@ -315,6 +321,7 @@ export async function POST(req: NextRequest) {
               temperature: profile.temperature,
               maxTokens: profile.maxTokens,
               timeoutMs: profile.timeoutMs,
+              connectTimeoutMs: CONNECT_TIMEOUT_MS,
             });
             if (finalRes.ok && finalRes.body) {
               const final = await consumeOpenAIStream(finalRes.body, (delta) => send({ delta }));
