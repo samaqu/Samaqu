@@ -51,7 +51,7 @@ const THEME_SWATCH_CLASS: Record<PanelTheme, string> = {
 };
 const themeLabel = (id: PanelTheme) => THEMES.find((option) => option.id === id)?.label ?? "Berry";
 
-type IconName = "home" | "card" | "box" | "users" | "spark" | "return" | "star" | "reseller" | "tag" | "alert" | "clock" | "clipboard" | "dashboard" | "chat";
+type IconName = "home" | "card" | "box" | "users" | "spark" | "return" | "star" | "reseller" | "tag" | "alert" | "clock" | "clipboard" | "dashboard" | "chat" | "logout";
 
 function NavIcon({ name }: { name: IconName }) {
   switch (name) {
@@ -145,6 +145,13 @@ function NavIcon({ name }: { name: IconName }) {
         <svg viewBox="0 0 24 24">
           <path d="M4 5h16v11H9l-5 4z" />
           <path d="M8 9.5h8M8 12.5h5" />
+        </svg>
+      );
+    case "logout":
+      return (
+        <svg viewBox="0 0 24 24">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <path d="M16 17l5-5-5-5M21 12H9" />
         </svg>
       );
     case "reseller":
@@ -555,6 +562,14 @@ export default function PanelShell({ children }: { children: ReactNode }) {
     setBusy(false);
   }
 
+  /** Keluar dari panel: sesi Supabase dihapus, lalu kembali ke formulir login. */
+  async function handleLogout() {
+    setMobileNavOpen(false);
+    await supabase.auth.signOut();
+    setPassword("");
+    setAuthorized(false);
+  }
+
   const appClass = `${styles.app}${THEME_APP_CLASS[theme] ? ` ${THEME_APP_CLASS[theme]}` : ""}`;
 
   if (!ready) {
@@ -714,6 +729,10 @@ export default function PanelShell({ children }: { children: ReactNode }) {
             );
           })}
           {NAV_BOTTOM.map((item) => renderNavLink(item, true))}
+          <button type="button" className={`${styles.navItem} ${styles.navGroupBtn}`} title="Keluar" onClick={handleLogout}>
+            <NavIcon name="logout" />
+            <span className={styles.navLabel}>Keluar</span>
+          </button>
         </nav>
 
         <div className={styles.foot}>
