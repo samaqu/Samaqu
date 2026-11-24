@@ -96,6 +96,16 @@ function durationLong(ms: number): string {
   return `${m} menit`;
 }
 
+/**
+ * Teks lencana terlambat. Menit dihitung dari JAM MULAI kerja (mis. 08.00), bukan dari batas toleransi:
+ * toleransi hanya menentukan kapan lencana muncul. Tanpa jam masuk yang bisa dibaca, cukup "Terlambat".
+ */
+const lateChipText = (minuteOfDay: number | null) => {
+  if (minuteOfDay === null) return "Terlambat";
+  const late = minuteOfDay - SCHEDULE.startMin;
+  return late > 0 ? `Terlambat ${durationLong(late * 60000)}` : "Terlambat";
+};
+
 const chip = (bg: string, fg: string): React.CSSProperties => ({ background: bg, color: fg, borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 700, display: "inline-block", whiteSpace: "nowrap" });
 const card: React.CSSProperties = { border: `1px solid ${LINE}`, borderRadius: 18, background: "#fff" };
 
@@ -222,6 +232,8 @@ export default function AbsensiView() {
           ? { label: "Belum Masuk", bg: "#f1f5f9", fg: "#475569" }
           : { label: "Sudah Pulang", bg: "#e0e7ff", fg: "#3730a3" };
   const lateNow = Boolean(mine?.today?.late) || (belumMasuk && workToday && nowMin > SCHEDULE.startMin + SCHEDULE.graceMin);
+  // Sudah absen masuk: menit terlambat dari jam masuknya. Belum masuk: terus bertambah mengikuti jam sekarang.
+  const lateRefMin = mine?.today?.masuk ? wibMinutes(Date.parse(mine.today.masuk)) : nowMin;
 
   // — rekap —
   const summary = selectedId ? data?.summaries[selectedId] : undefined;
@@ -246,7 +258,7 @@ export default function AbsensiView() {
             <div style={{ display: "grid", gap: 6, justifyItems: "end" }}>
               <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
                 <span style={chip(statusChip.bg, statusChip.fg)}>{statusChip.label}</span>
-                {lateNow ? <span style={chip("#fee2e2", "#991b1b")}>Terlambat</span> : null}
+                {lateNow ? <span style={chip("#fee2e2", "#991b1b")}>{lateChipText(lateRefMin)}</span> : null}
               </span>
               <span style={{ fontSize: 13, color: SUB }}>
                 Masuk: <b style={{ color: INK }}>{clockWib(mine.today?.masuk) ?? "Belum masuk"}</b> · Pulang: <b style={{ color: INK }}>{clockWib(mine.today?.pulang) ?? "Belum pulang"}</b>
@@ -423,7 +435,7 @@ export default function AbsensiView() {
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {d.ongoing ? <span style={chip("#e0f2fe", "#075985")}>Sedang berjalan</span> : null}
-                    {d.late ? <span style={chip("#fef3c7", "#92400e")}>Terlambat</span> : null}
+                    {d.late ? <span style={chip("#fef3c7", "#92400e")}>{lateChipText(d.masuk ? wibMinutes(Date.parse(d.masuk)) : null)}</span> : null}
                     {onTime ? <span style={chip("#dcfce7", "#166534")}>Tepat waktu</span> : null}
                     {d.overtimeMs > 0 ? <span style={chip("#ede9fe", "#5b21b6")}>Lembur {durationLong(d.overtimeMs)}</span> : null}
                     {d.forgotPulang ? <span style={chip("#fee2e2", "#991b1b")}>Lupa absen pulang</span> : null}
