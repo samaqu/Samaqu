@@ -25,6 +25,7 @@ import { usePaymentMethodName } from "@/lib/use-payment-methods";
 import { paymentChannelLabel } from "@/lib/payment-channel";
 import { describePayment } from "@/lib/order-shared";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
+import { lenganModelOf, lenganModelLabel, loadLenganTwinParents } from "@/lib/lengan-pendek";
 import { waNumber, waLink, pesanPembayaran } from "@/lib/whatsapp";
 import { supabase } from "@/lib/supabase";
 import {
@@ -393,9 +394,27 @@ export default function OrderDetailContent({
     return () => { active = false; };
   }, [order.order_items]);
 
+  // Model Koko (Lengan Panjang / Pendek) untuk chip item: hanya bantuan tampilan, gagal baca = tanpa chip Panjang.
+  const [lenganTwinParents, setLenganTwinParents] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    const ids = itemProductIds(order.order_items || []);
+    if (ids.length === 0) return;
+    let active = true;
+    loadLenganTwinParents(supabase, ids)
+      .then((parents) => {
+        if (active) setLenganTwinParents(parents);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [order.order_items]);
+
   const itemsWithPhotos = useMemo(
-    () => resolveItemPhotos(order.order_items || [], photoLookup),
-    [order.order_items, photoLookup]
+    () =>
+      resolveItemPhotos(order.order_items || [], photoLookup).map((item) => ({
+        ...item,
+        lengan_model: lenganModelOf(item, lenganTwinParents),
+      })),
+    [order.order_items, photoLookup, lenganTwinParents]
   );
 
   /**
@@ -773,6 +792,7 @@ export default function OrderDetailContent({
       chips: [
         item.kain ? { teks: `Kain ${item.kain}`, jenis: "kain" as const } : null,
         variantName(item.series) ? { teks: variantName(item.series), jenis: "kain" as const } : null,
+        lenganModelLabel(item) ? { teks: lenganModelLabel(item) as string, jenis: "kain" as const } : null,
         { teks: `${item.size || ""}${item.size ? " · " : ""}x${item.quantity}`, jenis: "netral" as const },
       ].filter((c): c is { teks: string; jenis: "kain" | "netral" } => !!c),
       harga: `Rp ${Number(item.price * item.quantity).toLocaleString("id-ID")}`,

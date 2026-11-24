@@ -17,6 +17,7 @@ import { isLayananCategory } from "@/lib/layanan";
 import { kotaFromShipping } from "@/lib/kota";
 import { itemProductIds, loadOrderPhotoLookup } from "@/lib/order-photo-data";
 import { resolveItemPhotos } from "@/lib/order-photo";
+import { loadLenganTwinParents, lenganModelOf } from "@/lib/lengan-pendek";
 import { changedRecipientFields, resiLockedMessage } from "@/lib/resi-lock";
 import { cleanErrorMessage, recordAnomalyFromError, recordStockAnomaly, resolveFailureReason, restoreItemsStrict, stockFailureMessage } from "@/lib/stock-guard";
 import { isGosend, normalizeOpsShippingMethod, shippingMethodForEdit } from "@/lib/gosend";
@@ -688,6 +689,15 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Model Koko (Lengan Panjang / Pendek) per item untuk chip di detail pesanan. Hanya bantuan
+  // tampilan: gagal dibaca = tanpa chip Panjang, daftar pesanan tetap jalan.
+  let lenganTwinParents = new Set<string>();
+  try {
+    lenganTwinParents = await loadLenganTwinParents(admin, productIds);
+  } catch (error) {
+    console.error("[OPS] model lengan gagal dibaca (dilewati):", error);
+  }
+
   const byOrder = new Map<string, any[]>();
   for (const item of itemsWithPhotos || []) {
     const row = {
@@ -697,6 +707,7 @@ export async function GET(req: NextRequest) {
         productWeights,
         variantWeights,
       ),
+      lengan_model: lenganModelOf(item, lenganTwinParents),
     };
     if (!byOrder.has(item.order_id)) byOrder.set(item.order_id, []);
     byOrder.get(item.order_id)!.push(row);

@@ -31,6 +31,7 @@ import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
 import PanelDetailPesanan, { PanelDetailShell, PanelLacakModal, jamWIB } from "@/components/ops/transaksi/PanelDetailPesanan";
 import ResellerOrderBlock from "@/components/reseller/admin/ResellerOrderBlock";
 import { describePayment } from "@/lib/order-shared";
+import { lenganModelLabel } from "@/lib/lengan-pendek";
 
 export default function TransaksiDetailDrawer({ open, order, variant = "ops", owner = "panel", onClose, onEdit, onCancel, onDelete, onResiCreated }) {
   const isPanel = variant === "panel";
@@ -252,12 +253,16 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
       const kain = item.kain ? { teks: `Kain ${item.kain}`, jenis: "kain" } : null;
       const series = variantName(item.series) ? { teks: variantName(item.series), jenis: "kain" } : null;
       const ukuranQty = { teks: `${item.size || ""}${item.size ? " · " : ""}x${item.quantity}`, jenis: "netral" };
+      // Koko yang punya model Pendek: tampilkan modelnya (Lengan Panjang / Lengan Pendek).
+      const modelLengan = lenganModelLabel(item);
+      const model = modelLengan ? { teks: modelLengan, jenis: "kain" } : null;
       const chips = isPaketItem(item)
         ? [kain, variantName(item.color) ? { teks: variantName(item.color), jenis: "kain" } : null, ukuranQty]
         : [
             kain,
             series,
             variantName(item.color) ? { teks: variantName(item.color), jenis: "kain" } : null,
+            model,
             ukuranQty,
           ];
       return {

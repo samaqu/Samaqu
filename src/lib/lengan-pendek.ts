@@ -32,6 +32,49 @@ export function lenganPendekName(parentName: string): string {
   return `${base} ${LENGAN_PENDEK}`.trim();
 }
 
+/** Baris produk ini adalah turunan Lengan Pendek? (dikenali dari id turunan atau nama berakhiran "Lengan Pendek"). */
+export function isLenganPendekRow(item: { product_id?: string | null; product_name?: string | null }): boolean {
+  const id = String(item?.product_id ?? "").trim().toLowerCase();
+  const name = String(item?.product_name ?? "").trim().toLowerCase();
+  return id.endsWith("-lengan-pendek") || name.endsWith(LENGAN_PENDEK.toLowerCase());
+}
+
+/** Model Koko satu item pesanan: "panjang" hanya bila produknya punya turunan Pendek (`twinParents`). */
+export function lenganModelOf(
+  item: { product_id?: string | null; product_name?: string | null },
+  twinParents: ReadonlySet<string>,
+): "panjang" | "pendek" | null {
+  if (isLenganPendekRow(item)) return "pendek";
+  return twinParents.has(String(item?.product_id ?? "")) ? "panjang" : null;
+}
+
+/**
+ * Teks chip model untuk detail pesanan admin. `lengan_model` dari server dipakai bila ada; tanpa itu,
+ * hanya Pendek yang bisa dikenali (dari id/nama). Null = tidak ada chip (bukan Koko ber-model).
+ */
+export function lenganModelLabel(item: {
+  product_id?: string | null;
+  product_name?: string | null;
+  lengan_model?: string | null;
+}): string | null {
+  if (item?.lengan_model === "panjang") return LENGAN_PANJANG;
+  if (item?.lengan_model === "pendek") return LENGAN_PENDEK;
+  return isLenganPendekRow(item) ? LENGAN_PENDEK : null;
+}
+
+/** Id produk utama (dari `productIds`) yang punya baris turunan Pendek di tabel `products`. */
+export async function loadLenganTwinParents(client: SupabaseClient, productIds: string[]): Promise<Set<string>> {
+  const parents = [...new Set(productIds.filter((id) => id && !isLenganPendekRow({ product_id: id })))];
+  if (parents.length === 0) return new Set();
+  const { data, error } = await client
+    .from("products")
+    .select("id")
+    .in("id", parents.map(lenganPendekId));
+  if (error || !data) return new Set();
+  const found = new Set((data as { id: string }[]).map((row) => row.id));
+  return new Set(parents.filter((id) => found.has(lenganPendekId(id))));
+}
+
 interface DerivedLink {
   id: string;
   price: number;

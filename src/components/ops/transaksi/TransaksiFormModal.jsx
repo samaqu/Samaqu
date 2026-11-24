@@ -51,6 +51,7 @@ import { openOrderEffectivePrice } from "@/lib/open-order-offering";
 import { OPS_STOCK_SIZES } from "@/lib/ops-stock";
 import { categoryRank, seriesRank, variantSortKey } from "@/lib/ops-order";
 import { formatWeightExact } from "@/lib/shipping-weight";
+import { LENGAN_PANJANG, LENGAN_PENDEK, isLenganPendekRow } from "@/lib/lengan-pendek";
 import { formatRupiah, isoToWibInput, itemSummaryLabel, itemSummaryParts, wibNow, wibToIso } from "@/components/ops/transaksi/transaksi-format";
 import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
 import DuplicateOrderWarning from "@/components/ops/transaksi/DuplicateOrderWarning";
@@ -514,6 +515,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       weights: variant.weights || {},
       product_weight: Number(variant.product_weight) || 0,
       linkedTo: variant.base_series_name || variant.base_product_name || null,
+      // Id produk yang stoknya dipinjam (null = pemegang stok). Dipakai mengenali Koko Lengan Pendek.
+      baseProductId: variant.base_product_id || null,
     }));
 
     // Add-on Open Order bukan baris `products` biasa. Saat mengedit pesanan yang memuatnya,
@@ -788,7 +791,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       const key = `${entry.category}|${entry.kain}|${entry.product_name}`;
       let group = map.get(key);
       if (!group) {
-        group = { key, product_id: entry.product_id, name: entry.product_name, category: entry.category, kain: entry.kain, warnas: [], series: [], stockTotal: 0, realTotal: 0, service: false };
+        group = { key, product_id: entry.product_id, name: entry.product_name, category: entry.category, kain: entry.kain, warnas: [], series: [], stockTotal: 0, realTotal: 0, service: false, ownRows: 0, baseProductId: entry.baseProductId };
         map.set(key, group);
       }
       if (entry.service) group.service = true;
@@ -797,11 +800,24 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       // Stok grup dihitung HANYA dari baris pemilik stok (tanpa `linkedTo`). Baris pengikut
       // memakai stok induknya, jadi kalau ikut dijumlah hasilnya dobel.
       if (!entry.linkedTo) {
+        group.ownRows += 1;
         group.stockTotal += Object.values(entry.sizes || {}).reduce((sum, n) => sum + (Number(n) || 0), 0);
         group.realTotal += Object.values(entry.realSizes || entry.sizes || {}).reduce((sum, n) => sum + (Number(n) || 0), 0);
       }
     }
-    return [...map.values()];
+    const groups = [...map.values()];
+    // Koko "Lengan Pendek" = produk turunan yang seluruh stoknya meminjam produk Lengan Panjang.
+    // Dia tidak jadi baris sendiri di daftar: jadi pilihan Model di bawah produk Panjang-nya
+    // (sama seperti "Pilih Model" di halaman produk website). Hanya dikaitkan bila produk utamanya ada.
+    for (const twin of groups) {
+      if (twin.category !== "Koko" || twin.ownRows > 0 || !twin.baseProductId) continue;
+      if (!isLenganPendekRow({ product_id: twin.product_id, product_name: twin.name })) continue;
+      const parent = groups.find((g) => g !== twin && g.category === twin.category && g.product_id === twin.baseProductId);
+      if (!parent) continue;
+      parent.pendekGroup = twin;
+      twin.panjangGroup = parent;
+    }
+    return groups;
   }, [dataset]);
 
   /** Grup yang sedang dipilih pada satu baris item (dibaca dari isian barisnya sendiri). */
@@ -815,6 +831,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     const query = search.trim().toLowerCase();
     return productGroups
       .filter((group) => catChip === "all" || group.category === catChip)
+      // Koko Lengan Pendek tidak tampil sendiri; dipilih lewat langkah Model produk Panjang-nya.
+      .filter((group) => !group.panjangGroup)
       .filter((group) => {
         if (!query) return true;
         return `${group.name} ${group.kain} ${group.category} ${group.warnas.join(" ")}`.toLowerCase().includes(query);
@@ -869,7 +887,11 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     const step = seriesStep(row.category, row.kain, row.warna);
     if (step.show && row.series === null) return null;
     const series = step.show ? row.series : "";
-    const rows = rowsFor(row.category, row.kain, row.warna).filter((entry) => (entry.series || "") === series);
+    // Cocokkan juga NAMA produk: Koko Lengan Panjang dan Lengan Pendek memakai kategori, kain, dan
+    // warna yang sama, jadi tanpa ini pilihan Pendek bisa ter-resolve ke produk Panjang.
+    const rows = rowsFor(row.category, row.kain, row.warna).filter(
+      (entry) => (entry.series || "") === series && (!row.product || entry.product_name === row.product),
+    );
     return rows.length === 1 ? rows[0] : rows[0] || null;
   };
 
@@ -1662,6 +1684,37 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       const warna = nextGroup.warnas[0] || "";
       scrollToStep(seriesStep(nextGroup.category, nextGroup.kain, warna).show ? seriesStepRef : sizeStepRef);
     }
+  };
+
+  /**
+   * Koko: ganti Model (Lengan Panjang <-> Lengan Pendek). Pendek = produk turunan yang stoknya
+   * meminjam Panjang, jadi baris berpindah ke produk turunannya (harga, stok, dan pemotongan stok
+   * mengikuti produk itu, sama seperti di website). Warna dan ukuran dipertahankan kalau di model
+   * tujuan juga ada; kalau tidak, dikosongkan supaya dipilih ulang. Harga manual dikosongkan:
+   * harganya milik model yang lama.
+   */
+  const chooseModel = (index, target) => {
+    const row = items[index];
+    if (!row || !target || row.product === target.name) return;
+    const warna = target.warnas.includes(row.warna) ? row.warna : target.warnas.length === 1 ? target.warnas[0] : "";
+    const variantOk =
+      Boolean(warna) &&
+      Boolean(row.variant) &&
+      dataset.some(
+        (entry) =>
+          entry.product_id === target.product_id &&
+          Object.keys(entry.sizes || {}).some((size) => `${entry.color}||${size}` === row.variant),
+      );
+    updateRow(index, {
+      product: target.name,
+      category: target.category,
+      kain: target.kain,
+      warna,
+      series: null,
+      variant: variantOk ? row.variant : "",
+      price: "",
+      priceManual: false,
+    });
   };
 
   /* Kata kunci & chip direset saat pindah baris supaya ketikan tidak "menempel" ke item lain,
@@ -3338,7 +3391,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                           ) : (
                             <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 dark:bg-slate-900 px-3 py-2">
                               <span className="min-w-0 text-sm font-bold text-slate-900 dark:text-white truncate">
-                                {group.name}
+                                {(group.panjangGroup || group).name}
                                 {group.kain ? (
                                   <span className="font-semibold text-slate-500 dark:text-slate-400"> · Kain {group.kain}</span>
                                 ) : null}
@@ -3353,6 +3406,41 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                             </div>
                           )}
                         </div>
+
+                        {/* Model Koko: Lengan Panjang | Lengan Pendek. Pendek meminjam stok Panjang,
+                            jadi ukuran yang tampil di bawah selalu sisa stok Panjang. */}
+                        {group && (group.pendekGroup || group.panjangGroup) && (
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                              Model
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {[
+                                { pendek: false, label: LENGAN_PANJANG },
+                                { pendek: true, label: LENGAN_PENDEK },
+                              ].map((model) => {
+                                const base = group.panjangGroup || group;
+                                const target = model.pendek ? base.pendekGroup : base;
+                                const active = Boolean(group.panjangGroup) === model.pendek;
+                                return (
+                                  <button
+                                    key={model.label}
+                                    type="button"
+                                    aria-pressed={active}
+                                    onClick={() => chooseModel(index, target)}
+                                    className={`px-3 py-2 rounded-xl border-2 text-sm font-bold transition-colors ${
+                                      active
+                                        ? "border-slate-900 dark:border-white bg-slate-900 dark:bg-white text-white dark:text-slate-900"
+                                        : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                    }`}
+                                  >
+                                    {model.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Langkah varian: pakaian = Warna, Cover & Hanger = PAKET (nama paket +
                             harga + sisa stok). Satu paket pun tetap ditampilkan sebagai chip supaya
