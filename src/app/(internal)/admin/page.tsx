@@ -510,7 +510,7 @@ function AdminPageInner() {
     e.preventDefault();
     setAuthError("");
     // Sign out any existing session first (customer might be logged in)
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setAuthError(error.message);
@@ -519,7 +519,7 @@ function AdminPageInner() {
     const u = data.user;
     const { data: adminData } = await supabase.from("admins").select("role").eq("user_id", u.id).single();
     if (!adminData) {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "local" });
       setAuthError("Akun ini bukan akun admin. Silakan gunakan akun admin yang benar.");
       return;
     }
@@ -528,7 +528,7 @@ function AdminPageInner() {
   }
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     setUser(null);
     setRole(null);
     setOrders([]);

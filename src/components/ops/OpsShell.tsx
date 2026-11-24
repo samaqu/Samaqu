@@ -364,7 +364,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
     const res = await fetch("/api/ops/leads?limit=1&options=0", { headers: { Authorization: `Bearer ${data.session.access_token}` } });
     if (!res.ok) {
       setError("Akun ini bukan admin SAMAQU");
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "local" });
       setBusy(false);
       return;
     }
@@ -374,7 +374,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
   }
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     setAuthorized(false);
   }
 

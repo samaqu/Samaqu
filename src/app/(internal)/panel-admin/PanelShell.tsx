@@ -554,7 +554,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
     });
     if (!res.ok) {
       setError("Akun ini bukan admin SAMAQU");
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "local" });
       setBusy(false);
       return;
     }
@@ -568,7 +568,7 @@ export default function PanelShell({ children }: { children: ReactNode }) {
   /** Keluar dari panel: sesi Supabase dihapus, cache akun ini dibuang, lalu kembali ke formulir login. */
   async function handleLogout() {
     setMobileNavOpen(false);
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     queryClient.clear();
     setPassword("");
     setAuthorized(false);
