@@ -418,12 +418,16 @@ export function deteksiAlamat(teks: string, sumber: WilayahSource): HasilDeteksi
     .flatMap((sel) => (adaTab ? [sel] : sel.split(/[,;\n|·•]+/).map((bagian) => rapikan(bagian))))
     .filter(Boolean);
 
-  /** Satu potongan dinilai "nama orang" (bukan label wilayah, bukan alamat, bukan angka). */
-  const tampakNamaOrang = (potongan: string): boolean => {
+  /**
+   * Satu potongan dinilai "nama orang" (bukan label wilayah, bukan alamat, bukan angka).
+   * `minKata` bawaan 2 (potongan acak di tengah teks yang cuma satu kata terlalu sering bukan nama);
+   * 1 hanya dipakai untuk potongan yang berdiri sendiri tepat sebelum nomor HP.
+   */
+  const tampakNamaOrang = (potongan: string, minKata = 2): boolean => {
     const isi = rapikan(potongan);
     if (!isi || /\d/.test(isi)) return false;
     const kata = normal(isi).split(" ").filter(Boolean);
-    if (kata.length < 2 || kata.length > 4) return false;
+    if (kata.length < minKata || kata.length > 4) return false;
     // Label wilayah ("Kec. Cibinong", "Kota Depok") bukan nama orang.
     if (AWALAN_ADMIN.has(kata[0])) return false;
     if (sumber.provinces.some((p) => skorCocok(isi, p) > 0)) return false;
@@ -450,11 +454,16 @@ export function deteksiAlamat(teks: string, sumber: WilayahSource): HasilDeteksi
     const labelNama = nilaiLabel(satuBaris, /(?:nama\s+lengkap|nama\s+penerima|nama)\s*:\s*([^\n,;|]+)/i);
     // Nama yang berdiri di barisnya sendiri ("Siti Aminah\nJl. Melati…") → pakai baris itu, jangan
     // digabung dengan seluruh teks sebelum nomor HP.
-    const barisNama = potonganBaris.find(tampakNamaOrang);
+    const barisNama = potonganBaris.find((potongan) => tampakNamaOrang(potongan));
     // Nama yang berdiri sendiri di potongan pertama (dipisah koma/baris): "Indra Ardiansyah, Jalan…".
     const potonganPertama = potonganBaris[0] || "";
     const namaPotonganPertama = tampakNamaOrang(potonganPertama) ? potonganPertama : "";
-    nama = rapikan(buangAwalanLabel(labelNama || namaPotonganPertama || barisNama || sebelumHp));
+    // Satu-satunya potongan sebelum nomor HP ("Inal\n0813…\nSimpang Sambung, …") adalah nama, walau
+    // cuma satu kata. Tanpa ini potongan alamat dua kata ("Simpang Sambung") di bawahnya ikut terpilih
+    // jadi nama, dan "Inal" nyasar ke alamat. Hanya berlaku bila TIDAK ada potongan lain sebelum HP.
+    const potonganSebelumHp = sebelumHp.split(/[,;\n|·•]+/).map((bagian) => rapikan(bagian)).filter(Boolean);
+    const namaSebelumHp = potonganSebelumHp.length === 1 && tampakNamaOrang(potonganSebelumHp[0], 1) ? potonganSebelumHp[0] : "";
+    nama = rapikan(buangAwalanLabel(labelNama || namaPotonganPertama || namaSebelumHp || barisNama || sebelumHp));
     // Alamat dinilai dari SELURUH teks: label "Alamat Lengkap:" / "Kecamatan:" bisa berada
     // SETELAH nomor WA pada tempelan CRM, dan nomor HP pun bisa berada di akhir baris — kalau hanya
     // potongan sesudah HP yang dipakai, alamatnya bisa kosong sama sekali.
