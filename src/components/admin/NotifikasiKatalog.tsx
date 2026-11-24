@@ -50,6 +50,9 @@ const PENANDA_INFO: Record<string, { label: string; contoh: string }> = {
   alasan: { label: "Alasan pembatalan", contoh: "Stok habis" },
   info_refund: { label: "Info refund", contoh: "Refund diproses 1–3 hari kerja" },
   nama_rekening: { label: "Nama pemilik rekening", contoh: "Ardo Babus Abdullah" },
+  estimasi: { label: "Estimasi barang siap (pre-order)", contoh: "7-10 hari kerja" },
+  dp: { label: "DP yang diterima (pre-order)", contoh: "Rp303.500" },
+  sisa: { label: "Sisa pembayaran (pre-order)", contoh: "Rp303.500" },
 };
 
 /** Data contoh HANYA untuk preview — tidak pernah ikut disimpan/dikirim. */
@@ -73,6 +76,9 @@ const SAMPLE: Record<string, string> = {
   alasan: "Stok habis",
   info_refund: "Refund diproses 1–3 hari kerja",
   nama_rekening: "Ardo Babus Abdullah",
+  estimasi: "7-10 hari kerja",
+  dp: "Rp303.500",
+  sisa: "Rp303.500",
 };
 
 /** Isi penanda dengan data contoh; penanda tak dikenal dibiarkan apa adanya. */

@@ -18,7 +18,13 @@ import { isCodOrderPayment } from "@/lib/payment-methods";
 import { isOpsAdmin, opsIdentity, unauthorized } from "@/lib/ops-auth";
 import { syncCommissionStatus } from "@/lib/affiliate/commission";
 import { computeOrderPackaging, packagingItemsForRpc } from "@/lib/produksi-order-hpp";
-import { PREORDER_NOT_READY_MESSAGE, isPreorderWaiting, parsePreorderCancelReason } from "@/lib/preorder";
+import {
+  PREORDER_NOT_READY_MESSAGE,
+  isPreorderDpPending,
+  isPreorderWaiting,
+  parsePreorderCancelReason,
+  preorderUnsettledMessage,
+} from "@/lib/preorder";
 
 /**
  * Notifikasi "pesanan dikirim" untuk resi yang disimpan manual (HBO) — memakai klaim atomik
@@ -150,7 +156,7 @@ export async function PATCH(request: NextRequest) {
     {
       const { data: poRow } = await supabaseAdmin
         .from("orders")
-        .select("is_preorder, preorder_ready_at, status")
+        .select("is_preorder, preorder_ready_at, status, total, preorder_dp_amount, preorder_settled_at")
         .eq("order_number", identifier)
         .maybeSingle();
       if (poRow && poRow.is_preorder === true) {
@@ -162,6 +168,14 @@ export async function PATCH(request: NextRequest) {
           (blockedWhileWaiting.includes(act) || (isStatusChip && status !== "dibatalkan"))
         ) {
           return NextResponse.json({ error: PREORDER_NOT_READY_MESSAGE }, { status: 400 });
+        }
+        // PO ber-DP yang sisanya belum dilunasi: tidak boleh dibuatkan resi / dikirim, walau stoknya
+        // sudah ready. Batal tetap boleh (dengan alasan wajib, di bawah).
+        if (
+          isPreorderDpPending(poRow) &&
+          (blockedWhileWaiting.includes(act) || (isStatusChip && status !== "dibatalkan"))
+        ) {
+          return NextResponse.json({ error: preorderUnsettledMessage(poRow) }, { status: 400 });
         }
         if (act === "cancelJnt" || (isStatusChip && status === "dibatalkan")) {
           const parsed = parsePreorderCancelReason({ reason, note: reasonNote });

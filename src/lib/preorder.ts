@@ -7,7 +7,7 @@
  *    (`stock_reserved = false`), belum boleh dibuatkan resi, dan tidak masuk antrean packing.
  *  - Saat barang datang admin menandai ready: stok dipotong lalu `preorder_ready_at` terisi, dan
  *    sejak itu PO mengikuti alur pesanan reguler.
- *  - PO wajib Lunas saat dicatat, tidak bisa dibatalkan ke customer; admin hanya boleh membatalkan
+ *  - PO wajib Lunas atau DP 50% saat dicatat (bagian "DP" di bawah), tidak bisa dibatalkan ke customer; admin hanya boleh membatalkan
  *    dengan alasan wajib (tercatat di `orders.cancel_reason`).
  */
 
@@ -35,7 +35,64 @@ export const PREORDER_NOT_READY_MESSAGE =
   "Pesanan pre-order ini masih menunggu stok. Tandai \"Stok sudah ready\" dulu sebelum membuat resi atau mengubah status pengiriman.";
 
 export const PREORDER_MUST_BE_PAID_MESSAGE =
-  "Pre-order wajib Lunas saat dicatat (customer transfer dulu). Pilih status Lunas.";
+  "Pre-order wajib Lunas atau DP saat dicatat (customer transfer dulu). Pilih Lunas atau DP 50%.";
+
+/* ── DP (uang muka) ─────────────────────────────────────────────────────────────
+ * PO boleh dicatat dengan DP 50% dari total pesanan (pilihan lain: Lunas penuh).
+ *  - `orders.preorder_dp_amount` = nominal DP yang diterima (null = PO Lunas penuh / bukan PO).
+ *  - `orders.preorder_settled_at` = waktu admin mencatat pelunasan sisa (null = sisa belum dibayar).
+ *  - Status pesanan TETAP `diproses` + `payment_status = "paid"` (DP sudah masuk), jadi omset dan
+ *    laporan lama tidak berubah: omset = total pesanan saat dicatat. Yang membedakan hanya dua
+ *    kolom di atas. Sisa tagihan = total - DP, sampai pelunasan dicatat.
+ *  - Selama sisa belum lunas: resi/kirim/GoSend diblokir (server + layar). "Stok sudah ready"
+ *    tetap boleh ditekan.
+ *  - Uang tidak diurus sistem: kalau PO ber-DP dibatalkan, pengembalian DP dilakukan manual di
+ *    luar sistem (dialog batal memberi peringatan). */
+
+/** Persen DP tetap. Satu angka di satu tempat; UI dan server memakai fungsi di bawah. */
+export const PREORDER_DP_PERCENT = 50;
+
+/** Kolom minimum untuk membaca status DP dari baris `orders`. */
+export interface PreorderDpFlags extends PreorderFlags {
+  total?: number | string | null;
+  preorder_dp_amount?: number | string | null;
+  preorder_settled_at?: string | null;
+}
+
+/** Nominal DP untuk satu total: 50% dibulatkan ke rupiah penuh. Total tidak valid/<= 0 menghasilkan 0. */
+export function preorderDpFor(total: unknown): number {
+  const value = Math.round(Number(total) || 0);
+  if (value <= 0) return 0;
+  return Math.round((value * PREORDER_DP_PERCENT) / 100);
+}
+
+/** PO ini dicatat dengan DP (bukan Lunas penuh): ada nominal DP yang tersimpan. */
+export function hasPreorderDp(order?: PreorderDpFlags | null): boolean {
+  return isPreorder(order) && (Number(order?.preorder_dp_amount) || 0) > 0;
+}
+
+/** PO ber-DP yang sisanya BELUM dilunasi dan belum dibatalkan. */
+export function isPreorderDpPending(order?: PreorderDpFlags | null): boolean {
+  return hasPreorderDp(order) && !order?.preorder_settled_at && String(order?.status || "") !== "dibatalkan";
+}
+
+/** Sisa tagihan (rupiah): total - DP selama belum lunas, 0 kalau sudah lunas/bukan PO ber-DP. */
+export function preorderBalanceDue(order?: PreorderDpFlags | null): number {
+  if (!isPreorderDpPending(order)) return 0;
+  return Math.max(0, Math.round(Number(order?.total) || 0) - Math.round(Number(order?.preorder_dp_amount) || 0));
+}
+
+const rupiahText = (value: number) => `Rp ${Math.round(value).toLocaleString("id-ID")}`;
+
+/** Pesan penolakan server untuk resi/kirim saat sisa DP belum dibayar. */
+export function preorderUnsettledMessage(order?: PreorderDpFlags | null): string {
+  return `Pre-order ini baru DP. Sisa ${rupiahText(preorderBalanceDue(order))} belum dibayar. Catat pelunasan dulu di menu Pre-Order sebelum membuat resi atau mengirim.`;
+}
+
+/** Label singkat DP di tabel/drawer: "DP 50%" sampai lunas. Null = bukan PO ber-DP atau sudah lunas. */
+export function preorderDpLabel(order?: PreorderDpFlags | null): string | null {
+  return isPreorderDpPending(order) ? `DP ${PREORDER_DP_PERCENT}%` : null;
+}
 
 /** Estimasi untuk customer: teks bebas pendek; kosong → bawaan "7-10 hari kerja". */
 export function normalizePreorderEstimate(value: unknown): string {

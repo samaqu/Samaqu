@@ -32,8 +32,9 @@ import PanelDetailPesanan, { PanelDetailShell, PanelLacakModal, jamWIB } from "@
 import ResellerOrderBlock from "@/components/reseller/admin/ResellerOrderBlock";
 import { describePayment } from "@/lib/order-shared";
 import { lenganModelLabel } from "@/lib/lengan-pendek";
+import { PREORDER_DP_PERCENT } from "@/lib/preorder";
 
-export default function TransaksiDetailDrawer({ open, order, variant = "ops", owner = "panel", onClose, onEdit, onCancel, onDelete, onResiCreated }) {
+export default function TransaksiDetailDrawer({ open, order, variant = "ops", owner = "panel", onClose, onEdit, onCancel, onDelete, onResiCreated, onSettle = undefined }) {
   const isPanel = variant === "panel";
   // Tema tampilan baru: panel admin (default) memakai warna pastel, dashboard ops memakai
   // mono hitam-putih supaya sama dengan /admin. Ditentukan pemanggil, bukan ditebak.
@@ -309,6 +310,7 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
     // aksinya "Stok sudah ready" di menu Pre-Order.
     const bisaProses =
       !order.preorder_waiting &&
+      !order.dp_pending &&
       (order.status === "pending" || (order.status === "diproses" && order.shipping_status !== "dikirim"));
     if (bisaProses && order.status !== stage) {
       aksi.push({
@@ -328,6 +330,16 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
         onClick: () => {
           if (canHubungiCustomer) window.open(`https://wa.me/${customerWa}`, "_blank", "noopener,noreferrer");
         },
+      });
+    } else if (order.dp_pending && order.status !== "dibatalkan") {
+      // PO ber-DP: yang harus dilakukan berikutnya adalah pelunasan, bukan resi. Tombol "Cetak Resi" yang
+      // mati tidak ditampilkan di sini supaya admin tidak mengira ada yang rusak.
+      aksi.push({
+        key: "lunas",
+        label: "Catat Pelunasan",
+        jenis: "utama",
+        hint: `Sisa Rp ${formatRupiah(order.balance_due)} sudah dibayar customer`,
+        onClick: () => onSettle?.(order),
       });
     } else if (canPrint) {
       aksi.push({ key: "cetak", label: orderGosend ? "Cetak Label" : "Cetak Resi", jenis: "utama", onClick: () => resiPanelRef.current?.print() });
@@ -367,6 +379,17 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
         }))}
       />
     );
+
+    // PO ber-DP yang sisanya belum dibayar: pengingat pelunasan lewat WhatsApp (nomor pesanan + sisa).
+    if (order.dp_pending && canHubungiPanel) {
+      const pesanDp = `Halo Ka, pre-order ${order.order_number} di SAMAQU sudah kami catat dengan DP. Sisa pembayarannya Rp ${formatRupiah(order.balance_due)}. Yuk dilunasi ya Ka supaya pesanan bisa segera kami kirim setelah barangnya siap. Terima kasih!`;
+      aksi.push({
+        key: "ingatkan-lunas",
+        label: "Ingatkan Pelunasan",
+        jenis: "sekunder",
+        onClick: () => window.open(`https://wa.me/${panelWa}?text=${encodeURIComponent(pesanDp)}`, "_blank", "noopener,noreferrer"),
+      });
+    }
 
     // Khusus belum bayar: aksi utama "Ingatkan Bayar" (WhatsApp berisi nomor pesanan & total).
     if (stage === "belum_bayar" && canHubungiPanel) {
@@ -438,6 +461,19 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
                kosong menggantung di atas footer. */
             order.items_edited_after_resi || order.notes || statusError || order.is_preorder || (editLockedReason && order.status !== "dibatalkan") ? (
               <>
+                {order.is_preorder && order.preorder_dp_amount ? (
+                  order.dp_pending ? (
+                    <div className="dp-warning" role="status" data-testid="preorder-dp-info">
+                      <b>DP {PREORDER_DP_PERCENT}% sudah diterima Rp {formatRupiah(order.preorder_dp_amount)}.</b> Sisa{" "}
+                      <b>Rp {formatRupiah(order.balance_due)}</b> belum dibayar. Resi dan pengiriman dibuka setelah pelunasan dicatat.
+                    </div>
+                  ) : (
+                    <p className="dp-catatan" data-testid="preorder-dp-info">
+                      DP Rp {formatRupiah(order.preorder_dp_amount)} dan pelunasan sudah dicatat
+                      {order.preorder_settled_at ? ` (${jamWIB(order.preorder_settled_at)})` : ""}. Pesanan sudah lunas.
+                    </p>
+                  )
+                ) : null}
                 {order.is_preorder ? (
                   <p className="dp-catatan" data-testid="preorder-info">
                     Pre-order · estimasi barang siap: {order.preorder_estimate || "7-10 hari kerja"}.{" "}

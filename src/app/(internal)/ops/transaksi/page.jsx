@@ -22,6 +22,7 @@ import { matchesStage } from "@/lib/order-flow";
 import { countByStage, stageCounts, stageTabsWithCounts } from "@/lib/order-shared";
 import DateFilter from "@/components/ops/leads/DateFilter";
 import ConfirmDeleteModal from "@/components/ops/ConfirmDeleteModal";
+import ConfirmDialog from "@/components/ops/ConfirmDialog";
 import PreorderReasonDialog from "@/components/ops/transaksi/PreorderReasonDialog";
 import TransaksiFormModal from "@/components/ops/transaksi/TransaksiFormModal";
 import TransaksiDetailDrawer from "@/components/ops/transaksi/TransaksiDetailDrawer";
@@ -115,6 +116,8 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
       if (isPoPage) {
         if (poFilter === "menunggu" && !order.preorder_waiting) return false;
         if (poFilter === "ready" && (order.preorder_waiting || order.status === "dibatalkan")) return false;
+        // Sisa DP belum dibayar (menunggu pelunasan), apa pun status stoknya.
+        if (poFilter === "dp" && !order.dp_pending) return false;
       } else if (!matchesStage(order, stageFilter)) {
         // Saring per TAHAP (order-flow, sama seperti halaman Pesanan admin).
         return false;
@@ -291,6 +294,28 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
       toast({ title: "Gagal menandai ready", description: error instanceof Error ? error.message : "Coba lagi.", variant: "destructive" }),
   });
 
+  /**
+   * "Catat pelunasan" sisa DP satu PO. Tidak ada uang yang diproses sistem: ini hanya mencatat bahwa
+   * sisanya sudah dibayar (diterima di luar sistem), lalu resi dan pengiriman dibuka. Selalu lewat
+   * dialog konfirmasi supaya tidak tercatat lunas karena klik tak sengaja.
+   */
+  const [settleTarget, setSettleTarget] = useState(null);
+  const settleMutation = useMutation({
+    mutationFn: (order) => base44.entities.Preorder.settle(order.order_number),
+    onSuccess: (_result, order) => {
+      setSettleTarget(null);
+      // Drawer yang sedang terbuka untuk pesanan ini langsung berubah jadi lunas; daftar disegarkan dari server.
+      const patch = { preorder_settled_at: new Date().toISOString(), dp_pending: false, balance_due: 0, status_label: "Lunas" };
+      setDetail((current) => (current && current.order_number === order.order_number ? { ...current, ...patch } : current));
+      queryClient.invalidateQueries({ queryKey: ["transaksi"] });
+      toast({ title: "✅ Pelunasan dicatat", description: `${order.order_number} · sudah lunas, resi dan pengiriman dibuka`, variant: "success" });
+    },
+    onError: (error) => {
+      setSettleTarget(null);
+      toast({ title: "Gagal mencatat pelunasan", description: error instanceof Error ? error.message : "Coba lagi.", variant: "destructive" });
+    },
+  });
+
   /** Proses semua PO yang stoknya cukup, urut siapa transfer duluan; yang belum cukup dilewati. */
   const [readyAllOpen, setReadyAllOpen] = useState(false);
   const readyAllMutation = useMutation({
@@ -386,8 +411,17 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
   const poStats = useMemo(() => {
     const waiting = listOrders.filter((order) => order.preorder_waiting).length;
     const ready = listOrders.filter((order) => order.is_preorder && !order.preorder_waiting && order.status !== "dibatalkan").length;
-    return { waiting, ready, total: listOrders.length };
+    // PO ber-DP yang sisanya belum dilunasi (jumlah + total sisa tagihan).
+    const dpOrders = listOrders.filter((order) => order.dp_pending);
+    const dp = dpOrders.length;
+    const dpBalance = dpOrders.reduce((sum, order) => sum + (Number(order.balance_due) || 0), 0);
+    return { waiting, ready, total: listOrders.length, dp, dpBalance };
   }, [listOrders]);
+
+  // Tab "Belum lunas" hilang saat pelunasan terakhir dicatat: jangan tinggal di filter yang kosong.
+  useEffect(() => {
+    if (poFilter === "dp" && poStats.dp === 0) setPoFilter("semua");
+  }, [poFilter, poStats.dp]);
 
   // Warna badge STATUS pesanan (bukan tahap packing) untuk tabel panel.
   const PANEL_STATUS_COLOR = { pending: "bayar", diproses: "siap", dikirim: "kirim", selesai: "selesai", dibatalkan: "batal" };
@@ -425,6 +459,7 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
         }}
         onCancel={(order) => setCancelTarget(order)}
         onDelete={(order) => setDeleteTarget(order)}
+        onSettle={(order) => setSettleTarget(order)}
       />
 
       {resellerEdit ? (
@@ -439,10 +474,27 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
         />
       ) : null}
 
+      {/* Catat pelunasan sisa DP pre-order (konfirmasi dulu; tidak ada uang yang diproses sistem). */}
+      <ConfirmDialog
+        open={!!settleTarget}
+        title="Catat pelunasan?"
+        message={
+          settleTarget
+            ? `Sisa Rp ${formatRupiah(settleTarget.balance_due)} dari ${settleTarget.order_number} (${settleTarget.customer_name}) sudah dibayar customer? Setelah dicatat, pesanan jadi lunas dan resi bisa dibuat. Sistem hanya mencatat; uangnya tidak diproses di sini.`
+            : ""
+        }
+        confirmLabel="Ya, sudah lunas"
+        zIndex={10000}
+        busy={settleMutation.isPending}
+        onConfirm={() => settleTarget && settleMutation.mutate(settleTarget)}
+        onCancel={() => setSettleTarget(null)}
+      />
+
       {/* Pre-order: batal/hapus wajib beralasan (kebijakan: PO tidak dapat dibatalkan ke customer). */}
       <PreorderReasonDialog
         isOpen={!!cancelTarget?.is_preorder}
         action="batal"
+        dpAmount={cancelTarget?.preorder_dp_amount}
         itemName={cancelTarget ? `${cancelTarget.order_number} · ${cancelTarget.customer_name}` : undefined}
         isBusy={cancelMutation.isPending}
         onClose={() => setCancelTarget(null)}
@@ -451,6 +503,7 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
       <PreorderReasonDialog
         isOpen={!!deleteTarget?.is_preorder}
         action="hapus"
+        dpAmount={deleteTarget?.preorder_dp_amount}
         itemName={deleteTarget ? `${deleteTarget.order_number} · ${deleteTarget.customer_name}` : undefined}
         isBusy={deleteMutation.isPending}
         onClose={() => setDeleteTarget(null)}
@@ -512,7 +565,7 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
                 <b style={{ color: "#7e22ce" }}>
                   <AnimatedNumber value={isLoading || poSummaryLoading ? 0 : poSummary?.waiting_count ?? poStats.waiting} />
                 </b>
-                <i>Sudah Lunas, belum diproses</i>
+                <i>Sudah bayar (Lunas atau DP), belum diproses</i>
               </div>
               <div className="card k">
                 <small>Bisa diproses sekarang</small>
@@ -611,6 +664,8 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
               ? [
                   { key: "menunggu", label: "Menunggu stok", count: poStats.waiting, stage: "menunggu_stok" },
                   { key: "ready", label: "Sudah ready", count: poStats.ready, stage: "belum_dipacking" },
+                  // Muncul hanya kalau ada PO ber-DP yang menunggu pelunasan (tab tidak ramai untuk PO Lunas).
+                  ...(poStats.dp > 0 ? [{ key: "dp", label: "Belum lunas", count: poStats.dp, stage: "belum_bayar" }] : []),
                   { key: "semua", label: "Semua", count: poStats.total, stage: "semua" },
                 ].map((tab) => (
                   <button
@@ -857,6 +912,8 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
                         {order.status === "diproses" ? (
                           order.preorder_waiting ? (
                             <small className="pack-todo">Menunggu stok</small>
+                          ) : order.dp_pending ? (
+                            <small className="pack-todo">Menunggu pelunasan</small>
                           ) : (
                             <small className={order.awb_no ? "pack-done" : "pack-todo"}>
                               {order.awb_no ? "Menunggu pickup" : "Belum di packing"}
@@ -866,6 +923,29 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
                       </td>
                       <td data-label="Status">
                         <span className={`bd s-${PANEL_STATUS_COLOR[order.status] || "batal"}`}>{order.status_label}</span>
+                        {/* PO ber-DP: sisa tagihan terlihat langsung di baris (tanpa buka detail). */}
+                        {order.dp_pending ? (
+                          <small data-testid="po-balance" className="pack-todo" style={{ display: "block", marginTop: 2 }}>
+                            Sisa Rp {formatRupiah(order.balance_due)}
+                          </small>
+                        ) : null}
+                        {/* Menu Pre-Order: "Catat pelunasan" untuk PO ber-DP yang sisanya sudah dibayar customer. */}
+                        {isPoPage && order.dp_pending ? (
+                          <button
+                            type="button"
+                            className="btn-sec"
+                            data-testid="po-settle"
+                            style={{ display: "block", marginTop: 6, padding: "3px 10px", fontSize: 11, lineHeight: 1.2, whiteSpace: "normal" }}
+                            disabled={settleMutation.isPending}
+                            title="Customer sudah membayar sisa DP: catat lunas supaya resi dan pengiriman bisa dibuat"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSettleTarget(order);
+                            }}
+                          >
+                            Catat pelunasan
+                          </button>
+                        ) : null}
                         {/* Menu Pre-Order: tombol "Stok sudah ready" langsung di baris (stok dicek server). */}
                         {isPoPage && order.preorder_waiting ? (
                           <button

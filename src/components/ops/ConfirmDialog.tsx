@@ -16,11 +16,13 @@ interface ConfirmDialogProps {
   /** danger = tombol setuju merah (tindakan yang sulit dibatalkan). */
   tone?: "default" | "danger";
   busy?: boolean;
+  /** Lapisan tumpukan; naikkan bila dialog harus muncul di atas drawer detail (z-index 9998). */
+  zIndex?: number;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-export default function ConfirmDialog({ open, title, message, confirmLabel, cancelLabel = "Batal", tone = "default", busy = false, onConfirm, onCancel }: ConfirmDialogProps) {
+export default function ConfirmDialog({ open, title, message, confirmLabel, cancelLabel = "Batal", tone = "default", busy = false, zIndex = 100, onConfirm, onCancel }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   // onCancel dibaca lewat ref supaya render ulang induk tidak memicu fokus ulang ke tombol Batal.
   const onCancelRef = useRef(onCancel);
@@ -43,7 +45,7 @@ export default function ConfirmDialog({ open, title, message, confirmLabel, canc
     <div
       role="presentation"
       onClick={onCancel}
-      style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(15,23,42,0.45)", display: "grid", placeItems: "center", padding: 16 }}
+      style={{ position: "fixed", inset: 0, zIndex, background: "rgba(15,23,42,0.45)", display: "grid", placeItems: "center", padding: 16 }}
     >
       <div
         role="alertdialog"

@@ -247,6 +247,13 @@ export const base44 = {
       async ready(orderNumber: string) {
         return call<{ ok: boolean; order_number: string }>("POST", PREORDER, { action: "ready", order_number: orderNumber });
       },
+      /** Catat pelunasan sisa DP satu PO (resi/kirim dibuka sesudahnya). Tidak memproses uang. */
+      async settle(orderNumber: string) {
+        return call<{ ok: boolean; order_number: string; balance_paid: number }>("POST", PREORDER, {
+          action: "settle",
+          order_number: orderNumber,
+        });
+      },
       /** Proses semua PO yang stoknya cukup, urut siapa transfer duluan; yang belum cukup dilewati. */
       async readyAll() {
         return call<{

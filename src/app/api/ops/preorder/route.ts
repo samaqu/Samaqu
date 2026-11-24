@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, opsIdentity, unauthorized } from "@/lib/ops-auth";
-import { preorderDemand, variantKey } from "@/lib/preorder";
+import { isPreorderDpPending, preorderBalanceDue, preorderDemand, variantKey } from "@/lib/preorder";
 import {
   isServiceLine,
   loadWaitingPreorders,
@@ -83,6 +83,42 @@ export async function POST(req: NextRequest) {
       if (!result.ok) return bad(result.message);
       console.log("[PREORDER] ready:", orderNumber, "oleh", actor);
       return NextResponse.json({ ok: true, order_number: orderNumber });
+    }
+
+    // Catat pelunasan sisa DP: tidak ada uang yang diproses sistem, hanya mencatat bahwa sisanya sudah
+    // dibayar (diterima admin di luar sistem). Sesudah ini resi/kirim dibuka. Aman terhadap dobel
+    // klik: penulisan bersyarat (`preorder_settled_at is null`).
+    if (action === "settle") {
+      const orderNumber = String(body?.order_number || "").trim();
+      if (!orderNumber) return bad("Nomor pesanan wajib diisi");
+      const { data: order, error: readError } = await admin
+        .from("orders")
+        .select("id, order_number, status, total, is_preorder, preorder_dp_amount, preorder_settled_at")
+        .eq("order_number", orderNumber)
+        .maybeSingle();
+      if (readError) return bad("Gagal membaca pesanan", 500);
+      if (!order) return bad("Pesanan tidak ditemukan", 404);
+      if (!isPreorderDpPending(order as any)) {
+        return bad("Pre-order ini tidak punya sisa DP yang menunggu pelunasan (sudah lunas, dibatalkan, atau bukan pre-order ber-DP).");
+      }
+      // Sisa dihitung SEBELUM menulis: itulah nominal yang dicatat sebagai sudah dibayar.
+      const balance = preorderBalanceDue(order as any);
+      const now = new Date().toISOString();
+      const { data: updated, error: writeError } = await admin
+        .from("orders")
+        .update({ preorder_settled_at: now, updated_at: now })
+        .eq("id", (order as any).id)
+        .eq("is_preorder", true)
+        .is("preorder_settled_at", null)
+        .neq("status", "dibatalkan")
+        .select("id");
+      if (writeError) {
+        console.error("[PREORDER] settle gagal:", orderNumber, writeError.message);
+        return bad("Gagal mencatat pelunasan. Coba lagi.", 500);
+      }
+      if (!updated || updated.length === 0) return bad("Pelunasan pre-order ini sudah dicatat sebelumnya.");
+      console.log("[PREORDER] settle:", orderNumber, "sisa", balance, "oleh", actor);
+      return NextResponse.json({ ok: true, order_number: orderNumber, balance_paid: balance });
     }
 
     if (action === "ready_all") {

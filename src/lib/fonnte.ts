@@ -443,6 +443,8 @@ export interface PreorderCreatedNotification {
   items: NewOrderNotificationItem[];
   /** Teks estimasi, mis. "7-10 hari kerja" (bisa diedit per pesanan). */
   estimate: string;
+  /** Terisi bila PO dicatat dengan DP: nominal DP yang diterima, sisa yang harus dibayar, dan total. */
+  dp?: { amount: number; balance: number; total: number };
 }
 
 export interface ShippedNotification {
@@ -658,6 +660,39 @@ export function buildPreorderCreatedMessage(order: PreorderCreatedNotification):
     `Estimasi barang siap: ${order.estimate}`,
     "",
     "Pesanan akan kami proses dan kirim setelah barangnya tersedia, dan semua item dikirim sekaligus.",
+    "",
+    "Mohon diperhatikan, pesanan pre-order tidak dapat dibatalkan.",
+    "",
+    "Terima kasih telah mempercayakan pesanan ini kepada SAMAQU.",
+  ].join("\n");
+}
+
+/**
+ * Pesan "pre-order sudah dicatat" untuk PO yang dibayar dengan DP: menyebut DP yang diterima, sisa
+ * yang harus dilunasi sebelum dikirim, dan total. Template terpisah dari pre-order Lunas supaya
+ * teks Lunas yang sudah disesuaikan admin tidak ikut berubah.
+ */
+export function buildPreorderDpCreatedMessage(order: PreorderCreatedNotification): string {
+  const ka = greetingName(order.customerName);
+  const dp = order.dp ?? { amount: 0, balance: 0, total: 0 };
+  return [
+    `Halo ${ka},`,
+    "",
+    "Terima kasih, DP pre-order Ka sudah kami terima.",
+    "",
+    `Nomor Pesanan: ${order.orderNumber}`,
+    "Pesanan:",
+    whatsAppItemLines(order.items),
+    "",
+    `Total pesanan: ${rupiah(dp.total)}`,
+    `DP diterima: ${rupiah(dp.amount)}`,
+    `Sisa pembayaran: ${rupiah(dp.balance)}`,
+    "",
+    "Sisa pembayaran dilunasi sebelum pesanan dikirim. Kami akan menghubungi Ka saat barangnya sudah tersedia.",
+    "",
+    `Estimasi barang siap: ${order.estimate}`,
+    "",
+    "Pesanan akan kami kirim setelah barangnya tersedia dan pembayaran lunas, dan semua item dikirim sekaligus.",
     "",
     "Mohon diperhatikan, pesanan pre-order tidak dapat dibatalkan.",
     "",
@@ -890,6 +925,21 @@ export async function notifyCustomerOrderPaid(order: OrderPaidNotification): Pro
 
 /** WA "pre-order dicatat" (sekali, lewat klaim `notify_created_at` di pemanggil). */
 export async function notifyCustomerPreorderCreated(order: PreorderCreatedNotification): Promise<boolean> {
+  // PO ber-DP memakai template sendiri (menyebut DP dan sisa); PO Lunas persis seperti sebelumnya.
+  if (order.dp && order.dp.amount > 0) {
+    return sendToCustomer(
+      order.customerWhatsapp,
+      await buildNotifikasi("pre-order-dp-dicatat", buildPreorderDpCreatedMessage(order), {
+        nama: greetingName(order.customerName),
+        nomor: order.orderNumber,
+        daftar_produk: whatsAppItemLines(order.items),
+        estimasi: order.estimate,
+        total: rupiah(order.dp.total),
+        dp: rupiah(order.dp.amount),
+        sisa: rupiah(order.dp.balance),
+      }),
+    );
+  }
   return sendToCustomer(
     order.customerWhatsapp,
     await buildNotifikasi("pre-order-dicatat", buildPreorderCreatedMessage(order), {
@@ -1350,6 +1400,22 @@ export function templateBawaanNotifikasi(): Record<string, string> {
     [whatsAppItemLines(SAMPEL_ITEM)]: p("daftar_produk"),
   });
 
+  // Nilai contoh sengaja tidak sama (total, DP, sisa) supaya tiap nilai punya penandanya sendiri.
+  const preorderDp = buildPreorderDpCreatedMessage({
+    orderNumber: p("nomor"),
+    customerName: p("nama"),
+    customerWhatsapp: p("wa"),
+    items: SAMPEL_ITEM,
+    estimate: p("estimasi"),
+    dp: { total: 607000, amount: 300000, balance: 307000 },
+  });
+  hasil["pre-order-dp-dicatat"] = gantiDenganPenanda(preorderDp, {
+    [whatsAppItemLines(SAMPEL_ITEM)]: p("daftar_produk"),
+    [rupiah(607000)]: p("total"),
+    [rupiah(300000)]: p("dp"),
+    [rupiah(307000)]: p("sisa"),
+  });
+
   const reminder = buildPaymentReminderMessage({
     orderNumber: p("nomor"),
     customerName: p("nama"),
@@ -1583,6 +1649,19 @@ export function katalogNotifikasi(): NotifikasiInfo[] {
       aktif: true,
       kapan: "Admin mencatat pre-order (sudah Lunas) di menu Transaksi atau Pre-Order; dikirim sekali",
       isi: buildPreorderCreatedMessage({ ...pembeli, items: SAMPEL_ITEM, estimate: "7-10 hari kerja" }),
+    },
+    {
+      key: "pre-order-dp-dicatat",
+      label: "Pre-order dicatat (DP)",
+      ke: "Pembeli",
+      aktif: true,
+      kapan: "Admin mencatat pre-order dengan DP 50% di menu Transaksi atau Pre-Order; dikirim sekali. Menyebut DP yang diterima dan sisa pembayaran",
+      isi: buildPreorderDpCreatedMessage({
+        ...pembeli,
+        items: SAMPEL_ITEM,
+        estimate: "7-10 hari kerja",
+        dp: { total: 607000, amount: 303500, balance: 303500 },
+      }),
     },
     {
       key: "pengingat-bayar",

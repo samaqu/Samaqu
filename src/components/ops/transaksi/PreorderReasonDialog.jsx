@@ -20,6 +20,8 @@ export default function PreorderReasonDialog({
   action = "batal",
   itemName,
   isBusy = false,
+  /** Nominal DP yang sudah diterima (PO ber-DP). Terisi = dialog memberi peringatan soal uang kembali. */
+  dpAmount = 0,
 }) {
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
@@ -82,6 +84,15 @@ export default function PreorderReasonDialog({
               data uji). Alasan dicatat.
               {action === "hapus" ? " Transaksi dihapus permanen." : ""}
             </p>
+            {Number(dpAmount) > 0 ? (
+              <p
+                data-testid="preorder-dp-warning"
+                className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mt-2 text-left"
+              >
+                Pesanan ini sudah menerima DP Rp {Math.round(Number(dpAmount)).toLocaleString("id-ID")}. Sistem tidak mengembalikan uang:
+                kalau DP harus dikembalikan, urus manual ke customer di luar sistem.
+              </p>
+            ) : null}
           </div>
 
           <fieldset className="space-y-1.5 mb-3">

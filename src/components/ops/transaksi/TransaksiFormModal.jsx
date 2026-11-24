@@ -52,6 +52,7 @@ import { OPS_STOCK_SIZES } from "@/lib/ops-stock";
 import { categoryRank, seriesRank, variantSortKey } from "@/lib/ops-order";
 import { formatWeightExact } from "@/lib/shipping-weight";
 import { LENGAN_PANJANG, LENGAN_PENDEK, isLenganPendekRow } from "@/lib/lengan-pendek";
+import { PREORDER_DP_PERCENT, preorderDpFor } from "@/lib/preorder";
 import { formatRupiah, isoToWibInput, itemSummaryLabel, itemSummaryParts, wibNow, wibToIso } from "@/components/ops/transaksi/transaksi-format";
 import TransaksiResiPanel from "@/components/ops/transaksi/TransaksiResiPanel";
 import DuplicateOrderWarning from "@/components/ops/transaksi/DuplicateOrderWarning";
@@ -608,6 +609,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         discount: String(initialData.discount || ""),
         payment_status: initialData.payment_status === "unpaid" ? "unpaid" : "paid",
         is_preorder: initialData.is_preorder === true,
+        // Mode Ubah: hanya penanda (nominal DP milik pesanan, dibaca dari `initialData`, tidak dihitung ulang).
+        preorder_dp: Number(initialData.preorder_dp_amount) > 0,
         preorder_estimate: initialData.preorder_estimate || "",
         notes: initialData.notes || "",
         affiliate_code: "",
@@ -639,6 +642,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         payment_status: "paid",
         // Dibuka dari menu Pre-Order: saklar PO langsung menyala.
         is_preorder: presetPreorder === true,
+        // Pre-Order baru: bawaan DP 50% (admin tinggal pilih "Lunas" kalau customer bayar penuh).
+        preorder_dp: presetPreorder === true,
         preorder_estimate: "",
         notes: "",
         affiliate_code: "",
@@ -1883,7 +1888,14 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       // ikut omset) dan otomatis mengirim invoice berisi nomor rekening ke WA pembeli.
       payment_status: !isPo && form.payment_status === "unpaid" ? "unpaid" : "paid",
       // Pre-order: stok tidak dipotong, wajib Lunas, estimasi kosong = bawaan server ("7-10 hari kerja").
-      ...(isPo ? { is_preorder: true, preorder_estimate: String(form.preorder_estimate || "").trim() } : {}),
+      ...(isPo
+        ? {
+            is_preorder: true,
+            preorder_estimate: String(form.preorder_estimate || "").trim(),
+            // Hanya penanda "pilih DP": server menghitung sendiri 50% dari total, bukan dari angka di sini.
+            ...(form.preorder_dp ? { preorder_dp: true } : {}),
+          }
+        : {}),
       notes: form.notes.trim(),
       // Kode affiliate (opsional): server memeriksa ulang dan mencatat komisinya.
       ...(String(form.affiliate_code || "").trim() ? { affiliate_code: String(form.affiliate_code).trim() } : {}),
@@ -2845,14 +2857,18 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                         checked={isPo}
                         disabled={isEdit}
                         onChange={(event) =>
-                          updateForm(event.target.checked ? { is_preorder: true, payment_status: "paid" } : { is_preorder: false })
+                          updateForm(
+                            event.target.checked
+                              ? { is_preorder: true, payment_status: "paid", preorder_dp: true }
+                              : { is_preorder: false, preorder_dp: false },
+                          )
                         }
                       />
                       <span className="min-w-0">
                         <span className="block text-sm font-bold text-slate-900 dark:text-white">Pre-Order (stok kosong, customer transfer dulu)</span>
                         <span className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                           {isPo
-                            ? "Stok tidak dipotong sekarang, wajib Lunas, dan pesanan tidak dapat dibatalkan ke customer. Customer otomatis dikabari lewat satu WA."
+                            ? "Stok tidak dipotong sekarang. Customer bayar Lunas atau DP 50% (pilih di Status Pembayaran). Pesanan tidak dapat dibatalkan ke customer, dan customer otomatis dikabari lewat satu WA."
                             : "Nyalakan kalau ukuran/warna yang dipesan stoknya kosong dan customer sudah transfer."}
                         </span>
                       </span>
@@ -4179,21 +4195,31 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                   <h4 className={sectionClass}>Status Pembayaran</h4>
                   {/* Segmented control: pilihan aktif solid + ikon, jadi tidak cuma beda border tipis. */}
                   <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
-                    {[
-                      { value: "paid", label: "Lunas", icon: Check },
-                      { value: "unpaid", label: "Belum Lunas", icon: Clock },
-                    ].map((opsi) => {
-                      const active = (form.payment_status || "paid") === opsi.value;
+                    {(isPo
+                      ? [
+                          // Pre-order: customer sudah transfer, entah penuh (Lunas) atau DP 50%. "Belum Lunas" tidak ada.
+                          { value: "lunas", label: "Lunas", icon: Check },
+                          { value: "dp", label: `DP ${PREORDER_DP_PERCENT}%`, icon: Clock },
+                        ]
+                      : [
+                          { value: "paid", label: "Lunas", icon: Check },
+                          { value: "unpaid", label: "Belum Lunas", icon: Clock },
+                        ]
+                    ).map((opsi) => {
+                      const active = isPo ? (opsi.value === "dp") === Boolean(form.preorder_dp) : (form.payment_status || "paid") === opsi.value;
                       const Icon = opsi.icon;
-                      // Pre-order wajib Lunas: customer transfer dulu.
-                      const lockedByPo = isPo && opsi.value === "unpaid";
+                      const lockedByPo = false;
                       return (
                         <button
                           key={opsi.value}
                           type="button"
-                          onClick={() => updateForm({ payment_status: opsi.value })}
+                          data-testid={isPo ? `po-pay-${opsi.value}` : undefined}
+                          onClick={() =>
+                            isPo
+                              ? updateForm({ preorder_dp: opsi.value === "dp", payment_status: "paid" })
+                              : updateForm({ payment_status: opsi.value })
+                          }
                           disabled={lockedByPo}
-                          title={lockedByPo ? "Pre-order wajib Lunas" : undefined}
                           aria-pressed={active}
                           className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-bold transition-all ${
                             active
@@ -4209,9 +4235,44 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                       );
                     })}
                   </div>
+                  {/* Pre-order DP: rincian nominal supaya admin tahu persis berapa yang harus diterima SEKARANG
+                      dan berapa sisanya. Nominal dihitung server (50% dari total); di sini hanya pratinjau. */}
+                  {isPo && form.preorder_dp ? (
+                    <div
+                      data-testid="preorder-dp-box"
+                      className="rounded-xl border border-purple-200 bg-purple-50 px-3.5 py-3 space-y-1.5 dark:border-purple-900 dark:bg-purple-950/30"
+                    >
+                      {total > 0 ? (
+                        <>
+                          <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-300">
+                            <span>Total pesanan</span>
+                            <span>Rp {formatRupiah(total)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm font-black text-purple-900 dark:text-purple-100">
+                            <span>DP {PREORDER_DP_PERCENT}% yang diterima sekarang</span>
+                            <span data-testid="preorder-dp-amount">Rp {formatRupiah(preorderDpFor(total))}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-300">
+                            <span>Sisa, dilunasi sebelum dikirim</span>
+                            <span data-testid="preorder-dp-balance">Rp {formatRupiah(Math.max(0, total - preorderDpFor(total)))}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-xs font-semibold text-purple-800 dark:text-purple-200">
+                          Isi produk dulu, nominal DP {PREORDER_DP_PERCENT}% akan tampil di sini.
+                        </p>
+                      )}
+                      <p className="text-[11px] font-semibold text-purple-800/80 dark:text-purple-200/80">
+                        Catat setelah customer benar-benar transfer DP-nya. Sisanya dicatat lunas nanti lewat tombol “Catat pelunasan” di
+                        menu Pre-Order; resi baru bisa dibuat setelah lunas.
+                      </p>
+                    </div>
+                  ) : null}
                   <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                     {isPo
-                      ? "Pre-order wajib Lunas: customer transfer dulu. Langsung masuk omset; barang dikirim setelah stok ready."
+                      ? form.preorder_dp
+                        ? "DP dicatat sebagai pembayaran yang sudah masuk. Pesanan tetap masuk omset sebesar total; barang dikirim setelah stok ready dan sisanya lunas."
+                        : "Lunas penuh: langsung masuk omset; barang dikirim setelah stok ready."
                       : form.payment_status === "unpaid"
                       ? "Belum ikut dihitung sebagai omset sampai ditandai lunas. Invoice berisi nomor rekening otomatis dikirim ke WA pembeli saat Simpan."
                       : "Transaksi langsung dianggap lunas dan masuk ke omset."}
@@ -4230,10 +4291,16 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                     )}
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-slate-900 dark:text-white">
-                        {form.payment_status === "unpaid" ? "Belum Lunas" : "Lunas"}
+                        {initialData?.dp_pending
+                          ? `DP ${PREORDER_DP_PERCENT}% · sisa Rp ${formatRupiah(initialData.balance_due)} belum dibayar`
+                          : form.payment_status === "unpaid"
+                            ? "Belum Lunas"
+                            : "Lunas"}
                       </p>
                       <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                        Status ini sudah tercatat di pesanan. Kalau berubah, ubah lewat tombol “Tandai Lunas” di detail transaksi.
+                        {initialData?.dp_pending
+                          ? `DP Rp ${formatRupiah(initialData.preorder_dp_amount)} sudah diterima. Pelunasan dicatat lewat tombol “Catat Pelunasan” di detail transaksi atau menu Pre-Order.`
+                          : "Status ini sudah tercatat di pesanan. Kalau berubah, ubah lewat tombol “Tandai Lunas” di detail transaksi."}
                       </p>
                     </div>
                   </div>

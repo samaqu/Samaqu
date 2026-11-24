@@ -133,6 +133,20 @@ const TransaksiResiPanel = forwardRef(function TransaksiResiPanel(
         className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2.5 text-xs font-semibold text-purple-800 dark:border-purple-900/40 dark:bg-purple-900/20 dark:text-purple-200"
       >
         Pre-order menunggu stok. Resi dan pengiriman dibuka setelah barangnya tersedia: tandai “Stok sudah ready” di menu Pre-Order.
+        {order.dp_pending ? ` Sisa DP Rp ${Math.round(Number(order.balance_due) || 0).toLocaleString("id-ID")} juga harus dilunasi dulu (Catat pelunasan).` : ""}
+      </div>
+    );
+  }
+
+  // Pre-order ber-DP yang stoknya sudah ready tapi sisanya belum dibayar: resi/kirim/GoSend dikunci
+  // (server juga menolaknya) sampai admin menekan "Catat pelunasan".
+  if (order.dp_pending === true && !cancelled) {
+    return (
+      <div
+        data-testid="preorder-unsettled-panel"
+        className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-semibold text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-200"
+      >
+        Sisa DP Rp {Math.round(Number(order.balance_due) || 0).toLocaleString("id-ID")} belum dibayar. Resi dan pengiriman dibuka setelah pelunasan dicatat: tekan “Catat Pelunasan” di bawah.
       </div>
     );
   }

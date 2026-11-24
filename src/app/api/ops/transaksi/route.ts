@@ -9,9 +9,13 @@ import { sendOnce } from "@/lib/order-notify";
 import {
   PREORDER_MUST_BE_PAID_MESSAGE,
   isPreorder,
+  isPreorderDpPending,
   isPreorderWaiting,
   normalizePreorderEstimate,
   parsePreorderCancelReason,
+  preorderBalanceDue,
+  preorderDpFor,
+  preorderDpLabel,
 } from "@/lib/preorder";
 import { isLayananCategory } from "@/lib/layanan";
 import { kotaFromShipping } from "@/lib/kota";
@@ -563,7 +567,7 @@ export async function GET(req: NextRequest) {
   let query = admin
     .from("orders")
     .select(
-      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, stock_reserved, shipping_pending, created_by_admin, is_preorder, preorder_estimate, preorder_ready_at, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel, reseller_id, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label, affiliate_id, referral_code",
+      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, stock_reserved, shipping_pending, created_by_admin, is_preorder, preorder_estimate, preorder_ready_at, preorder_dp_amount, preorder_settled_at, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel, reseller_id, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label, affiliate_id, referral_code",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -742,7 +746,8 @@ export async function GET(req: NextRequest) {
       reseller_payment: resellerPaymentByOrder.get(String(order.id)) || null,
       show_reseller_name_on_label: order.show_reseller_name_on_label === true,
       status,
-      status_label: statusLabel(status),
+      // PO yang baru DP tampil "DP 50%" (bukan "Lunas") sampai pelunasan dicatat.
+      status_label: preorderDpLabel(order) ?? statusLabel(status),
       subtotal: Number(order.subtotal) || 0,
       discount: Number(order.discount) || 0,
       shipping_cost: Number(order.shipping_cost) || 0,
@@ -797,6 +802,11 @@ export async function GET(req: NextRequest) {
       preorder_estimate: order.preorder_estimate || null,
       preorder_ready_at: order.preorder_ready_at || null,
       preorder_waiting: isPreorderWaiting(order),
+      // DP pre-order: nominal DP, waktu pelunasan, dan sisa tagihan (0 kalau lunas/bukan PO ber-DP).
+      preorder_dp_amount: Number(order.preorder_dp_amount) > 0 ? Number(order.preorder_dp_amount) : null,
+      preorder_settled_at: order.preorder_settled_at || null,
+      dp_pending: isPreorderDpPending(order),
+      balance_due: preorderBalanceDue(order),
       // Pesanan reseller "ongkir menyusul" (tahap "Menunggu Ongkir") + admin yang membuatkannya.
       shipping_pending: order.shipping_pending === true,
       created_by_admin: order.created_by_admin || null,
@@ -864,6 +874,12 @@ export async function POST(req: NextRequest) {
     const wantsPreorder = body?.is_preorder === true;
     if (wantsPreorder && String(body?.payment_status || "paid").trim().toLowerCase() === "unpaid") {
       return bad(PREORDER_MUST_BE_PAID_MESSAGE);
+    }
+    // DP pre-order: nominalnya DIHITUNG SERVER (50% dari total), bukan angka dari browser. `preorder_dp`
+    // hanya penanda "pilih DP". Hanya berlaku untuk pre-order; pesanan reguler mengabaikannya.
+    const dpAmount = wantsPreorder && body?.preorder_dp === true ? preorderDpFor(total) : 0;
+    if (wantsPreorder && body?.preorder_dp === true && dpAmount <= 0) {
+      return bad("Total pesanan belum terisi, DP 50% belum bisa dihitung.");
     }
 
     // Pengaman order dobel: nomor HP / nama yang sama dengan pesanan yang masih terbuka (14 hari).
@@ -947,7 +963,11 @@ export async function POST(req: NextRequest) {
       // Stok sudah dipotong di atas → pembatalan wajib mengembalikannya. PO: belum dipotong.
       stock_reserved: !wantsPreorder,
       ...(wantsPreorder
-        ? { is_preorder: true, preorder_estimate: normalizePreorderEstimate(body?.preorder_estimate) }
+        ? {
+            is_preorder: true,
+            preorder_estimate: normalizePreorderEstimate(body?.preorder_estimate),
+            ...(dpAmount > 0 ? { preorder_dp_amount: dpAmount } : {}),
+          }
         : {}),
       source,
       created_at: createdAt.toISOString(),
@@ -1085,11 +1105,19 @@ export async function POST(req: NextRequest) {
             price: item.price,
           })),
           estimate: normalizePreorderEstimate(body?.preorder_estimate),
+          // DP: teks WA menyebut DP yang diterima dan sisa yang harus dibayar.
+          ...(dpAmount > 0 ? { dp: { amount: dpAmount, balance: Math.max(0, total - dpAmount), total } } : {}),
         }),
       );
     }
 
-    return NextResponse.json({ order_number: order.order_number, total, ...(wantsPreorder ? { is_preorder: true } : {}), ...(affiliateInfo ? { affiliate: affiliateInfo } : {}) });
+    return NextResponse.json({
+      order_number: order.order_number,
+      total,
+      ...(wantsPreorder ? { is_preorder: true } : {}),
+      ...(dpAmount > 0 ? { preorder_dp_amount: dpAmount, balance_due: Math.max(0, total - dpAmount) } : {}),
+      ...(affiliateInfo ? { affiliate: affiliateInfo } : {}),
+    });
   } catch (e) {
     console.error("[OPS] transaksi POST:", e);
     return NextResponse.json({ error: "Gagal menyimpan transaksi" }, { status: 500 });
