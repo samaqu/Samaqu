@@ -558,14 +558,18 @@ export default function PanelShell({ children }: { children: ReactNode }) {
       setBusy(false);
       return;
     }
+    // Cache React Query (identitas `opsMe`, daftar lead, dst.) milik akun sebelumnya dibuang supaya
+    // akun yang baru login tidak membaca data/identitas lama (mis. PIC lead baru terisi nama akun lain).
+    queryClient.clear();
     setAuthorized(true);
     setBusy(false);
   }
 
-  /** Keluar dari panel: sesi Supabase dihapus, lalu kembali ke formulir login. */
+  /** Keluar dari panel: sesi Supabase dihapus, cache akun ini dibuang, lalu kembali ke formulir login. */
   async function handleLogout() {
     setMobileNavOpen(false);
     await supabase.auth.signOut();
+    queryClient.clear();
     setPassword("");
     setAuthorized(false);
   }
