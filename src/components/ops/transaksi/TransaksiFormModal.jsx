@@ -1259,6 +1259,16 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
   /** Ada pelanggan terpilih (akun maupun tamu) → tampilkan baris ringkas, bukan kotak pencarian. */
   const customerChosen = form?.customer_mode === "existing" && Boolean(form?.customer_id || String(form?.customer_name || "").trim());
 
+  /**
+   * Nama PENERIMA paket di pesanan ini (kolom `orders.customer_name` → nama penerima di resi).
+   * Mode Pelanggan terdaftar: `form.recipient_name` kosong (null/undefined) = ikut isian otomatis
+   * dari `form.customer_name` (pesanan terakhir / buku alamat); berisi teks = diketik admin khusus
+   * pesanan ini (alamat sama, penerima beda). Sengaja TERPISAH dari `form.customer_name` supaya
+   * identitas pelanggan, pencarian alamat, dan isian otomatis tidak bergeser saat admin mengetik.
+   */
+  const recipientName =
+    form?.customer_mode === "existing" && form?.recipient_name != null ? form.recipient_name : form?.customer_name ?? "";
+
   /* ── Alamat pengiriman (sama seperti checkout website) ── */
   const addressErrors = {
     address: String(form?.address || "").trim() ? "" : "Alamat lengkap wajib diisi",
@@ -1323,7 +1333,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       city: address?.city || "",
       kecamatan: address?.kecamatan || "",
       postal_code: address?.postal_code || "",
-      ...(recipient ? { customer_name: recipient } : null),
+      ...(recipient ? { customer_name: recipient, recipient_name: null } : null),
       ...(phone ? { customer_whatsapp: phone } : null),
     }));
   };
@@ -1339,6 +1349,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       customer_mode: "existing",
       customer_id: customer.id || "",
       customer_name: customer.name || "",
+      recipient_name: null,
       customer_whatsapp: customer.whatsapp || "",
       address_mode: "saved",
       saved_address_id: "",
@@ -1359,6 +1370,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     updateForm({
       customer_id: "",
       customer_name: "",
+      recipient_name: null,
       customer_whatsapp: "",
       address_mode: "saved",
       saved_address_id: "",
@@ -1459,6 +1471,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       customer_mode: "existing",
       customer_id: customer.id || "",
       customer_name: customer.name || "",
+      recipient_name: null,
       customer_whatsapp: customer.whatsapp || "",
       address_mode: "saved",
       saved_address_id: "",
@@ -1535,7 +1548,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
   // dianggap siap (tidak boleh menahan alur karena satu kolom alamat yang kosong).
   const step1Ready =
     managedSource ||
-    (Boolean(form?.customer_name?.trim()) && Boolean(form?.customer_whatsapp?.trim()) && !addressIncomplete);
+    (Boolean(String(recipientName).trim()) && Boolean(form?.customer_whatsapp?.trim()) && !addressIncomplete);
   const stepReady = [step1Ready, !incomplete, true];
   const stepLabels = ["Pelanggan", "Produk", "Pembayaran"];
 
@@ -1737,7 +1750,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         shipping_status: initialData?.shipping_status || "",
         // Dipakai panel "Transaksi tercatat" untuk memilih aksi: resi J&T atau tombol GoSend.
         shipping_method: courierMethod || form?.shipping_method || (form?.courier_on ? "" : initialData?.shipping_method) || "",
-        customer_name: form?.customer_name || initialData?.customer_name || "",
+        customer_name: recipientName || initialData?.customer_name || "",
         // PO yang menunggu stok belum bisa dibuatkan resi (panel resi menampilkan penjelasan).
         is_preorder: isPo,
         preorder_waiting: isPo && !initialData?.preorder_ready_at,
@@ -1774,7 +1787,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     // `shipping_province` kosong pada pesanan Open Order lama. Validasi lengkap tetap berlaku
     // untuk transaksi manual dan transaksi baru.
     if (!managedSource) {
-      if (!form.customer_name.trim()) {
+      if (!String(recipientName).trim()) {
         if (isEdit) setStep(0);
         setScrollKick((count) => count + 1);
         return setSaveError("Nama pelanggan wajib diisi.");
@@ -1802,7 +1815,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     setDupMatches(null);
     const payload = {
       customer_id: form.customer_mode === "existing" ? form.customer_id || null : null,
-      customer_name: form.customer_name.trim(),
+      customer_name: String(recipientName).trim(),
       customer_whatsapp: form.customer_whatsapp.trim(),
       source: form.source,
       created_at: createdAt,
@@ -2090,11 +2103,11 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                       className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[15px] font-extrabold"
                       style={{ background: PANEL_PINK, color: PANEL_BLUE_DEEP }}
                     >
-                      {String(form.customer_name || "?").trim().charAt(0).toUpperCase()}
+                      {String(recipientName || "?").trim().charAt(0).toUpperCase()}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13.5px] font-bold" style={{ color: PANEL_INK }}>
-                        {form.customer_name || "Tanpa nama"}
+                        {recipientName || "Tanpa nama"}
                       </p>
                       <p className="truncate text-[11.5px] font-medium" style={{ color: PANEL_MUTED }}>
                         {[form.customer_whatsapp || "nomor belum ada", form.city].filter(Boolean).join(" · ")}
@@ -2176,6 +2189,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                         customer_mode: "existing",
                         customer_id: "",
                         customer_name: "",
+                        recipient_name: null,
                         customer_whatsapp: "",
                         address_mode: "saved",
                         saved_address_id: "",
@@ -2425,13 +2439,31 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                   </div>
                 )}
 
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {form.customer_mode === "existing"
-                    ? form.customer_name
-                      ? `Penerima paket: ${form.customer_name} · ${form.customer_whatsapp || "nomor belum ada"}`
-                      : "Pilih salah satu pelanggan, atau ganti ke Pelanggan baru."
-                    : "Pelanggan baru dan alamatnya otomatis tersimpan di menu Pelanggan."}
-                </p>
+                {form.customer_mode === "existing" && customerChosen ? (
+                  <div>
+                    <label className={labelClass}>
+                      Nama penerima paket <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={recipientName}
+                      onChange={(event) => updateForm({ recipient_name: event.target.value })}
+                      placeholder="Nama penerima di resi"
+                      aria-label="Nama penerima paket"
+                      data-invalid={saveAttempted && !String(recipientName).trim() ? "true" : undefined}
+                      className={`${inputClass} ${saveAttempted && !String(recipientName).trim() ? "border-red-300 dark:border-red-900/60" : ""}`}
+                    />
+                    <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                      Nomor HP: {form.customer_whatsapp || "nomor belum ada"} · Nama ini hanya berlaku di pesanan ini.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {form.customer_mode === "existing"
+                      ? "Pilih salah satu pelanggan, atau ganti ke Pelanggan baru."
+                      : "Pelanggan baru dan alamatnya otomatis tersimpan di menu Pelanggan."}
+                  </p>
+                )}
 
                 {/* Alamat Pengiriman */}
                 <div className="pt-3 mt-1 border-t border-slate-100 dark:border-slate-800 space-y-2">
@@ -4145,7 +4177,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Pelanggan</p>
-                    <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{form.customer_name || "-"}</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{recipientName || "-"}</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">{form.customer_whatsapp || "nomor belum ada"}</p>
                   </div>
                   <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
