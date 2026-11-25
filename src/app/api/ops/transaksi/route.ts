@@ -44,7 +44,7 @@ import {
   resolveAddonWeight,
 } from "@/lib/open-order-config";
 import { openOrderEffectivePrice } from "@/lib/open-order-offering";
-import { syncLeadOnOrderSaved } from "@/lib/ops-lead-sync";
+import { syncLeadOnOrderSaved, syncLeadOnOrderEdited, revertLeadOnOrderCancelled } from "@/lib/ops-lead-sync";
 import { attributionColumns, recordManualAttribution, resolveManualAttribution, type ManualAttribution } from "@/lib/affiliate/manual-attribution";
 import {
   DUPLICATE_OPEN_STATUSES,
@@ -1587,6 +1587,14 @@ export async function PATCH(req: NextRequest) {
       return bad(cleanErrorMessage(rpcError.message || "") || "Gagal menyimpan perubahan item");
     }
 
+    // Nominal lead yang tertaut ikut diperbarui (harga produk saja, tanpa ongkir). Gagal di sini
+    // TIDAK membatalkan perubahan pesanan yang sudah tersimpan.
+    try {
+      await syncLeadOnOrderEdited(admin, order.id);
+    } catch (leadError) {
+      console.error("[OPS] transaksi PATCH: sinkron lead gagal:", leadError);
+    }
+
     // Alamat baru (kalau admin menambahkannya) ikut masuk buku alamat pelanggan.
     if (isManual && body?.save_address) {
       await saveCustomerAddress(admin, customerId, customerName, customerWhatsapp, shipping!);
@@ -1708,6 +1716,14 @@ export async function DELETE(req: NextRequest) {
     if (orderError) {
       console.error("[OPS] hapus transaksi:", orderError.message);
       return NextResponse.json({ error: "Gagal menghapus transaksi" }, { status: 500 });
+    }
+
+    // Lead yang closing dari transaksi ini ditandai Batal (nominal 0), supaya tidak menggantung
+    // menunjuk pesanan yang sudah tidak ada. Gagal di sini TIDAK membatalkan penghapusan.
+    try {
+      await revertLeadOnOrderCancelled(admin, order.id);
+    } catch (leadError) {
+      console.error("[OPS] hapus transaksi: sinkron lead gagal:", leadError);
     }
 
     return NextResponse.json({ order_number: order.order_number, deleted: true });

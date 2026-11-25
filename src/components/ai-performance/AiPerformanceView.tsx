@@ -33,6 +33,8 @@ type Stats = {
   handledRate: number;
   closingRate: number;
   closingSource?: "wa_closings" | "drafts";
+  /** Closing yang nominalnya masih nominal bukti transfer (order belum bisa ditautkan). */
+  closingFallback?: number;
   activity: Activity[];
   growth: {
     conversations: number | null;
@@ -310,7 +312,14 @@ export default function AiPerformanceView() {
 
           <p className="text-[11px] leading-relaxed" style={{ color: "#8a7d83" }}>
             {stats.closingSource === "wa_closings" ? (
-              <>Closing diambil dari <b>catatan closing AI</b> (wa_closings) pada periode ini; nominal memakai nominal bukti transfer.</>
+              <>
+                Closing diambil dari <b>catatan closing AI</b> (wa_closings) pada periode ini. Nominal =
+                <b> harga produk saja</b> (setelah diskon, tanpa ongkir) dari order yang tertaut
+                {stats.closingFallback
+                  ? `; ${stats.closingFallback} closing yang order-nya belum bisa ditautkan masih memakai nominal bukti transfer (sudah termasuk ongkir)`
+                  : ""}
+                .
+              </>
             ) : (
               <>Closing dihitung dari draft AI yang <b>disetujui admin</b> dan order-nya masih sah (diproses/dikirim/selesai).</>
             )}{" "}

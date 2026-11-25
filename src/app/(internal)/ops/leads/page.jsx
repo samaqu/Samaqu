@@ -23,7 +23,8 @@ import {
   ClipboardPaste,
   Search,
   Lock,
-  X
+  X,
+  XCircle
 } from "lucide-react";
 import { useToast } from "@/components/ops/ui/use-toast";
 import LeadFormModal from "@/components/ops/leads/LeadFormModal";
@@ -182,10 +183,13 @@ export default function Leads({ variant = "ops" }) {
 
   const stats = useMemo(() => {
     const closing = visibleLeads.filter((l) => l.status === 'closing');
+    // Batal = transaksinya dibatalkan/dihapus (diisi otomatis). Bukan closing dan bukan belum closing.
+    const batal = visibleLeads.filter((l) => l.status === 'batal');
     return {
       total: visibleLeads.length,
       closing: closing.length,
-      belum: visibleLeads.length - closing.length,
+      batal: batal.length,
+      belum: visibleLeads.length - closing.length - batal.length,
       rate: visibleLeads.length ? (closing.length / visibleLeads.length) * 100 : 0,
       nominal: closing.reduce((s, l) => s + (l.nominal || 0), 0),
     };
@@ -235,7 +239,12 @@ export default function Leads({ variant = "ops" }) {
   const statCards = [
     { label: "Total Leads", value: stats.total, icon: Users },
     { label: "Closing", value: stats.closing, icon: CheckCircle2 },
-    { label: "Belum Closing", value: stats.belum, icon: Clock },
+    {
+      label: "Belum Closing",
+      value: stats.belum,
+      icon: Clock,
+      sub: stats.batal ? { main: `${stats.batal} Batal`, extra: "transaksi dibatalkan", tone: "rose" } : null,
+    },
     { label: "Konversi", value: `${stats.rate.toFixed(1)}%`, icon: Target },
     {
       label: "Nominal Closing",
@@ -296,7 +305,7 @@ export default function Leads({ variant = "ops" }) {
               <p className="text-[clamp(1rem,1.35vw,1.5rem)] font-black font-heading text-slate-900 dark:text-white mt-0.5 tracking-tight whitespace-nowrap">{c.value}</p>
               {c.sub ? (
                 // Boleh turun baris saat kartu sempit (menu samping terbuka) — tidak dipotong "…".
-                <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-[11px] font-bold leading-snug text-emerald-700 dark:text-emerald-400" title={`${c.sub.main} · ${c.sub.extra}`}>
+                <p className={`mt-1 flex flex-wrap items-baseline gap-x-1.5 text-[11px] font-bold leading-snug ${c.sub.tone === "rose" ? "text-rose-600 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400"}`} title={`${c.sub.main} · ${c.sub.extra}`}>
                   <span className="whitespace-nowrap">{c.sub.main}</span>
                   <span className="whitespace-nowrap font-semibold text-slate-500 dark:text-slate-400">{c.sub.extra}</span>
                 </p>
@@ -493,6 +502,10 @@ export default function Leads({ variant = "ops" }) {
                         <span className="inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 rounded-lg text-xs font-bold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300">
                           <CheckCircle2 size={12} className="shrink-0" /> Closing
                         </span>
+                      ) : lead.status === 'batal' ? (
+                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300">
+                          <XCircle size={12} className="shrink-0" /> Batal
+                        </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
                           <Clock size={12} className="shrink-0" /> Belum Closing
@@ -568,7 +581,11 @@ export default function Leads({ variant = "ops" }) {
                     PIC: {lead.pic || "-"}
                   </span>
                   <span className="shrink-0 text-sm font-extrabold text-slate-900 dark:text-white">
-                    {lead.status === "closing" && lead.nominal ? `Rp ${formatRupiah(lead.nominal)}` : "—"}
+                    {lead.status === "closing" && lead.nominal
+                      ? `Rp ${formatRupiah(lead.nominal)}`
+                      : lead.status === "batal"
+                        ? <span className="text-rose-600 dark:text-rose-400">Batal</span>
+                        : "—"}
                   </span>
                 </div>
 

@@ -38,7 +38,7 @@ function pickLead(input: Record<string, unknown>) {
   // Terima juga bentuk camelCase dari form (Base44 memakai snake_case di DB).
   if (input?.nextFollowupAt !== undefined) out.next_followup_at = input.nextFollowupAt;
   if (out.nominal !== undefined) out.nominal = Number(out.nominal) || 0;
-  if (out.status === "belum_closing") out.nominal = 0;
+  if (out.status === "belum_closing" || out.status === "batal") out.nominal = 0;
   if (out.produk !== undefined) out.produk = out.produk ? String(out.produk).trim() : null;
   if (out.pic !== undefined) out.pic = out.pic ? String(out.pic).trim() : null;
 

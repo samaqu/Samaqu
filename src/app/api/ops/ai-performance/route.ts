@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
 import { jakartaMonthBounds } from "@/lib/ops-followup";
-import { SALE_STATUSES } from "@/lib/transaksi";
+import { SALE_STATUSES, orderRevenue } from "@/lib/transaksi";
 import { getAiConversationMetrics, type EscalationRef } from "@/lib/ai-performance-metrics";
 
 /**
@@ -11,7 +11,9 @@ import { getAiConversationMetrics, type EscalationRef } from "@/lib/ai-performan
  * Sumber angka (bukan mock):
  * - Percakapan & balasan: `wa_inbox` non-grup, non-skipped pada bulan WIB.
  * - Closing AI: `order_drafts` berstatus approved yang menghasilkan `orders` sah.
- * - Nominal: `orders.total` dari order hasil draft AI tersebut.
+ * - Nominal: HARGA PRODUK saja (total setelah diskon, tanpa ongkir, `orderRevenue`) dari order
+ *   hasil draft closing AI. Closing yang order-nya belum bisa ditautkan (bot laptop lama,
+ *   backfill) memakai nominal bukti transfer di `wa_closings`; jumlahnya ada di `closingFallback`.
  *
  * "Perlu bantuan admin" = nomor unik yang masuk `wa_escalations` (Pertanyaan AI)
  * atau pernah dibalas admin pada periode itu. "Chat ditangani AI" = total percakapan
@@ -85,15 +87,79 @@ async function escalationRows(
   return [...(created.data || []), ...(replied.data || [])];
 }
 
-type ClosingStats = { count: number; nominal: number; source: "wa_closings" | "drafts" };
+type ClosingStats = {
+  count: number;
+  nominal: number;
+  source: "wa_closings" | "drafts";
+  /** Jumlah closing yang nominalnya masih nominal bukti transfer (order belum bisa ditautkan). */
+  fallback: number;
+};
 
-async function academyClosings(startIso: string, endIso: string): Promise<ClosingStats | null> {
+/**
+ * Nominal HARGA PRODUK saja per closing bot, dihitung dari order hasil draft closing itu:
+ * `wa_closings.inbox_id` -> `order_drafts.source_inbox_id` (approved) -> `orders.order_number`.
+ * Hanya closing yang order-nya sah (SALE_STATUSES) yang masuk peta; sisanya dibiarkan memakai
+ * nominal bukti transfer. Pemanggil menangkap error dan memakai peta kosong (perilaku lama).
+ */
+async function productNominalByInbox(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  inboxIds: string[],
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  const unique = [...new Set(inboxIds.filter(Boolean))];
+  if (unique.length === 0) return result;
+
+  const orderNumberByInbox = new Map<string, string>();
+  for (let i = 0; i < unique.length; i += 100) {
+    const { data, error } = await admin
+      .from("order_drafts")
+      .select("source_inbox_id, approved_order_number")
+      .eq("status", "approved")
+      .in("source_inbox_id", unique.slice(i, i + 100));
+    if (error) throw new Error(error.message);
+    for (const row of data || []) {
+      const inbox = String(row.source_inbox_id || "");
+      const number = String(row.approved_order_number || "");
+      if (inbox && number && !orderNumberByInbox.has(inbox)) orderNumberByInbox.set(inbox, number);
+    }
+  }
+
+  const numbers = [...new Set(orderNumberByInbox.values())];
+  const orderByNumber = new Map<string, { status: string; total: number; shipping_cost: number }>();
+  for (let i = 0; i < numbers.length; i += 200) {
+    const { data, error } = await admin
+      .from("orders")
+      .select("order_number, status, total, shipping_cost")
+      .in("order_number", numbers.slice(i, i + 200));
+    if (error) throw new Error(error.message);
+    for (const row of data || []) {
+      orderByNumber.set(String(row.order_number), {
+        status: String(row.status || "").toLowerCase(),
+        total: Number(row.total) || 0,
+        shipping_cost: Number(row.shipping_cost) || 0,
+      });
+    }
+  }
+
+  for (const [inbox, number] of orderNumberByInbox) {
+    const order = orderByNumber.get(number);
+    if (!order || !SALE_STATUSES.includes(order.status)) continue;
+    result.set(inbox, orderRevenue(order));
+  }
+  return result;
+}
+
+async function academyClosings(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  startIso: string,
+  endIso: string,
+): Promise<ClosingStats | null> {
   const base = (process.env.ACADEMY_SUPABASE_URL || "").replace(/\/+$/, "");
   const key = process.env.ACADEMY_SERVICE_ROLE_KEY || "";
   if (!base || !key) return null;
 
   const url = new URL(`${base}/rest/v1/wa_closings`);
-  url.searchParams.set("select", "id,nominal,created_at,source");
+  url.searchParams.set("select", "id,inbox_id,nominal,created_at,source");
   url.searchParams.set("created_at", `gte.${startIso}`);
   url.searchParams.append("created_at", `lt.${endIso}`);
   url.searchParams.set("order", "created_at.asc");
@@ -104,14 +170,34 @@ async function academyClosings(startIso: string, endIso: string): Promise<Closin
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`Gagal membaca wa_closings (${res.status}).`);
-  const rows = (await res.json().catch(() => [])) as { nominal?: number | string | null }[];
-  return {
-    count: Array.isArray(rows) ? rows.length : 0,
-    nominal: Array.isArray(rows)
-      ? rows.reduce((sum, row) => sum + (Number(row.nominal) || 0), 0)
-      : 0,
-    source: "wa_closings",
-  };
+  const rows = (await res.json().catch(() => [])) as {
+    inbox_id?: string | null;
+    nominal?: number | string | null;
+  }[];
+  const list = Array.isArray(rows) ? rows : [];
+
+  // Harga produk saja dari order tertaut. Gagal membaca = peta kosong, semua closing memakai
+  // nominal bukti transfer seperti sebelumnya (angka tidak pernah hilang karena error).
+  const productByInbox = await productNominalByInbox(
+    admin,
+    list.map((row) => String(row.inbox_id || "")),
+  ).catch((error) => {
+    console.error("[AI-PERFORMANCE] Gagal menautkan closing ke order:", error instanceof Error ? error.message : error);
+    return new Map<string, number>();
+  });
+
+  let nominal = 0;
+  let fallback = 0;
+  for (const row of list) {
+    const product = productByInbox.get(String(row.inbox_id || ""));
+    if (product !== undefined) {
+      nominal += product;
+    } else {
+      nominal += Number(row.nominal) || 0;
+      fallback += 1;
+    }
+  }
+  return { count: list.length, nominal, source: "wa_closings", fallback };
 }
 
 /**
@@ -165,7 +251,7 @@ async function ordersByNumber(
     const chunk = numbers.slice(i, i + 200);
     const { data, error } = await admin
       .from("orders")
-      .select("order_number, status, total")
+      .select("order_number, status, total, shipping_cost")
       .in("order_number", chunk);
     if (error) throw new Error(error.message);
     found.push(...(data || []));
@@ -180,7 +266,7 @@ async function periodStats(
   const [rows, drafts, closingStats, leadsResult, escalations, costUsd] = await Promise.all([
     inboxRows(admin, month.startIso, month.endIso),
     approvedDrafts(admin, month.startIso, month.endIso),
-    academyClosings(month.startIso, month.endIso).catch(() => null),
+    academyClosings(admin, month.startIso, month.endIso).catch(() => null),
     // Leads memakai tanggal bisnis (`leads.tanggal`), sama seperti menu Leads —
     // bukan `created_at`, karena import/paste bisa memasukkan lead bertanggal bulan lalu.
     admin
@@ -228,7 +314,7 @@ async function periodStats(
       const order = orders.get(String(draft.approved_order_number || ""));
       if (!order || !SALE_STATUSES.includes(String(order.status || "").toLowerCase())) continue;
       closing += 1;
-      nominal += Number(order.total) || 0;
+      nominal += orderRevenue(order);
     }
   }
 
@@ -251,6 +337,8 @@ async function periodStats(
     handledRate: conversations > 0 ? Math.round((handled / conversations) * 1000) / 10 : 0,
     closingRate: conversations > 0 ? Math.round((closing / conversations) * 1000) / 10 : 0,
     closingSource,
+    /** Closing yang nominalnya masih nominal bukti transfer (order belum bisa ditautkan). */
+    closingFallback: closingStats?.fallback || 0,
     activity: rows.slice(0, 8).map((row) => ({
       sender: String(row.sender || ""),
       sender_name: row.sender_name || null,

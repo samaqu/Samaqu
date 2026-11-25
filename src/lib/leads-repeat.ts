@@ -113,6 +113,7 @@ export interface LeadHistory {
 export interface RepeatOrderPoint {
   /** Tanggal order menurut WIB (YYYY-MM-DD). */
   date: string;
+  /** HARGA PRODUK saja (total setelah diskon, tanpa ongkir) — sama dengan `orderRevenue` di lib/transaksi. */
   total: number;
   /** Nomor ternormalisasi — dipakai halaman untuk mengikuti pencarian. */
   phone: string;
@@ -252,7 +253,8 @@ export function buildRepeatOrders(
     for (const order of list.slice(1)) {
       const date = wibDateOf(order.created_at);
       if (!date || date < start || date > end) continue;
-      out.push({ date, total: money(order.total), phone });
+      // Omzet repeat = harga produk saja, SAMA dengan nominal closing (tanpa ongkir).
+      out.push({ date, total: Math.max(0, money(order.total) - money(order.shipping_cost)), phone });
     }
   }
   return out;

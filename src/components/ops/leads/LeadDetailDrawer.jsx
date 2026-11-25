@@ -284,7 +284,7 @@ export default function LeadDetailDrawer({ open, lead, history, tema = "mono", a
             </div>
             <div className="dp-baris dp-baris-detail">
               <span className="dp-baris-label">Status</span>
-              <span className="dp-baris-nilai">{closing ? "Closing" : "Belum Closing"}</span>
+              <span className="dp-baris-nilai">{closing ? "Closing" : lead.status === "batal" ? "Batal (transaksi dibatalkan)" : "Belum Closing"}</span>
             </div>
             {closing && lead.nominal ? (
               <div className="dp-baris dp-baris-detail">
