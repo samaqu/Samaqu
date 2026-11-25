@@ -1184,6 +1184,8 @@ export default function MasterProduk() {
                 </div>
               </div>
 
+              {/* Tab Laporan Stok hanya untuk memantau: tombol tambah/import disembunyikan. */}
+              {activeTab !== 'report' && (
               <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
                 <motion.button
                   onClick={() => setShowImportModal(true)}
@@ -1220,6 +1222,7 @@ export default function MasterProduk() {
                   Tambah Produk
                 </motion.button>
               </div>
+              )}
             </div>
             {/* Metrics Grid - Custom Mobile Layout */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3 mt-5 md:mt-6">
