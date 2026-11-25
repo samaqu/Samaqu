@@ -879,7 +879,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </p>
           <h1 className="text-[1.5rem] sm:text-[1.8rem] font-semibold leading-tight mb-1.5"
             style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "#000000" }}>
-              {product.name}{isPaket ? null : product.category === "Koko" ? (selectedColor && selectedColor !== "default" ? <span style={{ color: "#000000" }}> - {selectedColor}</span> : null) : product.jenis_kain?.name ? <span style={{ color: "#000000" }}> — Kain {product.jenis_kain.name}</span> : product.kain ? <span style={{ color: "#000000" }}> — Kain {product.kain}</span> : product.series ? <span style={{ color: "#000000" }}> — {product.series}</span> : selectedColor && selectedColor !== "default" ? <span style={{ color: "#000000" }}> — {selectedColor}</span> : null}
+              {product.name}{isPaket ? null : product.category === "Koko" ? (selectedColor && selectedColor !== "default" && !String(product.name || "").toLowerCase().includes(String(selectedColor).toLowerCase()) ? <span style={{ color: "#000000" }}> - {selectedColor}</span> : null) : product.jenis_kain?.name ? <span style={{ color: "#000000" }}> — Kain {product.jenis_kain.name}</span> : product.kain ? <span style={{ color: "#000000" }}> — Kain {product.kain}</span> : product.series ? <span style={{ color: "#000000" }}> — {product.series}</span> : selectedColor && selectedColor !== "default" ? <span style={{ color: "#000000" }}> — {selectedColor}</span> : null}
           </h1>
           <p className="text-[13px] font-ui mb-5" style={{ color: "rgba(0,0,0,.55)" }}>
             {metaParts.join(" · ")}
@@ -1202,7 +1202,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             </p>
             <h1 className="text-[2rem] sm:text-[2.5rem] lg:text-[2.8rem] font-semibold leading-tight mb-2"
               style={{ fontFamily: "var(--font-cormorant), Georgia, serif", color: "#000000" }}>
-            {product.name}{isPaket ? null : product.category === "Koko" ? (selectedColor && selectedColor !== "default" ? <span style={{ color: "#000000" }}> - {selectedColor}</span> : null) : product.jenis_kain?.name ? <span style={{ color: "#000000" }}> — Kain {product.jenis_kain.name}</span> : product.kain ? <span style={{ color: "#000000" }}> — Kain {product.kain}</span> : product.series ? <span style={{ color: "#000000" }}> — {product.series}</span> : selectedColor && selectedColor !== "default" ? <span style={{ color: "#000000" }}> — {selectedColor}</span> : null}
+            {product.name}{isPaket ? null : product.category === "Koko" ? (selectedColor && selectedColor !== "default" && !String(product.name || "").toLowerCase().includes(String(selectedColor).toLowerCase()) ? <span style={{ color: "#000000" }}> - {selectedColor}</span> : null) : product.jenis_kain?.name ? <span style={{ color: "#000000" }}> — Kain {product.jenis_kain.name}</span> : product.kain ? <span style={{ color: "#000000" }}> — Kain {product.kain}</span> : product.series ? <span style={{ color: "#000000" }}> — {product.series}</span> : selectedColor && selectedColor !== "default" ? <span style={{ color: "#000000" }}> — {selectedColor}</span> : null}
             </h1>
             <p className="text-[13px] font-ui mb-6" style={{ color: "rgba(0,0,0,.55)" }}>
               {metaParts.join(" · ")}
