@@ -97,7 +97,11 @@ export async function GET(req: NextRequest) {
   const result = products.map((p) => {
     const media = mediaMap.get(p.id) || [];
     const rate = rateForProduct(settings, p.id);
-    const fabric = Array.isArray(p.jenis_kain) ? p.jenis_kain[0]?.name : p.jenis_kain?.name;
+    // Koko: jenis kain hanya internal, jangan ikut ke daftar produk affiliate.
+    const fabric =
+      String(p.category || "").trim().toLowerCase() === "koko"
+        ? undefined
+        : Array.isArray(p.jenis_kain) ? p.jenis_kain[0]?.name : p.jenis_kain?.name;
     return {
       id: p.id,
       name: p.name,

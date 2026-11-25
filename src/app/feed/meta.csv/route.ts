@@ -152,10 +152,15 @@ function displayColor(product: ProductRow, variants: VariantRow[]): string {
   return words.length > 1 ? words.slice(1).join(" ") : "";
 }
 
+function isKoko(product: ProductRow): boolean {
+  return String(product.category ?? "").trim().toLowerCase() === "koko";
+}
+
 /** Nama produk + kain + series → sama dengan judul yang dibaca di halaman series. */
 function buildTitle(product: ProductRow): string {
   const parts = [String(product.name ?? "").trim()];
-  const kain = String(product.jenis_kain?.name ?? "").trim();
+  // Koko: jenis kain hanya internal, tidak ikut ke judul/deskripsi feed.
+  const kain = isKoko(product) ? "" : String(product.jenis_kain?.name ?? "").trim();
   if (kain && !norm(parts[0]).includes(norm(kain))) parts.push(`Kain ${kain}`);
   const series = String(product.series ?? "").trim();
   if (series) parts.push(`${series} Series`);
@@ -257,7 +262,7 @@ export async function GET() {
         stripHtml(
           [
             String(product.name ?? "").trim(),
-            String(product.jenis_kain?.name ?? "").trim() ? `Kain ${String(product.jenis_kain?.name).trim()}` : "",
+            !isKoko(product) && String(product.jenis_kain?.name ?? "").trim() ? `Kain ${String(product.jenis_kain?.name).trim()}` : "",
             String(product.series ?? "").trim() ? `${String(product.series).trim()} Series` : "",
             "Busana muslim pria premium dari SAMAQU.",
           ]

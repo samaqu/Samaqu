@@ -2219,7 +2219,7 @@ export default function TambahProdukPage({
                             if (variantModeChanged) setVariants(toPaket ? [emptyPaketVariant()] : []);
                             setCategory(val);
                             if (val !== "Thobe") setSeries("");
-                            if (val !== "Thobe" && val !== "Kandora") setSelectedJenisKainId("");
+                            if (val !== "Thobe" && val !== "Kandora" && val !== "Koko") setSelectedJenisKainId("");
                           }} className={`pf-select${errors.category ? " invalid" : ""}`}>
                             <option value="">Pilih kategori</option>
                             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -2229,9 +2229,12 @@ export default function TambahProdukPage({
                         {errors.category && <p className="pf-error">{errors.category}</p>}
                       </div>
                     </div>
-                    {(category === "Thobe" || category === "Kandora") && (
+                    {(category === "Thobe" || category === "Kandora" || category === "Koko") && (
                     <div>
                       <label className="pf-label">Jenis Kain</label>
+                      {category === "Koko" && (
+                        <p className="pf-hint" style={{ marginBottom: 6 }}>Opsional. Hanya untuk internal (Laporan Stok, produksi), tidak tampil ke customer.</p>
+                      )}
                       <div className="flex flex-wrap gap-2">
                         <div className="pf-selectwrap flex-1 min-w-[11rem]">
                           <select value={selectedJenisKainId} onChange={(e) => setSelectedJenisKainId(e.target.value)} className={`pf-select${errors.jenisKain ? " invalid" : ""}`}>

@@ -61,12 +61,15 @@ export interface DbTestimonial {
 
 function dbProductToProduct(db: DbProduct): Product {
   const images = Array.isArray(db.images) ? db.images : [];
+  // Koko: jenis kain hanya untuk internal (Laporan Stok, produksi). Jangan sampai ikut ke sisi
+  // customer (kartu katalog, filter, keranjang, pesan WA). Kolom di database tetap terisi.
+  const sembunyikanKain = String(db.category || "").trim().toLowerCase() === "koko";
   return {
     id: db.id,
     name: db.name,
     category: db.category as Product["category"],
     description: db.description || undefined,
-    kain: db.kain || undefined,
+    kain: sembunyikanKain ? undefined : db.kain || undefined,
     series: db.series || undefined,
     colors: Array.isArray(db.colors) ? db.colors : [],
     price: db.price,
@@ -93,8 +96,8 @@ function dbProductToProduct(db: DbProduct): Product {
       src,
       type: src.match(/\.(mp4|webm|ogg)$/i) ? "video" as const : "image" as const,
     })),
-    jenis_kain_id: db.jenis_kain_id || null,
-    jenis_kain: db.jenis_kain || null,
+    jenis_kain_id: sembunyikanKain ? null : db.jenis_kain_id || null,
+    jenis_kain: sembunyikanKain ? null : db.jenis_kain || null,
     catatan_harga: db.catatan_harga || null,
     weight: db.weight || undefined,
   };
