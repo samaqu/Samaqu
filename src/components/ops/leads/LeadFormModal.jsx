@@ -307,7 +307,7 @@ export default function LeadFormModal({ isOpen, onClose, initialData = null, def
 
             {form.status === 'closing' && (
               <div>
-                <label className={labelClass}>Nominal Transaksi</label>
+                <label className={labelClass}>Nominal Transaksi (harga produk, tanpa ongkir)</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 font-semibold text-sm">Rp</span>
                   <input
@@ -322,6 +322,9 @@ export default function LeadFormModal({ isOpen, onClose, initialData = null, def
                     className="w-full pl-10 pr-3 py-2.5 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 dark:focus:ring-green-900/30 text-sm font-bold text-slate-900 dark:text-white"
                   />
                 </div>
+                <p className="mt-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  Isi harga produk saja (setelah diskon), jangan termasuk ongkir. Kalau lead ini tertaut ke transaksi, nominal otomatis mengikuti transaksi.
+                </p>
               </div>
             )}
 

@@ -3,6 +3,15 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
 import { jakartaMonthBounds } from "@/lib/ops-followup";
 import { SALE_STATUSES, orderRevenue } from "@/lib/transaksi";
+import {
+  MANUAL_MATCH_AFTER_MS,
+  MANUAL_MATCH_BEFORE_MS,
+  matchManualOrders,
+  resolveClosing,
+  type ClosingDraft,
+  type ClosingOrder,
+  type ClosingRow,
+} from "@/lib/ai-closing-nominal";
 import { getAiConversationMetrics, type EscalationRef } from "@/lib/ai-performance-metrics";
 
 /**
@@ -10,17 +19,17 @@ import { getAiConversationMetrics, type EscalationRef } from "@/lib/ai-performan
  *
  * Sumber angka (bukan mock):
  * - Percakapan & balasan: `wa_inbox` non-grup, non-skipped pada bulan WIB.
- * - Closing AI: `order_drafts` berstatus approved yang menghasilkan `orders` sah.
- * - Nominal: HARGA PRODUK saja (total setelah diskon, tanpa ongkir, `orderRevenue`) dari order
- *   hasil draft closing AI. Closing yang order-nya belum bisa ditautkan (bot laptop lama,
- *   backfill) memakai nominal bukti transfer di `wa_closings`; jumlahnya ada di `closingFallback`.
+ * - Closing AI: catatan closing bot (`wa_closings`) yang BISA DIBUKTIKAN lewat order/draft (aturan lengkap
+ *   dan ujinya di `lib/ai-closing-nominal.ts`): draft approved + order sah, draft menunggu, atau order manual
+ *   yang cocok (nomor HP + total persis). Order batal dan draft ditolak TIDAK dihitung. Closing tanpa order/draft
+ *   tidak masuk angka utama dan ditampilkan terpisah (`closingUnlinked`).
+ * - Nominal: HARGA PRODUK saja (total setelah diskon, tanpa ongkir, `orderRevenue`). Draft yang belum di-approve:
+ *   nominal transfer dikurangi ongkir di draft.
  *
  * "Perlu bantuan admin" = nomor unik yang masuk `wa_escalations` (Pertanyaan AI)
  * atau pernah dibalas admin pada periode itu. "Chat ditangani AI" = total percakapan
  * unik dikurangi angka itu. "Leads dicatat AI" = lead periode itu yang nomornya ada
  * di percakapan WA periode itu. Semua rumusnya di `getAiConversationMetrics`.
- * "Closing" = draft AI yang disetujui admin dan order-nya masih sah (diproses/dikirim/selesai).
- * Draft yang ditolak atau order batal tidak dihitung.
  */
 
 const PAGE = 1000;
@@ -88,65 +97,112 @@ async function escalationRows(
 }
 
 type ClosingStats = {
+  /** Closing yang masuk angka utama (terbukti lewat order/draft). */
   count: number;
+  /** Nominal HARGA PRODUK saja dari closing yang dihitung. */
   nominal: number;
   source: "wa_closings" | "drafts";
-  /** Jumlah closing yang nominalnya masih nominal bukti transfer (order belum bisa ditautkan). */
-  fallback: number;
+  /** Closing tanpa order/draft yang bisa dibuktikan: TIDAK masuk angka utama, hanya ditampilkan. */
+  unlinked: number;
+  /** Jumlah nominal bukti transfer closing yang belum tertaut (sudah termasuk ongkir, hanya informasi). */
+  unlinkedNominal: number;
+  /** Closing yang order-nya batal atau draft-nya ditolak: tidak dihitung. */
+  excluded: number;
+};
+
+type ClosingContext = {
+  draftByInbox: Map<string, ClosingDraft>;
+  orderByNumber: Map<string, ClosingOrder>;
+  manualByClosing: Map<string, ClosingOrder>;
 };
 
 /**
- * Nominal HARGA PRODUK saja per closing bot, dihitung dari order hasil draft closing itu:
- * `wa_closings.inbox_id` -> `order_drafts.source_inbox_id` (approved) -> `orders.order_number`.
- * Hanya closing yang order-nya sah (SALE_STATUSES) yang masuk peta; sisanya dibiarkan memakai
- * nominal bukti transfer. Pemanggil menangkap error dan memakai peta kosong (perilaku lama).
+ * Kumpulkan bahan untuk `resolveClosing`: draft tiap closing (`wa_closings.inbox_id` ->
+ * `order_drafts.source_inbox_id`), order hasil draft yang di-approve, dan order manual yang cocok
+ * untuk closing yang drafnya ditolak/dihapus (nomor HP + total persis sama). Hanya membaca.
  */
-async function productNominalByInbox(
+async function loadClosingContext(
   admin: ReturnType<typeof getSupabaseAdmin>,
-  inboxIds: string[],
-): Promise<Map<string, number>> {
-  const result = new Map<string, number>();
-  const unique = [...new Set(inboxIds.filter(Boolean))];
-  if (unique.length === 0) return result;
-
-  const orderNumberByInbox = new Map<string, string>();
-  for (let i = 0; i < unique.length; i += 100) {
+  rows: ClosingRow[],
+): Promise<ClosingContext> {
+  const draftByInbox = new Map<string, ClosingDraft>();
+  const inboxIds = [...new Set(rows.map((row) => row.inboxId).filter(Boolean))];
+  for (let i = 0; i < inboxIds.length; i += 100) {
     const { data, error } = await admin
       .from("order_drafts")
-      .select("source_inbox_id, approved_order_number")
-      .eq("status", "approved")
-      .in("source_inbox_id", unique.slice(i, i + 100));
+      .select("source_inbox_id, status, approved_order_number, payload")
+      .in("source_inbox_id", inboxIds.slice(i, i + 100));
     if (error) throw new Error(error.message);
     for (const row of data || []) {
       const inbox = String(row.source_inbox_id || "");
-      const number = String(row.approved_order_number || "");
-      if (inbox && number && !orderNumberByInbox.has(inbox)) orderNumberByInbox.set(inbox, number);
-    }
-  }
-
-  const numbers = [...new Set(orderNumberByInbox.values())];
-  const orderByNumber = new Map<string, { status: string; total: number; shipping_cost: number }>();
-  for (let i = 0; i < numbers.length; i += 200) {
-    const { data, error } = await admin
-      .from("orders")
-      .select("order_number, status, total, shipping_cost")
-      .in("order_number", numbers.slice(i, i + 200));
-    if (error) throw new Error(error.message);
-    for (const row of data || []) {
-      orderByNumber.set(String(row.order_number), {
-        status: String(row.status || "").toLowerCase(),
-        total: Number(row.total) || 0,
-        shipping_cost: Number(row.shipping_cost) || 0,
+      if (!inbox || draftByInbox.has(inbox)) continue;
+      const payload = (row.payload || {}) as { shipping_cost?: unknown };
+      draftByInbox.set(inbox, {
+        status: String(row.status || ""),
+        orderNumber: row.approved_order_number ? String(row.approved_order_number) : null,
+        shippingCost: Math.max(0, Math.round(Number(payload.shipping_cost) || 0)),
       });
     }
   }
 
-  for (const [inbox, number] of orderNumberByInbox) {
-    const order = orderByNumber.get(number);
-    if (!order || !SALE_STATUSES.includes(order.status)) continue;
-    result.set(inbox, orderRevenue(order));
+  const draftOrderNumbers = [
+    ...new Set(
+      [...draftByInbox.values()].map((draft) => draft.orderNumber).filter((n): n is string => Boolean(n)),
+    ),
+  ];
+  const orderByNumber = new Map<string, ClosingOrder>();
+  for (let i = 0; i < draftOrderNumbers.length; i += 200) {
+    const { data, error } = await admin
+      .from("orders")
+      .select("order_number, status, total, shipping_cost")
+      .in("order_number", draftOrderNumbers.slice(i, i + 200));
+    if (error) throw new Error(error.message);
+    for (const row of data || []) {
+      orderByNumber.set(String(row.order_number), {
+        orderNumber: String(row.order_number),
+        status: String(row.status || ""),
+        total: Number(row.total) || 0,
+        shippingCost: Number(row.shipping_cost) || 0,
+      });
+    }
   }
-  return result;
+
+  // Closing yang drafnya ditolak atau tidak ada (mis. dihapus): coba buktikan lewat order manual.
+  const needManual = rows.filter((row) => {
+    const draft = draftByInbox.get(row.inboxId);
+    return !draft || draft.status === "rejected";
+  });
+  let manualByClosing = new Map<string, ClosingOrder>();
+  const times = needManual.map((row) => Date.parse(row.createdAt)).filter((t) => Number.isFinite(t));
+  if (times.length > 0) {
+    const from = new Date(Math.min(...times) - MANUAL_MATCH_BEFORE_MS).toISOString();
+    const to = new Date(Math.max(...times) + MANUAL_MATCH_AFTER_MS).toISOString();
+    const candidates: ClosingOrder[] = [];
+    for (let start = 0; ; start += PAGE) {
+      const { data, error } = await admin
+        .from("orders")
+        .select("order_number, customer_whatsapp, status, total, shipping_cost, created_at")
+        .gte("created_at", from)
+        .lte("created_at", to)
+        .order("created_at", { ascending: true })
+        .range(start, start + PAGE - 1);
+      if (error) throw new Error(error.message);
+      for (const row of data || []) {
+        candidates.push({
+          orderNumber: String(row.order_number),
+          whatsapp: row.customer_whatsapp as string | null,
+          status: String(row.status || ""),
+          total: Number(row.total) || 0,
+          shippingCost: Number(row.shipping_cost) || 0,
+          createdAt: String(row.created_at || ""),
+        });
+      }
+      if (!data || data.length < PAGE) break;
+    }
+    manualByClosing = matchManualOrders(needManual, candidates, new Set(draftOrderNumbers));
+  }
+
+  return { draftByInbox, orderByNumber, manualByClosing };
 }
 
 async function academyClosings(
@@ -159,7 +215,7 @@ async function academyClosings(
   if (!base || !key) return null;
 
   const url = new URL(`${base}/rest/v1/wa_closings`);
-  url.searchParams.set("select", "id,inbox_id,nominal,created_at,source");
+  url.searchParams.set("select", "id,inbox_id,sender,nominal,created_at,source");
   url.searchParams.set("created_at", `gte.${startIso}`);
   url.searchParams.append("created_at", `lt.${endIso}`);
   url.searchParams.set("order", "created_at.asc");
@@ -170,34 +226,60 @@ async function academyClosings(
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`Gagal membaca wa_closings (${res.status}).`);
-  const rows = (await res.json().catch(() => [])) as {
+  const raw = (await res.json().catch(() => [])) as {
+    id?: string | null;
     inbox_id?: string | null;
+    sender?: string | null;
     nominal?: number | string | null;
+    created_at?: string | null;
   }[];
-  const list = Array.isArray(rows) ? rows : [];
+  const list: ClosingRow[] = (Array.isArray(raw) ? raw : []).map((row) => ({
+    id: String(row.id || ""),
+    inboxId: String(row.inbox_id || ""),
+    sender: String(row.sender || ""),
+    nominal: Number(row.nominal) || 0,
+    createdAt: String(row.created_at || ""),
+  }));
 
-  // Harga produk saja dari order tertaut. Gagal membaca = peta kosong, semua closing memakai
-  // nominal bukti transfer seperti sebelumnya (angka tidak pernah hilang karena error).
-  const productByInbox = await productNominalByInbox(
-    admin,
-    list.map((row) => String(row.inbox_id || "")),
-  ).catch((error) => {
+  let context: ClosingContext | null = null;
+  try {
+    context = await loadClosingContext(admin, list);
+  } catch (error) {
     console.error("[AI-PERFORMANCE] Gagal menautkan closing ke order:", error instanceof Error ? error.message : error);
-    return new Map<string, number>();
-  });
+  }
+  if (!context) {
+    // Gagal menautkan: jangan menghilangkan angka. Pakai nominal bukti transfer apa adanya (perilaku lama).
+    return {
+      count: list.length,
+      nominal: list.reduce((sum, row) => sum + Math.max(0, row.nominal), 0),
+      source: "wa_closings",
+      unlinked: 0,
+      unlinkedNominal: 0,
+      excluded: 0,
+    };
+  }
 
+  let count = 0;
   let nominal = 0;
-  let fallback = 0;
+  let unlinked = 0;
+  let unlinkedNominal = 0;
+  let excluded = 0;
   for (const row of list) {
-    const product = productByInbox.get(String(row.inbox_id || ""));
-    if (product !== undefined) {
-      nominal += product;
+    const draft = context.draftByInbox.get(row.inboxId) || null;
+    const order = draft?.orderNumber ? context.orderByNumber.get(draft.orderNumber) || null : null;
+    const manual = context.manualByClosing.get(row.id) || null;
+    const result = resolveClosing(row, draft, order, manual);
+    if (result.counted) {
+      count += 1;
+      nominal += result.nominal;
+    } else if (result.kind === "belum_tertaut") {
+      unlinked += 1;
+      unlinkedNominal += Math.max(0, Math.round(row.nominal));
     } else {
-      nominal += Number(row.nominal) || 0;
-      fallback += 1;
+      excluded += 1;
     }
   }
-  return { count: list.length, nominal, source: "wa_closings", fallback };
+  return { count, nominal, source: "wa_closings", unlinked, unlinkedNominal, excluded };
 }
 
 /**
@@ -337,8 +419,12 @@ async function periodStats(
     handledRate: conversations > 0 ? Math.round((handled / conversations) * 1000) / 10 : 0,
     closingRate: conversations > 0 ? Math.round((closing / conversations) * 1000) / 10 : 0,
     closingSource,
-    /** Closing yang nominalnya masih nominal bukti transfer (order belum bisa ditautkan). */
-    closingFallback: closingStats?.fallback || 0,
+    /** Closing tanpa order/draft yang bisa dibuktikan: tidak masuk angka utama, hanya ditampilkan. */
+    closingUnlinked: closingStats?.unlinked || 0,
+    /** Nominal bukti transfer closing yang belum tertaut (termasuk ongkir, hanya informasi). */
+    nominalUnlinked: closingStats?.unlinkedNominal || 0,
+    /** Closing yang order-nya batal atau draft-nya ditolak: tidak dihitung. */
+    closingExcluded: closingStats?.excluded || 0,
     activity: rows.slice(0, 8).map((row) => ({
       sender: String(row.sender || ""),
       sender_name: row.sender_name || null,

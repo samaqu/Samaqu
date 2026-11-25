@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Loader2, MessageSquare, RefreshCw, Sparkles, Users, Wallet } from "lucide-react";
+import { Check, Loader2, MessageSquare, RefreshCw, Sparkles, Users, Wallet, XCircle } from "lucide-react";
 import { opsGet } from "@/app/(internal)/panel-admin/panel-api";
 
 type Activity = {
@@ -33,8 +33,12 @@ type Stats = {
   handledRate: number;
   closingRate: number;
   closingSource?: "wa_closings" | "drafts";
-  /** Closing yang nominalnya masih nominal bukti transfer (order belum bisa ditautkan). */
-  closingFallback?: number;
+  /** Closing tanpa order/draft yang bisa dibuktikan: tidak masuk angka utama. */
+  closingUnlinked?: number;
+  /** Nominal bukti transfer closing yang belum tertaut (termasuk ongkir, hanya informasi). */
+  nominalUnlinked?: number;
+  /** Closing yang order-nya batal atau draft-nya ditolak: tidak dihitung. */
+  closingExcluded?: number;
   activity: Activity[];
   growth: {
     conversations: number | null;
@@ -94,6 +98,7 @@ function KpiCard({
   delta,
   tone = "#2f6f9e",
   icon,
+  chips,
 }: {
   label: string;
   value: string;
@@ -102,6 +107,8 @@ function KpiCard({
   delta?: number | null;
   tone?: string;
   icon: React.ReactNode;
+  /** Penanda aturan hitung (pil kecil berikon) di bawah angka. */
+  chips?: { label: string; icon: React.ReactNode; color: string }[];
 }) {
   const hasDelta = delta !== undefined && delta !== null;
   return (
@@ -118,6 +125,20 @@ function KpiCard({
         {hasDelta ? <Delta value={delta as number} /> : hint}
       </p>
       {hasDelta && hint ? <p className="mt-0.5 text-[10px]" style={{ color: "#9aacb8" }}>{hint}</p> : null}
+      {chips && chips.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {chips.map((chip) => (
+            <span
+              key={chip.label}
+              className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold leading-none"
+              style={{ background: `${chip.color}14`, color: chip.color }}
+            >
+              {chip.icon}
+              {chip.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -239,6 +260,7 @@ export default function AiPerformanceView() {
               }
               icon={<Check size={16} />}
               tone="#8a5a12"
+              chips={[{ label: "Batal & ditolak tidak dihitung", icon: <XCircle size={11} />, color: "#b24a4a" }]}
             />
             <KpiCard
               label="Nominal closing"
@@ -251,6 +273,10 @@ export default function AiPerformanceView() {
               }
               icon={<Wallet size={16} />}
               tone="#7a4a8a"
+              chips={[
+                { label: "Hanya harga produk", icon: <Check size={11} />, color: "#1f8a58" },
+                { label: "Ongkir tidak dihitung", icon: <XCircle size={11} />, color: "#7a4a8a" },
+              ]}
             />
           </div>
 
@@ -310,15 +336,29 @@ export default function AiPerformanceView() {
             </div>
           </div>
 
+          {(stats.closingUnlinked || 0) > 0 || (stats.closingExcluded || 0) > 0 ? (
+            <div className="rounded-2xl border px-4 py-3 text-[12px] leading-relaxed" style={{ borderColor: "#f1dfb8", background: "#fff9ec", color: "#7a5a1a" }}>
+              {(stats.closingUnlinked || 0) > 0 ? (
+                <p>
+                  <b>{number(stats.closingUnlinked || 0)} closing belum tertaut order</b> dan tidak masuk angka di atas
+                  (nominal transfer {money(stats.nominalUnlinked || 0)}, masih termasuk ongkir). Biasanya draft-nya dihapus tanpa
+                  input transaksi, atau closing lama dari sebelum ada draft.
+                </p>
+              ) : null}
+              {(stats.closingExcluded || 0) > 0 ? (
+                <p className={(stats.closingUnlinked || 0) > 0 ? "mt-1" : ""}>
+                  <b>{number(stats.closingExcluded || 0)} closing tidak dihitung</b> karena order-nya batal atau draft-nya ditolak.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <p className="text-[11px] leading-relaxed" style={{ color: "#8a7d83" }}>
             {stats.closingSource === "wa_closings" ? (
               <>
-                Closing diambil dari <b>catatan closing AI</b> (wa_closings) pada periode ini. Nominal =
-                <b> harga produk saja</b> (setelah diskon, tanpa ongkir) dari order yang tertaut
-                {stats.closingFallback
-                  ? `; ${stats.closingFallback} closing yang order-nya belum bisa ditautkan masih memakai nominal bukti transfer (sudah termasuk ongkir)`
-                  : ""}
-                .
+                Closing = closing yang dicatat bot dan <b>terbukti lewat order</b>: draft yang di-approve (order sah),
+                draft yang menunggu approve, atau transaksi manual yang cocok (nomor HP dan total sama persis).
+                Nominal = <b>harga produk saja</b> (setelah diskon, tanpa ongkir). Order batal dan draft ditolak tidak dihitung.
               </>
             ) : (
               <>Closing dihitung dari draft AI yang <b>disetujui admin</b> dan order-nya masih sah (diproses/dikirim/selesai).</>

@@ -377,7 +377,7 @@ export default function PasteImportModal({ isOpen, onClose, onSuccess }) {
                           <th className="px-2 py-2 font-bold uppercase tracking-wider">Kontak</th>
                           <th className="px-2 py-2 font-bold uppercase tracking-wider">Sumber</th>
                           <th className="px-2 py-2 font-bold uppercase tracking-wider">Status</th>
-                          <th className="px-3 py-2 font-bold uppercase tracking-wider text-right">Nominal</th>
+                          <th className="px-3 py-2 font-bold uppercase tracking-wider text-right">Nominal (produk saja)</th>
                         </tr>
                       </thead>
                       <tbody>
