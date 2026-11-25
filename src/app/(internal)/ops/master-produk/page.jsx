@@ -52,6 +52,7 @@ import { format, startOfMonth, endOfMonth, subMonths, subDays } from "date-fns";
 import ConfirmDeleteModal from "@/components/ops/ConfirmDeleteModal";
 import ImportProductModal from "@/components/ops/ImportProductModal"; // Import the new modal
 import { useToast } from "@/components/ops/ui/use-toast";
+import { supabase } from "@/lib/supabase";
 import { usePageUrl } from "@/lib/ops-router";
 import { MetricCardSkeleton } from "@/components/ops/ui/skeleton";
 import { SIZES, stockStatus, varianPensiun, varianKomponen } from "@/lib/ops-variants";
@@ -736,6 +737,41 @@ export default function MasterProduk() {
   const navigate = useNavigate();
   const pageUrl = usePageUrl();
   const { toast } = useToast();
+
+  // Export PDF Laporan Stok (kain terjual per series + stok kosong) untuk satu bulan; PDF dibuat server.
+  const [stokPdfMonth, setStokPdfMonth] = useState(() => {
+    const w = new Date(Date.now() + 7 * 60 * 60 * 1000);
+    return `${w.getUTCFullYear()}-${String(w.getUTCMonth() + 1).padStart(2, "0")}`;
+  });
+  const [exportingStokPdf, setExportingStokPdf] = useState(false);
+  const handleExportStokPdf = async () => {
+    setExportingStokPdf(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      const res = await fetch(`/api/ops/stok/report?bulan=${stokPdfMonth}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(payload?.error || `Gagal membuat PDF (${res.status})`);
+      }
+      const blob = await res.blob();
+      const match = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = match?.[1] || `Laporan-Stok-Kain-SAMAQU-${stokPdfMonth}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast({ title: "Export PDF gagal", description: err?.message || "Coba lagi sebentar.", variant: "destructive" });
+    } finally {
+      setExportingStokPdf(false);
+    }
+  };
   const [activeTab, setActiveTab] = useState('produk');
   const [stockInDetail, setStockInDetail] = useState(null);
   const [stockOutDetail, setStockOutDetail] = useState(null);
@@ -1822,6 +1858,22 @@ export default function MasterProduk() {
                       Reset
                     </button>
                   )}
+                  <input
+                    type="month"
+                    value={stokPdfMonth}
+                    onChange={(e) => e.target.value && setStokPdfMonth(e.target.value)}
+                    aria-label="Bulan laporan PDF"
+                    className="px-3 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleExportStokPdf}
+                    disabled={exportingStokPdf}
+                    title="Unduh PDF kain terjual per series dan stok kosong untuk bulan yang dipilih"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 shadow-sm transition-colors"
+                  >
+                    {exportingStokPdf ? "Menyiapkan…" : "Export PDF"}
+                  </button>
                 </div>
               </div>
 
