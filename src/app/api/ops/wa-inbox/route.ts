@@ -3,6 +3,7 @@ import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getFonnteConfigs, normalizeWhatsappTarget, sendFonnteMessage } from "@/lib/fonnte";
 import { waMediaSignedUrl } from "@/lib/wa-media";
+import { HISTORY_SCAN, pickHistory, type HistoryRow } from "@/lib/wa-history";
 
 /**
  * Kotak masuk WhatsApp untuk balasan manual/Claude (tabel `wa_inbox`).
@@ -16,6 +17,9 @@ import { waMediaSignedUrl } from "@/lib/wa-media";
  */
 
 const MAX_ATTEMPTS = 3;
+/** Lama bot menahan diri setelah customer meminta admin manusia. Eskalasi lain tetap 5 menit. */
+const HUMAN_REQUEST_HOLD_MS = 30 * 60 * 1000;
+const HUMAN_REQUEST_REASON = /admin\s+manusia|minta\s+admin|bicara\s+(dengan|sama)\s+admin/i;
 const STALE_MS = 10 * 60 * 1000;
 
 const ACADEMY_URL = (process.env.ACADEMY_SUPABASE_URL || "").replace(/\/+$/, "");
@@ -77,13 +81,20 @@ export async function GET(req: NextRequest) {
   // Nomor yang baru di-escalate ditahan 5 menit supaya admin sempat ambil alih.
   // Lewat 5 menit bot mengambil alih lagi agar balasan tidak menggantung; nomor
   // lain tidak terpengaruh sama sekali.
+  // Pengecualian: customer yang MINTA admin manusia ditahan lebih lama (30 menit) supaya tidak dibalas bot lagi
+  // sebelum admin sempat mengambil alih. Alasannya diisi bot saat `teruskan_admin` ("customer minta admin manusia").
   const holdSince = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
+  const humanHoldSince = new Date(now.getTime() - HUMAN_REQUEST_HOLD_MS).toISOString();
   const { data: escalations } = await admin
     .from("wa_escalations")
-    .select("sender")
+    .select("sender, created_at, reason")
     .in("status", ["open", "claimed"])
-    .gte("created_at", holdSince);
-  const blockedSenders = new Set((escalations || []).map((item) => String(item.sender)));
+    .gte("created_at", humanHoldSince);
+  const blockedSenders = new Set(
+    (escalations || [])
+      .filter((item) => String(item.created_at) >= holdSince || HUMAN_REQUEST_REASON.test(String(item.reason || "")))
+      .map((item) => String(item.sender)),
+  );
 
   const claimed: Record<string, unknown>[] = [];
   for (const row of rows || []) {
@@ -128,7 +139,7 @@ export async function GET(req: NextRequest) {
 
   const withHistory: Record<string, unknown>[] = [];
   for (const row of claimed) {
-    const { data: history } = await admin
+    const { data: recent } = await admin
       .from("wa_inbox")
       // `id` ikut dikirim supaya bot bisa merujuk pesan bukti transfer yang dikirim customer SEBELUMNYA
       // (inbox_id untuk catat_closing). Hanya menambah kolom; pemakai lama mengabaikannya.
@@ -136,14 +147,15 @@ export async function GET(req: NextRequest) {
       .eq("sender", row.sender)
       .neq("id", row.id)
       .order("created_at", { ascending: false })
-      .limit(8);
+      .limit(HISTORY_SCAN);
+    const history = pickHistory((recent || []) as HistoryRow[]);
     const instruksi = (learnings || [])
       .filter((item) => item.scope === "global" || String(item.sender || "") === String(row.sender))
       .map((item) => ({ topic: item.topic, instruction: item.instruction, scope: item.scope }));
     withHistory.push({
       ...row,
       media_url: waMediaSignedUrl(row.media_key as string | null) || row.media_url,
-      riwayat: (history || []).reverse().map((item) => ({
+      riwayat: history.map((item) => ({
         ...item,
         media_url: waMediaSignedUrl(item.media_key as string | null),
       })),
