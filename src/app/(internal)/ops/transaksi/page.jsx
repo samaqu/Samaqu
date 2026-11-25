@@ -14,7 +14,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Check, Plus, XCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { base44 } from "@/lib/ops-api";
 import { SALE_BASIS_NOTE, SALE_STATUSES, orderRevenue, saleCount } from "@/lib/transaksi";
@@ -643,7 +643,12 @@ export default function Transaksi({ variant = "ops", mode = "reguler" }) {
           <div className="card k">
             <small>{selectedDate ? "Omset tanggal ini" : "Omset bulan ini"}</small>
             <b><AnimatedNumber value={isLoading ? 0 : panelKpis.revenue} format={(n) => `Rp ${formatRupiah(n)}`} /></b>
-            <i>Tidak termasuk dibatalkan</i>
+            {/* Aturan hitung omset (sama dengan AI Performance): produk saja, tanpa ongkir, tanpa batal. */}
+            <div className="k-chips">
+              <span className="k-chip ok"><Check size={11} />Harga produk saja</span>
+              <span className="k-chip info"><XCircle size={11} />Tanpa ongkir</span>
+              <span className="k-chip no"><XCircle size={11} />Tanpa batal</span>
+            </div>
           </div>
           <div className="card k">
             <small>Belum bayar</small>
