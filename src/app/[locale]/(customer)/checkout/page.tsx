@@ -19,7 +19,7 @@ import { startOnlinePayment } from "@/lib/mayar-client";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import PublicPhoto from "@/components/PublicPhoto";
 import WilayahSelect from "@/components/wilayah/WilayahSelect";
-import { OngkirHargaPromo, OngkirPromoBadge, ongkirHematText } from "@/components/promo/OngkirPromo";
+import { OngkirHargaPromo, OngkirPromoBadge, PROMO_RED, ongkirHematText } from "@/components/promo/OngkirPromo";
 
 // `payCost`/`discount`/`promoLabel` hanya ada kalau promo ongkir sedang berlaku (dari /api/shipping/jnt-cost).
 // `cost` tetap tarif J&T asli dan itulah yang dikirim ke server untuk diverifikasi.
@@ -1243,7 +1243,7 @@ function CheckoutContent() {
                 {selectedShipping?.promoLabel ? (
                   <span className="flex items-center gap-2">
                     <span className="line-through opacity-55 text-xs">Rp {selectedShipping.cost.toLocaleString("id-ID")}</span>
-                    <span className="font-semibold" style={{ color: "var(--espresso)" }}>
+                    <span className="font-bold" style={{ color: PROMO_RED }}>
                       {shippingCost <= 0 ? "Gratis" : `Rp ${shippingCost.toLocaleString("id-ID")}`}
                     </span>
                   </span>

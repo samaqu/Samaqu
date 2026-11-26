@@ -2,11 +2,14 @@
  * Tampilan promo ongkir (checkout katalog website) — HANYA muncul kalau ada promo yang
  * berlaku. Tanpa promo, komponen ini tidak dipakai sama sekali sehingga tampilan lama tidak berubah.
  *
- * Gaya mengikuti palet monokrom SAMAQU: lencana hitam bersudut penuh, harga asli dicoret, harga bayar tebal.
+ * Gaya: halaman SAMAQU monokrom, jadi satu-satunya aksen warna adalah merah tua pada lencana dan harga bayar; harga asli dicoret abu.
  * Warna lewat `currentColor`/variabel yang sudah ada supaya ikut tema halaman pemakai.
  */
 
 import { Tag } from "lucide-react";
+
+/** Merah tua pekat: menonjol tapi tidak sama dengan merah error form (#e74c3c) dan kontras aman untuk teks putih. */
+export const PROMO_RED = "#B91C1C";
 
 const rp = (value: number) => `Rp ${Math.max(0, Math.round(value)).toLocaleString("id-ID")}`;
 
@@ -15,7 +18,7 @@ export function OngkirPromoBadge({ label, className = "" }: { label: string; cla
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-[3px] text-[10.5px] font-semibold leading-none tracking-wide ${className}`}
-      style={{ background: "#111", color: "#fff" }}
+      style={{ background: PROMO_RED, color: "#fff" }}
     >
       <Tag size={10} strokeWidth={2.4} aria-hidden />
       {label}
@@ -38,7 +41,9 @@ export function OngkirHargaPromo({
   return (
     <span className={`inline-flex flex-col leading-tight ${align === "right" ? "items-end text-right" : "items-start text-left"} ${className}`}>
       <span className="text-[11px] font-normal line-through opacity-55 tabular-nums">{rp(cost)}</span>
-      <span className="font-semibold tabular-nums">{payCost <= 0 ? "Gratis" : rp(payCost)}</span>
+      <span className="font-bold tabular-nums" style={{ color: PROMO_RED }}>
+        {payCost <= 0 ? "Gratis" : rp(payCost)}
+      </span>
     </span>
   );
 }
