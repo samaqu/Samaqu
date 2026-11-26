@@ -9,10 +9,15 @@ import type { PromoAktif } from "./ongkir-promo";
 
 export function statusPromoText(promo: PromoAktif): string {
   const baris: string[] = [];
-  if (promo.jabo) baris.push("- Free ongkir Jabodetabek: BERLAKU. Ongkir ke alamat Jabodetabek Rp0 (J&T EZ dan ECO).");
+  const rp = (n: number) => `Rp${Math.round(n).toLocaleString("id-ID")}`;
+  if (promo.jabo) {
+    baris.push(
+      `- Gratis ongkir Jabodetabek s.d. ${rp(promo.jaboMax)}: BERLAKU. Potongan sebesar tarif J&T (EZ dan ECO), maksimal ${rp(promo.jaboMax)} per order; sisanya dibayar customer. Ongkir Rp0 hanya kalau tarif J&T tidak lebih dari ${rp(promo.jaboMax)}.`,
+    );
+  }
   if (promo.luar) {
     baris.push(
-      `- Potongan ongkir luar Jabodetabek: BERLAKU. Ongkir ke alamat di luar Jabodetabek dipotong ${promo.luarPercent}% dari tarif J&T (EZ dan ECO).`,
+      `- Diskon ongkir ${promo.luarPercent}% s.d. ${rp(promo.luarMax)} untuk luar Jabodetabek: BERLAKU. Dipotong ${promo.luarPercent}% dari tarif J&T (EZ dan ECO), maksimal ${rp(promo.luarMax)} per order; sisanya dibayar customer.`,
     );
   }
   if (!promo.jabo && !promo.luar) {
@@ -26,6 +31,6 @@ export function statusPromoText(promo: PromoAktif): string {
   return [
     `STATUS PROMO (hari ini ${promo.today}, dari pengaturan admin):`,
     ...baris,
-    "Hanya sebut promo yang tertulis BERLAKU. Angka ongkir resmi selalu dari cek_ongkir; jangan menghitung sendiri.",
+    "Hanya sebut promo yang tertulis BERLAKU. Angka ongkir resmi selalu dari cek_ongkir; jangan menghitung sendiri. Sebut batas maksimal persis seperti tertulis di atas.",
   ].join("\n");
 }

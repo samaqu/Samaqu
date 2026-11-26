@@ -4,8 +4,10 @@
  * Open Order dan halaman Free Cover Hanger SENGAJA tidak memakai promo ini (keputusan bos): ongkir di sana tetap penuh.
  *
  * Aturan (keputusan bos, 26 Nov 2026):
- *  - Alamat di Jabodetabek      → ongkir GRATIS (Rp0).
- *  - Alamat di luar Jabodetabek → ongkir dipotong N% dari tarif J&T (default 40), TANPA pembulatan ke ribuan.
+ *  - Alamat di Jabodetabek      → potongan sebesar tarif J&T, maksimal `jaboMax` per order (default Rp20.000).
+ *  - Alamat di luar Jabodetabek → potongan N% dari tarif J&T (default 40), maksimal `luarMax` per order (default Rp40.000),
+ *    TANPA pembulatan ke ribuan. Batas berlaku per order, berapa pun jumlah barangnya.
+ *  - Sisa ongkir dibayar customer. Customer bayar Rp0 hanya kalau tarif <= batas (label "Gratis ongkir").
  *  - Berlaku untuk semua layanan J&T yang tampil (EZ dan ECO). Reseller tidak ikut (pemanggilnya tidak memakai fungsi ini).
  *  - Masing-masing promo punya saklar + tanggal mulai/selesai (WIB, boleh kosong = tanpa batas).
  *
@@ -20,10 +22,14 @@ export type PromoOngkirSettings = {
   jaboActive: boolean;
   jaboStart: string | null;
   jaboEnd: string | null;
+  /** Potongan maksimal (Rp) per order, Jabodetabek. */
+  jaboMax: number;
   luarActive: boolean;
   luarStart: string | null;
   luarEnd: string | null;
   luarPercent: number;
+  /** Potongan maksimal (Rp) per order, luar Jabodetabek. */
+  luarMax: number;
   /** Nama kota resmi (dataset area J&T) yang dihitung sebagai Jabodetabek. */
   jaboCities: string[];
   /** Diskon akun VIP J&T (persen) — hanya untuk memecah angka di laporan. */
@@ -55,10 +61,12 @@ export const DEFAULT_PROMO_SETTINGS: PromoOngkirSettings = {
   jaboActive: false,
   jaboStart: null,
   jaboEnd: null,
+  jaboMax: 20000,
   luarActive: false,
   luarStart: null,
   luarEnd: null,
   luarPercent: 40,
+  luarMax: 40000,
   jaboCities: DEFAULT_JABO_CITIES,
   jntDiscountPercent: 25,
   fchBotActive: true,
@@ -68,11 +76,16 @@ export const DEFAULT_PROMO_SETTINGS: PromoOngkirSettings = {
 
 /** Kolom `store_settings` yang dibaca pembaca pengaturan. */
 export const PROMO_ONGKIR_COLUMNS =
-  "promo_ongkir_jabo_active, promo_ongkir_jabo_start, promo_ongkir_jabo_end, promo_ongkir_luar_active, promo_ongkir_luar_start, promo_ongkir_luar_end, promo_ongkir_luar_percent, promo_ongkir_jabo_cities, promo_ongkir_jnt_discount_percent, promo_bot_fch_active, promo_bot_fch_start, promo_bot_fch_end";
+  "promo_ongkir_jabo_active, promo_ongkir_jabo_start, promo_ongkir_jabo_end, promo_ongkir_luar_active, promo_ongkir_luar_start, promo_ongkir_luar_end, promo_ongkir_luar_percent, promo_ongkir_jabo_max, promo_ongkir_luar_max, promo_ongkir_jabo_cities, promo_ongkir_jnt_discount_percent, promo_bot_fch_active, promo_bot_fch_start, promo_bot_fch_end";
 
 function dateOrNull(value: unknown): string | null {
   const text = String(value ?? "").trim().slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
+}
+
+function rupiahOr(value: unknown, fallback: number): number {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
 function percentOr(value: unknown, fallback: number): number {
@@ -90,10 +103,12 @@ export function parsePromoSettings(row: Record<string, unknown> | null | undefin
     jaboActive: row.promo_ongkir_jabo_active === true,
     jaboStart: dateOrNull(row.promo_ongkir_jabo_start),
     jaboEnd: dateOrNull(row.promo_ongkir_jabo_end),
+    jaboMax: rupiahOr(row.promo_ongkir_jabo_max, DEFAULT_PROMO_SETTINGS.jaboMax),
     luarActive: row.promo_ongkir_luar_active === true,
     luarStart: dateOrNull(row.promo_ongkir_luar_start),
     luarEnd: dateOrNull(row.promo_ongkir_luar_end),
     luarPercent: percentOr(row.promo_ongkir_luar_percent, DEFAULT_PROMO_SETTINGS.luarPercent),
+    luarMax: rupiahOr(row.promo_ongkir_luar_max, DEFAULT_PROMO_SETTINGS.luarMax),
     jaboCities: cities.length ? cities : DEFAULT_JABO_CITIES,
     jntDiscountPercent: percentOr(row.promo_ongkir_jnt_discount_percent, DEFAULT_PROMO_SETTINGS.jntDiscountPercent),
     // Bonus cover bot: hanya MATI kalau admin mematikannya. Kolom belum ada / kosong = nyala (perilaku lama).
@@ -119,8 +134,10 @@ export function dalamPeriode(active: boolean, start: string | null, end: string 
 export type PromoAktif = {
   today: string;
   jabo: boolean;
+  jaboMax: number;
   luar: boolean;
   luarPercent: number;
+  luarMax: number;
   fchBot: boolean;
   jaboCities: string[];
   jntDiscountPercent: number;
@@ -130,11 +147,14 @@ export type PromoAktif = {
 export function promoAktif(settings: PromoOngkirSettings, today: string = tanggalWib()): PromoAktif {
   return {
     today,
-    jabo: dalamPeriode(settings.jaboActive, settings.jaboStart, settings.jaboEnd, today),
+    jabo: settings.jaboMax > 0 && dalamPeriode(settings.jaboActive, settings.jaboStart, settings.jaboEnd, today),
+    jaboMax: settings.jaboMax,
     luar:
       settings.luarPercent > 0 &&
+      settings.luarMax > 0 &&
       dalamPeriode(settings.luarActive, settings.luarStart, settings.luarEnd, today),
     luarPercent: settings.luarPercent,
+    luarMax: settings.luarMax,
     fchBot: dalamPeriode(settings.fchBotActive, settings.fchBotStart, settings.fchBotEnd, today),
     jaboCities: settings.jaboCities,
     jntDiscountPercent: settings.jntDiscountPercent,
@@ -164,11 +184,19 @@ export type HasilPromoOngkir = {
   label: string | null;
 };
 
+const rpText = (value: number) => `Rp${Math.max(0, Math.round(value)).toLocaleString("id-ID")}`;
+
+/** Label untuk customer: "Gratis ongkir" hanya kalau customer bayar Rp0; selain itu "Hemat ongkir Rp12.000". */
+function labelPromo(discount: number, pay: number): string {
+  return pay <= 0 ? "Gratis ongkir" : `Hemat ongkir ${rpText(discount)}`;
+}
+
 /**
  * Hitung ongkir setelah promo untuk SATU tarif.
- *  - kota resmi tidak dikenal (null) → tidak ada promo (ragu = ongkir penuh).
- *  - Jabodetabek + promo jabo aktif → bayar 0.
- *  - Luar Jabodetabek + promo luar aktif → potongan = round(tarif × persen / 100), bayar = tarif − potongan.
+ *  - kota resmi tidak dikenal (null) -> tidak ada promo (ragu = ongkir penuh).
+ *  - Jabodetabek + promo jabo aktif -> potongan = min(tarif, jaboMax).
+ *  - Luar Jabodetabek + promo luar aktif -> potongan = min(round(tarif x persen / 100), luarMax).
+ *  - bayar = tarif - potongan.
  */
 export function hitungPromoOngkir(input: {
   tarif: number;
@@ -181,19 +209,18 @@ export function hitungPromoOngkir(input: {
 
   if (isJabodetabek(input.kotaResmi, input.promo.jaboCities)) {
     if (!input.promo.jabo) return none;
-    return { original, discount: original, pay: 0, kind: "jabo", label: "Free ongkir" };
+    const discount = Math.min(original, Math.max(0, Math.round(input.promo.jaboMax)));
+    if (discount <= 0) return none;
+    const pay = original - discount;
+    return { original, discount, pay, kind: "jabo", label: labelPromo(discount, pay) };
   }
 
   if (!input.promo.luar) return none;
-  const discount = Math.min(original, Math.round((original * input.promo.luarPercent) / 100));
+  const persen = Math.round((original * input.promo.luarPercent) / 100);
+  const discount = Math.min(original, persen, Math.max(0, Math.round(input.promo.luarMax)));
   if (discount <= 0) return none;
-  return {
-    original,
-    discount,
-    pay: original - discount,
-    kind: "luar",
-    label: `Hemat ongkir ${input.promo.luarPercent}%`,
-  };
+  const pay = original - discount;
+  return { original, discount, pay, kind: "luar", label: labelPromo(discount, pay) };
 }
 
 export type OpsiOngkirPromo = {
@@ -227,16 +254,17 @@ export function terapkanPromoKeOpsi<T extends { cost: number }>(
 
 /**
  * Pecah potongan jadi bagian yang ditanggung diskon akun VIP J&T dan bagian yang ditanggung SAMAQU
- * (hanya untuk laporan). Contoh luar Jabodetabek 40% dengan diskon J&T 25%: 25% J&T + 15% SAMAQU;
- * Jabodetabek gratis: 25% J&T + 75% SAMAQU.
+ * (hanya untuk laporan). Porsi SAMAQU = potongan - diskon VIP J&T (diskon J&T = persen x tarif asli).
+ * Kalau potongan lebih kecil dari diskon J&T (mis. tarif besar dengan batas Rp40.000), hasilnya minus:
+ * itu BUKAN subsidi, jadi `samaqu` dibuat 0 dan nilainya dikembalikan di `selisih` (selisih untuk SAMAQU).
  */
 export function pecahPotongan(
   original: number,
   discount: number,
   jntDiscountPercent: number,
-): { jnt: number; samaqu: number } {
+): { jnt: number; samaqu: number; selisih: number } {
   const o = Math.max(0, Math.round(Number(original) || 0));
   const d = Math.max(0, Math.round(Number(discount) || 0));
-  const jnt = Math.min(d, Math.round((o * Math.max(0, Math.min(100, jntDiscountPercent))) / 100));
-  return { jnt, samaqu: d - jnt };
+  const jntPenuh = Math.round((o * Math.max(0, Math.min(100, jntDiscountPercent))) / 100);
+  return { jnt: Math.min(d, jntPenuh), samaqu: Math.max(0, d - jntPenuh), selisih: Math.max(0, jntPenuh - d) };
 }

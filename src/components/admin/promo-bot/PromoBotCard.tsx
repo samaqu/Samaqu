@@ -37,6 +37,8 @@ type Form = {
   luarStart: string;
   luarEnd: string;
   luarPercent: string;
+  jaboMax: string;
+  luarMax: string;
   citiesText: string;
   jntDiscountPercent: string;
   fchBotActive: boolean;
@@ -53,6 +55,8 @@ function toForm(s: PromoOngkirSettings): Form {
     luarStart: s.luarStart ?? "",
     luarEnd: s.luarEnd ?? "",
     luarPercent: String(s.luarPercent),
+    jaboMax: String(s.jaboMax),
+    luarMax: String(s.luarMax),
     citiesText: s.jaboCities.join("\n"),
     jntDiscountPercent: String(s.jntDiscountPercent),
     fchBotActive: s.fchBotActive,
@@ -212,6 +216,12 @@ export default function PromoBotCard() {
       setNotice({ kind: "err", text: "Persen potongan harus angka 0 sampai 100." });
       return;
     }
+    const jaboMax = Math.round(Number(form.jaboMax));
+    const luarMax = Math.round(Number(form.luarMax));
+    if (!Number.isFinite(jaboMax) || jaboMax < 0 || !Number.isFinite(luarMax) || luarMax < 0) {
+      setNotice({ kind: "err", text: "Potongan maksimal harus angka rupiah 0 atau lebih." });
+      return;
+    }
     if (!Number.isFinite(jntPercent) || jntPercent < 0 || jntPercent > 100) {
       setNotice({ kind: "err", text: "Diskon akun J&T harus angka 0 sampai 100." });
       return;
@@ -243,6 +253,8 @@ export default function PromoBotCard() {
         promo_ongkir_luar_start: form.luarStart || null,
         promo_ongkir_luar_end: form.luarEnd || null,
         promo_ongkir_luar_percent: luarPercent,
+        promo_ongkir_jabo_max: jaboMax,
+        promo_ongkir_luar_max: luarMax,
         promo_ongkir_jabo_cities: cities,
         promo_ongkir_jnt_discount_percent: jntPercent,
         promo_bot_fch_active: form.fchBotActive,
@@ -256,7 +268,7 @@ export default function PromoBotCard() {
       setNotice({ kind: "err", text: `Gagal menyimpan: ${error.message}` });
       return;
     }
-    const next = { ...form, luarPercent: String(luarPercent), jntDiscountPercent: String(jntPercent), citiesText: cities.join("\n") };
+    const next = { ...form, luarPercent: String(luarPercent), jaboMax: String(jaboMax), luarMax: String(luarMax), jntDiscountPercent: String(jntPercent), citiesText: cities.join("\n") };
     setForm(next);
     setSaved(next);
     setEditing(false);
@@ -295,7 +307,7 @@ export default function PromoBotCard() {
           <div className="flex flex-col gap-4">
             <PromoRow
               title="Free ongkir Jabodetabek"
-              description="Ongkir customer di Jabodetabek jadi Rp0 (J&T EZ dan ECO). Reseller tidak ikut."
+              description="Ongkir customer di Jabodetabek dipotong sebesar tarif J&T (EZ dan ECO), maksimal sebesar batas di bawah per order. Kalau tarifnya di atas batas, sisanya dibayar customer. Reseller tidak ikut."
               active={form.jaboActive}
               fase={jaboFase}
               onToggle={(next) => patch({ jaboActive: next })}
@@ -308,6 +320,20 @@ export default function PromoBotCard() {
                 end={form.jaboEnd}
                 onChange={(p) => patch({ ...(p.start !== undefined ? { jaboStart: p.start } : {}), ...(p.end !== undefined ? { jaboEnd: p.end } : {}) })}
               />
+              <div className="mt-4 max-w-[260px]">
+                <FieldLabel htmlFor="po-jabo-max">Potongan maksimal per order (Rp)</FieldLabel>
+                <input
+                  id="po-jabo-max"
+                  type="number"
+                  min={0}
+                  step={1000}
+                  className="pf-input"
+                  value={form.jaboMax}
+                  disabled={!editing}
+                  onChange={(e) => patch({ jaboMax: e.target.value })}
+                />
+                <HelperText>Berlaku per order, berapa pun jumlah thobenya. Contoh isi 20000: tarif Rp9.000 gratis, tarif Rp72.000 dipotong Rp20.000.</HelperText>
+              </div>
               <div className="mt-4">
                 <FieldLabel htmlFor="po-cities">Wilayah yang dihitung Jabodetabek</FieldLabel>
                 <textarea
@@ -336,7 +362,7 @@ export default function PromoBotCard() {
 
             <PromoRow
               title="Potongan ongkir luar Jabodetabek"
-              description="Ongkir customer di luar Jabodetabek dipotong sekian persen dari tarif J&T (EZ dan ECO), tanpa pembulatan. Reseller tidak ikut."
+              description="Ongkir customer di luar Jabodetabek dipotong sekian persen dari tarif J&T (EZ dan ECO), tanpa pembulatan, maksimal sebesar batas di bawah per order. Reseller tidak ikut."
               active={form.luarActive}
               fase={luarFase}
               onToggle={(next) => patch({ luarActive: next })}
@@ -354,6 +380,20 @@ export default function PromoBotCard() {
                   disabled={!editing}
                   onChange={(e) => patch({ luarPercent: e.target.value })}
                 />
+              </div>
+              <div className="mb-4 max-w-[260px]">
+                <FieldLabel htmlFor="po-luar-max">Potongan maksimal per order (Rp)</FieldLabel>
+                <input
+                  id="po-luar-max"
+                  type="number"
+                  min={0}
+                  step={1000}
+                  className="pf-input"
+                  value={form.luarMax}
+                  disabled={!editing}
+                  onChange={(e) => patch({ luarMax: e.target.value })}
+                />
+                <HelperText>Berlaku per order. Contoh isi 40000 dengan persen 40: tarif Rp11.000 dipotong Rp4.400, tarif Rp268.000 dipotong Rp40.000.</HelperText>
               </div>
               <PeriodeFields
                 idPrefix="po-luar"

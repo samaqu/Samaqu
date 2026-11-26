@@ -20,6 +20,9 @@ export async function GET(req: NextRequest) {
       ongkirJabodetabek: promo.jabo,
       ongkirLuar: promo.luar,
       ongkirLuarPersen: promo.luarPercent,
+      // Batas maksimal potongan (Rp) per order; teks promo untuk customer dibaca dari angka ini, tidak ditulis di persona.
+      ongkirJaboMax: promo.jaboMax,
+      ongkirLuarMax: promo.luarMax,
       fchBot: promo.fchBot,
     });
   } catch (error) {

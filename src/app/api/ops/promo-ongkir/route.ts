@@ -91,6 +91,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       period: { month: bounds.value, label: bounds.label, isPartial, hariBerjalan },
       luarPersen: settings.luarPercent,
+      jaboMax: settings.jaboMax,
+      luarMax: settings.luarMax,
       jntDiskonPersen: settings.jntDiscountPercent,
       belumAktif,
       ...report,

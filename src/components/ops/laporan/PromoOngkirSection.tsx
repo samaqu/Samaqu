@@ -23,12 +23,14 @@ type Origin = "bot" | "admin" | "website";
 type PromoOngkirData = {
   period: { month: string; label: string; isPartial: boolean; hariBerjalan: number };
   luarPersen: number;
+  jaboMax: number;
+  luarMax: number;
   jntDiskonPersen: number;
   belumAktif: boolean;
   jabodetabek: { pesanan: number; rupiah: number };
   luar: { pesanan: number; rupiah: number };
   total: { pesanan: number; diberikan: number; dibayarCustomer: number };
-  uangKeluar: { samaqu: number; ditanggungJnt: number };
+  uangKeluar: { samaqu: number; ditanggungJnt: number; selisihSamaqu: number };
   perAsal: Record<Origin, number>;
   perHari: Array<{ hari: string; pesanan: number }>;
   rinci: Array<{
@@ -169,14 +171,14 @@ export default function PromoOngkirSection({ month }: { month: string }) {
             <Blok
               dark
               testId="promo-ongkir-jabo"
-              judul="Jabodetabek (Gratis Ongkir)"
+              judul={`Jabodetabek (Gratis Ongkir s.d. ${rp(data.jaboMax)})`}
               pesanan={data.jabodetabek.pesanan}
               rupiah={data.jabodetabek.rupiah}
               keterangan="Total ongkir yang digratiskan"
             />
             <Blok
               testId="promo-ongkir-luar"
-              judul={`Luar Jabodetabek (Potongan ${data.luarPersen}%)`}
+              judul={`Luar Jabodetabek (Diskon ${data.luarPersen}% s.d. ${rp(data.luarMax)})`}
               pesanan={data.luar.pesanan}
               rupiah={data.luar.rupiah}
               keterangan="Total ongkir yang dipotong"
@@ -206,6 +208,12 @@ export default function PromoOngkirSection({ month }: { month: string }) {
             <p className="mt-0.5 text-[11px] font-semibold leading-relaxed text-zinc-500">
               Bagian potongan yang ditanggung SAMAQU. Sisanya ({rp(data.uangKeluar.ditanggungJnt)}) sudah ditanggung diskon akun J&amp;T {data.jntDiskonPersen}%.
             </p>
+            {data.uangKeluar.selisihSamaqu > 0 ? (
+              <p data-testid="promo-ongkir-selisih" className="mt-1.5 text-[11px] font-semibold leading-relaxed text-zinc-500">
+                Selisih untuk SAMAQU: <span className="font-black tabular-nums text-zinc-900">{rp(data.uangKeluar.selisihSamaqu)}</span>. Ini dari pesanan
+                yang potongannya lebih kecil dari diskon akun J&amp;T (karena ada batas maksimal), jadi bukan uang yang keluar.
+              </p>
+            ) : null}
           </div>
 
           {data.belumAktif ? (

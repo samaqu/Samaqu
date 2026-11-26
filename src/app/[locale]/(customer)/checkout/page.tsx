@@ -1081,9 +1081,12 @@ function CheckoutContent() {
                         {opt.promoLabel && (
                           <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
                             <OngkirPromoBadge label={opt.promoLabel} />
-                            <span className="text-[11px] font-ui" style={{ color: "var(--text-muted)" }}>
-                              {ongkirHematText(opt.discount ?? 0)}
-                            </span>
+                            {/* Label "Hemat ongkir Rp..." sudah memuat nominal; kalimat hemat hanya untuk "Gratis ongkir". */}
+                            {!opt.promoLabel.includes("Rp") && (
+                              <span className="text-[11px] font-ui" style={{ color: "var(--text-muted)" }}>
+                                {ongkirHematText(opt.discount ?? 0)}
+                              </span>
+                            )}
                           </span>
                         )}
                       </span>
@@ -1254,7 +1257,9 @@ function CheckoutContent() {
               {selectedShipping?.promoLabel && (
                 <div className="flex items-center justify-between gap-3">
                   <OngkirPromoBadge label={selectedShipping.promoLabel} />
-                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>{ongkirHematText(selectedShipping.discount ?? 0)}</span>
+                  {!selectedShipping.promoLabel.includes("Rp") && (
+                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>{ongkirHematText(selectedShipping.discount ?? 0)}</span>
+                  )}
                 </div>
               )}
               <div className="flex justify-between" style={{ color: "var(--text-secondary)" }}>

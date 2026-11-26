@@ -5,8 +5,9 @@
  *  - Hanya pesanan sah (diproses/dikirim/selesai) yang dihitung — disaring pemanggil (`isValidSaleOrder`).
  *  - Pesanan berpromo = `shipping_discount` > 0 dan `shipping_promo_kind` jabo/luar. Pesanan lama/tanpa promo
  *    (kolom kosong) otomatis tidak ikut, jadi saklar OFF = kartu kosong yang rapi.
- *  - "Uang yang benar-benar keluar dari SAMAQU" = bagian potongan yang BUKAN ditanggung diskon akun VIP J&T
- *    (lihat `pecahPotongan`): Jabodetabek gratis = 75%, luar Jabodetabek 40% = 15% dari tarif J&T.
+ *  - "Uang yang benar-benar keluar dari SAMAQU" = potongan dikurangi diskon akun VIP J&T (lihat `pecahPotongan`).
+ *    Kalau hasilnya minus (potongan lebih kecil dari diskon J&T karena batas maksimal), TIDAK dihitung subsidi:
+ *    dicatat terpisah sebagai "selisih untuk SAMAQU".
  *  - Angka utama adalah yang diberikan ke customer; angka "uang keluar" hanya pelengkap.
  * Tidak menyentuh rumus omset/laba (omset = total - ongkir yang dibayar, tidak berubah).
  */
@@ -50,8 +51,12 @@ export interface PromoOngkirReport {
   jabodetabek: { pesanan: number; rupiah: number };
   luar: { pesanan: number; rupiah: number };
   total: { pesanan: number; diberikan: number; dibayarCustomer: number };
-  /** Bagian potongan yang ditanggung SAMAQU (di luar diskon akun VIP J&T). */
-  uangKeluar: { samaqu: number; ditanggungJnt: number };
+  /**
+   * Bagian potongan yang ditanggung SAMAQU (di luar diskon akun VIP J&T) = uang yang benar-benar keluar.
+   * `selisihSamaqu`: pesanan yang potongannya LEBIH KECIL dari diskon J&T (karena batas maksimal); itu selisih untuk
+   * SAMAQU, bukan subsidi, jadi tidak ikut `samaqu`.
+   */
+  uangKeluar: { samaqu: number; ditanggungJnt: number; selisihSamaqu: number };
   perAsal: Record<PromoOngkirOrigin, number>;
   perHari: Array<{ hari: string; pesanan: number }>;
   rinci: PromoOngkirRow[];
@@ -81,7 +86,7 @@ export function buildPromoOngkirReport(input: BuildPromoOngkirInput): PromoOngki
     jabodetabek: { pesanan: 0, rupiah: 0 },
     luar: { pesanan: 0, rupiah: 0 },
     total: { pesanan: 0, diberikan: 0, dibayarCustomer: 0 },
-    uangKeluar: { samaqu: 0, ditanggungJnt: 0 },
+    uangKeluar: { samaqu: 0, ditanggungJnt: 0, selisihSamaqu: 0 },
     perAsal: { bot: 0, admin: 0, website: 0 },
     perHari: [],
     rinci: [],
@@ -97,7 +102,7 @@ export function buildPromoOngkirReport(input: BuildPromoOngkirInput): PromoOngki
     // Tarif J&T: kolom asli kalau ada; kalau kosong dihitung dari dibayar + potongan.
     const asli = int(order.shipping_cost_original) || dibayar + potongan;
     const asal = input.originOf(order);
-    const { jnt, samaqu } = pecahPotongan(asli, potongan, input.jntDiscountPercent);
+    const { jnt, samaqu, selisih } = pecahPotongan(asli, potongan, input.jntDiscountPercent);
 
     const grup = kind === "jabo" ? report.jabodetabek : report.luar;
     grup.pesanan += 1;
@@ -107,6 +112,7 @@ export function buildPromoOngkirReport(input: BuildPromoOngkirInput): PromoOngki
     report.total.dibayarCustomer += dibayar;
     report.uangKeluar.samaqu += samaqu;
     report.uangKeluar.ditanggungJnt += jnt;
+    report.uangKeluar.selisihSamaqu += selisih;
     report.perAsal[asal] += 1;
 
     const day = wibDay(order.created_at);
