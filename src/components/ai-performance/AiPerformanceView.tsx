@@ -3,24 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, Loader2, MessageSquare, RefreshCw, Sparkles, Users, Wallet, XCircle } from "lucide-react";
 import { opsGet } from "@/app/(internal)/panel-admin/panel-api";
-
-type ProdukTerjual = {
-  /** Order sah dari closing AI yang dihitung. */
-  orders: number;
-  units: number;
-  revenue: number;
-  /** Jumlah produk berbeda (semua series satu produk). */
-  products: number;
-  rows: {
-    name: string;
-    subname: string;
-    units: number;
-    revenue: number;
-    /** Rincian series dan ukuran, urut dari yang paling banyak. */
-    series?: { label: string; units: number }[];
-    sizes?: { label: string; units: number }[];
-  }[];
-};
+import ProdukTerjualAi, { type ProdukTerjualData } from "@/components/ai-performance/ProdukTerjualAi";
 
 type Stats = {
   conversations: number;
@@ -47,7 +30,7 @@ type Stats = {
   /** Closing yang order-nya batal atau draft-nya ditolak: tidak dihitung. */
   closingExcluded?: number;
   /** Hanya ada pada bulan terpilih; null/kosong = belum termuat. */
-  produkTerjual?: ProdukTerjual | null;
+  produkTerjual?: ProdukTerjualData | null;
   growth: {
     conversations: number | null;
     handled: number | null;
@@ -373,89 +356,7 @@ export default function AiPerformanceView() {
 
           <ChatRamaiChart data={stats.chatRamai} />
 
-          <div className="rounded-2xl border bg-white p-4 shadow-sm sm:p-5" style={{ borderColor: "#e3ebf1" }}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 className="text-base font-black" style={{ color: "#2a1a22" }}>Produk Paling Banyak Terjual Melalui AI</h3>
-                <p className="mt-0.5 text-xs" style={{ color: "#8a7d83" }}>
-                  Daftar produk yang berhasil terjual melalui bantuan AI bulan ini, diurutkan berdasarkan jumlah unit terjual.
-                </p>
-              </div>
-              {stats.produkTerjual && stats.produkTerjual.products > 0 ? (
-                <span className="rounded-full px-2.5 py-1 text-[10px] font-bold" style={{ background: "#e8f3fb", color: "#2f6f9e" }}>
-                  {number(stats.produkTerjual.products)} produk · {number(stats.produkTerjual.units)} pcs
-                </span>
-              ) : null}
-            </div>
-            {!stats.produkTerjual || stats.produkTerjual.rows.length === 0 ? (
-              <p className="mt-3 py-4 text-sm" style={{ color: "#8a7d83" }}>
-                {stats.produkTerjual ? "Belum ada produk terjual lewat AI pada periode ini." : "Daftar produk belum bisa dimuat."}
-              </p>
-            ) : (
-              <ol className="mt-3 divide-y" style={{ borderColor: "#edf1f4" }}>
-                {stats.produkTerjual.rows.map((item, index) => {
-                  const top = stats.produkTerjual?.rows[0]?.units || 1;
-                  return (
-                    <li key={`${item.name}-${item.subname}-${index}`} className="flex items-center gap-3 py-3">
-                      <span
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black"
-                        style={{ background: index === 0 ? "#2f6f9e" : "#e8f3fb", color: index === 0 ? "#ffffff" : "#2f6f9e" }}
-                      >
-                        {index + 1}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                          <p className="truncate text-xs font-bold" style={{ color: "#2a1a22" }}>
-                            {item.name}
-                            {item.subname ? <span className="ml-1.5 font-semibold" style={{ color: "#9aacb8" }}>{item.subname}</span> : null}
-                          </p>
-                          <p className="text-[11px] font-semibold tabular-nums" style={{ color: "#6B6A64" }}>
-                            <b style={{ color: "#2a1a22" }}>{number(item.units)} pcs</b> · {money(item.revenue)}
-                          </p>
-                        </div>
-                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full" style={{ background: "#edf1f4" }}>
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${Math.max(4, Math.round((item.units / top) * 100))}%`, background: "#2f6f9e" }}
-                          />
-                        </div>
-                        {(() => {
-                          // "Tanpa series" tidak ditampilkan kalau itu satu-satunya (tidak ada informasi).
-                          const series = (item.series ?? []).filter((s) => s.label && s.label !== "Tanpa series");
-                          const sizes = (item.sizes ?? []).filter((s) => s.label && s.label !== "Tanpa ukuran");
-                          if (series.length === 0 && sizes.length === 0) return null;
-                          const shown = series.slice(0, 3);
-                          const more = series.length - shown.length;
-                          return (
-                            <div className="mt-1.5 space-y-0.5 text-[11px]" style={{ color: "#6B6A64" }}>
-                              {series.length > 0 ? (
-                                <p>
-                                  <span className="font-bold" style={{ color: "#7c93a6" }}>Series: </span>
-                                  {shown.map((s) => `${s.label} ${number(s.units)}`).join(" · ")}
-                                  {more > 0 ? ` · +${number(more)} lainnya` : ""}
-                                </p>
-                              ) : null}
-                              {sizes.length > 0 ? (
-                                <p>
-                                  <span className="font-bold" style={{ color: "#7c93a6" }}>Ukuran: </span>
-                                  {sizes.map((s) => `${s.label} ${number(s.units)}`).join(" · ")}
-                                </p>
-                              ) : null}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-            {stats.produkTerjual && stats.produkTerjual.rows.length > 0 ? (
-              <p className="mt-3 text-[11px]" style={{ color: "#8a7d83" }}>
-                Total {number(stats.produkTerjual.units)} pcs dari {number(stats.produkTerjual.orders)} order · omzet {money(stats.produkTerjual.revenue)} (setelah diskon, tanpa ongkir). Cover &amp; hanger tidak ikut daftar.
-              </p>
-            ) : null}
-          </div>
+          <ProdukTerjualAi data={stats.produkTerjual} />
 
           {(stats.closingUnlinked || 0) > 0 || (stats.closingExcluded || 0) > 0 ? (
             <div className="rounded-2xl border px-4 py-3 text-[12px] leading-relaxed" style={{ borderColor: "#f1dfb8", background: "#fff9ec", color: "#7a5a1a" }}>

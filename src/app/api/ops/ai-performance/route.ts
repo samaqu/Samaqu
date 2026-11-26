@@ -350,21 +350,31 @@ async function productsSold(admin: ReturnType<typeof getSupabaseAdmin>, orderNum
     catalog.push(...((data || []) as unknown as BestSellerCatalogRow[]));
   }
 
-  const { rows, totals } = aggregateBestSellers(items, catalog).product;
-  return {
-    orders: orderIds.length,
-    units: totals.units,
-    revenue: totals.revenue,
-    products: totals.products,
-    rows: rows.slice(0, 8).map((row) => ({
+  const aggregate = aggregateBestSellers(items, catalog);
+
+  // Dua mode seperti Produk Terlaris di Laporan: per series (default) dan per produk (semua series digabung).
+  const shape = <T extends { key: string; name: string; subname: string; units: number; revenue: number; fallback: boolean; addonUnits: number; sizes: { label: string; units: number }[] }>(
+    mode: { rows: T[]; totals: { units: number; revenue: number; products: number } },
+  ) => ({
+    totals: { units: mode.totals.units, revenue: mode.totals.revenue, products: mode.totals.products },
+    rows: mode.rows.map((row) => ({
+      key: row.key,
       name: row.name,
       subname: row.subname,
       units: row.units,
       revenue: row.revenue,
-      // Rincian dari hasil hitung yang sama (sudah urut dari yang paling banyak).
-      series: row.seriesBreakdown.map((item) => ({ label: item.label, units: item.units })),
-      sizes: row.sizes.map((item) => ({ label: item.label, units: item.units })),
+      share: mode.totals.units > 0 ? (row.units / mode.totals.units) * 100 : 0,
+      fallback: row.fallback,
+      addonUnits: row.addonUnits,
+      sizes: row.sizes,
+      // Hanya mode produk yang punya rincian per series.
+      seriesBreakdown: (row as unknown as { seriesBreakdown?: unknown[] }).seriesBreakdown ?? [],
     })),
+  });
+
+  return {
+    orders: orderIds.length,
+    modes: { series: shape(aggregate.series), product: shape(aggregate.product) },
   };
 }
 
