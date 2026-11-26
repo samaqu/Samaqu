@@ -13,6 +13,14 @@ import {
   type ClosingRow,
 } from "@/lib/ai-closing-nominal";
 import { getAiConversationMetrics, type EscalationRef } from "@/lib/ai-performance-metrics";
+import {
+  aggregateBestSellers,
+  allocateOrderDiscounts,
+  isValidSaleOrder,
+  type BestSellerCatalogRow,
+  type BestSellerItem,
+} from "@/lib/best-sellers";
+import { OPEN_ORDER_ADDON_TARGET_ID } from "@/lib/open-order-config";
 
 /**
  * AI Performance Center.
@@ -108,6 +116,8 @@ type ClosingStats = {
   unlinkedNominal: number;
   /** Closing yang order-nya batal atau draft-nya ditolak: tidak dihitung. */
   excluded: number;
+  /** Nomor order dari closing yang dihitung (bahan daftar "Produk terjual lewat AI"). */
+  orderNumbers: string[];
 };
 
 type ClosingContext = {
@@ -256,9 +266,11 @@ async function academyClosings(
       unlinked: 0,
       unlinkedNominal: 0,
       excluded: 0,
+      orderNumbers: [],
     };
   }
 
+  const orderNumbers: string[] = [];
   let count = 0;
   let nominal = 0;
   let unlinked = 0;
@@ -272,6 +284,14 @@ async function academyClosings(
     if (result.counted) {
       count += 1;
       nominal += result.nominal;
+      // Draft yang masih menunggu belum punya order, jadi belum ada produk yang bisa dihitung.
+      const orderNumber =
+        result.kind === "draft_menunggu"
+          ? null
+          : String(draft?.status || "").toLowerCase() === "approved"
+            ? order?.orderNumber
+            : manual?.orderNumber;
+      if (orderNumber) orderNumbers.push(orderNumber);
     } else if (result.kind === "belum_tertaut") {
       unlinked += 1;
       unlinkedNominal += Math.max(0, Math.round(row.nominal));
@@ -279,7 +299,70 @@ async function academyClosings(
       excluded += 1;
     }
   }
-  return { count, nominal, source: "wa_closings", unlinked, unlinkedNominal, excluded };
+  return { count, nominal, source: "wa_closings", unlinked, unlinkedNominal, excluded, orderNumbers };
+}
+
+/**
+ * Produk yang terjual lewat AI: barang di order dari closing bot yang dihitung (order sah saja).
+ * Pakai agregator yang sama dengan Produk Terlaris (semua series satu baris; cover & layanan tidak
+ * ikut peringkat), omzet sudah dipotong porsi diskon pesanan. Hanya membaca.
+ */
+async function productsSold(admin: ReturnType<typeof getSupabaseAdmin>, orderNumbers: string[]) {
+  const numbers = [...new Set(orderNumbers)];
+  const CHUNK = 100;
+
+  const orderIds: string[] = [];
+  const discountByOrder = new Map<string, number>();
+  for (let i = 0; i < numbers.length; i += CHUNK) {
+    const { data, error } = await admin
+      .from("orders")
+      .select("id, status, discount")
+      .in("order_number", numbers.slice(i, i + CHUNK));
+    if (error) throw new Error(error.message);
+    for (const row of data || []) {
+      if (!isValidSaleOrder(row.status)) continue;
+      orderIds.push(String(row.id));
+      discountByOrder.set(String(row.id), Number(row.discount) || 0);
+    }
+  }
+
+  const items: BestSellerItem[] = [];
+  for (let i = 0; i < orderIds.length; i += CHUNK) {
+    const { data, error } = await admin
+      .from("order_items")
+      .select("order_id, product_id, product_name, color, size, kain, series, quantity, price, customer_price")
+      .in("order_id", orderIds.slice(i, i + CHUNK));
+    if (error) throw new Error(error.message);
+    items.push(...((data || []) as BestSellerItem[]));
+  }
+  allocateOrderDiscounts(items, discountByOrder);
+
+  const productIds = [
+    ...new Set([...items.map((item) => String(item.product_id || "")), OPEN_ORDER_ADDON_TARGET_ID].filter(Boolean)),
+  ];
+  const catalog: BestSellerCatalogRow[] = [];
+  for (let i = 0; i < productIds.length; i += CHUNK) {
+    const { data, error } = await admin
+      .from("products")
+      .select("id, name, category, series, kain, jenis_kain(name)")
+      .in("id", productIds.slice(i, i + CHUNK));
+    if (error) throw new Error(error.message);
+    catalog.push(...((data || []) as unknown as BestSellerCatalogRow[]));
+  }
+
+  const { rows, totals } = aggregateBestSellers(items, catalog).product;
+  return {
+    orders: orderIds.length,
+    units: totals.units,
+    revenue: totals.revenue,
+    products: totals.products,
+    rows: rows.slice(0, 8).map((row) => ({
+      name: row.name,
+      subname: row.subname,
+      units: row.units,
+      revenue: row.revenue,
+    })),
+  };
 }
 
 /**
@@ -344,6 +427,7 @@ async function ordersByNumber(
 async function periodStats(
   admin: ReturnType<typeof getSupabaseAdmin>,
   month: ReturnType<typeof jakartaMonthBounds>,
+  withProducts = false,
 ) {
   const [rows, drafts, closingStats, leadsResult, escalations, costUsd] = await Promise.all([
     inboxRows(admin, month.startIso, month.endIso),
@@ -382,6 +466,7 @@ async function periodStats(
   let closing = closingStats?.count || 0;
   let nominal = closingStats?.nominal || 0;
   let closingSource: ClosingStats["source"] = closingStats?.source || "drafts";
+  let closingOrderNumbers: string[] = closingStats?.orderNumbers || [];
 
   // Fallback hanya kalau koneksi Academy belum dikonfigurasi. Kalau sudah ada,
   // angka wa_closings adalah sumber utama (termasuk closing backfill).
@@ -392,13 +477,23 @@ async function periodStats(
     const orders = await ordersByNumber(admin, orderNumbers);
     closing = 0;
     nominal = 0;
+    closingOrderNumbers = [];
     for (const draft of drafts) {
       const order = orders.get(String(draft.approved_order_number || ""));
       if (!order || !SALE_STATUSES.includes(String(order.status || "").toLowerCase())) continue;
       closing += 1;
       nominal += orderRevenue(order);
+      closingOrderNumbers.push(String(draft.approved_order_number));
     }
   }
+
+  // Daftar produk hanya untuk bulan yang dipilih (bulan pembanding tidak perlu). Gagal = daftar kosong, angka lain tetap tampil.
+  const produkTerjual = withProducts
+    ? await productsSold(admin, closingOrderNumbers).catch((error) => {
+        console.error("[AI-PERFORMANCE] Gagal menghitung produk terjual:", error instanceof Error ? error.message : error);
+        return null;
+      })
+    : null;
 
   const conversations = metrics.conversations;
   const handled = handledSenders.size;
@@ -425,14 +520,8 @@ async function periodStats(
     nominalUnlinked: closingStats?.unlinkedNominal || 0,
     /** Closing yang order-nya batal atau draft-nya ditolak: tidak dihitung. */
     closingExcluded: closingStats?.excluded || 0,
-    activity: rows.slice(0, 8).map((row) => ({
-      sender: String(row.sender || ""),
-      sender_name: row.sender_name || null,
-      message: String(row.message || ""),
-      reply_text: row.reply_text || null,
-      status: row.status || null,
-      created_at: row.created_at,
-    })),
+    /** Produk dari order closing bot yang dihitung (hanya bulan terpilih); null = tidak dimuat/gagal. */
+    produkTerjual,
   };
 }
 
@@ -444,7 +533,7 @@ export async function GET(req: NextRequest) {
     const month = jakartaMonthBounds(new URL(req.url).searchParams.get("month"));
     const previous = jakartaMonthBounds(previousMonth(month.value));
     const [currentStats, previousStats] = await Promise.all([
-      periodStats(admin, month),
+      periodStats(admin, month, true),
       periodStats(admin, previous),
     ]);
 

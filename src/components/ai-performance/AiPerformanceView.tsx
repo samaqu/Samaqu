@@ -4,13 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Loader2, MessageSquare, RefreshCw, Sparkles, Users, Wallet, XCircle } from "lucide-react";
 import { opsGet } from "@/app/(internal)/panel-admin/panel-api";
 
-type Activity = {
-  sender: string;
-  sender_name: string | null;
-  message: string;
-  reply_text: string | null;
-  status: string | null;
-  created_at: string;
+type ProdukTerjual = {
+  /** Order sah dari closing AI yang dihitung. */
+  orders: number;
+  units: number;
+  revenue: number;
+  /** Jumlah produk berbeda (semua series satu produk). */
+  products: number;
+  rows: { name: string; subname: string; units: number; revenue: number }[];
 };
 
 type Stats = {
@@ -39,7 +40,8 @@ type Stats = {
   nominalUnlinked?: number;
   /** Closing yang order-nya batal atau draft-nya ditolak: tidak dihitung. */
   closingExcluded?: number;
-  activity: Activity[];
+  /** Hanya ada pada bulan terpilih; null/kosong = belum termuat. */
+  produkTerjual?: ProdukTerjual | null;
   growth: {
     conversations: number | null;
     handled: number | null;
@@ -66,19 +68,6 @@ const number = (value: number) => Math.round(Number(value) || 0).toLocaleString(
 /** Persentase gaya Indonesia (koma desimal); kosong/NaN tetap "0%". */
 const percent = (value: number) =>
   `${(Number(value) || 0).toLocaleString("id-ID", { maximumFractionDigits: 1 })}%`;
-const phone = (value: string) => {
-  const digits = String(value || "").replace(/\D/g, "");
-  return digits.startsWith("62") ? `0${digits.slice(2)}` : digits;
-};
-const shortTime = (value: string) =>
-  new Date(value).toLocaleString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Jakarta",
-  });
 
 function Delta({ value }: { value: number | null }) {
   if (value === null) return <span style={{ color: "#9aacb8" }}>—</span>;
@@ -308,32 +297,60 @@ export default function AiPerformanceView() {
           <div className="rounded-2xl border bg-white p-4 shadow-sm sm:p-5" style={{ borderColor: "#e3ebf1" }}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h3 className="text-base font-black" style={{ color: "#2a1a22" }}>Aktivitas percakapan</h3>
-                <p className="mt-0.5 text-xs" style={{ color: "#8a7d83" }}>Percakapan terbaru pada periode ini.</p>
+                <h3 className="text-base font-black" style={{ color: "#2a1a22" }}>Produk terjual lewat AI</h3>
+                <p className="mt-0.5 text-xs" style={{ color: "#8a7d83" }}>
+                  Barang di order closing AI bulan ini, urut dari yang paling banyak laku.
+                </p>
               </div>
-              <span className="rounded-full px-2.5 py-1 text-[10px] font-bold" style={{ background: "#e8f3fb", color: "#2f6f9e" }}>{stats.activity.length} terbaru</span>
+              {stats.produkTerjual && stats.produkTerjual.products > 0 ? (
+                <span className="rounded-full px-2.5 py-1 text-[10px] font-bold" style={{ background: "#e8f3fb", color: "#2f6f9e" }}>
+                  {number(stats.produkTerjual.products)} produk · {number(stats.produkTerjual.units)} pcs
+                </span>
+              ) : null}
             </div>
-            <div className="mt-3 divide-y" style={{ borderColor: "#edf1f4" }}>
-              {stats.activity.length === 0 ? (
-                <p className="py-4 text-sm" style={{ color: "#8a7d83" }}>Belum ada percakapan pada periode ini.</p>
-              ) : stats.activity.map((item, index) => (
-                <div key={`${item.sender}-${item.created_at}-${index}`} className="flex items-start gap-3 py-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-black" style={{ background: "#fdf0f4", color: "#8a4c62" }}>
-                    {(item.sender_name || phone(item.sender) || "C").slice(0, 1).toUpperCase()}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-1">
-                      <p className="truncate text-xs font-bold" style={{ color: "#2a1a22" }}>{item.sender_name || phone(item.sender)}</p>
-                      <span className="text-[10px]" style={{ color: "#9aacb8" }}>{shortTime(item.created_at)}</span>
-                    </div>
-                    <p className="mt-0.5 line-clamp-2 text-[11px]" style={{ color: "#6B6A64" }}>{item.message || "—"}</p>
-                  </div>
-                  <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: item.reply_text ? "#e7f5eb" : "#f2f4f6", color: item.reply_text ? "#1f8a58" : "#7c8a93" }}>
-                    {item.reply_text ? "Dibalas" : "Belum"}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {!stats.produkTerjual || stats.produkTerjual.rows.length === 0 ? (
+              <p className="mt-3 py-4 text-sm" style={{ color: "#8a7d83" }}>
+                {stats.produkTerjual ? "Belum ada produk terjual lewat AI pada periode ini." : "Daftar produk belum bisa dimuat."}
+              </p>
+            ) : (
+              <ol className="mt-3 divide-y" style={{ borderColor: "#edf1f4" }}>
+                {stats.produkTerjual.rows.map((item, index) => {
+                  const top = stats.produkTerjual?.rows[0]?.units || 1;
+                  return (
+                    <li key={`${item.name}-${item.subname}-${index}`} className="flex items-center gap-3 py-3">
+                      <span
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black"
+                        style={{ background: index === 0 ? "#2f6f9e" : "#e8f3fb", color: index === 0 ? "#ffffff" : "#2f6f9e" }}
+                      >
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                          <p className="truncate text-xs font-bold" style={{ color: "#2a1a22" }}>
+                            {item.name}
+                            {item.subname ? <span className="ml-1.5 font-semibold" style={{ color: "#9aacb8" }}>{item.subname}</span> : null}
+                          </p>
+                          <p className="text-[11px] font-semibold tabular-nums" style={{ color: "#6B6A64" }}>
+                            <b style={{ color: "#2a1a22" }}>{number(item.units)} pcs</b> · {money(item.revenue)}
+                          </p>
+                        </div>
+                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full" style={{ background: "#edf1f4" }}>
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${Math.max(4, Math.round((item.units / top) * 100))}%`, background: "#2f6f9e" }}
+                          />
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+            {stats.produkTerjual && stats.produkTerjual.rows.length > 0 ? (
+              <p className="mt-3 text-[11px]" style={{ color: "#8a7d83" }}>
+                Total {number(stats.produkTerjual.units)} pcs dari {number(stats.produkTerjual.orders)} order · omzet {money(stats.produkTerjual.revenue)} (setelah diskon, tanpa ongkir). Cover &amp; hanger tidak ikut daftar.
+              </p>
+            ) : null}
           </div>
 
           {(stats.closingUnlinked || 0) > 0 || (stats.closingExcluded || 0) > 0 ? (

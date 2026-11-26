@@ -471,3 +471,44 @@ export function aggregateBestSellers(
     cover: { units: coverUnits, revenue: coverRevenue, orders: coverOrders.size, addonUnits: coverAddonUnits },
   };
 }
+
+/**
+ * Tempelkan diskon pesanan ke baris item (`discount_share`), supaya omzet per baris = harga − porsi diskon
+ * dan total semua baris cocok dengan angka "Penjualan" di Laporan. Aturan yang sama dengan `/api/ops/best-sellers`:
+ * item Cover Thobe menerima diskon lebih dulu (penyebab diskonnya = gratis cover hanger) sampai sebesar harga barisnya,
+ * sisa diskon baru dibagi proporsional ke baris lain. Mengubah `items` di tempat.
+ */
+export function allocateOrderDiscounts(items: BestSellerItem[], discountByOrder: Map<string, number>): void {
+  const lineTotal = (item: BestSellerItem) => {
+    const price = Number(item.price) > 0 ? Number(item.price) : Number(item.customer_price) || 0;
+    return price * (Number(item.quantity ?? item.qty) || 0);
+  };
+  const isCoverThobe = (item: BestSellerItem) =>
+    String(item.product_id || "") === "cover-hanger" && /cover\s*thobe/i.test(String(item.color || ""));
+
+  const byOrder = new Map<string, BestSellerItem[]>();
+  for (const item of items) {
+    const key = String(item.order_id || "");
+    if (!byOrder.has(key)) byOrder.set(key, []);
+    byOrder.get(key)!.push(item);
+  }
+
+  for (const [orderId, orderItems] of byOrder) {
+    const discount = discountByOrder.get(orderId) || 0;
+    if (discount <= 0) continue;
+    let remaining = discount;
+    for (const line of orderItems.filter(isCoverThobe)) {
+      if (remaining <= 0) break;
+      const give = Math.min(remaining, lineTotal(line));
+      line.discount_share = (Number(line.discount_share) || 0) + give;
+      remaining -= give;
+    }
+    const others = orderItems.filter((item) => !isCoverThobe(item));
+    const otherTotal = others.reduce((sum, line) => sum + lineTotal(line), 0);
+    if (remaining > 0 && otherTotal > 0) {
+      for (const line of others) {
+        line.discount_share = (Number(line.discount_share) || 0) + Math.round((remaining * lineTotal(line)) / otherTotal);
+      }
+    }
+  }
+}

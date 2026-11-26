@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ChevronDown, Clock, Coins, Gift, Loader2, Package, Wallet } from "lucide-react";
+import { AlertTriangle, ChevronDown, Coins, Gift, Loader2, Package, Wallet } from "lucide-react";
 import { bagiPersen, VARIAN_KOKO, VARIAN_THOBE } from "@/lib/promo-fch-report";
 
 /**
@@ -190,40 +190,30 @@ export default function PromoFchSection({ month }: { month: string }) {
         </p>
       ) : (
         <div className="mt-4 space-y-3">
-          {/* 1. Empat angka utama */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {/* 1. Tiga angka utama */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Tile
               dark
               testId="promo-fch-keluar"
               icon={<Gift size={14} strokeWidth={2.1} />}
-              label="Keluar"
+              label="Total diberikan"
               value={`${nfmt(data.keluar)} cover`}
               note={`dari ${nfmt(data.rinci.length)} pesanan`}
             />
             <Tile
               icon={<Coins size={14} strokeWidth={2.1} />}
-              label="Nilai digratiskan"
+              label="Total nilai bonus"
               value={rp(data.nilaiDigratiskan)}
-              note="harga toko Rp35.000 per cover"
+              note="Harga jual normal"
             />
             <Tile
               icon={<Wallet size={14} strokeWidth={2.1} />}
-              label="Modal sebenarnya"
+              label="Total modal digunakan"
               value={rp(data.modal)}
               note={
                 data.modalTanpaData > 0
                   ? `${nfmt(data.modalTanpaData)} cover belum punya data modal`
                   : "uang yang benar-benar keluar (HPP)"
-              }
-            />
-            <Tile
-              icon={<Clock size={14} strokeWidth={2.1} />}
-              label="Menunggu review"
-              value={`${nfmt(data.menunggu.draft)} draft`}
-              note={
-                data.menunggu.draft > 0
-                  ? `${nfmt(data.menunggu.unit)} cover belum dihitung`
-                  : "tidak ada antrean sekarang"
               }
             />
           </div>
