@@ -26,6 +26,7 @@ import {
 } from "@/lib/promo/ongkir-promo";
 import { Card, FieldLabel, HelperText, PROMO_COLORS, PROMO_FORM_CSS, TEXT, TEXT_MUTED } from "../promo-fch/primitives";
 import { ToggleSwitch } from "../promo-fch/ToggleSwitch";
+import { SaveBar } from "../promo-fch/SaveBar";
 
 /** Bentuk yang diedit di form (teks supaya isian bisa kosong sementara diketik). */
 type Form = {
@@ -81,11 +82,13 @@ function PeriodeFields({
   start,
   end,
   onChange,
+  disabled,
 }: {
   idPrefix: string;
   start: string;
   end: string;
   onChange: (patch: { start?: string; end?: string }) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -96,6 +99,7 @@ function PeriodeFields({
           type="date"
           className="pf-input"
           value={start}
+          disabled={disabled}
           onChange={(e) => onChange({ start: e.target.value })}
         />
       </div>
@@ -106,6 +110,7 @@ function PeriodeFields({
           type="date"
           className="pf-input"
           value={end}
+          disabled={disabled}
           onChange={(e) => onChange({ end: e.target.value })}
         />
       </div>
@@ -122,6 +127,7 @@ function PromoRow({
   active,
   fase,
   onToggle,
+  locked,
   children,
 }: {
   title: string;
@@ -129,6 +135,8 @@ function PromoRow({
   active: boolean;
   fase: Fase;
   onToggle: (next: boolean) => void;
+  /** true = mode baca saja (setelah disimpan); saklar terkunci sampai admin menekan "Edit pengaturan". */
+  locked: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -150,7 +158,7 @@ function PromoRow({
             {description}
           </p>
         </div>
-        <ToggleSwitch checked={active} onChange={onToggle} label={title} />
+        <ToggleSwitch checked={active} onChange={onToggle} disabled={locked} label={title} />
       </div>
       <div className="mt-4">{children}</div>
     </div>
@@ -163,6 +171,8 @@ export default function PromoBotCard() {
   const [form, setForm] = useState<Form>(toForm(DEFAULT_PROMO_SETTINGS));
   const [saved, setSaved] = useState<Form>(toForm(DEFAULT_PROMO_SETTINGS));
   const [saving, setSaving] = useState(false);
+  /** false = baca saja (setelah disimpan / saat dibuka); "Edit pengaturan" membukanya, Simpan/Batal menguncinya lagi. */
+  const [editing, setEditing] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   useEffect(() => {
@@ -249,6 +259,7 @@ export default function PromoBotCard() {
     const next = { ...form, luarPercent: String(luarPercent), jntDiscountPercent: String(jntPercent), citiesText: cities.join("\n") };
     setForm(next);
     setSaved(next);
+    setEditing(false);
     setNotice({ kind: "ok", text: "Promo yang disebut bot tersimpan. Langsung berlaku di checkout, draft pesanan, dan bot." });
   }
 
@@ -288,9 +299,11 @@ export default function PromoBotCard() {
               active={form.jaboActive}
               fase={jaboFase}
               onToggle={(next) => patch({ jaboActive: next })}
+              locked={!editing}
             >
               <PeriodeFields
                 idPrefix="po-jabo"
+                disabled={!editing}
                 start={form.jaboStart}
                 end={form.jaboEnd}
                 onChange={(p) => patch({ ...(p.start !== undefined ? { jaboStart: p.start } : {}), ...(p.end !== undefined ? { jaboEnd: p.end } : {}) })}
@@ -302,6 +315,7 @@ export default function PromoBotCard() {
                   className="pf-input"
                   rows={7}
                   value={form.citiesText}
+                  disabled={!editing}
                   onChange={(e) => patch({ citiesText: e.target.value })}
                   style={{ fontVariantNumeric: "tabular-nums" }}
                 />
@@ -309,8 +323,9 @@ export default function PromoBotCard() {
                   Satu kota/kabupaten per baris, ditulis persis seperti nama di data J&T (contoh: KOTA ADM. JAKARTA SELATAN, KAB. BOGOR).{" "}
                   <button
                     type="button"
-                    className="underline"
+                    className="underline disabled:opacity-40 disabled:no-underline"
                     style={{ color: PROMO_COLORS.ink }}
+                    disabled={!editing}
                     onClick={() => patch({ citiesText: DEFAULT_JABO_CITIES.join("\n") })}
                   >
                     Kembalikan daftar bawaan
@@ -325,6 +340,7 @@ export default function PromoBotCard() {
               active={form.luarActive}
               fase={luarFase}
               onToggle={(next) => patch({ luarActive: next })}
+              locked={!editing}
             >
               <div className="mb-4 max-w-[220px]">
                 <FieldLabel htmlFor="po-luar-persen">Potongan (persen dari tarif J&T)</FieldLabel>
@@ -335,11 +351,13 @@ export default function PromoBotCard() {
                   max={100}
                   className="pf-input"
                   value={form.luarPercent}
+                  disabled={!editing}
                   onChange={(e) => patch({ luarPercent: e.target.value })}
                 />
               </div>
               <PeriodeFields
                 idPrefix="po-luar"
+                disabled={!editing}
                 start={form.luarStart}
                 end={form.luarEnd}
                 onChange={(p) => patch({ ...(p.start !== undefined ? { luarStart: p.start } : {}), ...(p.end !== undefined ? { luarEnd: p.end } : {}) })}
@@ -353,6 +371,7 @@ export default function PromoBotCard() {
                   max={100}
                   className="pf-input"
                   value={form.jntDiscountPercent}
+                  disabled={!editing}
                   onChange={(e) => patch({ jntDiscountPercent: e.target.value })}
                 />
                 <HelperText>Hanya untuk laporan: dipakai memisahkan potongan yang ditanggung J&T dan yang ditanggung SAMAQU. Tidak mempengaruhi ongkir customer.</HelperText>
@@ -365,9 +384,11 @@ export default function PromoBotCard() {
               active={form.fchBotActive}
               fase={fchFase}
               onToggle={(next) => patch({ fchBotActive: next })}
+              locked={!editing}
             >
               <PeriodeFields
                 idPrefix="po-fch"
+                disabled={!editing}
                 start={form.fchBotStart}
                 end={form.fchBotEnd}
                 onChange={(p) => patch({ ...(p.start !== undefined ? { fchBotStart: p.start } : {}), ...(p.end !== undefined ? { fchBotEnd: p.end } : {}) })}
@@ -389,40 +410,18 @@ export default function PromoBotCard() {
               </div>
             ) : null}
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-[12px] font-medium" style={{ color: dirty ? "#8a4b08" : TEXT_MUTED }}>
-                <span className="inline-block h-2 w-2 rounded-full" style={{ background: dirty ? "#E0A100" : "#22c55e" }} />
-                {dirty ? "Ada perubahan yang belum disimpan" : "Semua perubahan tersimpan"}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForm(saved);
-                    setNotice(null);
-                  }}
-                  disabled={!dirty || saving}
-                  className="rounded-lg px-4 py-2 text-[12px] font-semibold disabled:opacity-40"
-                  style={{ border: "1px solid var(--bd)", color: TEXT, background: "var(--card)" }}
-                >
-                  Batal
-                </button>
-                <button
-                  type="button"
-                  onClick={save}
-                  disabled={!dirty || saving}
-                  className="inline-flex items-center gap-2 rounded-lg px-5 py-2 text-[12px] font-bold disabled:opacity-60"
-                  style={{
-                    background: `linear-gradient(90deg, ${PROMO_COLORS.saveFrom}, ${PROMO_COLORS.saveTo})`,
-                    border: `1px solid ${PROMO_COLORS.saveBorder}`,
-                    color: PROMO_COLORS.saveText,
-                  }}
-                >
-                  {saving ? <Loader2 size={13} className="animate-spin" /> : null}
-                  {saving ? "Menyimpan…" : "Simpan promo bot"}
-                </button>
-              </div>
-            </div>
+            <SaveBar
+              dirty={dirty}
+              saving={saving}
+              locked={!editing}
+              onEdit={() => setEditing(true)}
+              onReset={() => {
+                setForm(saved);
+                setNotice(null);
+                setEditing(false);
+              }}
+              onSave={save}
+            />
           </div>
         )}
       </Card>
