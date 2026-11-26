@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, Send, Loader2, Image as ImageIcon } from "lucide-react";
+import { X, Send, Loader2, Image as ImageIcon, MessageCircle } from "lucide-react";
+import { stripWaMarker, wantsAdmin } from "@/lib/chat-handoff";
 import ImageZoom, { type ZoomMedia } from "@/components/ImageZoom";
 import { useSafeTranslations, useSafeLocale } from "@/lib/safe-i18n";
 import { waNumber } from "@/lib/whatsapp";
@@ -137,10 +138,17 @@ export default function ChatPanel({
     ];
     let cards: NonNullable<Msg["products"]> = [];
     let imgs: NonNullable<Msg["images"]> = [];
+    let handoff = false;
     const render = (content: string) =>
       setMessages([
         ...history,
-        { role: "assistant", content, products: cards, images: imgs.length ? imgs : undefined },
+        {
+          role: "assistant",
+          content: stripWaMarker(content),
+          products: cards,
+          images: imgs.length ? imgs : undefined,
+          handoff: handoff || undefined,
+        },
       ]);
     setMessages([...history, { role: "assistant", content: "" }]);
     setInput("");
@@ -185,7 +193,7 @@ export default function ChatPanel({
           const payload = trimmed.slice(5).trim();
           if (!payload) continue;
 
-          let evt: { delta?: string; reset?: boolean; error?: string; done?: boolean; products?: Msg["products"]; images?: Msg["images"] };
+          let evt: { delta?: string; reset?: boolean; error?: string; done?: boolean; handoff?: boolean; products?: Msg["products"]; images?: Msg["images"] };
           try {
             evt = JSON.parse(payload);
           } catch {
@@ -193,6 +201,7 @@ export default function ChatPanel({
           }
 
           if (evt.reset) acc = "";
+          else if (evt.handoff) handoff = true;
           else if (Array.isArray(evt.products)) cards = evt.products;
           else if (Array.isArray(evt.images)) imgs = evt.images;
           else if (typeof evt.delta === "string") acc += evt.delta;
@@ -208,6 +217,25 @@ export default function ChatPanel({
     } finally {
       setLoading(false);
     }
+  }
+
+  /**
+   * Tautan WhatsApp admin dengan pesan awal yang rapi: nama (kalau ada), asal "Live Chat
+   * website", dan topik = pertanyaan terakhir pelanggan yang BUKAN sekadar minta admin.
+   */
+  function buildHandoffHref(upTo: number) {
+    if (!whatsapp) return "";
+    const topic = messages
+      .slice(0, upTo)
+      .reverse()
+      .find((m) => m.role === "user" && m.content.trim() && !wantsAdmin(m.content))
+      ?.content.trim()
+      .replace(/\s+/g, " ")
+      .slice(0, 200);
+    const name = identity.name.trim();
+    const intro = name ? t("handoffIntroName", { name }) : t("handoffIntro");
+    const text = topic ? `${intro}\n${t("handoffTopic")} "${topic}"` : intro;
+    return `https://wa.me/${waNumber(whatsapp)}?text=${encodeURIComponent(text)}`;
   }
 
   const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content;
@@ -343,6 +371,18 @@ export default function ChatPanel({
                 </>
               )}
             </div>
+            {m.role === "assistant" && m.handoff && buildHandoffHref(i) && (
+              <a
+                href={buildHandoffHref(i)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold text-white"
+                style={{ background: "#16a34a" }}
+              >
+                <MessageCircle size={16} />
+                {t("handoffButton")}
+              </a>
+            )}
             {m.products && m.products.length > 0 && (
               <div className="w-full space-y-1.5">
                 {m.products.map((p) => (

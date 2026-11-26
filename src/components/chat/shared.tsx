@@ -8,6 +8,8 @@ export interface Msg {
   content: string;
   products?: ChatProductCard[];
   images?: string[];
+  /** Balasan AI ini perlu tombol "lanjut ke admin lewat WhatsApp" di bawahnya. */
+  handoff?: boolean;
 }
 
 // Tombol "Lanjut chat ke WhatsApp admin" di panel chat — dimatikan sementara.
