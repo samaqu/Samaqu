@@ -361,6 +361,9 @@ async function productsSold(admin: ReturnType<typeof getSupabaseAdmin>, orderNum
       subname: row.subname,
       units: row.units,
       revenue: row.revenue,
+      // Rincian dari hasil hitung yang sama (sudah urut dari yang paling banyak).
+      series: row.seriesBreakdown.map((item) => ({ label: item.label, units: item.units })),
+      sizes: row.sizes.map((item) => ({ label: item.label, units: item.units })),
     })),
   };
 }

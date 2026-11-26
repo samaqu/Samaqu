@@ -11,7 +11,15 @@ type ProdukTerjual = {
   revenue: number;
   /** Jumlah produk berbeda (semua series satu produk). */
   products: number;
-  rows: { name: string; subname: string; units: number; revenue: number }[];
+  rows: {
+    name: string;
+    subname: string;
+    units: number;
+    revenue: number;
+    /** Rincian series dan ukuran, urut dari yang paling banyak. */
+    series?: { label: string; units: number }[];
+    sizes?: { label: string; units: number }[];
+  }[];
 };
 
 type Stats = {
@@ -411,6 +419,31 @@ export default function AiPerformanceView() {
                             style={{ width: `${Math.max(4, Math.round((item.units / top) * 100))}%`, background: "#2f6f9e" }}
                           />
                         </div>
+                        {(() => {
+                          // "Tanpa series" tidak ditampilkan kalau itu satu-satunya (tidak ada informasi).
+                          const series = (item.series ?? []).filter((s) => s.label && s.label !== "Tanpa series");
+                          const sizes = (item.sizes ?? []).filter((s) => s.label && s.label !== "Tanpa ukuran");
+                          if (series.length === 0 && sizes.length === 0) return null;
+                          const shown = series.slice(0, 3);
+                          const more = series.length - shown.length;
+                          return (
+                            <div className="mt-1.5 space-y-0.5 text-[11px]" style={{ color: "#6B6A64" }}>
+                              {series.length > 0 ? (
+                                <p>
+                                  <span className="font-bold" style={{ color: "#7c93a6" }}>Series: </span>
+                                  {shown.map((s) => `${s.label} ${number(s.units)}`).join(" · ")}
+                                  {more > 0 ? ` · +${number(more)} lainnya` : ""}
+                                </p>
+                              ) : null}
+                              {sizes.length > 0 ? (
+                                <p>
+                                  <span className="font-bold" style={{ color: "#7c93a6" }}>Ukuran: </span>
+                                  {sizes.map((s) => `${s.label} ${number(s.units)}`).join(" · ")}
+                                </p>
+                              ) : null}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </li>
                   );
