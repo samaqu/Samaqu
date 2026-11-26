@@ -12,6 +12,8 @@
 import { getSupabaseAdmin } from "./supabase-admin";
 import { getFonnteConfig, resolveAdminTargets, sendFonnteMessage } from "./fonnte";
 import { checkTariffSemua } from "./jnt/tariff";
+import { terapkanPromoKeOpsi } from "./promo/ongkir-promo";
+import { kotaResmiTujuan, readPromoAktif } from "./promo/ongkir-promo-server";
 import { layananByCode } from "./jnt/layanan";
 import { getJntConfig } from "./jnt/config";
 import { getSendSiteCode, resolveTariffCodes, JNT_AREAS } from "./jnt/area-mapping";
@@ -606,8 +608,12 @@ async function cekOngkir(args: Record<string, unknown>): Promise<ChatToolResult>
     return { text: `Tidak ada layanan J&T untuk ${kecamatan}${kota ? `, ${kota}` : ""}.` };
   }
 
-  const lines = rows.map(
-    (row) => `- ${row.label} — ${rupiah(row.cost)}${row.etd ? ` — ${row.etd}` : ""}`,
+  // Promo ongkir (kalau sedang berlaku): sebut tarif J&T asli dan yang dibayar. Tanpa promo `rows` tidak berubah.
+  const promoRows = terapkanPromoKeOpsi(rows, kotaResmiTujuan(kota, kecamatan), await readPromoAktif());
+  const lines = promoRows.map((row) =>
+    "promoLabel" in row
+      ? `- ${row.label} — tarif J&T ${rupiah(row.cost)}, ongkir dibayar ${row.payCost <= 0 ? "Rp0 (gratis)" : rupiah(row.payCost)} (${row.promoLabel}, hemat ${rupiah(row.discount)})${row.etd ? ` — ${row.etd}` : ""}`
+      : `- ${row.label} — ${rupiah(row.cost)}${row.etd ? ` — ${row.etd}` : ""}`,
   );
   return {
     text: `Ongkir J&T Depok → ${kecamatan}${kota ? `, ${kota}` : ""} · ${weight} g\n${lines.join("\n")}`,

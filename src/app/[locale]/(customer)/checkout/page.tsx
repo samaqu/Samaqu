@@ -19,8 +19,11 @@ import { startOnlinePayment } from "@/lib/mayar-client";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import PublicPhoto from "@/components/PublicPhoto";
 import WilayahSelect from "@/components/wilayah/WilayahSelect";
+import { OngkirHargaPromo, OngkirPromoBadge, ongkirHematText } from "@/components/promo/OngkirPromo";
 
-interface ShipOpt { courier: string; service: string; description: string; cost: number; etd: string; }
+// `payCost`/`discount`/`promoLabel` hanya ada kalau promo ongkir sedang berlaku (dari /api/shipping/jnt-cost).
+// `cost` tetap tarif J&T asli dan itulah yang dikirim ke server untuk diverifikasi.
+interface ShipOpt { courier: string; service: string; description: string; cost: number; etd: string; payCost?: number; discount?: number; promoLabel?: string; }
 
 interface SavedAddress {
   id: string;
@@ -770,7 +773,8 @@ function CheckoutContent() {
 
   const selectedColor = colorParam || product?.colors?.[0] || "-";
   const selectedSize = sizeParam;
-  const shippingCost = selectedShipping?.cost || 0;
+  // Ongkir yang ditagih = setelah promo (kalau ada). Tanpa promo `payCost` kosong dan nilainya sama dengan `cost`.
+  const shippingCost = selectedShipping ? (selectedShipping.payCost ?? selectedShipping.cost) || 0 : 0;
   const cartSubtotal = isCartMode ? items.reduce((sum, item) => {
     const unitPrice = (item.create_your_price_enabled && item.customer_price) ? item.customer_price : item.price;
     return sum + unitPrice * item.qty;
@@ -1063,13 +1067,25 @@ function CheckoutContent() {
                           <span className="text-[13px] sm:text-sm font-ui font-medium" style={{ color: "var(--espresso)" }}>
                             {opt.courier.toUpperCase()} — {opt.service}
                           </span>
-                          <span className="text-[13px] sm:text-sm font-ui font-semibold" style={{ color: "var(--gold)" }}>
-                            Rp {opt.cost.toLocaleString("id-ID")}
-                          </span>
+                          {opt.promoLabel ? (
+                            <OngkirHargaPromo cost={opt.cost} payCost={opt.payCost ?? opt.cost} className="text-[13px] sm:text-sm font-ui" />
+                          ) : (
+                            <span className="text-[13px] sm:text-sm font-ui font-semibold" style={{ color: "var(--gold)" }}>
+                              Rp {opt.cost.toLocaleString("id-ID")}
+                            </span>
+                          )}
                         </span>
                         <span className="block text-[11px] sm:text-xs font-ui mt-0.5" style={{ color: "var(--text-muted)" }}>
                           {opt.description}{opt.etd ? ` · Estimasi ${opt.etd}${/hari/i.test(opt.etd) ? "" : " hari"}` : ""}
                         </span>
+                        {opt.promoLabel && (
+                          <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <OngkirPromoBadge label={opt.promoLabel} />
+                            <span className="text-[11px] font-ui" style={{ color: "var(--text-muted)" }}>
+                              {ongkirHematText(opt.discount ?? 0)}
+                            </span>
+                          </span>
+                        )}
                       </span>
                     </label>
                   );
@@ -1223,8 +1239,24 @@ function CheckoutContent() {
                 <span>Subtotal</span><span>Rp {subtotal.toLocaleString("id-ID")}</span>
               </div>
               <div className="flex justify-between" style={{ color: "var(--text-secondary)" }}>
-                <span>Pengiriman</span><span>{selectedShipping ? `Rp ${shippingCost.toLocaleString("id-ID")}` : "—"}</span>
+                <span>Pengiriman</span>
+                {selectedShipping?.promoLabel ? (
+                  <span className="flex items-center gap-2">
+                    <span className="line-through opacity-55 text-xs">Rp {selectedShipping.cost.toLocaleString("id-ID")}</span>
+                    <span className="font-semibold" style={{ color: "var(--espresso)" }}>
+                      {shippingCost <= 0 ? "Gratis" : `Rp ${shippingCost.toLocaleString("id-ID")}`}
+                    </span>
+                  </span>
+                ) : (
+                  <span>{selectedShipping ? `Rp ${shippingCost.toLocaleString("id-ID")}` : "—"}</span>
+                )}
               </div>
+              {selectedShipping?.promoLabel && (
+                <div className="flex items-center justify-between gap-3">
+                  <OngkirPromoBadge label={selectedShipping.promoLabel} />
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>{ongkirHematText(selectedShipping.discount ?? 0)}</span>
+                </div>
+              )}
               <div className="flex justify-between" style={{ color: "var(--text-secondary)" }}>
                 <span>Total berat</span>
                 <span>{berat.toLocaleString("id-ID")} g ({(berat / 1000).toLocaleString("id-ID", { maximumFractionDigits: 3 })} kg)</span>

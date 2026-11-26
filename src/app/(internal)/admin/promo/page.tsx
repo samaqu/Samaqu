@@ -8,11 +8,13 @@
 
 import AdminShell from "@/components/AdminShell";
 import PromoFchSettingsForm from "@/components/admin/PromoFchSettingsForm";
+import PromoBotCard from "@/components/admin/promo-bot/PromoBotCard";
 
 export default function AdminPromoPage() {
   return (
     <AdminShell>
       <PromoFchSettingsForm />
+      <PromoBotCard />
     </AdminShell>
   );
 }

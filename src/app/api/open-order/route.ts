@@ -15,6 +15,7 @@ import {
 } from "@/lib/open-order-offering";
 import { sumWeightGramsBySize, productWeightMapFromRows, variantWeightMapFromRows } from "@/lib/shipping-weight";
 import { verifyJntShipping } from "@/lib/shipping-verify";
+import { hitungPromoUntukPesanan } from "@/lib/promo/ongkir-promo-server";
 import { syncLeadOnOrderSaved } from "@/lib/ops-lead-sync";
 import {
   notifyAdminNewOrder,
@@ -430,7 +431,13 @@ export async function POST(request: NextRequest) {
     if (!shippingCheck.ok) {
       return NextResponse.json({ error: shippingCheck.error }, { status: shippingCheck.status });
     }
-    const shippingCost = shippingCheck.cost;
+    // Promo ongkir (kalau aktif): potongan dihitung server dari tarif J&T yang sudah diverifikasi.
+    const promoOngkir = await hitungPromoUntukPesanan({
+      tarif: shippingCheck.cost,
+      city: rawCustomer.city,
+      district: rawCustomer.district,
+    });
+    const shippingCost = promoOngkir.pay;
     const shippingMethod = shippingCheck.method;
 
     // Metode pembayaran: daftar resminya diatur admin di dashboard (tabel `payment_methods`).
@@ -574,6 +581,14 @@ export async function POST(request: NextRequest) {
         shipping_postal_code: postalCode || null,
         shipping_method: shippingMethod,
         shipping_cost: shippingCost,
+        // Promo ongkir: kolom ini hanya ikut ditulis kalau promo benar-benar dipakai (tanpa promo, baris persis seperti dulu).
+        ...(promoOngkir.kind
+          ? {
+              shipping_cost_original: promoOngkir.original,
+              shipping_discount: promoOngkir.discount,
+              shipping_promo_kind: promoOngkir.kind,
+            }
+          : {}),
         payment_method: paymentRow?.id ?? "bank",
         subtotal,
         discount: 0,

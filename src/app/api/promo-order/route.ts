@@ -23,6 +23,7 @@ import {
   FALLBACK_ITEM_WEIGHT_GRAMS,
 } from "@/lib/shipping-weight";
 import { verifyJntShipping } from "@/lib/shipping-verify";
+import { hitungPromoUntukPesanan } from "@/lib/promo/ongkir-promo-server";
 import { syncLeadOnOrderSaved } from "@/lib/ops-lead-sync";
 import { notifyAdminNewOrder, notifyCustomerOrderCreated } from "@/lib/fonnte";
 import { sendOnce } from "@/lib/order-notify";
@@ -372,7 +373,9 @@ export async function POST(request: NextRequest) {
     if (!shipping.ok) {
       return bad(shipping.error, shipping.status ?? 400);
     }
-    const shippingCost = shipping.cost;
+    // Promo ongkir (kalau aktif): potongan dihitung server dari tarif J&T yang sudah diverifikasi.
+    const promoOngkir = await hitungPromoUntukPesanan({ tarif: shipping.cost, city, district });
+    const shippingCost = promoOngkir.pay;
     const shippingService = String(shipping.method ?? shippingMethod ?? "EZ").replace(/^J&T\s*/i, "").toUpperCase() || "EZ";
 
     const subtotal = validatedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -514,6 +517,14 @@ export async function POST(request: NextRequest) {
         shipping_postal_code: postalCode || null,
         shipping_method: `J&T ${shippingService}`,
         shipping_cost: shippingCost,
+        // Promo ongkir: kolom ini hanya ikut ditulis kalau promo benar-benar dipakai (tanpa promo, baris persis seperti dulu).
+        ...(promoOngkir.kind
+          ? {
+              shipping_cost_original: promoOngkir.original,
+              shipping_discount: promoOngkir.discount,
+              shipping_promo_kind: promoOngkir.kind,
+            }
+          : {}),
         payment_method: String(body.paymentMethod ?? "").trim() || "bank",
         subtotal,
         discount: 0,

@@ -166,6 +166,14 @@ function findRow(city: string, district: string): JntAreaRow | null {
 }
 
 /**
+ * Baris area J&T untuk (kota, kecamatan) — dipakai promo ongkir untuk mengenali kota resmi tujuan
+ * (mis. "KOTA ADM. JAKARTA SELATAN"). Hanya membuka `findRow`; logic pencocokan tidak berubah.
+ */
+export function resolveAreaRow(city: string, district: string): JntAreaRow | null {
+  return findRow(city, district);
+}
+
+/**
  * Order API: 3-char city code for origin/destination_code.
  * `district` opsional: dipakai untuk memastikan saat nama kotanya ambigu
  * (mis. "Bekasi" bisa Kab. atau Kota — kecamatan yang menentukan).

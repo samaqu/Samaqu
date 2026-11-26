@@ -288,6 +288,20 @@ export async function PATCH(request: NextRequest) {
         packResult = { packed: false, warning: true };
       }
 
+      // Tarif J&T sebelum promo ongkir (kalau pesanan ini memakai promo): dibaca terpisah dan best-effort supaya
+      // select utama di atas tidak berubah. Gagal/kolom belum ada = null = perilaku lama.
+      let shippingCostOriginal: number | null = null;
+      try {
+        const { data: promoRow, error: promoErr } = await supabaseAdmin
+          .from("orders")
+          .select("shipping_cost_original")
+          .eq("id", order.id)
+          .maybeSingle();
+        if (!promoErr) shippingCostOriginal = Number((promoRow as { shipping_cost_original?: unknown } | null)?.shipping_cost_original) || null;
+      } catch {
+        shippingCostOriginal = null;
+      }
+
       const result = await createJntOrderForOrder({
         order_number: order.order_number,
         customer_name: order.customer_name,
@@ -300,6 +314,7 @@ export async function PATCH(request: NextRequest) {
         // Ongkir tersimpan dipakai mencocokkan layanan (EZ/ECO) supaya resinya sama dengan
         // layanan yang ditagih ke pembeli.
         shipping_cost: order.shipping_cost,
+        shipping_cost_original: shippingCostOriginal,
         weight: order.weight,
         payment_method: order.payment_method,
         shipping_method: order.shipping_method,

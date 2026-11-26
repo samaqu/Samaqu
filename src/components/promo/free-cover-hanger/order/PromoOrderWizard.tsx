@@ -342,7 +342,7 @@ export default function PromoOrderWizard({
   }
 
   const subtotal = lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
-  const total = subtotal + (extraCover ? OPEN_ORDER_ADDON.price : 0) + (shipping?.cost ?? 0);
+  const total = subtotal + (extraCover ? OPEN_ORDER_ADDON.price : 0) + (shipping ? (shipping.payCost ?? shipping.cost) : 0);
 
   // ── Bonus Cover Hanger = produk katalog `cover-hanger` ──
   // Stok & berat dibaca dari varian katalog yang sama dengan server, jadi angka ongkir di sini
@@ -515,7 +515,13 @@ export default function PromoOrderWizard({
         }
         // Route J&T sudah mengurutkan opsi dari yang termurah.
         const cheapest = json.data[0];
-        const next = { service: cheapest.service || "J&T", cost: cheapest.cost || 0 };
+        const next: DraftShipping = { service: cheapest.service || "J&T", cost: cheapest.cost || 0 };
+        // Info promo ongkir (kalau ada) hanya untuk tampilan dan TIDAK disimpan di cache: saklar/tanggal promo bisa
+        // berubah kapan saja, jadi hasil berpromo selalu dihitung ulang (server meng-cache tarifnya 10 menit).
+        if (typeof cheapest.payCost === "number" && cheapest.promoLabel) {
+          setShipping({ ...next, payCost: cheapest.payCost, discount: cheapest.discount || 0, promoLabel: String(cheapest.promoLabel) });
+          return;
+        }
         ongkirCacheRef.current.set(cacheKey, next);
         writeOngkirCache(cacheKey, next);
         setShipping(next);

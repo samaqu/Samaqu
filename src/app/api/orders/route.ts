@@ -30,6 +30,7 @@ import { recordCommissionForOrder } from "@/lib/affiliate/commission";
 import { snapshotOrderHpp } from "@/lib/produksi-order-hpp";
 import { validateVoucherServer } from "@/lib/voucher-server";
 import { verifyJntShipping } from "@/lib/shipping-verify";
+import { hitungPromoUntukPesanan } from "@/lib/promo/ongkir-promo-server";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 /**
@@ -274,7 +275,14 @@ export async function POST(request: NextRequest) {
     if (!shippingCheck.ok) {
       return NextResponse.json({ error: shippingCheck.error }, { status: shippingCheck.status });
     }
-    const verifiedShippingCost = shippingCheck.cost;
+    // Promo ongkir (kalau aktif): tarif J&T yang sudah diverifikasi di atas dipotong/digratiskan di server.
+    // Klien tetap mengirim tarif asli; yang disimpan dan ditagih adalah ongkir setelah promo.
+    const promoOngkir = await hitungPromoUntukPesanan({
+      tarif: shippingCheck.cost,
+      city: shipping.city,
+      district: shipping.district,
+    });
+    const verifiedShippingCost = promoOngkir.pay;
     const verifiedShippingMethod = shippingCheck.method;
     const total = subtotal - discount + verifiedShippingCost;
 
@@ -455,6 +463,14 @@ export async function POST(request: NextRequest) {
         shipping_notes: shipping.notes || null,
         shipping_method: verifiedShippingMethod,
         shipping_cost: verifiedShippingCost,
+        // Promo ongkir: kolom ini hanya ikut ditulis kalau promo benar-benar dipakai (tanpa promo, baris persis seperti dulu).
+        ...(promoOngkir.kind
+          ? {
+              shipping_cost_original: promoOngkir.original,
+              shipping_discount: promoOngkir.discount,
+              shipping_promo_kind: promoOngkir.kind,
+            }
+          : {}),
         payment_method: paymentValue,
         subtotal,
         discount,

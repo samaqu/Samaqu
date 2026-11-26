@@ -55,6 +55,12 @@ export interface JntOrderSource {
   payment_method?: string | null;
   /** Ongkir yang ditagih ke pembeli — dipakai menebak layanan J&T yang harus dipakai resinya. */
   shipping_cost?: number | null;
+  /**
+   * Tarif J&T SEBELUM promo ongkir (`orders.shipping_cost_original`). Kalau terisi, inilah yang dicocokkan
+   * ke tarif EZ/ECO — `shipping_cost` sudah dipotong promo (bisa Rp0) sehingga tidak bisa dipakai mencocokkan.
+   * Kosong (pesanan tanpa promo / lama) = perilaku lama persis.
+   */
+  shipping_cost_original?: number | null;
   order_items: JntOrderSourceItem[];
 }
 
@@ -198,7 +204,7 @@ export async function createJntOrderForOrder(order: JntOrderSource): Promise<Jnt
   // persis perilaku lama.
   const beratKg = Math.max(weightGrams / 1000, 0.1);
   let serviceCode = "EZ";
-  const biayaOngkir = Math.round(Number(order.shipping_cost) || 0);
+  const biayaOngkir = Math.round(Number(order.shipping_cost_original) || Number(order.shipping_cost) || 0);
   if (biayaOngkir > 0) {
     try {
       const tarif = await checkTariffSemua({

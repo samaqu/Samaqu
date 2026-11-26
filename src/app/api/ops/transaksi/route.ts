@@ -835,6 +835,16 @@ export async function POST(req: NextRequest) {
     // (perilaku lama). GoSend: ongkir tidak dicatat (diurus di luar sistem), jadi dipaksa 0.
     const shippingMethod = normalizeOpsShippingMethod(body?.shipping_method);
     const shippingCost = isGosend(shippingMethod) ? 0 : Math.max(0, Math.round(Number(body?.shipping_cost) || 0));
+    // Promo ongkir (draft bot yang disetujui): hanya dicatat kalau angkanya konsisten (asli − potongan = dibayar).
+    // Tanpa field ini (form admin biasa) tidak ada yang berubah.
+    const promoOriginal = Math.max(0, Math.round(Number(body?.shipping_cost_original) || 0));
+    const promoDiscount = Math.max(0, Math.round(Number(body?.shipping_discount) || 0));
+    const promoKind = String(body?.shipping_promo_kind || "");
+    const promoOngkirValid =
+      (promoKind === "jabo" || promoKind === "luar") &&
+      promoDiscount > 0 &&
+      promoOriginal - promoDiscount === shippingCost &&
+      !isGosend(shippingMethod);
     const discount = Math.max(0, Math.round(Number(body?.discount) || 0));
     const createdAt = new Date(String(body?.created_at || ""));
     const inputItems: ItemInput[] = Array.isArray(body?.items) ? body.items : [];
@@ -952,6 +962,9 @@ export async function POST(req: NextRequest) {
       shipping_postal_code: shipping.postal_code,
       shipping_notes: notes || null,
       shipping_cost: shippingCost,
+      ...(promoOngkirValid
+        ? { shipping_cost_original: promoOriginal, shipping_discount: promoDiscount, shipping_promo_kind: promoKind }
+        : {}),
       ...(shippingMethod ? { shipping_method: shippingMethod } : {}),
       payment_method: paymentMethod,
       payment_status: paid ? "paid" : "unpaid",

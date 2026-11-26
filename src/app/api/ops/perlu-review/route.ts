@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, opsActorEmail, unauthorized } from "@/lib/ops-auth";
 import { waMediaSignedUrl } from "@/lib/wa-media";
 import { POTONG_PANJANG_ID, POTONG_PANJANG_NAME, POTONG_PANJANG_PRICE } from "@/lib/layanan";
+import { hitungPromoUntukPesanan } from "@/lib/promo/ongkir-promo-server";
 
 /**
  * Menu "Perlu Review".
@@ -196,6 +197,30 @@ async function withFreeCoverHanger(
 }
 
 const ADDRESS_FIELDS = ["address", "province", "city", "kecamatan", "postal_code"] as const;
+
+/**
+ * Promo ongkir untuk draft bot: bot mengirim `shipping_cost_original` (tarif J&T yang dikutip `cek_ongkir`)
+ * di samping `shipping_cost` (yang ditagih). Server menghitung ULANG dengan fungsi promo yang sama dengan
+ * checkout. Promo masih berlaku -> `shipping_cost` = hasil server + kolom asli/potongan/jenis ikut disimpan.
+ * Promo sudah tidak berlaku / bot tidak mengirim tarif asli -> payload TIDAK diubah sama sekali (perilaku lama).
+ */
+async function promoOngkirDraft(payload: any): Promise<Record<string, unknown>> {
+  const original = Math.max(0, Math.round(Number(payload?.shipping_cost_original) || 0));
+  if (original <= 0) return {};
+  const shipping = payload?.shipping || {};
+  const h = await hitungPromoUntukPesanan({
+    tarif: original,
+    city: String(shipping.city || ""),
+    district: String(shipping.kecamatan || ""),
+  });
+  if (!h.kind) return { shipping_cost_original: undefined };
+  return {
+    shipping_cost: h.pay,
+    shipping_cost_original: h.original,
+    shipping_discount: h.discount,
+    shipping_promo_kind: h.kind,
+  };
+}
 
 /**
  * Alamat draft harus benar-benar alamat, bukan cuma nama kecamatan/kota.
@@ -509,7 +534,7 @@ export async function POST(req: NextRequest) {
     // sama seperti saat admin mengedit draft.
     const priced = await normalizeItems(admin, payload.items);
     if (priced.error) return bad(priced.error);
-    const normalizedPayload = { ...payload, items: priced.rows };
+    const normalizedPayload = { ...payload, items: priced.rows, ...(await promoOngkirDraft(payload)) };
     const sourceInboxId = body?.source_inbox_id ? String(body.source_inbox_id) : null;
     let proofKey: string | null = null;
     if (sourceInboxId) {

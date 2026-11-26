@@ -3,9 +3,22 @@ import { checkTariffSemua } from "@/lib/jnt/tariff";
 import { layananByCode } from "@/lib/jnt/layanan";
 import { getJntConfig } from "@/lib/jnt/config";
 import { getSendSiteCode, resolveTariffCodes } from "@/lib/jnt/area-mapping";
+import { terapkanPromoKeOpsi } from "@/lib/promo/ongkir-promo";
+import { kotaResmiTujuan, readPromoAktif } from "@/lib/promo/ongkir-promo-server";
 
 const costCache = new Map<string, { data: unknown; ts: number }>();
 const CACHE_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * Promo ongkir: tambahkan `payCost`/`discount`/`promoLabel` ke tiap opsi HANYA kalau ada promo yang berlaku
+ * hari ini. `cost` tetap tarif J&T. Tanpa promo, `data` dikembalikan apa adanya (respons persis seperti dulu).
+ */
+async function denganPromo(body: { data: Array<{ cost: number }> }, city: string, district: string) {
+  const promo = await readPromoAktif();
+  if (!promo.jabo && !promo.luar) return body;
+  const data = terapkanPromoKeOpsi(body.data, kotaResmiTujuan(city, district), promo);
+  return data === body.data ? body : { ...body, data };
+}
 
 // Dicatat sekali per proses supaya log tidak dibanjiri pesan yang sama saat user mengetik.
 let warnedUnconfigured = false;
@@ -45,7 +58,7 @@ export async function POST(req: Request) {
     const cacheKey = `${originCode}-${resolved.destAreaCode}-${weight}`;
     const cached = costCache.get(cacheKey);
     if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
-      return NextResponse.json(cached.data);
+      return NextResponse.json(await denganPromo(cached.data as { data: Array<{ cost: number }> }, city, district));
     }
 
     // Semua layanan yang didukung (EZ + ECO). Rute yang tidak dilayani sebuah layanan tidak
@@ -79,7 +92,7 @@ export async function POST(req: Request) {
     const responseData = { data: shipOptions };
     costCache.set(cacheKey, { data: responseData, ts: Date.now() });
 
-    return NextResponse.json(responseData);
+    return NextResponse.json(await denganPromo(responseData, city, district));
   } catch (e) {
     console.error("[JNT-COST] ERROR:", e);
     return NextResponse.json({ error: "Gagal menghitung ongkir J&T" }, { status: 500 });

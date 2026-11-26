@@ -38,6 +38,7 @@ import BestSellerSection from "@/components/ops/BestSellerSection";
 import BreakdownPengeluaran, { type BreakdownData } from "@/components/ops/laporan/BreakdownPengeluaran";
 import { type FreeGiftData } from "@/components/ops/laporan/RincianFreeGift";
 import PromoFchSection from "@/components/ops/laporan/PromoFchSection";
+import PromoOngkirSection from "@/components/ops/laporan/PromoOngkirSection";
 
 /**
  * Sebagian ikon lucide ada di runtime tapi belum masuk definisi tipe versi ini —
@@ -906,6 +907,7 @@ export default function LaporanKeuanganPage() {
       {/* RINCIAN BIAYA FREE GIFT — Promo Free Cover Hanger: berapa yang keluar, dari mana, modal, stok. Menggantikan
           tabel HPP lama (RincianFreeGift) dan kartu cover di Produk Terlaris. Mengikuti bulan yang dipilih di atas. */}
       <PromoFchSection month={month} />
+      <PromoOngkirSection month={month} />
 
       {/* BREAKDOWN PENGELUARAN — rincian tiap komponen biaya (buka/tutup) */}
       <section className="lpr-rise rounded-3xl border border-[#E4E4E7] bg-[#EFEFF1] p-5 shadow-sm md:p-6">
