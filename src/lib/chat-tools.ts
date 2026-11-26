@@ -446,10 +446,10 @@ async function cariProduk(args: Record<string, unknown>, ctx?: ChatToolContext):
 }
 
 const SIZE_GUIDE: Record<string, string> = {
-  thobe: "Thobe SAMAQU panjang & longgar. Patokan umum: M (tinggi 160–168 cm), L (168–175), XL (175–182), XXL (182+).",
-  kandora: "Kandora potongan longgar. Umumnya sama dengan Thobe: M (160–168 cm), L (168–175), XL (175–182).",
+  thobe: "Thobe SAMAQU panjang & longgar. Rekomendasi ukuran WAJIB memakai tabel tinggi x berat badan (TB x BB) di persona, baca sel persis. JANGAN memakai patokan tinggi saja.",
+  kandora: "Kandora potongan longgar. Ukurannya sama dengan Thobe: pakai tabel tinggi x berat badan (TB x BB) di persona, baca sel persis. JANGAN memakai patokan tinggi saja.",
   koko: "Koko potongan regular. M (155–165 cm), L (165–172), XL (172–178), XXL (178+).",
-  vest: "Vest dipakai di atas kemeja — pilih sesuai lingkar dada: M (90–96 cm), L (96–102), XL (102–108).",
+  vest: "Data ukuran Vest belum tersedia. Jangan menebak ukuran Vest; arahkan pelanggan konsultasi ke admin lewat WhatsApp.",
   kabak: "Kabak longgar; ikuti tinggi badan seperti Thobe.",
 };
 
