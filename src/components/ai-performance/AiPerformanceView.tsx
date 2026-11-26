@@ -28,7 +28,7 @@ type Stats = {
   closing: number;
   nominal: number;
   /** Pesan masuk per jam WIB (indeks 0-23) dan per hari (indeks 0 = Minggu). */
-  chatRamai?: { perJam: number[]; perHari: number[]; total: number };
+  chatRamai?: { perJam: number[]; perHari: number[]; customers: number; days: number };
   handledRate: number;
   closingRate: number;
   closingSource?: "wa_closings" | "drafts";
@@ -73,15 +73,19 @@ const URUTAN_HARI = [1, 2, 3, 4, 5, 6, 0];
 const jam = (hour: number) => `${String(hour).padStart(2, "0")}.00`;
 
 /** Grafik "kapan chat paling ramai": pesan masuk customer per jam (WIB) + per hari dalam seminggu. */
-function ChatRamaiChart({ data }: { data?: { perJam: number[]; perHari: number[]; total: number } }) {
+function ChatRamaiChart({ data }: { data?: { perJam: number[]; perHari: number[]; customers: number; days: number } }) {
   const card = "rounded-2xl border bg-white p-4 shadow-sm sm:p-5";
+  // Angka rata-rata gaya Indonesia, satu desimal (7,2); bilangan bulat tampil tanpa koma.
+  const avg = (value: number) => (Number(value) || 0).toLocaleString("id-ID", { maximumFractionDigits: 1 });
   const head = (
     <div>
       <h3 className="text-base font-black" style={{ color: "#2a1a22" }}>Kapan chat paling ramai</h3>
-      <p className="mt-0.5 text-xs" style={{ color: "#8a7d83" }}>Pesan masuk dari customer per jam (WIB) pada bulan ini.</p>
+      <p className="mt-0.5 text-xs" style={{ color: "#8a7d83" }}>
+        Rata-rata jumlah customer yang chat, per jam dan per hari{data ? ` (dari ${number(data.days)} hari bulan ini, jam WIB)` : ""}.
+      </p>
     </div>
   );
-  if (!data || data.total === 0) {
+  if (!data || data.customers === 0) {
     return (
       <div className={card} style={{ borderColor: "#e3ebf1" }}>
         {head}
@@ -100,20 +104,27 @@ function ChatRamaiChart({ data }: { data?: { perJam: number[]; perHari: number[]
       <div className="flex flex-wrap items-start justify-between gap-2">
         {head}
         <span className="rounded-full px-2.5 py-1 text-[10px] font-bold" style={{ background: "#e8f3fb", color: "#2f6f9e" }}>
-          {number(data.total)} pesan
+          {number(data.customers)} customer chat
         </span>
       </div>
 
-      <p className="mt-3 text-sm font-semibold" style={{ color: "#2a1a22" }}>
-        Paling ramai jam {jam(peakHour)}–{jam((peakHour + 1) % 24)}{" "}
-        <span style={{ color: "#6B6A64" }}>({number(maxJam)} pesan)</span>
-        <span style={{ color: "#9aacb8" }}> · </span>
-        hari tersibuk <b>{HARI[peakDay]}</b>
-      </p>
+      <div className="mt-3 space-y-0.5 text-sm" style={{ color: "#2a1a22" }}>
+        <p>
+          <b>Jam tersibuk: {jam(peakHour)}–{jam((peakHour + 1) % 24)}</b>
+          <span style={{ color: "#6B6A64" }}>, rata-rata {avg(maxJam)} customer chat di jam itu tiap hari.</span>
+        </p>
+        <p>
+          <b>Hari tersibuk: {HARI[peakDay]}</b>
+          <span style={{ color: "#6B6A64" }}>, rata-rata {avg(maxHari)} customer chat per hari.</span>
+        </p>
+      </div>
 
-      <div className="mt-4 flex h-28 items-end gap-[3px]" role="img" aria-label="Grafik pesan masuk per jam">
+      <p className="mt-4 text-[10px] font-bold uppercase tracking-wider" style={{ color: "#7c93a6" }}>
+        Customer chat per jam (rata-rata sehari)
+      </p>
+      <div className="mt-2 flex h-28 items-end gap-[3px]" role="img" aria-label="Grafik rata-rata customer chat per jam">
         {data.perJam.map((count, hour) => (
-          <div key={hour} className="flex h-full min-w-0 flex-1 flex-col justify-end" title={`${jam(hour)}: ${number(count)} pesan`}>
+          <div key={hour} className="flex h-full min-w-0 flex-1 flex-col justify-end" title={`${jam(hour)}: rata-rata ${avg(count)} customer per hari`}>
             <div
               className="w-full rounded-t"
               style={{
@@ -132,7 +143,10 @@ function ChatRamaiChart({ data }: { data?: { perJam: number[]; perHari: number[]
         ))}
       </div>
 
-      <div className="mt-4 grid grid-cols-7 gap-1.5">
+      <p className="mt-4 text-[10px] font-bold uppercase tracking-wider" style={{ color: "#7c93a6" }}>
+        Customer chat per hari (rata-rata tiap hari itu)
+      </p>
+      <div className="mt-2 grid grid-cols-7 gap-1.5">
         {URUTAN_HARI.map((day) => {
           const isPeak = day === peakDay;
           return (
@@ -142,7 +156,7 @@ function ChatRamaiChart({ data }: { data?: { perJam: number[]; perHari: number[]
               style={{ background: isPeak ? "#e8f3fb" : "#f5f8fa", border: `1px solid ${isPeak ? "#b9d3e6" : "#edf1f4"}` }}
             >
               <p className="text-[10px] font-bold" style={{ color: isPeak ? "#2f6f9e" : "#7c93a6" }}>{HARI[day].slice(0, 3)}</p>
-              <p className="text-xs font-black tabular-nums" style={{ color: "#2a1a22" }}>{number(data.perHari[day])}</p>
+              <p className="text-xs font-black tabular-nums" style={{ color: "#2a1a22" }}>{avg(data.perHari[day])}</p>
             </div>
           );
         })}

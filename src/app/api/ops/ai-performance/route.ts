@@ -366,23 +366,60 @@ async function productsSold(admin: ReturnType<typeof getSupabaseAdmin>, orderNum
 }
 
 /**
- * Kapan chat paling ramai: jumlah pesan masuk customer per jam (0-23) dan per hari dalam seminggu
- * (0 = Minggu), memakai jam WIB. Bahannya baris `wa_inbox` yang sama dengan angka percakapan
- * (bukan grup, bukan yang dilewati bot). Hanya menghitung, tidak mengubah data.
+ * Kapan chat paling ramai, dihitung dalam CUSTOMER (nomor unik), bukan jumlah pesan (satu customer bisa
+ * kirim banyak pesan sekali chat) dan dirata-rata PER HARI supaya angkanya masuk akal dibaca:
+ *  - `perJam[h]`  = rata-rata customer yang chat pada jam h (WIB) dalam sehari.
+ *  - `perHari[d]` = rata-rata customer yang chat per hari untuk hari dalam seminggu d (0 = Minggu).
+ * Rata-rata dibagi jumlah hari yang sudah berjalan di bulan itu (bulan berjalan sampai hari ini).
+ * Bahannya baris `wa_inbox` yang sama dengan angka percakapan (bukan grup, bukan yang dilewati bot).
+ * Hanya menghitung, tidak mengubah data.
  */
-function chatRamai(rows: { created_at?: string | null }[]) {
-  const perJam = Array<number>(24).fill(0);
-  const perHari = Array<number>(7).fill(0);
-  let total = 0;
+function chatRamai(rows: { created_at?: string | null; sender?: string | null }[], startIso: string, endIso: string) {
+  const dateKey = (ms: number) => new Date(ms + BIZ_OFFSET_MS).toISOString().slice(0, 10);
+
+  // Hari yang sudah berjalan pada periode (tanggal WIB), dan berapa kali tiap hari dalam seminggu muncul.
+  const endMs = Math.min(Date.parse(endIso), Date.now());
+  const weekdayCount = Array<number>(7).fill(0);
+  let days = 0;
+  for (let ms = Date.parse(startIso); ms < endMs; ms += 86_400_000) {
+    weekdayCount[new Date(`${dateKey(ms)}T00:00:00Z`).getUTCDay()] += 1;
+    days += 1;
+  }
+  days = Math.max(1, days);
+
+  const perJamTotal = Array<number>(24).fill(0);
+  const perHariTotal = Array<number>(7).fill(0);
+  const byHour = new Map<string, Set<string>>();
+  const byDay = new Map<string, Set<string>>();
+  const everyone = new Set<string>();
   for (const row of rows) {
     const time = Date.parse(String(row.created_at || ""));
     if (!Number.isFinite(time)) continue;
+    const sender = String(row.sender || "");
+    if (!sender) continue;
     const wib = new Date(time + BIZ_OFFSET_MS);
-    perJam[wib.getUTCHours()] += 1;
-    perHari[wib.getUTCDay()] += 1;
-    total += 1;
+    const day = wib.toISOString().slice(0, 10);
+    const hourKey = `${day}|${wib.getUTCHours()}`;
+    if (!byHour.has(hourKey)) byHour.set(hourKey, new Set());
+    byHour.get(hourKey)!.add(sender);
+    if (!byDay.has(day)) byDay.set(day, new Set());
+    byDay.get(day)!.add(sender);
+    everyone.add(sender);
   }
-  return { perJam, perHari, total };
+  for (const [key, senders] of byHour) perJamTotal[Number(key.split("|")[1])] += senders.size;
+  for (const [day, senders] of byDay) perHariTotal[new Date(`${day}T00:00:00Z`).getUTCDay()] += senders.size;
+
+  const round1 = (value: number) => Math.round(value * 10) / 10;
+  return {
+    /** Rata-rata customer per jam dalam sehari. */
+    perJam: perJamTotal.map((total) => round1(total / days)),
+    /** Rata-rata customer per hari, untuk tiap hari dalam seminggu (indeks 0 = Minggu). */
+    perHari: perHariTotal.map((total, index) => round1(weekdayCount[index] > 0 ? total / weekdayCount[index] : 0)),
+    /** Customer unik yang chat pada periode. */
+    customers: everyone.size,
+    /** Jumlah hari yang dirata-ratakan. */
+    days,
+  };
 }
 
 async function approvedDrafts(
@@ -503,8 +540,8 @@ async function periodStats(
     leadsFromChatShare: metrics.leadsFromChatShare,
     closing,
     nominal,
-    /** Pesan masuk per jam (WIB) dan per hari dalam seminggu, untuk grafik "chat paling ramai". */
-    chatRamai: chatRamai(rows),
+    /** Rata-rata customer yang chat per jam (WIB) dan per hari dalam seminggu, untuk grafik "chat paling ramai". */
+    chatRamai: chatRamai(rows, month.startIso, month.endIso),
     handledRate: conversations > 0 ? Math.round((handled / conversations) * 1000) / 10 : 0,
     closingRate: conversations > 0 ? Math.round((closing / conversations) * 1000) / 10 : 0,
     closingSource,

@@ -35,6 +35,7 @@ const IconCalendar: any = (LucideIcons as any).CalendarDays ?? (LucideIcons as a
 const IconTraffic: any =
   (LucideIcons as any).ChartNoAxesCombined ?? (LucideIcons as any).TrendingUp ?? (LucideIcons as any).LineChart ?? BarChart3;
 const IconReseller: any = (LucideIcons as any).Store ?? ShoppingBag;
+const IconSparkles: any = (LucideIcons as any).Sparkles ?? BarChart3;
 import { supabase } from "@/lib/supabase";
 import { useResellerQueueCount } from "@/lib/use-reseller-queue";
 import { Toaster } from "@/components/ops/ui/toaster";
@@ -49,6 +50,7 @@ const BASE_MENU_GROUPS: MenuGroup[] = [
     items: [
       { title: "Dashboard", href: "/ops", icon: LayoutDashboard },
       { title: "Trafik", href: "/ops/trafik", icon: IconTraffic },
+      { title: "AI Performance", href: "/ops/ai-performance", icon: IconSparkles },
     ],
   },
   {
