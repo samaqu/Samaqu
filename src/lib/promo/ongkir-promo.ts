@@ -1,6 +1,7 @@
 /**
- * Promo Ongkir customer SAMAQU — SATU fungsi hitung untuk checkout website, Open Order, promo FCH,
+ * Promo Ongkir customer SAMAQU — SATU fungsi hitung untuk checkout katalog website,
  * draft pesanan bot, dan tool bot (`cek_ongkir` / `rekap_pesanan`).
+ * Open Order dan halaman Free Cover Hanger SENGAJA tidak memakai promo ini (keputusan bos): ongkir di sana tetap penuh.
  *
  * Aturan (keputusan bos, 26 Nov 2026):
  *  - Alamat di Jabodetabek      → ongkir GRATIS (Rp0).

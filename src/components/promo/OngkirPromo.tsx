@@ -1,5 +1,5 @@
 /**
- * Tampilan promo ongkir (checkout website, Open Order, promo FCH) — HANYA muncul kalau ada promo yang
+ * Tampilan promo ongkir (checkout katalog website) — HANYA muncul kalau ada promo yang
  * berlaku. Tanpa promo, komponen ini tidak dipakai sama sekali sehingga tampilan lama tidak berubah.
  *
  * Gaya mengikuti palet monokrom SAMAQU: lencana hitam bersudut penuh, harga asli dicoret, harga bayar tebal.

@@ -13,7 +13,6 @@ import type { OpenOrderProduct } from "@/lib/open-order-offering";
 import type { CartLine, DraftShipping } from "./types";
 import { lineColorLabel, lineImage, lineName, ProductPhoto } from "./StepCart";
 import { DANGER, Field, FIELD_BG, LINE, MUTED, PrimaryButton, SummaryRow, TextArea } from "./ui";
-import { OngkirHargaPromo, OngkirPromoBadge, ongkirHematText } from "@/components/promo/OngkirPromo";
 
 export default function StepReview({
   lines,
@@ -54,8 +53,7 @@ export default function StepReview({
 }) {
   const t = useSafeTranslations("openOrder");
   const addonTotal = extraCover ? OPEN_ORDER_ADDON.price : 0;
-  // Ongkir yang ditagih = setelah promo (kalau ada); tanpa promo sama dengan tarif J&T seperti sebelumnya.
-  const ongkir = shipping ? (shipping.payCost ?? shipping.cost) : 0;
+  const ongkir = shipping?.cost ?? 0;
   const total = subtotal + addonTotal + ongkir;
 
   return (
@@ -92,26 +90,8 @@ export default function StepReview({
         {extraCover && <SummaryRow label={OPEN_ORDER_ADDON.name} value={money(addonTotal)} />}
         <SummaryRow
           label={shipping ? `Ongkir (J&T — ${shipping.service})` : "Ongkir"}
-          value={
-            loadingOngkir ? (
-              "Menghitung…"
-            ) : shipping?.promoLabel ? (
-              <OngkirHargaPromo cost={shipping.cost} payCost={ongkir} />
-            ) : shipping ? (
-              money(ongkir)
-            ) : (
-              "—"
-            )
-          }
+          value={loadingOngkir ? "Menghitung…" : shipping ? money(ongkir) : "—"}
         />
-        {!loadingOngkir && shipping?.promoLabel ? (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <OngkirPromoBadge label={shipping.promoLabel} />
-            <span className="text-[11px]" style={{ color: MUTED }}>
-              {ongkirHematText(shipping.discount ?? 0)}
-            </span>
-          </div>
-        ) : null}
         <SummaryRow
           label="Total berat"
           value={`${totalWeight.toLocaleString("id-ID")} g (${(totalWeight / 1000).toLocaleString("id-ID", { maximumFractionDigits: 3 })} kg)`}

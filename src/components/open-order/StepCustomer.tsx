@@ -18,7 +18,6 @@ import { money } from "@/lib/open-order-catalog";
 import LocationPicker from "./LocationPicker";
 import type { CustomerData, DraftShipping, SavedAddress } from "./types";
 import { DANGER, Field, FIELD_BG, MUTED, PrimaryButton, SummaryRow, TextArea, TextInput } from "./ui";
-import { OngkirHargaPromo, OngkirPromoBadge, ongkirHematText } from "@/components/promo/OngkirPromo";
 
 export default function StepCustomer({
   customer,
@@ -189,26 +188,8 @@ export default function StepCustomer({
       <div className="mt-4 rounded-2xl px-5 py-4" style={{ background: FIELD_BG, border: "1px solid rgba(0,0,0,.25)" }}>
         <SummaryRow
           label={shipping ? `Ongkir (J&T — ${shipping.service})` : "Ongkir"}
-          value={
-            loadingOngkir ? (
-              "Menghitung…"
-            ) : shipping?.promoLabel ? (
-              <OngkirHargaPromo cost={shipping.cost} payCost={shipping.payCost ?? shipping.cost} />
-            ) : shipping ? (
-              money(shipping.cost)
-            ) : (
-              "—"
-            )
-          }
+          value={loadingOngkir ? "Menghitung…" : shipping ? money(shipping.cost) : "—"}
         />
-        {!loadingOngkir && shipping?.promoLabel ? (
-          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <OngkirPromoBadge label={shipping.promoLabel} />
-            <span className="text-[11px]" style={{ color: MUTED }}>
-              {ongkirHematText(shipping.discount ?? 0)}
-            </span>
-          </div>
-        ) : null}
         {ongkirError ? (
           <p className="mt-1.5 text-[11px] leading-relaxed" style={{ color: MUTED }}>
             Ongkir otomatis belum tersedia — admin akan menghitung dan mengabari kamu.

@@ -45,12 +45,7 @@ export const EMPTY_CUSTOMER: CustomerData = {
 
 export interface DraftShipping {
   service: string;
-  /** Tarif J&T asli. Ini yang dikirim ke server untuk diverifikasi (server yang menerapkan promo). */
   cost: number;
-  /** Hanya ada kalau promo ongkir sedang berlaku (dari /api/shipping/jnt-cost). */
-  payCost?: number;
-  discount?: number;
-  promoLabel?: string;
 }
 
 /**
