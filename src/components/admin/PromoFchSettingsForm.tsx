@@ -113,6 +113,8 @@ export default function PromoFchSettingsForm() {
   /** id varian (`product_id|color|size`) yang sedang disimpan. */
   const [savingVariantId, setSavingVariantId] = useState<string | null>(null);
   const savedRef = useRef<Settings>(EMPTY_SETTINGS);
+  /** false = pengaturan read-only; tombol "Edit pengaturan" membukanya, simpan/batal menguncinya lagi. */
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -270,6 +272,7 @@ export default function PromoFchSettingsForm() {
     savedRef.current = settings;
     setSaved(settings);
     setNotice({ kind: "ok", text: "Pengaturan promo tersimpan" });
+    setEditing(false);
     // Halaman promo langsung memakai pengaturan baru.
     void requestRevalidate();
   }
@@ -277,6 +280,7 @@ export default function PromoFchSettingsForm() {
   function resetSettings() {
     setSettings(savedRef.current);
     setNotice(null);
+    setEditing(false);
   }
 
   /**
@@ -476,27 +480,31 @@ export default function PromoFchSettingsForm() {
       {/* ── Layout 2 kolom: form di kiri, preview sticky di kanan ── */}
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
         <div className="flex min-w-0 flex-col gap-5">
-          <StatusCard
-            active={settings.active}
-            onChange={(active) => patch({ active })}
-            bonusExhausted={bonusExhausted}
-          />
-          <TeksCard
-            eyebrow={settings.eyebrow}
-            title={settings.title}
-            description={settings.description}
-            onChange={patch}
-          />
-          <KuotaCard
-            quotaTotal={settings.quotaTotal}
-            quotaLeft={settings.quotaLeft}
-            quotaNote={settings.quotaNote}
-            onChange={(next) => {
-              if (next.quotaTotal !== undefined) patchQuotaTotal(next.quotaTotal);
-              if (next.quotaNote !== undefined) patch({ quotaNote: next.quotaNote });
-            }}
-          />
-          <PeriodeCard startDate={settings.startDate} endDate={settings.endDate} onChange={patch} />
+          {/* Terkunci (hanya baca) sampai "Edit pengaturan" ditekan. Sakelar produk di bawah
+              tersimpan per klik, jadi sengaja di luar fieldset ini. */}
+          <fieldset disabled={!editing} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
+            <StatusCard
+              active={settings.active}
+              onChange={(active) => patch({ active })}
+              bonusExhausted={bonusExhausted}
+            />
+            <TeksCard
+              eyebrow={settings.eyebrow}
+              title={settings.title}
+              description={settings.description}
+              onChange={patch}
+            />
+            <KuotaCard
+              quotaTotal={settings.quotaTotal}
+              quotaLeft={settings.quotaLeft}
+              quotaNote={settings.quotaNote}
+              onChange={(next) => {
+                if (next.quotaTotal !== undefined) patchQuotaTotal(next.quotaTotal);
+                if (next.quotaNote !== undefined) patch({ quotaNote: next.quotaNote });
+              }}
+            />
+            <PeriodeCard startDate={settings.startDate} endDate={settings.endDate} onChange={patch} />
+          </fieldset>
           <ProdukCard
             products={cards}
             savingId={savingId}
@@ -507,7 +515,14 @@ export default function PromoFchSettingsForm() {
             savingVariantId={savingVariantId}
             onToggleVariant={toggleVariant}
           />
-          <SaveBar dirty={dirty} saving={saving} onReset={resetSettings} onSave={saveSettings} />
+          <SaveBar
+            dirty={dirty}
+            saving={saving}
+            locked={!editing}
+            onEdit={() => setEditing(true)}
+            onReset={resetSettings}
+            onSave={saveSettings}
+          />
         </div>
 
         <div className="flex flex-col gap-5 lg:sticky lg:top-4">

@@ -11,10 +11,8 @@
  */
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Check, Image as ImageIcon, Loader2, Search } from "lucide-react";
+import { AlertTriangle, Check, Loader2, Search } from "lucide-react";
 import ConfirmModal from "@/components/ConfirmModal";
-import { cloudinaryUrl } from "@/lib/cloudinary";
-import { getProductThumbnail } from "@/lib/product-thumbnail";
 import type { Product } from "@/lib/katalog-data";
 import { PROMO_COLORS, TEXT, TEXT_MUTED } from "./primitives";
 import { ToggleSwitch } from "./ToggleSwitch";
@@ -55,35 +53,6 @@ function groupByColor(rows: PromoVariant[]): Array<{ color: string; sizes: Promo
 const INITIAL_VISIBLE = 8;
 
 const rupiah = (value: number) => "Rp " + Math.round(value || 0).toLocaleString("id-ID");
-
-/** Thumbnail kecil; kalau gagal dimuat → kotak abu netral (tanpa alt text mentah). */
-function Thumb({ src, name }: { src: string; name: string }) {
-  const [failed, setFailed] = useState(false);
-
-  if (!src || failed) {
-    return (
-      <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md"
-        style={{ background: "#EDEDED", border: "1px solid var(--bd)" }}
-        aria-label="Foto tidak tersedia"
-        role="img"
-      >
-        <ImageIcon size={14} style={{ color: "#B5B5B5" }} />
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={cloudinaryUrl(src, { width: 120 })}
-      alt={name}
-      loading="lazy"
-      onError={() => setFailed(true)}
-      className="h-10 w-10 shrink-0 rounded-md object-cover"
-      style={{ background: "#EDEDED", border: "1px solid var(--bd)" }}
-    />
-  );
-}
 
 function StockBadge({ stock }: { stock: number }) {
   const tone =
@@ -261,13 +230,13 @@ export function ProdukCard({
         </span>
       </div>
 
-      {/* Tabel — di layar kecil boleh scroll horizontal di dalam box-nya sendiri. */}
-      <div className="overflow-x-auto rounded-xl" style={{ border: "1px solid var(--bd)" }}>
-        <table className="w-full min-w-[640px] border-collapse text-[12.5px]">
+      {/* Tabel tanpa foto & tanpa scroll samping: teks boleh turun baris, kolom Kategori disembunyikan di layar kecil. */}
+      <div className="rounded-xl" style={{ border: "1px solid var(--bd)" }}>
+        <table className="w-full border-collapse text-[12.5px]">
           <thead>
             <tr style={{ background: "var(--sub)", color: TEXT_MUTED }}>
               <th className="px-3 py-2 text-left font-semibold">Produk</th>
-              <th className="px-3 py-2 text-left font-semibold">Kategori</th>
+              <th className="hidden px-3 py-2 text-left font-semibold md:table-cell">Kategori</th>
               <th className="px-3 py-2 text-right font-semibold">Harga</th>
               <th className="px-3 py-2 text-left font-semibold">Stok</th>
               <th className="px-3 py-2 text-right font-semibold">Ikut promo</th>
@@ -285,19 +254,14 @@ export function ProdukCard({
                 <Fragment key={product.id}>
                   <tr style={{ borderTop: "1px solid #ECE4D8" }}>
                     <td className="px-3 py-2">
-                      <div className="flex items-center gap-2.5">
-                        <Thumb src={getProductThumbnail(product)} name={product.name} />
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold" style={{ color: TEXT }}>
-                            {product.name}
-                          </p>
-                          <p className="truncate text-[11px]" style={{ color: TEXT_MUTED }}>
-                            {jenis}
-                          </p>
-                        </div>
-                      </div>
+                      <p className="font-semibold" style={{ color: TEXT }}>
+                        {product.name}
+                      </p>
+                      <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
+                        {jenis}
+                      </p>
                     </td>
-                    <td className="px-3 py-2" style={{ color: TEXT_MUTED }}>
+                    <td className="hidden px-3 py-2 md:table-cell" style={{ color: TEXT_MUTED }}>
                       {product.category}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums" style={{ color: TEXT }}>
@@ -307,7 +271,7 @@ export function ProdukCard({
                       <StockBadge stock={product.totalStock ?? 0} />
                     </td>
                     <td className="px-3 py-2">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
                         {byColor.length > 0 ? (
                           <button
                             type="button"

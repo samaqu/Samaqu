@@ -11,11 +11,16 @@ import { PROMO_COLORS, TEXT, TEXT_MUTED } from "./primitives";
 export function SaveBar({
   dirty,
   saving,
+  locked,
+  onEdit,
   onReset,
   onSave,
 }: {
   dirty: boolean;
   saving: boolean;
+  /** true = pengaturan read-only; hanya tombol "Edit pengaturan" yang tampil. */
+  locked: boolean;
+  onEdit: () => void;
   onReset: () => void;
   onSave: () => void;
 }) {
@@ -36,9 +41,23 @@ export function SaveBar({
             className="inline-block h-2 w-2 rounded-full"
             style={{ background: dirty ? "#E0A100" : "#22c55e" }}
           />
-          {dirty ? "Ada perubahan yang belum disimpan" : "Semua perubahan tersimpan"}
+          {locked ? "Pengaturan terkunci (hanya baca)" : dirty ? "Ada perubahan yang belum disimpan" : "Semua perubahan tersimpan"}
         </span>
 
+        {locked ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="rounded-lg px-5 py-2 text-[12px] font-bold"
+            style={{
+              background: `linear-gradient(90deg, ${PROMO_COLORS.saveFrom}, ${PROMO_COLORS.saveTo})`,
+              border: `1px solid ${PROMO_COLORS.saveBorder}`,
+              color: PROMO_COLORS.saveText,
+            }}
+          >
+            Edit pengaturan
+          </button>
+        ) : (
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -64,6 +83,7 @@ export function SaveBar({
             {saving ? "Menyimpan…" : "Simpan pengaturan"}
           </button>
         </div>
+        )}
       </div>
     </div>
   );
