@@ -99,6 +99,35 @@ export function splitCoverLines(items: PromoItem[], orderDiscount: number): Cove
   });
 }
 
+/**
+ * Perkiraan kasar berapa hari stok satu varian cukup: stok sekarang dibagi rata-rata keluar per hari VARIAN ITU.
+ * Dihitung per varian (bukan stok gabungan) karena pemakaian bisa menumpuk di satu varian saja; stok gabungan
+ * membuat varian yang hampir habis terlihat aman. `null` = tidak bisa diperkirakan (stok tidak terbaca atau
+ * belum ada pemakaian). Stok 0 = 0 hari.
+ */
+export function perkiraanHariCukup(stok: number | null, keluar: number, hariBerjalan: number): number | null {
+  if (stok === null || !Number.isFinite(stok)) return null;
+  if (stok <= 0) return 0;
+  const rata = hariBerjalan > 0 ? keluar / hariBerjalan : 0;
+  return rata > 0 ? Math.floor(stok / rata) : null;
+}
+
+/** Bagi menjadi persen bulat yang JUMLAHNYA tepat 100 (sisa pembulatan ke pecahan terbesar). */
+export function bagiPersen(values: number[]): number[] {
+  const total = values.reduce((sum, value) => sum + Math.max(0, value), 0);
+  if (total <= 0) return values.map(() => 0);
+  const raw = values.map((value) => (Math.max(0, value) / total) * 100);
+  const lantai = raw.map(Math.floor);
+  let sisa = 100 - lantai.reduce((sum, value) => sum + value, 0);
+  const urut = raw.map((value, index) => ({ index, pecahan: value - Math.floor(value) })).sort((a, b) => b.pecahan - a.pecahan || a.index - b.index);
+  for (const { index } of urut) {
+    if (sisa <= 0) break;
+    lantai[index] += 1;
+    sisa -= 1;
+  }
+  return lantai;
+}
+
 export interface PromoFchRow {
   tanggal: string;
   nomorPesanan: string;

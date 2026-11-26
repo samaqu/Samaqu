@@ -7,6 +7,7 @@ import { OPEN_ORDER_SOURCE_KEY, PROMO_FCH_SOURCE_KEY, orderSourceKey, statusLabe
 import {
   buildPromoFchReport,
   COVER_PRODUCT_IDS,
+  perkiraanHariCukup,
   VARIAN_KOKO,
   VARIAN_THOBE,
   type PromoDraft,
@@ -139,12 +140,10 @@ export async function GET(req: NextRequest) {
       .limit(500);
 
     const [stokThobe, stokKoko] = await Promise.all([readCoverStock(admin, VARIAN_THOBE), readCoverStock(admin, VARIAN_KOKO)]);
-    const stok = [
+    const stokMentah = [
       { varian: VARIAN_THOBE, stok: stokThobe },
       { varian: VARIAN_KOKO, stok: stokKoko },
     ];
-    const stokTerbaca = stok.filter((row) => row.stok !== null);
-    const stokTotal = stokTerbaca.length ? stokTerbaca.reduce((sum, row) => sum + (row.stok || 0), 0) : null;
 
     const report = buildPromoFchReport({
       orders,
@@ -156,14 +155,25 @@ export async function GET(req: NextRequest) {
       statusLabel,
     });
 
-    const rataPerHari = hariBerjalan > 0 ? report.keluar / hariBerjalan : 0;
+    // Perkiraan dihitung PER VARIAN (stok varian itu / rata-rata keluar per hari varian itu), bukan stok gabungan.
+    const stok = stokMentah.map((row) => ({
+      ...row,
+      perkiraanHari: perkiraanHariCukup(
+        row.stok,
+        report.perVarian.find((item) => item.varian === row.varian)?.gratis ?? 0,
+        hariBerjalan,
+      ),
+    }));
+    const hariTerdekat = stok
+      .filter((row) => row.perkiraanHari !== null)
+      .sort((a, b) => (a.perkiraanHari as number) - (b.perkiraanHari as number))[0];
+
     return NextResponse.json({
       period: { month: bounds.value, label: bounds.label, isPartial, hariBerjalan },
       ...report,
       stok,
-      stokTotal,
-      // Perkiraan kasar: stok sekarang dibagi rata-rata keluar per hari pada periode ini.
-      perkiraanHariCukup: stokTotal !== null && rataPerHari > 0 ? Math.floor(stokTotal / rataPerHari) : null,
+      // Varian yang paling cepat habis (kira-kira), untuk peringatan di kartu.
+      terdekat: hariTerdekat ? { varian: hariTerdekat.varian, hari: hariTerdekat.perkiraanHari } : null,
     });
   } catch (error) {
     console.error("[OPS] promo-fch GET:", error);
