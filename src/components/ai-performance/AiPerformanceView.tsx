@@ -370,9 +370,9 @@ export default function AiPerformanceView() {
           <div className="rounded-2xl border bg-white p-4 shadow-sm sm:p-5" style={{ borderColor: "#e3ebf1" }}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h3 className="text-base font-black" style={{ color: "#2a1a22" }}>Produk terjual lewat AI</h3>
+                <h3 className="text-base font-black" style={{ color: "#2a1a22" }}>Produk Paling Banyak Terjual Melalui AI</h3>
                 <p className="mt-0.5 text-xs" style={{ color: "#8a7d83" }}>
-                  Barang di order closing AI bulan ini, urut dari yang paling banyak laku.
+                  Daftar produk yang berhasil terjual melalui bantuan AI bulan ini, diurutkan berdasarkan jumlah unit terjual.
                 </p>
               </div>
               {stats.produkTerjual && stats.produkTerjual.products > 0 ? (
