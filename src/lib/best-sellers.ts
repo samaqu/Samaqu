@@ -110,10 +110,26 @@ export interface BestSellerLayananTotals {
   orders: number;
 }
 
+/**
+ * Total baris COVER & HANGER (bonus promo + add-on Open Order). Cover bukan produk pilihan pembeli: sebagian
+ * besar unitnya hadiah gratis, sehingga di peringkat ia selalu menyalip Thobe yang benar-benar laku. Seperti
+ * layanan, ia tidak masuk peringkat dan tidak menambah total unit/omzet barang; rinciannya (gratis vs dibeli,
+ * per varian, per asal) ada di kartu "Promo Free Cover Hanger". `revenue` = omzet SETELAH porsi diskon
+ * pesanan, jadi peringkat + cover tetap cocok dengan angka sebelum cover dikeluarkan.
+ */
+export interface BestSellerCoverTotals {
+  units: number;
+  revenue: number;
+  orders: number;
+  /** Bagian dari `units` yang berasal dari add-on Open Order. */
+  addonUnits: number;
+}
+
 export interface BestSellerAggregate {
   series: { rows: BestSellerSeriesRow[]; totals: BestSellerModeTotals };
   product: { rows: BestSellerProductRow[]; totals: BestSellerModeTotals };
   layanan: BestSellerLayananTotals;
+  cover: BestSellerCoverTotals;
 }
 
 /** Pesanan yang dianggap penjualan sah — satu aturan dengan laporan & menu Transaksi. */
@@ -254,6 +270,10 @@ export function aggregateBestSellers(
   let layananUnits = 0;
   let layananRevenue = 0;
   const layananOrders = new Set<string>();
+  let coverUnits = 0;
+  let coverRevenue = 0;
+  let coverAddonUnits = 0;
+  const coverOrders = new Set<string>();
 
   for (const item of items) {
     const qty = Number(item.quantity ?? item.qty) || 0;
@@ -307,6 +327,16 @@ export function aggregateBestSellers(
       fallback = true;
       fallbackItems += 1;
       fallbackUnits += qty;
+    }
+
+    // Cover & Hanger (hadiah promo dan add-on) bukan produk pilihan pembeli: dihitung terpisah, di luar
+    // peringkat. Kartu "Promo Free Cover Hanger" yang menampilkan rinciannya.
+    if (isAddon || masterId === OPEN_ORDER_ADDON_TARGET_ID || category === "Cover & Hanger") {
+      coverUnits += qty;
+      coverRevenue += price * qty - (Number(item.discount_share) || 0);
+      if (isAddon) coverAddonUnits += qty;
+      if (item.order_id) coverOrders.add(String(item.order_id));
+      continue;
     }
 
     // Baris layanan (Jasa Potong Panjang) bukan barang yang diperingkatkan: dihitung terpisah.
@@ -438,5 +468,6 @@ export function aggregateBestSellers(
     series: { rows: seriesRows, totals: totalsOf(seriesRows) },
     product: { rows: productRows, totals: totalsOf(productRows) },
     layanan: { units: layananUnits, revenue: layananRevenue, orders: layananOrders.size },
+    cover: { units: coverUnits, revenue: coverRevenue, orders: coverOrders.size, addonUnits: coverAddonUnits },
   };
 }

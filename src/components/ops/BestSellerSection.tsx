@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUpRight, ChevronDown, Loader2, RefreshCw, Scissors } from "lucide-react";
+import PromoFchSection from "@/components/ops/laporan/PromoFchSection";
 
 /**
  * Kartu "Produk Terlaris" halaman Laporan ops.
@@ -485,6 +486,9 @@ export default function BestSellerSection() {
               </div>
             </div>
           ) : null}
+
+          {/* Cover & Hanger (bonus promo + add-on) bukan produk pilihan pembeli: di luar peringkat, rinciannya di kartu ini. */}
+          <PromoFchSection month={month} />
 
           {totals?.units === 0 ? (
             <p className="mt-4 rounded-2xl bg-[#F9FAFB] px-4 py-3 text-xs font-semibold text-slate-500">
