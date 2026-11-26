@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isOpsAdmin, unauthorized } from "@/lib/ops-auth";
-import { jakartaMonthBounds } from "@/lib/ops-followup";
+import { BIZ_OFFSET_MS, jakartaMonthBounds } from "@/lib/ops-followup";
 import { SALE_STATUSES, orderRevenue } from "@/lib/transaksi";
 import {
   MANUAL_MATCH_AFTER_MS,
@@ -366,29 +366,23 @@ async function productsSold(admin: ReturnType<typeof getSupabaseAdmin>, orderNum
 }
 
 /**
- * Total biaya AI CS (feature `wa`) pada periode, dalam USD.
- * Dicatat `wa-agent` ke `ai_usage_logs` memakai harga di `ai_settings.pricing`.
+ * Kapan chat paling ramai: jumlah pesan masuk customer per jam (0-23) dan per hari dalam seminggu
+ * (0 = Minggu), memakai jam WIB. Bahannya baris `wa_inbox` yang sama dengan angka percakapan
+ * (bukan grup, bukan yang dilewati bot). Hanya menghitung, tidak mengubah data.
  */
-async function aiUsageCost(startIso: string, endIso: string): Promise<number | null> {
-  const base = (process.env.ACADEMY_SUPABASE_URL || "").replace(/\/+$/, "");
-  const key = process.env.ACADEMY_SERVICE_ROLE_KEY || "";
-  if (!base || !key) return null;
-
-  const url = new URL(`${base}/rest/v1/ai_usage_logs`);
-  url.searchParams.set("select", "estimated_cost");
-  url.searchParams.set("feature", "eq.wa");
-  url.searchParams.set("created_at", `gte.${startIso}`);
-  url.searchParams.append("created_at", `lt.${endIso}`);
-  url.searchParams.set("limit", "50000");
-
-  const res = await fetch(url, {
-    headers: { apikey: key, Authorization: `Bearer ${key}` },
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  const rows = (await res.json().catch(() => [])) as { estimated_cost?: number | string | null }[];
-  if (!Array.isArray(rows)) return 0;
-  return rows.reduce((sum, row) => sum + (Number(row.estimated_cost) || 0), 0);
+function chatRamai(rows: { created_at?: string | null }[]) {
+  const perJam = Array<number>(24).fill(0);
+  const perHari = Array<number>(7).fill(0);
+  let total = 0;
+  for (const row of rows) {
+    const time = Date.parse(String(row.created_at || ""));
+    if (!Number.isFinite(time)) continue;
+    const wib = new Date(time + BIZ_OFFSET_MS);
+    perJam[wib.getUTCHours()] += 1;
+    perHari[wib.getUTCDay()] += 1;
+    total += 1;
+  }
+  return { perJam, perHari, total };
 }
 
 async function approvedDrafts(
@@ -429,7 +423,7 @@ async function periodStats(
   month: ReturnType<typeof jakartaMonthBounds>,
   withProducts = false,
 ) {
-  const [rows, drafts, closingStats, leadsResult, escalations, costUsd] = await Promise.all([
+  const [rows, drafts, closingStats, leadsResult, escalations] = await Promise.all([
     inboxRows(admin, month.startIso, month.endIso),
     approvedDrafts(admin, month.startIso, month.endIso),
     academyClosings(admin, month.startIso, month.endIso).catch(() => null),
@@ -442,7 +436,6 @@ async function periodStats(
       .lte("tanggal", `${month.value}-${String(month.daysInMonth).padStart(2, "0")}`)
       .limit(5000),
     escalationRows(admin, month.startIso, month.endIso),
-    aiUsageCost(month.startIso, month.endIso).catch(() => null),
   ]);
   if (leadsResult.error) throw new Error(leadsResult.error.message);
   const leads = leadsResult.count || 0;
@@ -510,7 +503,8 @@ async function periodStats(
     leadsFromChatShare: metrics.leadsFromChatShare,
     closing,
     nominal,
-    aiCostUsd: costUsd,
+    /** Pesan masuk per jam (WIB) dan per hari dalam seminggu, untuk grafik "chat paling ramai". */
+    chatRamai: chatRamai(rows),
     handledRate: conversations > 0 ? Math.round((handled / conversations) * 1000) / 10 : 0,
     closingRate: conversations > 0 ? Math.round((closing / conversations) * 1000) / 10 : 0,
     closingSource,
@@ -537,24 +531,11 @@ export async function GET(req: NextRequest) {
       periodStats(admin, previous),
     ]);
 
-    // Kurs USD → Rp bisa diubah lewat env tanpa deploy kode.
-    const usdIdr = Number(process.env.USD_IDR_RATE) || 18108.5;
-    const aiCostIdr = currentStats.aiCostUsd == null
-      ? null
-      : Math.round(currentStats.aiCostUsd * usdIdr);
-    const costPerClosing =
-      aiCostIdr != null && currentStats.closing > 0
-        ? Math.round(aiCostIdr / currentStats.closing)
-        : null;
-
     return NextResponse.json({
       period: { value: month.value, label: month.label },
       previousPeriod: { value: previous.value, label: previous.label },
       stats: {
         ...currentStats,
-        aiCostIdr,
-        costPerClosing,
-        usdIdr,
         growth: {
           conversations: growth(currentStats.conversations, previousStats.conversations),
           handled: growth(currentStats.handled, previousStats.handled),

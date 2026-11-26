@@ -27,10 +27,8 @@ type Stats = {
   leadsFromChatShare: number;
   closing: number;
   nominal: number;
-  aiCostUsd?: number | null;
-  aiCostIdr?: number | null;
-  costPerClosing?: number | null;
-  usdIdr?: number;
+  /** Pesan masuk per jam WIB (indeks 0-23) dan per hari (indeks 0 = Minggu). */
+  chatRamai?: { perJam: number[]; perHari: number[]; total: number };
   handledRate: number;
   closingRate: number;
   closingSource?: "wa_closings" | "drafts";
@@ -68,6 +66,90 @@ const number = (value: number) => Math.round(Number(value) || 0).toLocaleString(
 /** Persentase gaya Indonesia (koma desimal); kosong/NaN tetap "0%". */
 const percent = (value: number) =>
   `${(Number(value) || 0).toLocaleString("id-ID", { maximumFractionDigits: 1 })}%`;
+
+const HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+/** Senin dulu (urutan kerja), Minggu terakhir. */
+const URUTAN_HARI = [1, 2, 3, 4, 5, 6, 0];
+const jam = (hour: number) => `${String(hour).padStart(2, "0")}.00`;
+
+/** Grafik "kapan chat paling ramai": pesan masuk customer per jam (WIB) + per hari dalam seminggu. */
+function ChatRamaiChart({ data }: { data?: { perJam: number[]; perHari: number[]; total: number } }) {
+  const card = "rounded-2xl border bg-white p-4 shadow-sm sm:p-5";
+  const head = (
+    <div>
+      <h3 className="text-base font-black" style={{ color: "#2a1a22" }}>Kapan chat paling ramai</h3>
+      <p className="mt-0.5 text-xs" style={{ color: "#8a7d83" }}>Pesan masuk dari customer per jam (WIB) pada bulan ini.</p>
+    </div>
+  );
+  if (!data || data.total === 0) {
+    return (
+      <div className={card} style={{ borderColor: "#e3ebf1" }}>
+        {head}
+        <p className="mt-3 py-4 text-sm" style={{ color: "#8a7d83" }}>Belum ada chat pada periode ini.</p>
+      </div>
+    );
+  }
+
+  const maxJam = Math.max(...data.perJam);
+  const peakHour = data.perJam.indexOf(maxJam);
+  const maxHari = Math.max(...data.perHari);
+  const peakDay = data.perHari.indexOf(maxHari);
+
+  return (
+    <div className={card} style={{ borderColor: "#e3ebf1" }}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        {head}
+        <span className="rounded-full px-2.5 py-1 text-[10px] font-bold" style={{ background: "#e8f3fb", color: "#2f6f9e" }}>
+          {number(data.total)} pesan
+        </span>
+      </div>
+
+      <p className="mt-3 text-sm font-semibold" style={{ color: "#2a1a22" }}>
+        Paling ramai jam {jam(peakHour)}–{jam((peakHour + 1) % 24)}{" "}
+        <span style={{ color: "#6B6A64" }}>({number(maxJam)} pesan)</span>
+        <span style={{ color: "#9aacb8" }}> · </span>
+        hari tersibuk <b>{HARI[peakDay]}</b>
+      </p>
+
+      <div className="mt-4 flex h-28 items-end gap-[3px]" role="img" aria-label="Grafik pesan masuk per jam">
+        {data.perJam.map((count, hour) => (
+          <div key={hour} className="flex h-full min-w-0 flex-1 flex-col justify-end" title={`${jam(hour)}: ${number(count)} pesan`}>
+            <div
+              className="w-full rounded-t"
+              style={{
+                height: `${count > 0 ? Math.max(4, Math.round((count / maxJam) * 100)) : 0}%`,
+                background: hour === peakHour ? "#2f6f9e" : "#b9d3e6",
+              }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="mt-1.5 flex gap-[3px]">
+        {data.perJam.map((_, hour) => (
+          <span key={hour} className="min-w-0 flex-1 text-center text-[9px] tabular-nums" style={{ color: "#9aacb8" }}>
+            {hour % 3 === 0 ? String(hour).padStart(2, "0") : ""}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-4 grid grid-cols-7 gap-1.5">
+        {URUTAN_HARI.map((day) => {
+          const isPeak = day === peakDay;
+          return (
+            <div
+              key={day}
+              className="rounded-lg px-1 py-1.5 text-center"
+              style={{ background: isPeak ? "#e8f3fb" : "#f5f8fa", border: `1px solid ${isPeak ? "#b9d3e6" : "#edf1f4"}` }}
+            >
+              <p className="text-[10px] font-bold" style={{ color: isPeak ? "#2f6f9e" : "#7c93a6" }}>{HARI[day].slice(0, 3)}</p>
+              <p className="text-xs font-black tabular-nums" style={{ color: "#2a1a22" }}>{number(data.perHari[day])}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function Delta({ value }: { value: number | null }) {
   if (value === null) return <span style={{ color: "#9aacb8" }}>—</span>;
@@ -269,30 +351,7 @@ export default function AiPerformanceView() {
             />
           </div>
 
-          <div className="rounded-2xl border bg-white p-4 shadow-sm" style={{ borderColor: "#e3ebf1" }}>
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#7c93a6" }}>Biaya AI bulan ini</p>
-                <p className="mt-1 text-2xl font-black tabular-nums" style={{ color: "#2a1a22" }}>
-                  {stats.aiCostIdr == null ? "Belum tersedia" : money(stats.aiCostIdr)}
-                </p>
-                <p className="mt-0.5 text-[11px]" style={{ color: "#8a7d83" }}>
-                  {stats.aiCostUsd == null
-                    ? "Pencatatan biaya belum aktif."
-                    : `$${Number(stats.aiCostUsd).toFixed(2)} · kurs Rp${number(stats.usdIdr ?? 0)}`}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#7c93a6" }}>Biaya per closing</p>
-                <p className="mt-1 text-2xl font-black tabular-nums" style={{ color: "#1f8a58" }}>
-                  {stats.costPerClosing == null ? "Belum ada closing" : money(stats.costPerClosing)}
-                </p>
-                <p className="mt-0.5 text-[11px]" style={{ color: "#8a7d83" }}>
-                  dari {number(stats.closing)} closing bulan ini
-                </p>
-              </div>
-            </div>
-          </div>
+          <ChatRamaiChart data={stats.chatRamai} />
 
           <div className="rounded-2xl border bg-white p-4 shadow-sm sm:p-5" style={{ borderColor: "#e3ebf1" }}>
             <div className="flex flex-wrap items-center justify-between gap-2">
