@@ -48,6 +48,8 @@ type Item = {
   size: string;
   quantity: number;
   price: number;
+  /** Cover + Hanger yang DIBELI customer (bukan bonus). Hanya dibawa lewat, tidak ditampilkan: tanpa ini diskon promo gratis cover terpasang lagi saat draft disimpan. */
+  cover_berbayar?: boolean;
 };
 
 type ProductGroup = {
@@ -118,6 +120,7 @@ export default function DraftEditor({
       size: String(item.size || "").toUpperCase(),
       quantity: Math.max(1, Number(item.quantity) || 1),
       price: Number(item.price) || 0,
+      ...(item.cover_berbayar === true ? { cover_berbayar: true } : {}),
     })),
   );
   const [variants, setVariants] = useState<Variant[]>([]);

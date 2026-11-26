@@ -4,6 +4,7 @@ import { isOpsAdmin, opsActorEmail, unauthorized } from "@/lib/ops-auth";
 import { waMediaSignedUrl } from "@/lib/wa-media";
 import { POTONG_PANJANG_ID, POTONG_PANJANG_NAME, POTONG_PANJANG_PRICE } from "@/lib/layanan";
 import { hitungPromoUntukPesanan } from "@/lib/promo/ongkir-promo-server";
+import { applyCoverDiscount, COVER_DISCOUNT } from "@/lib/draft-cover-discount";
 
 /**
  * Menu "Perlu Review".
@@ -27,8 +28,6 @@ const FREE_COVER_SKU = "CVH-SHC";
 const FREE_COVER_COLOR = "Cover Thobe + Hanger";
 const FREE_COVER_SIZE = "ALL SIZE";
 
-/** Diskon promo gratis cover: satu item "Cover Thobe + Hanger" = Rp35.000. */
-const COVER_DISCOUNT = 35000;
 
 /**
  * Semua baris cover pada draft — Thobe maupun Koko (`cover-hanger` punya 3 varian warna).
@@ -306,6 +305,8 @@ async function normalizeItems(
       size,
       quantity,
       price: override > 0 ? override : Number(product.price) || 0,
+      // Cover + Hanger yang DIBELI customer (bukan bonus): tanda ini mencegah diskon promo gratis cover.
+      ...(item?.cover_berbayar === true ? { cover_berbayar: true } : {}),
     });
   }
   return { rows };
@@ -463,29 +464,6 @@ export async function GET(req: NextRequest) {
       drafts: draftItems.length,
     },
   });
-}
-
-/**
- * Samakan diskon draft dengan promo cover hanger. Dipakai saat draft dibuat, dibaca,
- * diedit, dan disetujui supaya angka di layar = angka yang dibukukan.
- * Diskon yang lebih besar dari promo (diisi admin) tidak diturunkan.
- */
-function applyCoverDiscount(payload: any) {
-  const items = Array.isArray(payload?.items) ? payload.items : [];
-  const subtotal = items.reduce(
-    (sum: number, item: any) => sum + (Number(item?.price) || 0) * (Number(item?.quantity) || 0),
-    0,
-  );
-  const current = Math.max(0, Math.round(Number(payload?.discount) || 0));
-  const coverQty = items
-    .filter(
-      (item: any) =>
-        String(item?.product_id || "") === "cover-hanger" &&
-        /cover\s*thobe/i.test(String(item?.color || "")),
-    )
-    .reduce((sum: number, item: any) => sum + Math.max(1, Number(item?.quantity) || 1), 0);
-  const target = coverQty ? Math.min(COVER_DISCOUNT * coverQty, subtotal) : 0;
-  return { ...payload, discount: Math.min(Math.max(current, target), subtotal) };
 }
 
 export async function POST(req: NextRequest) {
