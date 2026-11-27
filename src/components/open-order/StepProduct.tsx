@@ -129,6 +129,12 @@ export default function StepProduct({
   if (!product) return null;
 
   const colorLabel = openOrderColorLabel(product, draft.color);
+  // Stok ukuran yang sedang dipilih — sama seperti halaman detail Katalog: 0 = Habis, ≤ 5 = Stok
+  // Menipis, selain itu Tersedia. `null` = stok ukuran tidak diketahui (tidak diblokir; server tetap
+  // memeriksa lagi saat pesanan dikirim).
+  const sizeStockValue = variant?.sizeStock?.[draft.size];
+  const stockNow = typeof sizeStockValue === "number" ? sizeStockValue : null;
+  const isOutOfStock = stockNow === 0;
   const finalPrice = cypEnabled ? (price >= minimum ? price : minimum) : minimum;
   const priceTooLow = cypEnabled && price < minimum;
   const lineTotal = finalPrice * draft.quantity;
@@ -142,7 +148,7 @@ export default function StepProduct({
   }
 
   function handleAdd() {
-    if (priceTooLow || phase !== "live") return;
+    if (priceTooLow || isOutOfStock || phase !== "live") return;
     onAdd({ ...draft, price: finalPrice, series: series?.name ?? "" });
   }
 
@@ -459,6 +465,15 @@ export default function StepProduct({
               </p>
             </div>
           )}
+          <div className="mt-3">
+            {stockNow === 0 ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-ui font-medium px-2.5 py-1 rounded-full" style={{ background: "#fde8e8", color: "#c0392b" }}>Habis</span>
+            ) : stockNow !== null && stockNow <= 5 ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-ui font-medium px-2.5 py-1 rounded-full" style={{ background: "#fef3cd", color: "#856404" }}>Stok Menipis</span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[11px] font-ui font-medium px-2.5 py-1 rounded-full" style={{ background: "#e7ecdf", color: "#5b6b45" }}>Tersedia</span>
+            )}
+          </div>
         </div>
 
         {description && (
@@ -538,11 +553,11 @@ export default function StepProduct({
             <button
               type="button"
               onClick={handleAdd}
-              disabled={priceTooLow}
+              disabled={priceTooLow || isOutOfStock}
               className="w-full flex items-center justify-center gap-2.5 py-4 rounded-sm text-[12px] tracking-[0.08em] uppercase font-ui font-semibold transition-all duration-300 hover:scale-[1.01] hover:shadow-lg disabled:opacity-40 disabled:hover:scale-100"
               style={{ background: "var(--espresso)", color: "white", boxShadow: "0 8px 28px -8px rgba(0,0,0,.35)" }}
             >
-              Tambah ke Pesanan
+              {isOutOfStock ? "Stok Habis" : "Tambah ke Pesanan"}
             </button>
           )}
         </div>
@@ -624,11 +639,11 @@ export default function StepProduct({
           <button
             type="button"
             onClick={handleAdd}
-            disabled={priceTooLow}
+            disabled={priceTooLow || isOutOfStock}
             className="shrink-0 h-12 px-6 rounded-full text-[14px] font-ui font-bold transition-all duration-300 active:scale-[.98] disabled:opacity-40"
             style={{ background: "var(--espresso)", color: "white" }}
           >
-            Tambah ke Pesanan
+            {isOutOfStock ? "Stok Habis" : "Tambah ke Pesanan"}
           </button>
         </div>
       )}

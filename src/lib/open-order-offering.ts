@@ -59,6 +59,11 @@ export interface OpenOrderVariant {
   sizes: string[];
   /** Total stok semua ukuran di baris + warna ini (0 kalau variannya tidak dikelola). */
   stock: number;
+  /**
+   * Stok EFEKTIF per ukuran di baris + warna ini (`{ M: 7, XXL: 0 }`). `undefined` = tidak ada data stok.
+   * Dipakai langkah detail untuk menampilkan "Habis" per ukuran, sama seperti halaman detail Katalog.
+   */
+  sizeStock?: Record<string, number>;
   /** Media baris ini (gambar + video) — sumber galeri di langkah detail. */
   media: OpenOrderMedia[];
 }
@@ -216,6 +221,7 @@ export function buildOpenOrderProducts(
 ): OpenOrderProduct[] {
   const sizesByRow = new Map<string, Map<string, string[]>>();
   const stockByRow = new Map<string, Map<string, number>>();
+  const sizeStockByRow = new Map<string, Map<string, Record<string, number>>>();
   for (const row of stockRows) {
     if (!row.product_id || !row.color || !row.size) continue;
     const byColor = sizesByRow.get(row.product_id) ?? new Map<string, string[]>();
@@ -227,6 +233,12 @@ export function buildOpenOrderProducts(
     const stockByColor = stockByRow.get(row.product_id) ?? new Map<string, number>();
     stockByRow.set(row.product_id, stockByColor);
     stockByColor.set(row.color, (stockByColor.get(row.color) ?? 0) + (row.stock ?? 0));
+
+    const sizeStockByColor = sizeStockByRow.get(row.product_id) ?? new Map<string, Record<string, number>>();
+    sizeStockByRow.set(row.product_id, sizeStockByColor);
+    const perSize = sizeStockByColor.get(row.color) ?? {};
+    perSize[row.size] = (perSize[row.size] ?? 0) + (row.stock ?? 0);
+    sizeStockByColor.set(row.color, perSize);
   }
 
   interface Group {
@@ -305,6 +317,7 @@ export function buildOpenOrderProducts(
         // Diurutkan S–M–L, bukan mengikuti urutan baris `product_variants` di database.
         sizes: sortSizes(sizesByRow.get(row.id)?.get(color) ?? []),
         stock,
+        sizeStock: sizeStockByRow.get(row.id)?.get(color),
         media,
       });
     }
