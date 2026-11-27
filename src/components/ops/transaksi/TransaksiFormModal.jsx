@@ -353,6 +353,12 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
    *  jadi ongkir saja tidak cukup untuk menandai baris mana yang aktif. */
   const [selectedService, setSelectedService] = useState("");
   /**
+   * Promo ongkir dari layanan yang dipilih (hanya ada kalau saklar promo di menu Promo sedang berlaku dan
+   * layanan itu kena promo): { original, discount, kind, label, pay }. Dipakai hanya selama kolom Ongkir masih
+   * berisi `pay` (lihat `promoOngkirDipakai`), jadi mengetik ongkir sendiri / pindah kurir otomatis melepasnya.
+   */
+  const [promoOngkir, setPromoOngkir] = useState(null);
+  /**
    * Setelah transaksi tersimpan, drawer TIDAK langsung ditutup: diganti panel "Transaksi tercatat"
    * yang isinya aksi resi (buat + cetak), supaya admin tidak perlu mencari barisnya di daftar.
    */
@@ -575,6 +581,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     setAddressBackup(null);
     setOngkir(EMPTY_ONGKIR);
     setSelectedService("");
+    setPromoOngkir(null);
     setAddressPrefilledFrom("");
     setCustomerSearch("");
     setCustomerEditing(false);
@@ -1097,6 +1104,17 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
   const courierBuilt = form?.courier_on ? buildCustomCourierMethod(form.courier_name, form.courier_service) : null;
   const courierMethod = courierBuilt?.ok ? courierBuilt.method : "";
   const shippingValue = gosendOn ? 0 : Number(digits(form?.shipping_cost)) || 0;
+  // Promo ongkir hanya dicatat untuk transaksi BARU, kurir J&T EZ/ECO (bukan GoSend/HBO/kurir lain), dan selama angka
+  // di kolom Ongkir masih sama dengan ongkir setelah promo. Server memeriksa ulang konsistensinya.
+  const promoOngkirDipakai =
+    !isEdit &&
+    promoOngkir &&
+    !gosendOn &&
+    !courierMethod &&
+    form?.shipping_method !== "J&T HBO" &&
+    shippingValue === promoOngkir.pay
+      ? promoOngkir
+      : null;
   const total = Math.max(0, subtotal - Math.min(discountValue, subtotal)) + shippingValue;
 
   /**
@@ -1217,9 +1235,23 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     // HBO dibuat manual di J&T VIP: tarifnya tidak lewat Tariff Check, jadi ongkirnya tetap
     // diisi admin sendiri — yang disimpan hanya penanda layanannya.
     if (service?.manual) {
+      setPromoOngkir(null);
       updateForm({ shipping_method: "J&T HBO", courier_on: false });
       return;
     }
+    // Layanan kena promo ongkir: kolom Ongkir diisi ongkir yang DIBAYAR customer (setelah promo).
+    if (!isEdit && service?.promoLabel && Number.isFinite(Number(service?.payCost))) {
+      setPromoOngkir({
+        original: Math.round(Number(service.cost) || 0),
+        discount: Math.round(Number(service.discount) || 0),
+        kind: service.promoKind,
+        label: service.promoLabel,
+        pay: Math.round(Number(service.payCost) || 0),
+      });
+      updateForm({ shipping_cost: digits(service.payCost), shipping_method: "", courier_on: false });
+      return;
+    }
+    setPromoOngkir(null);
     updateForm({ shipping_cost: digits(service?.cost), shipping_method: "", courier_on: false });
   };
 
@@ -1878,6 +1910,13 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       source: form.source,
       created_at: createdAt,
       shipping_cost: shippingValue,
+      ...(promoOngkirDipakai
+        ? {
+            shipping_cost_original: promoOngkirDipakai.original,
+            shipping_discount: promoOngkirDipakai.discount,
+            shipping_promo_kind: promoOngkirDipakai.kind,
+          }
+        : {}),
       ...(courierMethod
         ? { shipping_method: courierMethod }
         : form.shipping_method === "J&T HBO" || gosendOn
@@ -4064,6 +4103,28 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                   ) : null}
                 </div>
 
+                {promoOngkirDipakai && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-[12px] leading-relaxed text-red-900 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+                    <p className="font-bold">Promo ongkir dipakai: {promoOngkirDipakai.label}</p>
+                    <p>
+                      Tarif J&amp;T Rp {formatRupiah(promoOngkirDipakai.original)}, potongan Rp {formatRupiah(promoOngkirDipakai.discount)}, customer
+                      bayar {promoOngkirDipakai.pay <= 0 ? "Rp 0 (gratis)" : `Rp ${formatRupiah(promoOngkirDipakai.pay)}`}. Kolom Ongkir sudah terisi
+                      ongkir yang dibayar customer.
+                    </p>
+                    <button
+                      type="button"
+                      className="mt-1 font-bold underline underline-offset-2"
+                      onClick={() => {
+                        const penuh = promoOngkirDipakai.original;
+                        setPromoOngkir(null);
+                        updateForm({ shipping_cost: digits(penuh) });
+                      }}
+                    >
+                      Tanpa promo (pakai tarif penuh Rp {formatRupiah(promoOngkirDipakai.original)})
+                    </button>
+                  </div>
+                )}
+
                 {ongkirStale && (
                   <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
                     Ongkir mungkin berubah, cek ulang
@@ -4136,9 +4197,23 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                                 </span>
                               ) : null}
                             </span>
-                            <span className="shrink-0 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">
-                              Rp {formatRupiah(service.cost)}
-                            </span>
+                            {!isEdit && service.promoLabel && Number.isFinite(Number(service.payCost)) ? (
+                              <span className="shrink-0 flex flex-col items-end gap-0.5 whitespace-nowrap">
+                                <span className="text-[11px] font-semibold text-slate-400 line-through">
+                                  Rp {formatRupiah(service.cost)}
+                                </span>
+                                <span className="text-sm font-black text-red-700 dark:text-red-400">
+                                  {Number(service.payCost) <= 0 ? "Gratis" : `Rp ${formatRupiah(service.payCost)}`}
+                                </span>
+                                <span className="rounded-full bg-red-700 px-2 py-0.5 text-[10px] font-bold leading-none text-white">
+                                  {service.promoLabel}
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="shrink-0 text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">
+                                Rp {formatRupiah(service.cost)}
+                              </span>
+                            )}
                           </button>
                         );
                       })}
@@ -4177,6 +4252,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                     </div>
                     <p className="px-3.5 py-2 text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
                       Pilih layanan untuk mengisi ongkir otomatis. Nominalnya masih bisa diedit.
+                      {!isEdit && ongkir.services.some((service) => service.promoLabel)
+                        ? " Layanan bertanda promo terisi ongkir setelah promo (ikut tercatat di Laporan)."
+                        : ""}
                     </p>
                   </div>
                 )}
@@ -4438,6 +4516,12 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                     <span className="text-slate-500 dark:text-slate-400">Ongkir</span>
                     <span className="font-semibold text-slate-900 dark:text-white">Rp {formatRupiah(shippingValue)}</span>
                   </div>
+                  {promoOngkirDipakai ? (
+                    <div className="flex items-center justify-between">
+                      <span className="text-red-700 dark:text-red-400">Promo ongkir ({promoOngkirDipakai.label})</span>
+                      <span className="font-semibold text-red-700 dark:text-red-400">hemat Rp {formatRupiah(promoOngkirDipakai.discount)}</span>
+                    </div>
+                  ) : null}
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500 dark:text-slate-400">Diskon</span>
                     <span className="font-semibold text-slate-900 dark:text-white">
