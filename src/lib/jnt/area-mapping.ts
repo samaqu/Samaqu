@@ -65,7 +65,8 @@ export const stripCityPrefix = (city: string) =>
   norm(city)
     // Urutan penting: "KABUPATEN" harus dicek sebelum "KAB" supaya tidak menyisakan "UPATEN".
     // "KAB" tanpa titik pun ikut dibuang karena data alamat di lapangan sering menulis "Kab Bogor".
-    .replace(/^(KOTA|KABUPATEN|KAB\.?)?\s*(ADM\.?)?\s*/, "")
+    // Pakai batas kata (\b): "KOTA" di "KOTAWARINGIN"/"KOTABARU"/"KOTAMOBAGU" adalah bagian nama, bukan awalan.
+    .replace(/^(?:(?:KOTA|KABUPATEN|KAB)\b\.?\s*)?(?:ADM\b\.?\s*)?/, "")
     .trim();
 
 // ─── Indexes (built once at module load) ───
