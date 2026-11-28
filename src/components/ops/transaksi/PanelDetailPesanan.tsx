@@ -14,6 +14,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ExternalLink, FileText, MapPin, MessageCircle, Package, ShoppingBag, Truck } from "lucide-react";
 import { localPhone } from "@/lib/whatsapp";
+import { OngkirHargaPromo, OngkirPromoBadge } from "@/components/promo/OngkirPromo";
 
 const WIB = "Asia/Jakarta";
 /** Batas auto-cancel yang sama dengan cron: 24 jam sejak pesanan dibuat. */
@@ -219,6 +220,9 @@ export default function PanelDetailPesanan({
   items,
   subtotal,
   ongkir,
+  ongkirAsli = 0,
+  ongkirDiskon = 0,
+  ongkirPromoJenis = null,
   diskon,
   total,
   metodeBayar,
@@ -260,6 +264,12 @@ export default function PanelDetailPesanan({
   items: ItemTampilan[];
   subtotal: number;
   ongkir: number;
+  /** Tarif J&T sebelum promo ongkir (0 = tidak ada promo yang dipakai di pesanan ini). */
+  ongkirAsli?: number;
+  /** Potongan ongkir (Rp) dari promo — sama untuk website & draft bot WA. */
+  ongkirDiskon?: number;
+  /** "jabo" | "luar" | null — null berarti pesanan ini tidak pakai promo ongkir. */
+  ongkirPromoJenis?: string | null;
   diskon: number;
   total: number;
   metodeBayar: string;
@@ -277,6 +287,9 @@ export default function PanelDetailPesanan({
 }) {
   const info = TAHAP[tahap] || TAHAP.belum_dipacking;
   const level = levelLangkah(tahap);
+  // Promo ongkir dipakai kalau pesanan punya jenis promo TERCATAT dan tarif aslinya lebih
+  // besar dari ongkir yang ditagih (jaga-jaga data lama/rusak: beda nol tidak menampilkan apa-apa).
+  const adaPromoOngkir = Boolean(ongkirPromoJenis) && ongkirAsli > ongkir;
   // GoSend: tanpa resi dan tanpa scan kurir — lencana hijau, teks status default berbeda.
   const kurirGosend = /gosend/i.test(kurir);
 
@@ -467,8 +480,20 @@ export default function PanelDetailPesanan({
               <span>{rupiah(subtotal)}</span>
             </div>
             <div className="dp-ringkas-baris">
-              <span>Ongkir</span>
-              <span>{rupiah(ongkir)}</span>
+              <span className="dp-ongkir-label">
+                Ongkir
+                {adaPromoOngkir ? (
+                  <OngkirPromoBadge
+                    label={ongkir <= 0 ? "Gratis Ongkir" : `Potongan ${rupiah(ongkirDiskon)}`}
+                    className="dp-ongkir-badge"
+                  />
+                ) : null}
+              </span>
+              {adaPromoOngkir ? (
+                <OngkirHargaPromo cost={ongkirAsli} payCost={ongkir} />
+              ) : (
+                <span>{rupiah(ongkir)}</span>
+              )}
             </div>
             {diskon > 0 ? (
               <div className="dp-ringkas-baris">
@@ -837,6 +862,8 @@ const DP_CSS = `
 .dp-ringkas{display:flex;flex-direction:column;gap:4px;background:#f7f9fb;border-radius:10px;padding:7px 10px}
 .dp-ringkas-baris{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;font-weight:600;color:#3d4a5c}
 .dp-ringkas-baris .hijau{color:#1b7347;font-weight:700}
+.dp-ongkir-label{display:inline-flex;align-items:center;gap:6px}
+.dp-ongkir-badge{flex-shrink:0}
 .dp-ringkas-garis{height:1px;background:#e4e9ef;margin:2px 0}
 .dp-ringkas-total{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .dp-ringkas-total span:first-child{font-size:12px;font-weight:900;color:#24324a}

@@ -567,7 +567,7 @@ export async function GET(req: NextRequest) {
   let query = admin
     .from("orders")
     .select(
-      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, stock_reserved, shipping_pending, created_by_admin, is_preorder, preorder_estimate, preorder_ready_at, preorder_dp_amount, preorder_settled_at, subtotal, discount, shipping_cost, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel, reseller_id, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label, affiliate_id, referral_code",
+      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, stock_reserved, shipping_pending, created_by_admin, is_preorder, preorder_estimate, preorder_ready_at, preorder_dp_amount, preorder_settled_at, subtotal, discount, shipping_cost, shipping_cost_original, shipping_discount, shipping_promo_kind, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel, reseller_id, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label, affiliate_id, referral_code",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -751,6 +751,11 @@ export async function GET(req: NextRequest) {
       subtotal: Number(order.subtotal) || 0,
       discount: Number(order.discount) || 0,
       shipping_cost: Number(order.shipping_cost) || 0,
+      // Promo ongkir (gratis ongkir / potongan) — sama untuk website & draft bot WA. Null/0 kalau
+      // tidak ada promo yang dipakai, jadi drawer tidak menampilkan lencana apa pun (perilaku lama).
+      shipping_cost_original: Number(order.shipping_cost_original) || 0,
+      shipping_discount: Number(order.shipping_discount) || 0,
+      shipping_promo_kind: order.shipping_promo_kind || null,
       // Layanan tersimpan ("J&T EZ"/"J&T ECO"/"J&T HBO") — dipakai drawer & form Ubah.
       shipping_method: order.shipping_method || "",
       total: Number(order.total) || 0,
