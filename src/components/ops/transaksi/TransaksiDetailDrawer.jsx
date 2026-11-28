@@ -34,6 +34,14 @@ import { describePayment } from "@/lib/order-shared";
 import { lenganModelLabel } from "@/lib/lengan-pendek";
 import { PREORDER_DP_PERCENT } from "@/lib/preorder";
 
+/** "2026-12-10" → "10 Des 2026". Deadline tersimpan sebagai tanggal (date) saja, tanpa jam. */
+function formatDeadlineID(value) {
+  const text = String(value || "").slice(0, 10);
+  const d = new Date(`${text}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return text;
+  return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 export default function TransaksiDetailDrawer({ open, order, variant = "ops", owner = "panel", onClose, onEdit, onCancel, onDelete, onResiCreated, onSettle = undefined }) {
   const isPanel = variant === "panel";
   // Tema tampilan baru: panel admin (default) memakai warna pastel, dashboard ops memakai
@@ -41,6 +49,38 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
   const tema = owner === "ops" ? "mono" : "warna";
   const [statusBusy, setStatusBusy] = useState(false);
   const [statusError, setStatusError] = useState("");
+  // Export PDF Produksi (satu PO satu PDF): fetch + unduh blob, sama seperti Export PDF bulanan.
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportPdfError, setExportPdfError] = useState("");
+  const handleExportProductionPdf = async () => {
+    if (!order?.order_number) return;
+    setExportingPdf(true);
+    setExportPdfError("");
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      const res = await fetch(`/api/ops/preorder/${encodeURIComponent(order.order_number)}/report`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(payload?.error || "Gagal membuat PDF produksi.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `PO-Produksi-${order.order_number}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportPdfError(err?.message || "Gagal membuat PDF produksi. Coba lagi.");
+    } finally {
+      setExportingPdf(false);
+    }
+  };
   const status = order ? STATUS_STYLES[order.status] : null;
   const source = order ? SOURCE_STYLES[order.source_key || order.source] : null;
   const resellerHref = order?.reseller_id
@@ -479,11 +519,31 @@ export default function TransaksiDetailDrawer({ open, order, variant = "ops", ow
                 ) : null}
                 {order.is_preorder ? (
                   <p className="dp-catatan" data-testid="preorder-info">
-                    Pre-order · estimasi barang siap: {order.preorder_estimate || "7-10 hari kerja"}.{" "}
-                    {order.preorder_waiting
+                    Pre-order · estimasi barang siap: {order.preorder_estimate || "7-10 hari kerja"}
+                    {order.preorder_deadline ? (
+                      <>
+                        {" "}
+                        · deadline <b>{formatDeadlineID(order.preorder_deadline)}</b>
+                      </>
+                    ) : null}
+                    . {order.preorder_waiting
                       ? "Dikirim bersamaan setelah semua barang tersedia. Pesanan tidak dapat dibatalkan ke customer."
                       : "Stok sudah ready; diproses seperti pesanan biasa."}
                   </p>
+                ) : null}
+                {order.is_preorder ? (
+                  <div>
+                    <button
+                      type="button"
+                      data-testid="preorder-export-pdf"
+                      onClick={handleExportProductionPdf}
+                      disabled={exportingPdf}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-all disabled:opacity-60"
+                    >
+                      {exportingPdf ? "Menyiapkan…" : "Export PDF Produksi"}
+                    </button>
+                    {exportPdfError ? <p className="dp-error">{exportPdfError}</p> : null}
+                  </div>
                 ) : null}
                 {order.items_edited_after_resi && awb ? (
                   <div className="dp-warning" role="status">

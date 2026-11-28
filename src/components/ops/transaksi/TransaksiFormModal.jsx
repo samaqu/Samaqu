@@ -619,6 +619,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         // Mode Ubah: hanya penanda (nominal DP milik pesanan, dibaca dari `initialData`, tidak dihitung ulang).
         preorder_dp: Number(initialData.preorder_dp_amount) > 0,
         preorder_estimate: initialData.preorder_estimate || "",
+        preorder_deadline: initialData.preorder_deadline || "",
         notes: initialData.notes || "",
         affiliate_code: "",
         // Alamat transaksi ini sudah tersimpan di pesanan, jadi isiannya langsung terisi.
@@ -652,6 +653,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         // Pre-Order baru: bawaan DP 50% (admin tinggal pilih "Lunas" kalau customer bayar penuh).
         preorder_dp: presetPreorder === true,
         preorder_estimate: "",
+        preorder_deadline: "",
         notes: "",
         affiliate_code: "",
         address_mode: "saved",
@@ -1901,6 +1903,12 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
     }
     const createdAt = wibToIso(form.date, form.time);
     if (!createdAt) return setSaveError("Tanggal/jam transaksi tidak valid.");
+    // Deadline PO wajib diisi (dipakai PDF ke bagian produksi).
+    if (isPo && !String(form.preorder_deadline || "").trim()) {
+      if (isEdit) setStep(0);
+      setScrollKick((count) => count + 1);
+      return setSaveError("Tanggal Deadline wajib diisi untuk pre-order.");
+    }
 
     setDupMatches(null);
     const payload = {
@@ -1931,6 +1939,7 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         ? {
             is_preorder: true,
             preorder_estimate: String(form.preorder_estimate || "").trim(),
+            preorder_deadline: String(form.preorder_deadline || "").trim(),
             // Hanya penanda "pilih DP": server menghitung sendiri 50% dari total, bukan dari angka di sini.
             ...(form.preorder_dp ? { preorder_dp: true } : {}),
           }
@@ -2913,18 +2922,36 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                       </span>
                     </label>
                     {isPo ? (
-                      <label className="block">
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Estimasi barang siap</span>
-                        <input
-                          type="text"
-                          data-testid="preorder-estimate"
-                          value={form.preorder_estimate || ""}
-                          onChange={(event) => updateForm({ preorder_estimate: event.target.value })}
-                          placeholder="7-10 hari kerja"
-                          maxLength={60}
-                          className={`${inputClass} mt-1`}
-                        />
-                      </label>
+                      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                        <label className="block">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Estimasi barang siap</span>
+                          <input
+                            type="text"
+                            data-testid="preorder-estimate"
+                            value={form.preorder_estimate || ""}
+                            onChange={(event) => updateForm({ preorder_estimate: event.target.value })}
+                            placeholder="7-10 hari kerja"
+                            maxLength={60}
+                            className={`${inputClass} mt-1`}
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            Tanggal Deadline <span className="text-red-500">*</span>
+                          </span>
+                          <input
+                            type="date"
+                            required
+                            data-testid="preorder-deadline"
+                            value={form.preorder_deadline || ""}
+                            onChange={(event) => updateForm({ preorder_deadline: event.target.value })}
+                            className={`${inputClass} mt-1`}
+                          />
+                          <span className="mt-1 block text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+                            Batas barang harus siap, untuk PDF ke bagian produksi.
+                          </span>
+                        </label>
+                      </div>
                     ) : null}
                   </div>
                 )}

@@ -13,6 +13,7 @@ import {
   isPreorderWaiting,
   normalizePreorderEstimate,
   parsePreorderCancelReason,
+  parsePreorderDeadline,
   preorderBalanceDue,
   preorderDpFor,
   preorderDpLabel,
@@ -567,7 +568,7 @@ export async function GET(req: NextRequest) {
   let query = admin
     .from("orders")
     .select(
-      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, stock_reserved, shipping_pending, created_by_admin, is_preorder, preorder_estimate, preorder_ready_at, preorder_dp_amount, preorder_settled_at, subtotal, discount, shipping_cost, shipping_cost_original, shipping_discount, shipping_promo_kind, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel, reseller_id, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label, affiliate_id, referral_code",
+      "id, order_number, created_at, customer_id, customer_name, customer_whatsapp, status, source, stock_reserved, shipping_pending, created_by_admin, is_preorder, preorder_estimate, preorder_deadline, preorder_ready_at, preorder_dp_amount, preorder_settled_at, subtotal, discount, shipping_cost, shipping_cost_original, shipping_discount, shipping_promo_kind, shipping_method, total, shipping_notes, weight, awb_no, jnt_order_id, shipping_status, tracking_status_code, shipping_address, shipping_city, shipping_province, shipping_kecamatan, shipping_postal_code, payment_method, payment_status, paid_at, payment_provider, payment_channel, reseller_id, reseller_balance_deduction, reseller_shortfall_amount, reseller_shortfall_status, show_reseller_name_on_label, affiliate_id, referral_code",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -805,6 +806,7 @@ export async function GET(req: NextRequest) {
       // Pre-order: penanda dipakai tabel, kartu, dan drawer. Pesanan reguler selalu false/null.
       is_preorder: order.is_preorder === true,
       preorder_estimate: order.preorder_estimate || null,
+      preorder_deadline: order.preorder_deadline || null,
       preorder_ready_at: order.preorder_ready_at || null,
       preorder_waiting: isPreorderWaiting(order),
       // DP pre-order: nominal DP, waktu pelunasan, dan sisa tagihan (0 kalau lunas/bukan PO ber-DP).
@@ -890,6 +892,9 @@ export async function POST(req: NextRequest) {
     if (wantsPreorder && String(body?.payment_status || "paid").trim().toLowerCase() === "unpaid") {
       return bad(PREORDER_MUST_BE_PAID_MESSAGE);
     }
+    // Deadline wajib diisi untuk PO baru — dipakai PDF "Export PDF Produksi" per pesanan.
+    const deadlineResult = wantsPreorder ? parsePreorderDeadline(body?.preorder_deadline) : null;
+    if (deadlineResult && !deadlineResult.ok) return bad(deadlineResult.error);
     // DP pre-order: nominalnya DIHITUNG SERVER (50% dari total), bukan angka dari browser. `preorder_dp`
     // hanya penanda "pilih DP". Hanya berlaku untuk pre-order; pesanan reguler mengabaikannya.
     const dpAmount = wantsPreorder && body?.preorder_dp === true ? preorderDpFor(total) : 0;
@@ -984,6 +989,7 @@ export async function POST(req: NextRequest) {
         ? {
             is_preorder: true,
             preorder_estimate: normalizePreorderEstimate(body?.preorder_estimate),
+            preorder_deadline: deadlineResult && deadlineResult.ok ? deadlineResult.value : null,
             ...(dpAmount > 0 ? { preorder_dp_amount: dpAmount } : {}),
           }
         : {}),
@@ -1549,6 +1555,11 @@ export async function PATCH(req: NextRequest) {
     // `p_addon_product_id` (varian dikosongkan, stok tidak disentuh).
     const stockedAddonPresent = items.some((item) => isStockedAddonLine(item));
 
+    // Deadline PO wajib ada di setiap simpanan, termasuk saat mengedit item PO lama yang belum
+    // punya deadline (migrasi aditif: PO lama kolomnya NULL sampai admin isi lewat form edit ini).
+    const editDeadlineResult = isPoEdit ? parsePreorderDeadline(body?.preorder_deadline) : null;
+    if (editDeadlineResult && !editDeadlineResult.ok) return bad(editDeadlineResult.error);
+
     const manualHeader = isManual
       ? {
           customer_name: customerName,
@@ -1571,6 +1582,8 @@ export async function PATCH(req: NextRequest) {
           ...(isPoEdit && body?.preorder_estimate !== undefined
             ? { preorder_estimate: normalizePreorderEstimate(body.preorder_estimate) }
             : {}),
+          // Deadline PO: sudah divalidasi wajib ada di atas (`editDeadlineResult`) sebelum sampai sini.
+          ...(isPoEdit && editDeadlineResult?.ok ? { preorder_deadline: editDeadlineResult.value } : {}),
         }
       : null;
 

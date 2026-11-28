@@ -100,6 +100,31 @@ export function normalizePreorderEstimate(value: unknown): string {
   return text || PREORDER_DEFAULT_ESTIMATE;
 }
 
+/* ── Deadline (tanggal barang harus siap untuk produksi) ────────────────────
+ * Wajib diisi saat PO dicatat (beda dari `preorder_estimate` yang teks bebas dan boleh kosong).
+ * Dipakai PDF "Export PDF Produksi" per pesanan dan form Transaksi/Pre-Order. */
+
+export const PREORDER_DEADLINE_REQUIRED_MESSAGE = "Tanggal deadline wajib diisi untuk pre-order.";
+export const PREORDER_DEADLINE_INVALID_MESSAGE = "Tanggal deadline tidak valid.";
+
+/** Format "YYYY-MM-DD" valid (tanggal kalender nyata, bukan sekadar cocok pola). */
+export function isValidPreorderDeadline(value: unknown): value is string {
+  const text = String(value ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
+  const d = new Date(`${text}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === text;
+}
+
+export type PreorderDeadlineResult = { ok: true; value: string } | { ok: false; error: string };
+
+/** Validasi deadline PO: wajib diisi dan harus tanggal kalender yang sah. */
+export function parsePreorderDeadline(value: unknown): PreorderDeadlineResult {
+  const text = String(value ?? "").trim();
+  if (!text) return { ok: false, error: PREORDER_DEADLINE_REQUIRED_MESSAGE };
+  if (!isValidPreorderDeadline(text)) return { ok: false, error: PREORDER_DEADLINE_INVALID_MESSAGE };
+  return { ok: true, value: text };
+}
+
 /* ── Pembatalan: alasan wajib ──────────────────────────────────────────────── */
 
 export const PREORDER_CANCEL_REASONS = [
