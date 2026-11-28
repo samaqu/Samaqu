@@ -1418,7 +1418,10 @@ export async function PATCH(req: NextRequest) {
     let customerWhatsapp = String(order.customer_whatsapp || "").trim();
     let customerId = order.customer_id || null;
     let source = String(order.source || "").trim().toLowerCase();
-    let notes = "";
+    // Catatan admin: dibaca untuk SEMUA jenis transaksi (manual, Open Order/CYO, website, dst),
+    // bukan cuma manual — form Ubah menampilkan kotak Catatan tanpa pembeda sumber, jadi server
+    // tidak boleh diam-diam membuangnya untuk pesanan non-manual.
+    let notes = String(body?.notes || "").trim();
     let shippingCost = Number(order.shipping_cost) || 0;
     let discount = Number(order.discount) || 0;
     let createdAt: Date | null = null;
@@ -1429,7 +1432,6 @@ export async function PATCH(req: NextRequest) {
       customerWhatsapp = String(body?.customer_whatsapp || "").trim();
       customerId = String(body?.customer_id || "").trim() || order.customer_id || null;
       source = String(body?.source || "").trim().toLowerCase();
-      notes = String(body?.notes || "").trim();
       // GoSend: ongkir tidak dicatat → 0, berapa pun yang dikirim form.
       shippingCost = isGosend(normalizeOpsShippingMethod(body?.shipping_method))
         ? 0
@@ -1635,7 +1637,12 @@ export async function PATCH(req: NextRequest) {
           // Deadline PO: sudah divalidasi wajib ada di atas (`editDeadlineResult`) sebelum sampai sini.
           ...(isPoEdit && editDeadlineResult?.ok ? { preorder_deadline: editDeadlineResult.value } : {}),
         }
-      : null;
+      : // Non-manual (Open Order/CYO, website, reseller, promo): identitas/alamat/total tetap
+        // terkunci (checkout yang menentukan), tapi Catatan tetap boleh diisi admin — RPC
+        // `samaqu_edit_order_items` sekarang ikut membaca `shipping_notes` di luar grup manual.
+        body?.notes !== undefined
+        ? { shipping_notes: notes }
+        : null;
 
     const { data: rpcResult, error: rpcError } = isPoEdit
       ? await admin.rpc("samaqu_edit_preorder_items", {
