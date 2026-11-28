@@ -304,10 +304,10 @@ export default function PromoOngkirSection({ month }: { month: string }) {
                         <th className="px-3 py-2.5">Pesanan</th>
                         <th className="px-3 py-2.5">Pelanggan</th>
                         <th className="px-3 py-2.5">Tujuan</th>
-                        <th className="px-3 py-2.5 text-right">Ongkir J&amp;T</th>
-                        <th className="px-3 py-2.5 text-right">Dipotong</th>
-                        <th className="px-3 py-2.5 text-right">Dibayar customer</th>
-                        <th className="px-3 py-2.5">Asal</th>
+                        <th className="whitespace-nowrap px-3 py-2.5 text-right">Ongkir J&amp;T</th>
+                        <th className="whitespace-nowrap px-3 py-2.5 text-right">Potongan</th>
+                        <th className="whitespace-nowrap px-3 py-2.5 text-right">Dibayar customer</th>
+                        <th className="whitespace-nowrap px-3 py-2.5">Asal</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -322,11 +322,11 @@ export default function PromoOngkirSection({ month }: { month: string }) {
                               {row.tujuan}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-right font-semibold tabular-nums text-zinc-600">{rp(row.ongkirJnt)}</td>
-                          <td className="px-3 py-2 text-right font-black tabular-nums text-zinc-900">{rp(row.potongan)}</td>
-                          <td className="px-3 py-2 text-right font-semibold tabular-nums text-zinc-700">{rp(row.dibayar)}</td>
-                          <td className="px-3 py-2">
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${ORIGIN_META[row.asal].badge}`}>
+                          <td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums text-zinc-600">{rp(row.ongkirJnt)}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right font-black tabular-nums text-zinc-900">{rp(row.potongan)}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums text-zinc-700">{rp(row.dibayar)}</td>
+                          <td className="whitespace-nowrap px-3 py-2">
+                            <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-black ${ORIGIN_META[row.asal].badge}`}>
                               {ORIGIN_META[row.asal].label}
                             </span>
                           </td>
