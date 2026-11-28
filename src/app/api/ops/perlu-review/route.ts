@@ -251,10 +251,24 @@ function addressProblem(shipping: any): string | null {
  * Dipakai saat draft dibuat (AI) dan saat draft diedit admin, supaya harga
  * kiriman AI tidak pernah dipakai dan draft selalu bisa di-approve.
  */
+/**
+ * Kabak hanya punya SATU product_id ("kabak"); nomor 01/02/04/12 adalah warna ("Kabak 04").
+ * Bot kadang mengirim "kabak-04" sebagai product_id -> dipetakan ke kabak + warna "Kabak 04",
+ * supaya draft tidak ditolak "Produk kabak-04 tidak valid".
+ */
+function fixKabakAlias(item: any) {
+  const productId = String(item?.product_id || "").trim().toLowerCase();
+  const match = productId.match(/^kabak[-_ ]?(\d{1,2})$/);
+  if (!match) return item;
+  const nomor = match[1].padStart(2, "0");
+  return { ...item, product_id: "kabak", color: `Kabak ${nomor}`, size: item?.size || "ALL SIZE" };
+}
+
 async function normalizeItems(
   admin: ReturnType<typeof getSupabaseAdmin>,
-  items: any[],
+  rawItems: any[],
 ): Promise<{ rows?: any[]; error?: string }> {
+  const items = rawItems.map(fixKabakAlias);
   const productIds = [...new Set(items.map((item: any) => String(item?.product_id || "").trim()).filter(Boolean))];
   if (!productIds.length) return { error: "Draft harus punya minimal 1 produk." };
 
