@@ -294,3 +294,48 @@ export function preorderDemand(orders: PreorderPlanOrder[], isService?: (line: P
   }
   return [...rows.values()].sort((a, b) => b.needed - a.needed || a.key.localeCompare(b.key));
 }
+
+/* ── Pesanan campuran (ready-stock + PO dalam satu pesanan) ──────────────────────────────────
+ * Penanda PO sekarang per BARIS (`order_items.is_preorder_item`), bukan per pesanan. Baris
+ * `is_preorder_item = false` (ready) stoknya dipotong langsung saat dicatat seperti pesanan
+ * biasa; baris `true` (PO) menunggu stok seperti sebelumnya. `orders.is_preorder` tetap jadi
+ * saklar utama (menentukan apakah pesanan ini ikut antrean Pre-Order), tapi KEBUTUHAN stok dan
+ * PDF produksi hanya menghitung baris yang `is_preorder_item = true`.
+ *
+ * Tahap awal: pesanan yang punya CAMPURAN (ada baris ready DAN baris PO) tidak bisa diubah daftar
+ * barangnya — baris ready dikunci persis seperti apa adanya, supaya stok yang sudah kepotong untuk
+ * baris itu tidak ikut berubah tanpa penyesuaian stok (fungsi edit PO tidak menyentuh stok sama
+ * sekali). Baris PO dan field pesanan (alamat/catatan/deadline) tetap boleh diubah. */
+
+export const PREORDER_MIXED_READY_LOCKED_MESSAGE =
+  "Pesanan ini punya barang ready-stock. Barang ready tidak bisa diubah dari sini (batalkan pesanan untuk koreksi, atau catat pesanan baru). Barang PO dan data lain tetap boleh diubah.";
+
+export const PREORDER_NEEDS_PO_ITEM_MESSAGE =
+  "Minimal satu barang harus ditandai \"Stok kosong (PO)\" kalau mode Pre-Order dinyalakan. Kalau semua barang sudah ready, matikan toggle Pre-Order.";
+
+export interface ReadyLineKey {
+  product_id: unknown;
+  color?: unknown;
+  size?: unknown;
+  quantity: unknown;
+}
+
+function readyLineSignature(line: ReadyLineKey): string {
+  const product = String(line.product_id ?? "").trim();
+  const color = String(line.color ?? "default").trim() || "default";
+  const size = String(line.size ?? "").trim().toUpperCase();
+  const qty = Math.round(Number(line.quantity) || 0);
+  return `${product}||${color}||${size}||${qty}`;
+}
+
+/**
+ * Baris ready (bukan PO) di pesanan campuran harus persis sama sebelum/sesudah edit — produk,
+ * warna, ukuran, dan qty (bukan multiset berurutan, jadi urutan baris boleh beda). Harga TIDAK
+ * ikut dibandingkan (harga tidak mempengaruhi stok, boleh dikoreksi).
+ */
+export function preorderReadyLinesUnchanged(oldLines: ReadyLineKey[], newLines: ReadyLineKey[]): boolean {
+  const a = oldLines.map(readyLineSignature).sort();
+  const b = newLines.map(readyLineSignature).sort();
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+}

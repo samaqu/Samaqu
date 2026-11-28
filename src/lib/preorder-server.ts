@@ -27,12 +27,19 @@ export interface WaitingPreorder extends PreorderPlanOrder {
 /** Baris layanan (mis. jasa potong panjang) tidak punya stok. */
 export const isServiceLine = (line: { product_id?: unknown; product_name?: unknown }) => isPotongPanjangLine(line);
 
-/** Semua PO yang sudah Lunas dan menunggu stok, urut siapa transfer duluan. */
+/**
+ * Semua PO yang sudah Lunas dan menunggu stok, urut siapa transfer duluan.
+ *
+ * Pesanan CAMPURAN (ready + PO dalam satu pesanan): `lines`/`items` di sini HANYA baris
+ * `is_preorder_item = true` (yang beneran menunggu stok). Baris ready sudah kepotong stoknya
+ * saat pesanan dicatat, jadi tidak ikut dihitung sebagai kebutuhan ataupun dipotong lagi saat
+ * "Stok sudah ready" (lihat `markPreorderReady` — ia memotong persis isi `lines` ini).
+ */
 export async function loadWaitingPreorders(admin: Admin): Promise<WaitingPreorder[]> {
   const { data, error } = await admin
     .from("orders")
     .select(
-      "id, order_number, created_at, customer_name, customer_whatsapp, preorder_estimate, order_items(product_id, product_name, color, size, quantity)",
+      "id, order_number, created_at, customer_name, customer_whatsapp, preorder_estimate, order_items(product_id, product_name, color, size, quantity, is_preorder_item)",
     )
     .eq("is_preorder", true)
     .is("preorder_ready_at", null)
@@ -41,13 +48,15 @@ export async function loadWaitingPreorders(admin: Admin): Promise<WaitingPreorde
   if (error) throw new Error(error.message);
 
   return (data || []).map((row: any) => {
-    const lines = ((row.order_items || []) as any[]).map((item) => ({
-      product_id: String(item.product_id || ""),
-      product_name: String(item.product_name || ""),
-      color: item.color ?? null,
-      size: item.size ?? null,
-      quantity: Number(item.quantity) || 0,
-    }));
+    const lines = ((row.order_items || []) as any[])
+      .filter((item) => item.is_preorder_item === true)
+      .map((item) => ({
+        product_id: String(item.product_id || ""),
+        product_name: String(item.product_name || ""),
+        color: item.color ?? null,
+        size: item.size ?? null,
+        quantity: Number(item.quantity) || 0,
+      }));
     return {
       id: String(row.id),
       order_number: String(row.order_number),

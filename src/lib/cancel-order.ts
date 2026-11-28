@@ -50,6 +50,14 @@ export interface CancelableOrder {
    */
   is_preorder?: boolean | null;
   /**
+   * Kolom `orders.preorder_ready_at`. Kalau tidak diisi pemanggil, dibaca dari database bersamaan
+   * dengan `is_preorder` (lihat di bawah). Dipakai memutuskan baris mana yang stoknya SUDAH
+   * dipotong pada pesanan CAMPURAN (ready + PO): selama NULL (PO masih menunggu), hanya baris
+   * ready (`order_items.is_preorder_item = false`) yang stoknya dikembalikan; begitu terisi
+   * (PO sudah ready), semua baris sudah kepotong jadi semuanya ikut dikembalikan seperti biasa.
+   */
+  preorder_ready_at?: string | null;
+  /**
    * Teks `orders.shipping_method`. Kalau tidak diisi pemanggil, dibaca dari database hanya bila perlu
    * (ada resi tanpa `jnt_order_id`): resi KURIR LAIN diinput manual dan J&T tidak mengenalnya, jadi
    * tidak boleh di-void ke J&T (pembatalan pasti ditolak).
@@ -93,12 +101,20 @@ export async function cancelOrderCompletely(
   // Pre-order: penjaga pusat. Pemanggil yang tidak menyebut penandanya dicek ke database; kalau
   // gagal dibaca dianggap bukan PO (perilaku pesanan reguler tidak berubah).
   let isPreorderOrder = order.is_preorder === true;
-  if (order.is_preorder === undefined) {
+  let preorderReadyAt = order.preorder_ready_at ?? null;
+  if (order.is_preorder === undefined || order.preorder_ready_at === undefined) {
     try {
-      const { data: flag } = await supabase.from("orders").select("is_preorder").eq("id", order.id).maybeSingle();
-      isPreorderOrder = (flag as { is_preorder?: boolean | null } | null)?.is_preorder === true;
+      const { data: flag } = await supabase
+        .from("orders")
+        .select("is_preorder, preorder_ready_at")
+        .eq("id", order.id)
+        .maybeSingle();
+      const row = flag as { is_preorder?: boolean | null; preorder_ready_at?: string | null } | null;
+      if (order.is_preorder === undefined) isPreorderOrder = row?.is_preorder === true;
+      if (order.preorder_ready_at === undefined) preorderReadyAt = row?.preorder_ready_at ?? null;
     } catch {
-      isPreorderOrder = false;
+      if (order.is_preorder === undefined) isPreorderOrder = false;
+      if (order.preorder_ready_at === undefined) preorderReadyAt = null;
     }
   }
   if (isPreorderOrder && !isPreorderCancelRemark(remark)) {
@@ -133,9 +149,13 @@ export async function cancelOrderCompletely(
   if (hasStockReservation(order)) {
     const { data: items } = await supabase
       .from("order_items")
-      .select("product_id, product_name, color, size, quantity")
+      .select("product_id, product_name, color, size, quantity, is_preorder_item")
       .eq("order_id", order.id);
 
+    // PO masih menunggu (preorder_ready_at null): baris PO (`is_preorder_item = true`) BELUM
+    // pernah dipotong stoknya (lihat alur create di transaksi/route.ts), jadi tidak boleh ikut
+    // "dikembalikan" — hanya baris ready yang stoknya benar-benar sudah dipotong. Begitu PO sudah
+    // ready, semua baris sudah kepotong sehingga semuanya ikut dikembalikan seperti biasa.
     const restored = (items ?? []).filter(
       (item) =>
         item.product_id &&
@@ -143,7 +163,8 @@ export async function cancelOrderCompletely(
         item.size &&
         Number(item.quantity) > 0 &&
         // Baris layanan tidak punya stok, jadi tidak ikut dikembalikan.
-        !isPotongPanjangLine(item)
+        !isPotongPanjangLine(item) &&
+        (item.is_preorder_item !== true || preorderReadyAt != null)
     );
 
     for (const item of restored) {

@@ -57,6 +57,12 @@ export interface ProductionPdfItem {
   color?: string | null;
   size?: string | null;
   quantity?: number | null;
+  /**
+   * Pesanan campuran (ready + PO dalam satu pesanan): hanya baris `true` yang masuk PDF
+   * produksi. Hilang/`undefined` (data lama sebelum kolom ini ada) diperlakukan sebagai PO,
+   * supaya PO lama tetap tercetak seluruhnya seperti sebelumnya.
+   */
+  is_preorder_item?: boolean | null;
 }
 
 export interface ProductionPdfOrder {
@@ -93,6 +99,8 @@ export interface ProductionRow {
 
 export function buildProductionRows(items: ProductionPdfItem[]): ProductionRow[] {
   return (items || [])
+    // Pesanan campuran: barang ready-stock tidak dicetak di PDF produksi, cuma barang PO.
+    .filter((item) => item.is_preorder_item !== false)
     .map((item) => ({
       kain: clean(item.kain) || "-",
       produk: clean(item.product_name) || "Produk",

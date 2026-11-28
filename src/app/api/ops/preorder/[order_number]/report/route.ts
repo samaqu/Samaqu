@@ -42,7 +42,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ order_n
 
     const { data: items, error: itemsError } = await admin
       .from("order_items")
-      .select("product_name, series, kain, color, size, quantity")
+      .select("product_name, series, kain, color, size, quantity, is_preorder_item")
       .eq("order_id", order.id);
     if (itemsError) throw new Error(itemsError.message);
 

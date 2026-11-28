@@ -17,6 +17,9 @@ import {
   preorderBalanceDue,
   preorderDpFor,
   preorderDpLabel,
+  preorderReadyLinesUnchanged,
+  PREORDER_MIXED_READY_LOCKED_MESSAGE,
+  PREORDER_NEEDS_PO_ITEM_MESSAGE,
 } from "@/lib/preorder";
 import { isLayananCategory } from "@/lib/layanan";
 import { kotaFromShipping } from "@/lib/kota";
@@ -112,6 +115,8 @@ type ItemInput = {
   price?: unknown;
   /** id baris lama saat mode Ubah — dipakai menyalin harga/CYP dari baris yang diganti. */
   source_item_id?: unknown;
+  /** true = baris ini stok kosong (PO), menunggu "Stok sudah ready". Hanya berlaku saat pesanan Pre-Order. */
+  is_preorder_item?: unknown;
 };
 
 type Shipping = {
@@ -194,6 +199,8 @@ type Snapshot = {
   product_image?: string | null;
   /** Kategori master produk; baris kategori "Jasa" tidak menyentuh stok. */
   category?: string | null;
+  /** true = baris PO (stok kosong, menunggu ready); false = ready-stock, dipotong langsung. */
+  is_preorder_item: boolean;
 };
 
 type Admin = ReturnType<typeof getSupabaseAdmin>;
@@ -210,7 +217,11 @@ type Admin = ReturnType<typeof getSupabaseAdmin>;
  * diterima hanya bilangan bulat dalam batas `MANUAL_PRICE_MIN`–`MANUAL_PRICE_MAX`; selain itu
  * permintaannya ditolak. Tanpa `price`, harga katalog database yang dipakai seperti biasa.
  */
-async function buildSnapshot(admin: Admin, input: ItemInput[]): Promise<{ items?: Snapshot[]; error?: string }> {
+async function buildSnapshot(
+  admin: Admin,
+  input: ItemInput[],
+  wantsPreorder: boolean,
+): Promise<{ items?: Snapshot[]; error?: string }> {
   const cleaned = input
     .map((row) => ({
       product_id: String(row?.product_id || "").trim(),
@@ -219,6 +230,9 @@ async function buildSnapshot(admin: Admin, input: ItemInput[]): Promise<{ items?
       quantity: Math.round(Number(row?.quantity) || 0),
       /** Harga manual ketikan admin; `undefined`/kosong = pakai harga katalog. */
       price: row?.price,
+      // Bawaan: SEMUA baris PO saat mode Pre-Order dinyalakan (admin uncheck baris yang ready).
+      // Pesanan reguler: selalu false, apa pun yang dikirim layar.
+      is_preorder_item: wantsPreorder && row?.is_preorder_item !== false,
     }))
     .filter((row) => row.product_id);
 
@@ -286,6 +300,7 @@ async function buildSnapshot(admin: Admin, input: ItemInput[]): Promise<{ items?
       price,
       manual_price: manual,
       category: product.category ?? null,
+      is_preorder_item: row.is_preorder_item,
     });
   }
   return { items };
@@ -304,6 +319,7 @@ type OldItem = {
   customer_price: number | null;
   minimum_price: number | null;
   product_image: string | null;
+  is_preorder_item: boolean;
 };
 
 /**
@@ -343,6 +359,7 @@ async function buildEditSnapshot(
       quantity: Math.round(Number(row?.quantity) || 0),
       price: row?.price,
       source_item_id: String(row?.source_item_id || "").trim(),
+      is_preorder_item: Boolean(row?.is_preorder_item),
     }))
     .filter((row) => row.product_id);
 
@@ -422,6 +439,8 @@ async function buildEditSnapshot(
         customer_price: null,
         minimum_price: null,
         product_image: old?.product_image ?? null,
+        // Add-on Open Order/Promo bukan konsep PO (PO hanya transaksi manual).
+        is_preorder_item: false,
       });
       continue;
     }
@@ -485,6 +504,7 @@ async function buildEditSnapshot(
       customer_price: old?.customer_price ?? null,
       minimum_price: minimum,
       product_image: old?.product_image ?? null,
+      is_preorder_item: row.is_preorder_item,
     });
   }
 
@@ -649,7 +669,7 @@ export async function GET(req: NextRequest) {
   const { data: lineItems } = await admin
     .from("order_items")
     .select(
-      "id, order_id, product_id, product_name, series, kain, color, size, quantity, price, product_image, customer_price, minimum_price, reseller_buy_price, reseller_sell_price",
+      "id, order_id, product_id, product_name, series, kain, color, size, quantity, price, product_image, customer_price, minimum_price, reseller_buy_price, reseller_sell_price, is_preorder_item",
     )
     .in("order_id", list.map((o) => o.id));
 
@@ -878,17 +898,26 @@ export async function POST(req: NextRequest) {
     }
     const actorEmail = (await opsIdentity(req))?.email || "admin";
 
-    const snapshot = await buildSnapshot(admin, inputItems);
+    // Dibutuhkan SEBELUM membangun snapshot: menentukan baris mana yang bawaannya PO (lihat
+    // `buildSnapshot`). Pesanan reguler (wantsPreorder false): seluruh baris selalu ready.
+    const wantsPreorder = body?.is_preorder === true;
+
+    const snapshot = await buildSnapshot(admin, inputItems, wantsPreorder);
     if (snapshot.error || !snapshot.items) return bad(snapshot.error || "Produk tidak valid");
 
     const items = snapshot.items;
+    // Pesanan campuran didukung: baris ready (`is_preorder_item` false) dipotong stoknya langsung;
+    // baris PO (true) menunggu "Stok sudah ready". Mode Pre-Order tanpa satu pun baris PO tidak
+    // bermakna (sama saja pesanan reguler) — admin diminta mematikan togglenya saja.
+    if (wantsPreorder && !items.some((item) => item.is_preorder_item)) {
+      return bad(PREORDER_NEEDS_PO_ITEM_MESSAGE);
+    }
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const finalDiscount = Math.min(discount, subtotal);
     const total = subtotal - finalDiscount + shippingCost;
 
-    // Pre-order: customer transfer dulu, ukuran boleh kosong. Stok TIDAK dipotong saat dicatat
-    // (dipotong saat admin menekan "stok sudah ready"), dan wajib Lunas. Pesanan reguler: tidak berubah.
-    const wantsPreorder = body?.is_preorder === true;
+    // Pre-order: customer transfer dulu, ukuran boleh kosong untuk baris PO-nya, dan wajib Lunas.
+    // Pesanan reguler: tidak berubah. (`wantsPreorder` sudah dihitung di atas, sebelum snapshot.)
     if (wantsPreorder && String(body?.payment_status || "paid").trim().toLowerCase() === "unpaid") {
       return bad(PREORDER_MUST_BE_PAID_MESSAGE);
     }
@@ -932,11 +961,14 @@ export async function POST(req: NextRequest) {
     // `orderId` dibuat DI SINI (sebelum potong) supaya bisa dipakai sebagai ref komponen.
     // Saat insert nanti hanya `order_number` yang boleh berubah karena bentrok; id tetap.
     const orderId = crypto.randomUUID();
-    // Barang yang benar-benar terpotong stoknya di request ini — dasar rollback. PO: kosong
-    // (tidak ada yang dipotong, jadi tidak ada yang boleh "dikembalikan").
-    const stockHeld: Snapshot[] = wantsPreorder ? [] : items;
-    if (!wantsPreorder) {
-      const deducted = await deductStock(admin, items, orderId);
+    // Hanya baris READY (`is_preorder_item` false) yang dipotong stoknya sekarang — baris PO
+    // menunggu "Stok sudah ready" seperti sebelumnya. Pesanan reguler: semua baris ready, jadi
+    // perilakunya identik dengan sebelum ada pesanan campuran.
+    const readyItems = items.filter((item) => !item.is_preorder_item);
+    // Barang yang benar-benar terpotong stoknya di request ini — dasar rollback.
+    const stockHeld: Snapshot[] = readyItems;
+    if (readyItems.length > 0) {
+      const deducted = await deductStock(admin, readyItems, orderId);
       if (!deducted.ok) {
         await restoreStock(admin, deducted.done, orderId);
         return bad(deducted.message);
@@ -983,8 +1015,10 @@ export async function POST(req: NextRequest) {
       discount: finalDiscount,
       total,
       status: paid ? "diproses" : "pending",
-      // Stok sudah dipotong di atas → pembatalan wajib mengembalikannya. PO: belum dipotong.
-      stock_reserved: !wantsPreorder,
+      // true kalau ADA baris yang stoknya dipotong di atas (baris ready) → pembatalan wajib
+      // mengembalikan baris itu. PO murni (semua baris PO, readyItems kosong): tetap false,
+      // sama seperti sebelum ada pesanan campuran.
+      stock_reserved: readyItems.length > 0,
       ...(wantsPreorder
         ? {
             is_preorder: true,
@@ -1032,6 +1066,7 @@ export async function POST(req: NextRequest) {
         size: item.size,
         quantity: item.quantity,
         price: item.price,
+        is_preorder_item: item.is_preorder_item,
       })),
     );
 
@@ -1244,7 +1279,7 @@ export async function PATCH(req: NextRequest) {
 
     const { data: oldRows, error: oldError } = await admin
       .from("order_items")
-      .select("id, product_id, product_name, series, kain, color, size, quantity, price, customer_price, minimum_price, product_image")
+      .select("id, product_id, product_name, series, kain, color, size, quantity, price, customer_price, minimum_price, product_image, is_preorder_item")
       .eq("order_id", order.id);
     if (oldError) return NextResponse.json({ error: oldError.message }, { status: 500 });
     const oldItems: OldItem[] = (oldRows || []).map((row: any) => ({
@@ -1260,6 +1295,7 @@ export async function PATCH(req: NextRequest) {
       customer_price: row.customer_price == null ? null : Number(row.customer_price) || 0,
       minimum_price: row.minimum_price == null ? null : Number(row.minimum_price) || 0,
       product_image: row.product_image ?? null,
+      is_preorder_item: row.is_preorder_item === true,
     }));
     if (oldItems.length === 0) return bad("Pesanan ini tidak punya item untuk diubah");
 
@@ -1440,6 +1476,18 @@ export async function PATCH(req: NextRequest) {
     if (snapshot.error || !snapshot.items) return bad(snapshot.error || "Produk tidak valid");
     const items = snapshot.items;
 
+    // Pesanan campuran (ada baris ready DAN baris PO): baris ready SUDAH kepotong stoknya saat
+    // dicatat, tapi `samaqu_edit_preorder_items` tidak menyentuh stok sama sekali — jadi baris
+    // ready harus persis sama sebelum/sesudah (produk/warna/ukuran/qty), supaya stok yang sudah
+    // terpotong tidak diam-diam berubah. Baris PO dan field pesanan lain tetap bebas diubah.
+    if (isPoEdit) {
+      const oldReady = oldItems.filter((it) => it.is_preorder_item === false);
+      const newReady = items.filter((it) => !it.is_preorder_item);
+      if (!preorderReadyLinesUnchanged(oldReady, newReady)) {
+        return bad(PREORDER_MIXED_READY_LOCKED_MESSAGE);
+      }
+    }
+
     const allSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     // Baris bonus/add-on dipisah dari subtotal untuk Open Order & promo (harganya Rp 0).
     const withAddon = group === "open_order" || group === "promo_fch";
@@ -1548,6 +1596,8 @@ export async function PATCH(req: NextRequest) {
       customer_price: item.customer_price ?? null,
       minimum_price: item.minimum_price ?? null,
       product_image: item.product_image ?? null,
+      // Dibaca hanya oleh `samaqu_edit_preorder_items` (RPC reguler mengabaikan field tak dikenal).
+      is_preorder_item: item.is_preorder_item,
     }));
 
     // Add-on format baru memegang stok varian katalog → dikirim terpisah supaya RPC menyimpan

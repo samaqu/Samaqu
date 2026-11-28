@@ -113,6 +113,9 @@ const emptyRow = () => ({
   priceManual: false,
   quantity: 1,
   editing: true,
+  // Bawaan PO saat mode Pre-Order dinyalakan (lihat kotak "Barang mana yang stok kosong");
+  // diabaikan server kalau pesanan bukan Pre-Order.
+  is_preorder_item: true,
 });
 
 /** Batasi qty: minimal 1, tidak lebih dari stok efektif varian yang dipilih. */
@@ -756,13 +759,21 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
           quantity: Number(item.quantity) || 1,
           editing: false,
           source_item_id: item.id || "",
+          // Add-on bukan konsep PO.
+          is_preorder_item: false,
         };
       }
 
       const groups = dataset.filter((entry) => entry.product_id === item.product_id);
       const group = groups.find((entry) => entry.color === (item.color || "default")) || groups[0];
       if (!group) {
-        return { ...emptyRow(), variant: `${item.color || "default"}||${String(item.size).toUpperCase()}`, quantity: item.quantity, source_item_id: item.id || "" };
+        return {
+          ...emptyRow(),
+          variant: `${item.color || "default"}||${String(item.size).toUpperCase()}`,
+          quantity: item.quantity,
+          source_item_id: item.id || "",
+          is_preorder_item: item.is_preorder_item !== false,
+        };
       }
       // Pembanding harga "manual" = harga JALUR pesanan ini (Open Order vs katalog), bukan selalu katalog.
       const manual = recordedManualPrice(item.price, pathPrice(group));
@@ -779,6 +790,9 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
         priceManual: manual !== null,
         quantity: item.quantity,
         editing: false,
+        // Baris ready/PO pesanan campuran: hilang (data lama) diperlakukan sebagai PO, sama
+        // seperti backfill migrasi (PO lama semuanya dianggap PO penuh).
+        is_preorder_item: item.is_preorder_item !== false,
         // Baris lama yang diganti: server menyalin harga/CYP dari id ini.
         source_item_id: item.id || "",
       };
@@ -1142,6 +1156,8 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       size: paket ? paketSize(product) : variantSize,
       quantity: Number(row.quantity) || 0,
       source_item_id: row.source_item_id || "",
+      // Server mengabaikan ini kalau pesanan bukan Pre-Order (lihat `buildSnapshot`).
+      is_preorder_item: row.is_preorder_item !== false,
     };
   };
 
@@ -1908,6 +1924,12 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
       if (isEdit) setStep(0);
       setScrollKick((count) => count + 1);
       return setSaveError("Tanggal Deadline wajib diisi untuk pre-order.");
+    }
+    // Minimal satu barang ditandai PO — kalau semua di-uncheck, mode Pre-Order jadi tidak bermakna.
+    if (isPo && !items.some((row) => rowComplete(row) && row.is_preorder_item !== false)) {
+      if (isEdit) setStep(0);
+      setScrollKick((count) => count + 1);
+      return setSaveError('Minimal satu barang harus ditandai "PO" (stok kosong). Kalau semua barang sudah ready, matikan toggle Pre-Order.');
     }
 
     setDupMatches(null);
@@ -2951,6 +2973,51 @@ export default function TransaksiFormModal({ isOpen, onClose, initialData = null
                             Batas barang harus siap, untuk PDF ke bagian produksi.
                           </span>
                         </label>
+                      </div>
+                    ) : null}
+                    {isPo && items.some((row) => rowComplete(row)) ? (
+                      <div className="space-y-1.5 rounded-xl border border-purple-200 bg-white px-3.5 py-3 dark:border-purple-900 dark:bg-slate-900/40">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Barang mana yang stok kosong (PO)?
+                        </span>
+                        <span className="block text-[10.5px] font-semibold text-slate-400 dark:text-slate-500">
+                          {isEdit
+                            ? "Mode Ubah: status PO/ready barang yang sudah tercatat tidak bisa diganti dari sini (stoknya sudah kepotong/belum). Barang baru yang ditambah otomatis PO."
+                            : "Bawaannya semua PO. Uncheck barang yang stoknya sebenarnya sudah ada — stok barang itu langsung dipotong sekarang, tidak ikut menunggu."}
+                        </span>
+                        <div className="space-y-1 pt-1">
+                          {items.map((row, index) => {
+                            if (!rowComplete(row)) return null;
+                            const group = groupOf(row);
+                            const [variantColor, variantSize] = String(row.variant || "").split("||");
+                            const label = group?.name || row.product || `Produk ${index + 1}`;
+                            const detail = [variantColor && variantColor !== "default" ? variantColor : "", variantSize]
+                              .filter(Boolean)
+                              .join(" · ");
+                            return (
+                              <label
+                                key={index}
+                                className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-800"
+                              >
+                                <span className="min-w-0 truncate font-semibold text-slate-700 dark:text-slate-200">
+                                  {label}
+                                  {detail ? <span className="font-normal text-slate-400"> · {detail}</span> : null}
+                                  <span className="font-normal text-slate-400"> · {Number(row.quantity) || 0} pcs</span>
+                                </span>
+                                <span className="flex shrink-0 items-center gap-1.5">
+                                  <input
+                                    type="checkbox"
+                                    data-testid={`preorder-item-po-${index}`}
+                                    checked={row.is_preorder_item !== false}
+                                    disabled={isEdit}
+                                    onChange={(event) => updateRow(index, { is_preorder_item: event.target.checked })}
+                                  />
+                                  <span className="text-[10.5px] font-bold text-purple-700 dark:text-purple-300">PO</span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
                       </div>
                     ) : null}
                   </div>
