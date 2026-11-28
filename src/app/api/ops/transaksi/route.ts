@@ -1726,7 +1726,7 @@ export async function DELETE(req: NextRequest) {
     const admin = getSupabaseAdmin();
     const { data: order, error } = await admin
       .from("orders")
-      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, is_preorder")
+      .select("id, order_number, status, source, awb_no, jnt_order_id, stock_reserved, is_preorder, preorder_ready_at")
       .eq("order_number", orderNumber)
       .maybeSingle();
 
@@ -1758,14 +1758,19 @@ export async function DELETE(req: NextRequest) {
 
     const { data: items } = await admin
       .from("order_items")
-      .select("product_id, color, size, quantity")
+      .select("product_id, color, size, quantity, is_preorder_item")
       .eq("order_id", order.id);
 
     // Stok dikembalikan hanya kalau memang pernah terpotong dan belum dikembalikan pembatalan.
+    // Pesanan campuran (ready + PO) yang masih menunggu: baris PO (`is_preorder_item = true`)
+    // BELUM pernah dipotong stoknya, jadi tidak ikut "dikembalikan" — sama seperti `cancel-order.ts`.
     // Hasil pengembalian DIPERIKSA: kalau ada yang gagal, transaksi tidak boleh terhapus diam-diam sementara
     // stoknya hilang. Yang gagal tercatat di Anomali Stok.
     if (order.stock_reserved === true && order.status !== "dibatalkan") {
-      const { restored, failed } = await restoreItemsStrict(admin, items || [], order.id, "ops-transaksi-hapus");
+      const restorableItems = (items || []).filter(
+        (item) => item.is_preorder_item !== true || order.preorder_ready_at != null,
+      );
+      const { restored, failed } = await restoreItemsStrict(admin, restorableItems, order.id, "ops-transaksi-hapus");
       if (failed.length > 0) {
         if (restored.length > 0) {
           // Sebagian sudah kembali: tandai stok tidak lagi tertahan supaya percobaan Hapus berikutnya tidak
